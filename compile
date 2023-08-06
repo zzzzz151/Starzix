@@ -1,0 +1,1 @@
+g++ -O3 -g -std=c++17 z5.cpp -o z5 && g++ -O3 -g -std=c++17 test.cpp -o test
