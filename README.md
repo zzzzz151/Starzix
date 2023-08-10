@@ -30,6 +30,8 @@ Check extension
 
 Killer moves
 
+Late move reductions
+
 Null move pruning
 
 Futility pruning
