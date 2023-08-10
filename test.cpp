@@ -3,6 +3,7 @@
 #include <string>
 #include <chrono>
 #include <unordered_map>
+#include <cstring>
 
 using namespace std;
 using namespace chess;
@@ -143,7 +144,7 @@ void orderMoves(U64 boardKey, U64 indexInTT, Movelist &moves, int plyFromRoot)
     {
         if (TT[indexInTT].key == boardKey && moves[i] == TT[indexInTT].bestMove)
             moves[i].setScore(32000);
-        else if (board.isCapture(moves[i]) && moves[i].typeOf() != moves[i].CASTLING)
+        else if (board.isCapture(moves[i]))
         {
 
             PieceType captured = board.at<PieceType>(moves[i].to());
@@ -152,6 +153,8 @@ void orderMoves(U64 boardKey, U64 indexInTT, Movelist &moves, int plyFromRoot)
             moves[i].setScore(moveScore);
             // moves[i].setScore(SEECapture(moves[i]));
         }
+        else if (moves[i].typeOf() == moves[i].PROMOTION)
+            moves[i].setScore(-31980);
         else if (killerMoves[plyFromRoot][0] == moves[i] || killerMoves[plyFromRoot][1] == moves[i])
             moves[i].setScore(-31990);
         else
