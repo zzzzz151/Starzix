@@ -239,6 +239,7 @@ int negamax(int depth, int plyFromRoot, int alpha, int beta, bool doNull = true)
         return eval;
 
     // Null move pruning
+    /*
     if (!inCheck && plyFromRoot > 0 && doNull && depth >= 3)
     {
         bool hasAtLeast1Piece = board.pieces(PieceType::KNIGHT, board.sideToMove()) > 0 || board.pieces(PieceType::BISHOP, board.sideToMove()) > 0 || board.pieces(PieceType::ROOK, board.sideToMove()) > 0 || board.pieces(PieceType::QUEEN, board.sideToMove()) > 0;
@@ -251,6 +252,7 @@ int negamax(int depth, int plyFromRoot, int alpha, int beta, bool doNull = true)
                 return beta;
         }
     }
+    */
 
     orderMoves(boardKey, indexInTT, moves, plyFromRoot);
     int bestEval = NEG_INFINITY;
@@ -302,13 +304,46 @@ int negamax(int depth, int plyFromRoot, int alpha, int beta, bool doNull = true)
     return bestEval;
 }
 
+int aspiration(int depth, int score)
+{
+    int delta = 25;
+    int alpha = max(NEG_INFINITY, score - delta);
+    int beta = min(POS_INFINITY, score + delta);
+
+    while (true)
+    {
+        score = negamax(depth, 0, alpha, beta);
+        if (isTimeUp())
+            return 0;
+
+        if (score <= alpha)
+        {
+            beta = (alpha + beta) / 2;
+            alpha = max(NEG_INFINITY, alpha - delta);
+        }
+        else if (score >= beta)
+        {
+            beta = min(POS_INFINITY, beta + delta);
+        }
+        else
+            return score;
+
+        delta *= 2;
+    }
+}
+
 void iterativeDeepening(float millisecondsLeft)
 {
     start = chrono::steady_clock::now();
     timeForThisTurn = millisecondsLeft / (float)30;
 
     for (int iterationDepth = 1; !isTimeUp(); iterationDepth++)
-        negamax(iterationDepth, 0, NEG_INFINITY, POS_INFINITY);
+    {
+        if (iterationDepth < 7)
+            negamax(iterationDepth, 0, NEG_INFINITY, POS_INFINITY);
+        else
+            aspiration(iterationDepth, 0);
+    }
 }
 
 void position(vector<string> words)

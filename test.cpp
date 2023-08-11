@@ -238,6 +238,7 @@ int negamax(int depth, int plyFromRoot, int alpha, int beta, bool doNull = true)
         return eval;
 
     // Null move pruning
+    /*
     if (!inCheck && plyFromRoot > 0 && doNull && depth >= 3)
     {
         bool hasAtLeast1Piece = board.pieces(PieceType::KNIGHT, board.sideToMove()) > 0 || board.pieces(PieceType::BISHOP, board.sideToMove()) > 0 || board.pieces(PieceType::ROOK, board.sideToMove()) > 0 || board.pieces(PieceType::QUEEN, board.sideToMove()) > 0;
@@ -250,6 +251,7 @@ int negamax(int depth, int plyFromRoot, int alpha, int beta, bool doNull = true)
                 return beta;
         }
     }
+    */
 
     orderMoves(boardKey, indexInTT, moves, plyFromRoot);
     int bestEval = NEG_INFINITY;

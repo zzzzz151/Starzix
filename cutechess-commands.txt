@@ -1,5 +1,5 @@
 z5 vs test
-cutechess-cli -concurrency 8 -games 2 -rounds 100 -each tc=5+0.05 -engine cmd=./z5 dir=. proto=uci -engine cmd=./test dir=. proto=uci -openings file="openings-8ply-10k.pgn" format=pgn order=random plies=8 policy=default 
+cutechess-cli -concurrency 4 -games 2 -rounds 100 -each tc=5+0.05 -engine cmd=./z5 dir=. proto=uci -engine cmd=./test dir=. proto=uci -openings file="openings-8ply-10k.pgn" format=pgn order=random plies=8 policy=default 
 
 z5 vs z5
 cutechess-cli -concurrency 4 -games 2 -rounds 100 -each tc=5+0.05 -engine cmd=./z5 dir=. proto=uci -engine cmd=./z5 dir=. proto=uci -openings file="openings-8ply-10k.pgn" format=pgn order=random plies=8 policy=default 
