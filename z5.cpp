@@ -8,6 +8,7 @@
 using namespace std;
 using namespace chess;
 
+Move NULL_MOVE;
 const int POS_INFINITY = 9999999, NEG_INFINITY = -9999999;
 const PieceType PIECE_TYPES[7] = {PieceType::NONE, PieceType::PAWN, PieceType::KNIGHT, PieceType::BISHOP, PieceType::ROOK, PieceType::QUEEN, PieceType::KING};
 const int PIECE_VALUES[7] = {0, 100, 302, 320, 500, 900, 15000};
@@ -34,8 +35,8 @@ TTEntry TT[0x800000];
 int PIECE_PHASE[] = {0, 0, 1, 1, 2, 4, 0};
 U64 PSTs[] = {657614902731556116, 420894446315227099, 384592972471695068, 312245244820264086, 364876803783607569, 366006824779723922, 366006826859316500, 786039115310605588, 421220596516513823, 366011295806342421, 366006826859316436, 366006896669578452, 162218943720801556, 440575073001255824, 657087419459913430, 402634039558223453, 347425219986941203, 365698755348489557, 311382605788951956, 147850316371514514, 329107007234708689, 402598430990222677, 402611905376114006, 329415149680141460, 257053881053295759, 291134268204721362, 492947507967247313, 367159395376767958, 384021229732455700, 384307098409076181, 402035762391246293, 328847661003244824, 365712019230110867, 366002427738801364, 384307168185238804, 347996828560606484, 329692156834174227, 365439338182165780, 386018218798040211, 456959123538409047, 347157285952386452, 365711880701965780, 365997890021704981, 221896035722130452, 384289231362147538, 384307167128540502, 366006826859320596, 366006826876093716, 366002360093332756, 366006824694793492, 347992428333053139, 457508666683233428, 329723156783776785, 329401687190893908, 366002356855326100, 366288301819245844, 329978030930875600, 420621693221156179, 422042614449657239, 384602117564867863, 419505151144195476, 366274972473194070, 329406075454444949, 275354286769374224, 366855645423297932, 329991151972070674, 311105941360174354, 256772197720318995, 365993560693875923, 258219435335676691, 383730812414424149, 384601907111998612, 401758895947998613, 420612834953622999, 402607438610388375, 329978099633296596, 67159620133902};
 
-Move killerMoves[512][2];
 Board board;
+Move killerMoves[512][2];
 Move bestMoveRoot;
 float timeForThisTurn;
 chrono::steady_clock::time_point start;
@@ -239,7 +240,6 @@ int negamax(int depth, int plyFromRoot, int alpha, int beta, bool doNull = true)
         return eval;
 
     // Null move pruning
-    /*
     if (!inCheck && plyFromRoot > 0 && doNull && depth >= 3)
     {
         bool hasAtLeast1Piece = board.pieces(PieceType::KNIGHT, board.sideToMove()) > 0 || board.pieces(PieceType::BISHOP, board.sideToMove()) > 0 || board.pieces(PieceType::ROOK, board.sideToMove()) > 0 || board.pieces(PieceType::QUEEN, board.sideToMove()) > 0;
@@ -250,24 +250,38 @@ int negamax(int depth, int plyFromRoot, int alpha, int beta, bool doNull = true)
             board.unmakeNullMove();
             if (eval >= beta)
                 return beta;
+            if (isTimeUp())
+                return POS_INFINITY;
         }
     }
-    */
 
     orderMoves(boardKey, indexInTT, moves, plyFromRoot);
     int bestEval = NEG_INFINITY;
     Move bestMove;
+    bool pv = plyFromRoot == 0 || beta - alpha > 1;
     for (int i = 0; i < moves.size(); i++)
     {
         Move move = moves[i];
         board.makeMove(move);
         bool tactical = board.isCapture(move) || move.promotionType() == PieceType::QUEEN || board.inCheck();
-        int eval = 2147483647;
         bool shouldLmr = i >= 3 && !tactical && !inCheck;
+        int eval = 2147483647;
         if (shouldLmr)
             eval = -negamax(depth - 2, plyFromRoot + 1, -beta, -alpha);
         if (eval > alpha)
             eval = -negamax(depth - 1, plyFromRoot + 1, -beta, -alpha);
+        /*
+        if (i==0)
+            eval = -negamax(depth - 1, plyFromRoot + 1, -beta, -alpha);
+        else
+        {
+            bool tactical = board.isCapture(move) || move.promotionType() == PieceType::QUEEN || board.inCheck();
+            bool doLmr = i >= 3 && !tactical && !inCheck;
+            eval = -negamax(depth - 1 - doLmr, plyFromRoot + 1, -alpha-1, -alpha);
+            if (eval > alpha && (pv || doLmr)) // bool pv = plyFromRoot == 0 || beta - alpha > 1;
+                eval = -negamax(depth - 1, plyFromRoot + 1, -beta, -alpha);
+        }
+        */
         board.unmakeMove(move);
 
         if (eval > bestEval)
@@ -304,29 +318,36 @@ int negamax(int depth, int plyFromRoot, int alpha, int beta, bool doNull = true)
     return bestEval;
 }
 
-int aspiration(int depth, int score)
+Move bestMoveRootAsp;
+int delta = 15;
+int score;
+void aspiration(int maxDepth)
 {
-    int delta = 25;
     int alpha = max(NEG_INFINITY, score - delta);
     int beta = min(POS_INFINITY, score + delta);
+    int depth = maxDepth;
 
-    while (true)
+    while (!isTimeUp())
     {
         score = negamax(depth, 0, alpha, beta);
         if (isTimeUp())
-            return 0;
+            break;
 
-        if (score <= alpha)
+        if (score >= beta)
+        {
+            beta = min(beta + delta, POS_INFINITY);
+            bestMoveRootAsp = bestMoveRoot;
+            depth--;
+        }
+        else if (score <= alpha)
         {
             beta = (alpha + beta) / 2;
-            alpha = max(NEG_INFINITY, alpha - delta);
-        }
-        else if (score >= beta)
-        {
-            beta = min(POS_INFINITY, beta + delta);
+            alpha = max(alpha - delta, NEG_INFINITY);
+            depth = maxDepth;
         }
         else
-            return score;
+            break;
+            
 
         delta *= 2;
     }
@@ -336,13 +357,14 @@ void iterativeDeepening(float millisecondsLeft)
 {
     start = chrono::steady_clock::now();
     timeForThisTurn = millisecondsLeft / (float)30;
+    bestMoveRootAsp = NULL_MOVE;
 
     for (int iterationDepth = 1; !isTimeUp(); iterationDepth++)
     {
-        if (iterationDepth < 7)
-            negamax(iterationDepth, 0, NEG_INFINITY, POS_INFINITY);
+        if (iterationDepth < 6)
+            score = negamax(iterationDepth, 0, NEG_INFINITY, POS_INFINITY);
         else
-            aspiration(iterationDepth, 0);
+            aspiration(iterationDepth);
     }
 }
 
@@ -400,7 +422,7 @@ void uciLoop()
         {
             int millisecondsLeft = board.sideToMove() == Color::WHITE ? stoi(words[2]) : stoi(words[4]);
             iterativeDeepening(millisecondsLeft);
-            cout << "bestmove " + uci::moveToUci(bestMoveRoot) + "\n";
+            cout << "bestmove " + uci::moveToUci(bestMoveRootAsp == NULL_MOVE ? bestMoveRoot : bestMoveRootAsp) + "\n";
         }
     }
 }
