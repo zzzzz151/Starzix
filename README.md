@@ -1,4 +1,4 @@
-# z5 is a UCI compliant C++ chess engine
+# z5 is a UCI C++ chess engine
 
 # How to run
 
@@ -34,9 +34,9 @@ Late move reductions
 
 Null move pruning
 
-Futility pruning
-
 Reverse futility pruning
+
+Internal iterative reduction
 
 # Credits
 

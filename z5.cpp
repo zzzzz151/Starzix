@@ -170,6 +170,7 @@ int qSearch(int alpha, int beta, int plyFromRoot)
     int eval = evaluate();
     if (eval >= beta)
         return beta;
+
     if (alpha < eval)
         alpha = eval;
 
@@ -219,6 +220,10 @@ int negamax(int depth, int plyFromRoot, int alpha, int beta, bool doNull = true)
         if (TT[indexInTT].type == EXACT || (TT[indexInTT].type == LOWER_BOUND && TT[indexInTT].score >= beta) || (TT[indexInTT].type == UPPER_BOUND && TT[indexInTT].score <= alpha))
             return TT[indexInTT].score;
 
+    // Internal iterative reduction
+    if (TT[indexInTT].key != boardKey && depth > 3)
+        depth--;
+
     Movelist moves;
     movegen::legalmoves(moves, board);
 
@@ -254,16 +259,7 @@ int negamax(int depth, int plyFromRoot, int alpha, int beta, bool doNull = true)
     {
         Move move = moves[i];
         board.makeMove(move);
-        bool moveResultsInCheck = board.inCheck();
-        bool tactical = board.isCapture(move) || move.promotionType() == PieceType::QUEEN || moveResultsInCheck;
-
-        // Futility pruning
-        if (!inCheck && depth <= 7 && i > 0 && !tactical && evaluate() + 40 + 60 * depth <= alpha)
-        {
-            board.unmakeMove(move);
-            continue;
-        }
-
+        bool tactical = board.isCapture(move) || move.promotionType() == PieceType::QUEEN || board.inCheck();
         int eval = 2147483647;
         bool shouldLmr = i >= 3 && !tactical && !inCheck;
         if (shouldLmr)
