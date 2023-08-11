@@ -20,6 +20,8 @@ Negamax
 
 Alpha beta pruning
 
+Aspiration window
+
 Transposition table
 
 Move ordering (includes MVV-LVA)
