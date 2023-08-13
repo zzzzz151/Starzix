@@ -234,13 +234,17 @@ int negamax(int depth, int plyFromRoot, int alpha, int beta, bool doNull = true)
     if (depth <= 0)
         return qSearch(alpha, beta, plyFromRoot);
 
-    // Reverse futility pruning
-    int eval = evaluate();
-    if (!inCheck && depth <= 7 && eval >= beta + 80 * depth / 1.5f)
-        return eval;
+    // RFP (Reverse futility pruning)
+    if (plyFromRoot > 0 && depth <= 7 && !inCheck)
+    {
+        int eval = evaluate();
+        if (eval >= beta + 53 * depth)
+            return eval;
+    }
 
-    // Null move pruning
-    if (!inCheck && plyFromRoot > 0 && doNull && depth >= 3)
+    // NMP (Null move pruning)
+    bool pv = beta - alpha > 1;
+    if (plyFromRoot > 0 && depth >= 3 && !inCheck && doNull)
     {
         bool hasAtLeast1Piece = board.pieces(PieceType::KNIGHT, board.sideToMove()) > 0 || board.pieces(PieceType::BISHOP, board.sideToMove()) > 0 || board.pieces(PieceType::ROOK, board.sideToMove()) > 0 || board.pieces(PieceType::QUEEN, board.sideToMove()) > 0;
         if (hasAtLeast1Piece)
@@ -258,30 +262,25 @@ int negamax(int depth, int plyFromRoot, int alpha, int beta, bool doNull = true)
     orderMoves(boardKey, indexInTT, moves, plyFromRoot);
     int bestEval = NEG_INFINITY;
     Move bestMove;
-    bool pv = plyFromRoot == 0 || beta - alpha > 1;
     for (int i = 0; i < moves.size(); i++)
     {
         Move move = moves[i];
         board.makeMove(move);
-        bool tactical = board.isCapture(move) || move.promotionType() == PieceType::QUEEN || board.inCheck();
-        bool shouldLmr = i >= 3 && !tactical && !inCheck;
-        int eval = 2147483647;
-        if (shouldLmr)
-            eval = -negamax(depth - 2, plyFromRoot + 1, -beta, -alpha);
-        if (eval > alpha)
-            eval = -negamax(depth - 1, plyFromRoot + 1, -beta, -alpha);
-        /*
-        if (i==0)
+
+        // PVS (Principal variation search)
+        int eval;
+        if (i == 0)
             eval = -negamax(depth - 1, plyFromRoot + 1, -beta, -alpha);
         else
         {
+            // LMR (Late move reduction)
             bool tactical = board.isCapture(move) || move.promotionType() == PieceType::QUEEN || board.inCheck();
             bool doLmr = i >= 3 && !tactical && !inCheck;
-            eval = -negamax(depth - 1 - doLmr, plyFromRoot + 1, -alpha-1, -alpha);
-            if (eval > alpha && (pv || doLmr)) // bool pv = plyFromRoot == 0 || beta - alpha > 1;
+            eval = -negamax(depth - 1 - doLmr, plyFromRoot + 1, -alpha - 1, -alpha);
+            if (eval > alpha && (eval < beta || doLmr))
                 eval = -negamax(depth - 1, plyFromRoot + 1, -beta, -alpha);
         }
-        */
+
         board.unmakeMove(move);
 
         if (eval > bestEval)
@@ -319,10 +318,10 @@ int negamax(int depth, int plyFromRoot, int alpha, int beta, bool doNull = true)
 }
 
 Move bestMoveRootAsp;
-int delta = 15;
 int score;
 void aspiration(int maxDepth)
 {
+    int delta = 25;
     int alpha = max(NEG_INFINITY, score - delta);
     int beta = min(POS_INFINITY, score + delta);
     int depth = maxDepth;
@@ -347,7 +346,6 @@ void aspiration(int maxDepth)
         }
         else
             break;
-            
 
         delta *= 2;
     }
@@ -414,12 +412,11 @@ void uciLoop()
             cout << "readyok\n";
         else if (words[0] == "position")
         {
-            cout << "new pos" << endl;
-            memset(killerMoves, 0, sizeof(killerMoves));
             position(words);
         }
         else if (words[0] == "go")
         {
+            memset(killerMoves, 0, sizeof(killerMoves));
             int millisecondsLeft = board.sideToMove() == Color::WHITE ? stoi(words[2]) : stoi(words[4]);
             iterativeDeepening(millisecondsLeft);
             cout << "bestmove " + uci::moveToUci(bestMoveRootAsp == NULL_MOVE ? bestMoveRoot : bestMoveRootAsp) + "\n";

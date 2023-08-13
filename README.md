@@ -14,23 +14,19 @@ Evaluation with piece values and PSTs
 
 Iterative deepening
 
-Time management
-
-Negamax
-
-Alpha beta pruning
-
-Aspiration window
-
-Transposition table
-
-Move ordering (includes MVV-LVA)
+Negamax with alpha beta pruning and PVS
 
 Quiescence search
 
+Transposition table
+
+Move ordering (includes MVVLVA)
+
+Aspiration window
+
 Check extension
 
-Killer moves
+Killer moves (2 per ply)
 
 Late move reductions
 
@@ -39,6 +35,8 @@ Null move pruning
 Reverse futility pruning
 
 Internal iterative reduction
+
+Time management
 
 # Credits
 
