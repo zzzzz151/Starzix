@@ -8,8 +8,6 @@ In cutechess-commands.txt you'll find some cutechess-cli commands I use to test 
 
 # Features
 
-UCI compliant
-
 Evaluation with piece values and PSTs
 
 Iterative deepening
