@@ -417,7 +417,11 @@ void uciLoop()
         else if (words[0] == "go")
         {
             memset(killerMoves, 0, sizeof(killerMoves));
-            int millisecondsLeft = board.sideToMove() == Color::WHITE ? stoi(words[2]) : stoi(words[4]);
+            int millisecondsLeft = 60000;
+            if (words[1] == "wtime")
+                millisecondsLeft = board.sideToMove() == Color::WHITE ? stoi(words[2]) : stoi(words[4]);
+            else if (words[1] == "movetime")
+                millisecondsLeft = stoi(words[2]);
             iterativeDeepening(millisecondsLeft);
             cout << "bestmove " + uci::moveToUci(bestMoveRootAsp == NULL_MOVE ? bestMoveRoot : bestMoveRootAsp) + "\n";
         }
