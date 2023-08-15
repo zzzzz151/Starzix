@@ -2,7 +2,7 @@
 
 # How to compile
 
-```make z5``` to create the 'z5' executable
+```make``` to create the 'z5' binary
 
 # Features
 

@@ -1,26 +1,17 @@
-// g++  -std=c++2a main.cpp -o main
+#ifndef UCI_HPP
+#define UCI_HPP
 
 #include "chess.hpp"
-#include <iostream>
-#include <cstdlib> // For rand() function
-#include <ctime>   // For seeding rand() with current time
-#include <string>
-
-using namespace std;
+#include "search.hpp"
 using namespace chess;
+using namespace std;
 
-Board board;
-Color color, enemyColor;
-
-void position(vector<string> words)
+inline void position(vector<string> words)
 {
-    color = Color::WHITE;
-    enemyColor = Color::BLACK;
-
     int movesTokenIndex = -1;
     if (words[1] == "startpos")
     {
-        board = Board("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        board = Board(STARTPOS);
         movesTokenIndex = 2;
     }
     else if (words[1] == "fen")
@@ -33,20 +24,14 @@ void position(vector<string> words)
     }
 
     for (int i = movesTokenIndex + 1; i < words.size(); i++)
-    {
-        // cout << "making move " + words[i] << endl;
         board.makeMove(uci::uciToMove(board, words[i]));
-        Color temp = color;
-        color = enemyColor;
-        enemyColor = temp;
-    }
 }
 
-void uciLoop()
+inline void uciLoop()
 {
     string received;
     getline(cin, received);
-    cout << "id name z5\n";
+    cout << "id name test\n";
     cout << "id author zzzzz\n";
     cout << "uciok\n";
 
@@ -61,23 +46,26 @@ void uciLoop()
 
         if (received == "quit" || !cin.good())
             break;
+        else if (received == "ucinewgame")
+            memset(TT, 0, sizeof(TT)); // Clear TT
         else if (received == "isready")
             cout << "readyok\n";
         else if (words[0] == "position")
+        {
             position(words);
+        }
         else if (words[0] == "go")
         {
-            Movelist moves;
-            movegen::legalmoves(moves, board);
-            int randomIndex = rand() % moves.size();
-            board.makeMove(moves[randomIndex]);
-            cout << "bestmove " + uci::moveToUci(moves[randomIndex]) + "\n";
+            memset(killerMoves, 0, sizeof(killerMoves));
+            int millisecondsLeft = 60000;
+            if (words[1] == "wtime")
+                millisecondsLeft = board.sideToMove() == Color::WHITE ? stoi(words[2]) : stoi(words[4]);
+            else if (words[1] == "movetime")
+                millisecondsLeft = stoi(words[2]);
+            iterativeDeepening(millisecondsLeft);
+            cout << "bestmove " + uci::moveToUci(bestMoveRootAsp == NULL_MOVE ? bestMoveRoot : bestMoveRootAsp) + "\n";
         }
     }
 }
 
-int main()
-{
-    uciLoop();
-    return 0;
-}
+#endif

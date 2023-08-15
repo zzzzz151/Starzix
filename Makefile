@@ -1,26 +1,24 @@
 CC := g++
 CFLAGS := -O3 -g -std=c++17
 
-# Directories
-SRC_DIR := src
-
 # Source files and object files
-SRCS := $(wildcard $(SRC_DIR)/*.cpp)
-OBJS := $(patsubst $(SRC_DIR)/%.cpp, %.o, $(SRCS))
-
-# Executables
-EXECUTABLES := z5 test
+SRCS := $(wildcard src/*.cpp)
+OBJS := $(patsubst src/%.cpp, %.o, $(SRCS))
 
 # Default target
-all: $(EXECUTABLES)
+all: z5
 
-z5: $(SRC_DIR)/main.cpp
+z5: src/main.cpp
 	$(CC) $(CFLAGS) $< -o $@
 
-test: $(SRC_DIR)/test.cpp
+# Source files and object files
+SRCS := $(wildcard src-test/*.cpp)
+OBJS := $(patsubst src-test/%.cpp, %.o, $(SRCS))
+
+test: src-test/main.cpp
 	$(CC) $(CFLAGS) $< -o $@
 
 clean:
-	rm -f $(EXECUTABLES)
+	rm -f z5 test
 
 .PHONY: all clean
