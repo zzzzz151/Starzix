@@ -1,0 +1,262 @@
+#ifndef SEARCH_HPP
+#define SEARCH_HPP
+
+#include <chrono>
+#include <climits>
+#include "chess.hpp"
+#include "eval.hpp"
+#include "see.hpp"
+using namespace chess;
+using namespace std;
+
+int POS_INFINITY = 9999999, NEG_INFINITY = -9999999;
+Move NULL_MOVE;
+
+char EXACT = 1, LOWER_BOUND = 2, UPPER_BOUND = 3;
+struct TTEntry
+{
+    U64 key;
+    int score;
+    Move bestMove;
+    int depth;
+    char type;
+};
+TTEntry TT[0x800000];
+
+chrono::steady_clock::time_point start;
+float timeForThisTurn;
+extern Board board;
+Move bestMoveRoot, bestMoveRootAsp;
+int score;
+Move killerMoves[512][2];
+
+inline bool isTimeUp()
+{
+    return (chrono::steady_clock::now() - start) / std::chrono::milliseconds(1) >= timeForThisTurn;
+}
+
+inline void orderMoves(U64 boardKey, U64 indexInTT, Movelist &moves, int plyFromRoot)
+{
+    for (int i = 0; i < moves.size(); i++)
+    {
+        if (TT[indexInTT].key == boardKey && moves[i] == TT[indexInTT].bestMove)
+            moves[i].setScore(INT_MAX);
+        else if (board.isCapture(moves[i]))
+        {
+            PieceType captured = board.at<PieceType>(moves[i].to());
+            PieceType capturing = board.at<PieceType>(moves[i].from());
+            int moveScore = 100 * PIECE_VALUES[(int)captured] - PIECE_VALUES[(int)capturing]; // MVVLVA
+            moveScore += SEE(moves[i]) ? 100'000'000 : -850'000'000;
+            moves[i].setScore(moveScore);
+        }
+        else if (moves[i].typeOf() == moves[i].PROMOTION)
+            moves[i].setScore(-400'000'000);
+        else if (killerMoves[plyFromRoot][0] == moves[i] || killerMoves[plyFromRoot][1] == moves[i])
+            moves[i].setScore(-700'000'000);
+        else
+            moves[i].setScore(-1'000'000'000);
+    }
+    moves.sort();
+}
+
+inline int qSearch(int alpha, int beta, int plyFromRoot)
+{
+    // Quiescence saarch: search capture moves until a 'quiet' position is reached
+
+    int eval = evaluate();
+    if (eval >= beta)
+        return beta;
+
+    if (alpha < eval)
+        alpha = eval;
+
+    Movelist captures;
+    movegen::legalmoves<MoveGenType::CAPTURE>(captures, board);
+    U64 boardKey = board.zobrist();
+    U64 indexInTT = 0x7FFFFF & boardKey;
+    orderMoves(boardKey, indexInTT, captures, plyFromRoot);
+
+    for (const auto &capture : captures)
+    {
+        board.makeMove(capture);
+        int score = -qSearch(-beta, -alpha, plyFromRoot + 1);
+        board.unmakeMove(capture);
+
+        if (score >= beta)
+            return score; // in CPW: return beta;
+        if (score > alpha)
+            alpha = score;
+    }
+
+    return alpha;
+}
+
+inline void savePotentialKillerMove(Move move, int plyFromRoot)
+{
+    if (!board.isCapture(move) && move != killerMoves[plyFromRoot][0])
+    {
+        killerMoves[plyFromRoot][1] = killerMoves[plyFromRoot][0];
+        killerMoves[plyFromRoot][0] = move;
+    }
+}
+
+inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull = true)
+{
+    if (plyFromRoot > 0 && board.isRepetition())
+        return 0;
+
+    int originalAlpha = alpha;
+    bool inCheck = board.inCheck();
+    if (inCheck)
+        depth++;
+
+    U64 boardKey = board.zobrist();
+    U64 indexInTT = 0x7FFFFF & boardKey;
+    if (plyFromRoot > 0 && TT[indexInTT].key == boardKey && TT[indexInTT].depth >= depth)
+        if (TT[indexInTT].type == EXACT || (TT[indexInTT].type == LOWER_BOUND && TT[indexInTT].score >= beta) || (TT[indexInTT].type == UPPER_BOUND && TT[indexInTT].score <= alpha))
+            return TT[indexInTT].score;
+
+    // Internal iterative reduction
+    if (TT[indexInTT].key != boardKey && depth > 3)
+        depth--;
+
+    Movelist moves;
+    movegen::legalmoves(moves, board);
+
+    if (moves.empty())
+        return inCheck ? NEG_INFINITY + plyFromRoot : 0; // else it's draw
+
+    if (depth <= 0)
+        return qSearch(alpha, beta, plyFromRoot);
+
+    // RFP (Reverse futility pruning)
+    if (plyFromRoot > 0 && depth <= 7 && !inCheck)
+    {
+        int eval = evaluate();
+        if (eval >= beta + 53 * depth)
+            return eval;
+    }
+
+    // NMP (Null move pruning)
+    bool pv = beta - alpha > 1;
+    if (plyFromRoot > 0 && depth >= 3 && !inCheck && doNull)
+    {
+        bool hasAtLeast1Piece = board.pieces(PieceType::KNIGHT, board.sideToMove()) > 0 || board.pieces(PieceType::BISHOP, board.sideToMove()) > 0 || board.pieces(PieceType::ROOK, board.sideToMove()) > 0 || board.pieces(PieceType::QUEEN, board.sideToMove()) > 0;
+        if (hasAtLeast1Piece)
+        {
+            board.makeNullMove();
+            int eval = -search(depth - 3, plyFromRoot + 1, -beta, -alpha, false);
+            board.unmakeNullMove();
+            if (eval >= beta)
+                return beta;
+            if (isTimeUp())
+                return POS_INFINITY;
+        }
+    }
+
+    orderMoves(boardKey, indexInTT, moves, plyFromRoot);
+    int bestEval = NEG_INFINITY;
+    Move bestMove;
+    for (int i = 0; i < moves.size(); i++)
+    {
+        Move move = moves[i];
+        board.makeMove(move);
+
+        // PVS (Principal variation search)
+        int eval;
+        if (i == 0)
+            eval = -search(depth - 1, plyFromRoot + 1, -beta, -alpha);
+        else
+        {
+            // LMR (Late move reduction)
+            bool tactical = board.isCapture(move) || move.promotionType() == PieceType::QUEEN || board.inCheck();
+            bool doLMR = i >= 3 && !tactical && !inCheck;
+            eval = -search(depth - 1 - doLMR, plyFromRoot + 1, -alpha - 1, -alpha);
+            if (eval > alpha && (eval < beta || doLMR))
+                eval = -search(depth - 1, plyFromRoot + 1, -beta, -alpha);
+        }
+
+        board.unmakeMove(move);
+
+        if (eval > bestEval)
+        {
+            bestEval = eval;
+            bestMove = move;
+            if (plyFromRoot == 0)
+                bestMoveRoot = move;
+
+            if (bestEval > alpha)
+                alpha = bestEval;
+            if (alpha >= beta)
+            {
+                savePotentialKillerMove(move, plyFromRoot);
+                break;
+            }
+        }
+
+        if (isTimeUp())
+            return POS_INFINITY;
+    }
+
+    TT[indexInTT].key = boardKey;
+    TT[indexInTT].depth = depth;
+    TT[indexInTT].score = bestEval;
+    TT[indexInTT].bestMove = bestMove;
+    if (bestEval <= originalAlpha)
+        TT[indexInTT].type = UPPER_BOUND;
+    else if (bestEval >= beta)
+        TT[indexInTT].type = LOWER_BOUND;
+    else
+        TT[indexInTT].type = EXACT;
+
+    return bestEval;
+}
+
+inline void aspiration(int maxDepth)
+{
+    int delta = 25;
+    int alpha = max(NEG_INFINITY, score - delta);
+    int beta = min(POS_INFINITY, score + delta);
+    int depth = maxDepth;
+
+    while (!isTimeUp())
+    {
+        score = search(depth, 0, alpha, beta);
+        if (isTimeUp())
+            break;
+
+        if (score >= beta)
+        {
+            beta = min(beta + delta, POS_INFINITY);
+            bestMoveRootAsp = bestMoveRoot;
+            depth--;
+        }
+        else if (score <= alpha)
+        {
+            beta = (alpha + beta) / 2;
+            alpha = max(alpha - delta, NEG_INFINITY);
+            depth = maxDepth;
+        }
+        else
+            break;
+
+        delta *= 2;
+    }
+}
+
+inline void iterativeDeepening(float millisecondsLeft)
+{
+    start = chrono::steady_clock::now();
+    timeForThisTurn = millisecondsLeft / (float)30;
+    bestMoveRootAsp = NULL_MOVE;
+
+    for (int iterationDepth = 1; !isTimeUp(); iterationDepth++)
+    {
+        if (iterationDepth < 6)
+            score = search(iterationDepth, 0, NEG_INFINITY, POS_INFINITY);
+        else
+            aspiration(iterationDepth);
+    }
+}
+
+#endif

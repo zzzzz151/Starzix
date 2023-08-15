@@ -1,10 +1,8 @@
 # z5 is a UCI C++ chess engine
 
-# How to run
+# How to compile
 
-```./compile``` to create the 'z5' executable of z5.cpp
-
-In cutechess-commands.txt you'll find some cutechess-cli commands I use to test the engine
+```make z5``` to create the 'z5' executable
 
 # Features
 
@@ -18,7 +16,7 @@ Quiescence search
 
 Transposition table
 
-Move ordering (includes MVVLVA)
+Move ordering with SEE and MVVLVA
 
 Aspiration window
 
