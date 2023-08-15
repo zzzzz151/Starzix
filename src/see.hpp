@@ -27,7 +27,6 @@ inline int gain(Board board, Move move)
     return score;
 }
 
-
 inline PieceType popLeastValuable(Board board, Bitboard &occ, Bitboard attackers, Color color)
 {
     Bitboard bb = attackers & board.pieces(PieceType::PAWN, color);

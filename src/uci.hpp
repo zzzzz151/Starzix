@@ -1,6 +1,7 @@
 #ifndef UCI_HPP
 #define UCI_HPP
 
+#include <cstring> // for memset()
 #include "chess.hpp"
 #include "search.hpp"
 using namespace chess;
