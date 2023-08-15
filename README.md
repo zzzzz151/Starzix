@@ -2,7 +2,13 @@
 
 # How to compile
 
+**Linux**
+
 ```make``` to create the 'z5' binary
+
+**Windows**
+
+```g++ -O3 -std=c++17 src/main.cpp -o z5.exe```
 
 # Features
 
