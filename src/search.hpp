@@ -9,10 +9,10 @@
 using namespace chess;
 using namespace std;
 
-int POS_INFINITY = 9999999, NEG_INFINITY = -9999999;
+const int POS_INFINITY = 9999999, NEG_INFINITY = -9999999;
 Move NULL_MOVE;
 
-char EXACT = 1, LOWER_BOUND = 2, UPPER_BOUND = 3;
+const char EXACT = 1, LOWER_BOUND = 2, UPPER_BOUND = 3;
 struct TTEntry
 {
     U64 key;
