@@ -1,9 +1,12 @@
 .vscode
 .vscode/
+**/.vscode
+**/.vscode/
 
 .ipynb_checkpoints
 .ipynb_checkpoints/
-
+**/.ipynb_checkpoints
+**/.ipynb_checkpoints/
 
 z5.exe
 z5
@@ -15,10 +18,6 @@ games.txt
 games.pgn
 debug.txt
 
-random_evals.csv
-tactic_evals.csv
-chessData.csv
-
-NN
-NN/*
-NN/**
+**/random_evals.csv
+**/tactic_evals.csv
+**/chessData.csv

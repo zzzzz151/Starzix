@@ -2,7 +2,6 @@
 #define SEE_HPP
 
 #include "chess.hpp"
-#include "eval.hpp"
 using namespace chess;
 using namespace std;
 
@@ -17,16 +16,15 @@ inline int gain(Board board, Move move)
         return 0;
 
     if (move.typeOf() == move.ENPASSANT)
-        return PIECE_VALUES[1];
+        return PIECE_VALUES[0];
 
     int score = PIECE_VALUES[(int)board.at<PieceType>(move.to())];
 
     if (move.typeOf() == move.PROMOTION)
-        score += PIECE_VALUES[(int)move.promotionType()] - PIECE_VALUES[1]; // gain promotion, lose the pawn
+        score += PIECE_VALUES[(int)move.promotionType()] - PIECE_VALUES[0]; // gain promotion, lose the pawn
 
     return score;
 }
-
 
 inline PieceType popLeastValuable(Board board, Bitboard &occ, Bitboard attackers, Color color)
 {

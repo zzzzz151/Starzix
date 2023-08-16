@@ -244,19 +244,21 @@ inline void aspiration(int maxDepth)
     }
 }
 
-inline void iterativeDeepening(float millisecondsLeft)
+inline int iterativeDeepening(float millisecondsLeft)
 {
     start = chrono::steady_clock::now();
     timeForThisTurn = millisecondsLeft / (float)30;
     bestMoveRootAsp = NULL_MOVE;
-
-    for (int iterationDepth = 1; !isTimeUp(); iterationDepth++)
+    int iterationDepth = 1;
+    while (!isTimeUp())
     {
         if (iterationDepth < 6)
             score = search(iterationDepth, 0, NEG_INFINITY, POS_INFINITY);
         else
             aspiration(iterationDepth);
+        iterationDepth++;
     }
+    return iterationDepth;
 }
 
 #endif

@@ -12,7 +12,7 @@
 
 # Features
 
-Evaluation with piece values and PSTs
+PeSTO's tapered evaluation with piece values and PSTs
 
 Iterative deepening
 

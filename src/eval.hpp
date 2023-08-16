@@ -4,9 +4,11 @@
 #include "chess.hpp"
 using namespace chess;
 
-PieceType PIECE_TYPES[7] = {PieceType::PAWN, PieceType::KNIGHT, PieceType::BISHOP, PieceType::ROOK, PieceType::QUEEN, PieceType::KING, PieceType::NONE};
 int PIECE_VALUES[7] = {100, 302, 320, 500, 900, 15000, 0};
-int PIECE_PHASE[] = {0, 1, 1, 2, 4, 0, 0};
+
+PieceType PIECE_TYPES_FOR_EVAL[7] = {PieceType::NONE, PieceType::PAWN, PieceType::KNIGHT, PieceType::BISHOP, PieceType::ROOK, PieceType::QUEEN, PieceType::KING};
+int PIECE_VALUES_FOR_EVAL[7] = {0, 100, 302, 320, 500, 900, 15000};
+int PIECE_PHASE_FOR_EVAL[] = {0, 0, 1, 1, 2, 4, 0};
 U64 PSTs[] = {657614902731556116, 420894446315227099, 384592972471695068, 312245244820264086,
               364876803783607569, 366006824779723922, 366006826859316500, 786039115310605588,
               421220596516513823, 366011295806342421, 366006826859316436, 366006896669578452,
@@ -38,16 +40,16 @@ inline int evaluate(Board board)
 
     for (bool stm : {true, false})
     {
-        for (int i = 0; i <= 5; i++)
+        for (int i = 1; i <= 6; i++)
         {
             int ind;
-            Bitboard mask = board.pieces(PIECE_TYPES[i], stm ? Color::WHITE : Color::BLACK);
+            Bitboard mask = board.pieces(PIECE_TYPES_FOR_EVAL[i], stm ? Color::WHITE : Color::BLACK);
             while (mask != 0)
             {
-                phase += PIECE_PHASE[i];
-                ind = 128 * i + builtin::poplsb(mask) ^ (stm ? 56 : 0);
-                mg += getPSTValue(ind) + PIECE_VALUES[i];
-                eg += getPSTValue(ind + 64) + PIECE_VALUES[i];
+                phase += PIECE_PHASE_FOR_EVAL[i];
+                ind = 128 * (i - 1) + builtin::poplsb(mask) ^ (stm ? 56 : 0);
+                mg += getPSTValue(ind) + PIECE_VALUES_FOR_EVAL[i];
+                eg += getPSTValue(ind + 64) + PIECE_VALUES_FOR_EVAL[i];
             }
         }
 

@@ -63,7 +63,8 @@ inline void uciLoop()
                 millisecondsLeft = board.sideToMove() == Color::WHITE ? stoi(words[2]) : stoi(words[4]);
             else if (words[1] == "movetime")
                 millisecondsLeft = stoi(words[2]);
-            iterativeDeepening(millisecondsLeft);
+            int depth = iterativeDeepening(millisecondsLeft);
+            cout << "depth " << depth << endl;
             cout << "bestmove " + uci::moveToUci(bestMoveRootAsp == NULL_MOVE ? bestMoveRoot : bestMoveRootAsp) + "\n";
         }
     }

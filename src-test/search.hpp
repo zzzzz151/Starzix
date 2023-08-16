@@ -4,15 +4,15 @@
 #include <chrono>
 #include <climits>
 #include "chess.hpp"
-#include "eval.hpp"
+#include "nn.hpp"
 #include "see.hpp"
 using namespace chess;
 using namespace std;
 
-int POS_INFINITY = 9999999, NEG_INFINITY = -9999999;
+const int POS_INFINITY = 9999999, NEG_INFINITY = -9999999;
 Move NULL_MOVE;
 
-char EXACT = 1, LOWER_BOUND = 2, UPPER_BOUND = 3;
+const char EXACT = 1, LOWER_BOUND = 2, UPPER_BOUND = 3;
 struct TTEntry
 {
     U64 key;
@@ -244,19 +244,21 @@ inline void aspiration(int maxDepth)
     }
 }
 
-inline void iterativeDeepening(float millisecondsLeft)
+inline int iterativeDeepening(float millisecondsLeft)
 {
     start = chrono::steady_clock::now();
     timeForThisTurn = millisecondsLeft / (float)30;
     bestMoveRootAsp = NULL_MOVE;
-
-    for (int iterationDepth = 1; !isTimeUp(); iterationDepth++)
+    int iterationDepth = 1;
+    while (!isTimeUp())
     {
         if (iterationDepth < 6)
             score = search(iterationDepth, 0, NEG_INFINITY, POS_INFINITY);
         else
             aspiration(iterationDepth);
+        iterationDepth++;
     }
+    return iterationDepth;
 }
 
 #endif
