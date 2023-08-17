@@ -4,7 +4,7 @@
 #include <chrono>
 #include <climits>
 #include "chess.hpp"
-#include "nn.hpp"
+#include "eval.hpp"
 #include "see.hpp"
 using namespace chess;
 using namespace std;
@@ -130,7 +130,8 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
         return qSearch(alpha, beta, plyFromRoot);
 
     // RFP (Reverse futility pruning)
-    if (plyFromRoot > 0 && depth <= 7 && !inCheck)
+    bool pv = beta - alpha > 1;
+    if (!pv && plyFromRoot > 0 && depth <= 7 && !inCheck)
     {
         int eval = evaluate(board);
         if (eval >= beta + 53 * depth)
@@ -138,8 +139,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
     }
 
     // NMP (Null move pruning)
-    bool pv = beta - alpha > 1;
-    if (plyFromRoot > 0 && depth >= 3 && !inCheck && doNull)
+    if (!pv && plyFromRoot > 0 && depth >= 3 && !inCheck && doNull)
     {
         bool hasAtLeast1Piece = board.pieces(PieceType::KNIGHT, board.sideToMove()) > 0 || board.pieces(PieceType::BISHOP, board.sideToMove()) > 0 || board.pieces(PieceType::ROOK, board.sideToMove()) > 0 || board.pieces(PieceType::QUEEN, board.sideToMove()) > 0;
         if (hasAtLeast1Piece)
