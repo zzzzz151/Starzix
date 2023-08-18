@@ -42,7 +42,7 @@ inline int *scoreMoves(Movelist &moves, U64 boardKey, U64 indexInTT, int plyFrom
     {
         if (TT[indexInTT].key == boardKey && moves[i] == TT[indexInTT].bestMove)
             scores[i] = INT_MAX;
-        if (board.isCapture(moves[i]))
+        else if (board.isCapture(moves[i]))
         {
             PieceType captured = board.at<PieceType>(moves[i].to());
             PieceType capturing = board.at<PieceType>(moves[i].from());
@@ -72,19 +72,23 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
     if (alpha < eval)
         alpha = eval;
 
-    Movelist captures;
-    movegen::legalmoves<MoveGenType::CAPTURE>(captures, board);
+    Movelist moves;
+    movegen::legalmoves<MoveGenType::CAPTURE>(moves, board);
     U64 boardKey = board.zobrist();
     U64 indexInTT = 0x7FFFFF & boardKey;
-    int *scores = scoreMoves(captures, boardKey, indexInTT, plyFromRoot);
+    int *scores = scoreMoves(moves, boardKey, indexInTT, plyFromRoot);
 
-    for (int i = 0; i < captures.size(); i++)
+    for (int i = 0; i < moves.size(); i++)
     {
-        // Incrementally sort moves
-        for (int j = i + 1; j < captures.size(); j++)
+        for (int j = i + 1; j < moves.size(); j++)
+        {
             if (scores[j] > scores[i])
-                (scores[i], scores[j], captures[i], captures[j]) = (scores[j], scores[i], captures[j], captures[i]);
-        Move capture = captures[i];
+            {
+                swap(moves[i], moves[j]);
+                swap(scores[i], scores[j]);
+            }
+        }
+        Move capture = moves[i];
 
         board.makeMove(capture);
         int score = -qSearch(-beta, -alpha, plyFromRoot + 1);
@@ -167,12 +171,15 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
     Move bestMove;
     for (int i = 0; i < moves.size(); i++)
     {
-        // Incrementally sort moves
         for (int j = i + 1; j < moves.size(); j++)
+        {
             if (scores[j] > scores[i])
-                (scores[i], scores[j], moves[i], moves[j]) = (scores[j], scores[i], moves[j], moves[i]);
+            {
+                swap(moves[i], moves[j]);
+                swap(scores[i], scores[j]);
+            }
+        }
         Move move = moves[i];
-
         board.makeMove(move);
 
         // PVS (Principal variation search)
