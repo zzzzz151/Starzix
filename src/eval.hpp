@@ -34,7 +34,7 @@ inline int getPSTValue(int psq)
     return (int)(((PSTs[psq / 10] >> (6 * (psq % 10))) & 63) - 20) * 8;
 }
 
-inline int evaluate(Board board)
+inline int evaluate(const Board &board)
 {
     int mg = 0, eg = 0, phase = 0;
 

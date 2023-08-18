@@ -10,7 +10,7 @@ inline int squareBit(Square sq)
     return U64(1) << (int)sq;
 }
 
-inline int gain(Board board, Move move)
+inline int gain(const Board &board, Move &move)
 {
     if (move.typeOf() == move.CASTLING)
         return 0;
@@ -26,7 +26,7 @@ inline int gain(Board board, Move move)
     return score;
 }
 
-inline PieceType popLeastValuable(Board board, Bitboard &occ, Bitboard attackers, Color color)
+inline PieceType popLeastValuable(const Board &board, Bitboard &occ, Bitboard attackers, Color color)
 {
     Bitboard bb = attackers & board.pieces(PieceType::PAWN, color);
     if (bb > 0)
@@ -74,7 +74,7 @@ inline PieceType popLeastValuable(Board board, Bitboard &occ, Bitboard attackers
 }
 
 // SEE (static exchange evaluation)
-inline bool SEE(Board board, Move move, int threshold = 0)
+inline bool SEE(const Board &board, Move &move, int threshold = 0)
 {
     int score = gain(board, move) - threshold;
     if (score < 0)

@@ -7,7 +7,7 @@
 using namespace chess;
 using namespace std;
 
-inline void position(vector<string> words)
+inline void position(vector<string> &words)
 {
     int movesTokenIndex = -1;
     if (words[1] == "startpos")
@@ -32,7 +32,7 @@ inline void uciLoop()
 {
     string received;
     getline(cin, received);
-    cout << "id name test\n";
+    cout << "id name IncrSortMoves\n";
     cout << "id author zzzzz\n";
     cout << "uciok\n";
 
@@ -64,7 +64,7 @@ inline void uciLoop()
             else if (words[1] == "movetime")
                 millisecondsLeft = stoi(words[2]);
             int depth = iterativeDeepening(millisecondsLeft);
-            cout << "depth " << depth << endl;
+            //cout << "depth " << depth << endl;
             cout << "bestmove " + uci::moveToUci(bestMoveRootAsp == NULL_MOVE ? bestMoveRoot : bestMoveRootAsp) + "\n";
         }
     }

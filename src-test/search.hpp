@@ -35,28 +35,30 @@ inline bool isTimeUp()
     return (chrono::steady_clock::now() - start) / std::chrono::milliseconds(1) >= timeForThisTurn;
 }
 
-inline void orderMoves(U64 boardKey, U64 indexInTT, Movelist &moves, int plyFromRoot)
+inline int *scoreMoves(Movelist &moves, U64 boardKey, U64 indexInTT, int plyFromRoot)
 {
+    int *scores = new int[moves.size()];
     for (int i = 0; i < moves.size(); i++)
     {
         if (TT[indexInTT].key == boardKey && moves[i] == TT[indexInTT].bestMove)
-            moves[i].setScore(INT_MAX);
-        else if (board.isCapture(moves[i]))
+            scores[i] = INT_MAX;
+        if (board.isCapture(moves[i]))
         {
             PieceType captured = board.at<PieceType>(moves[i].to());
             PieceType capturing = board.at<PieceType>(moves[i].from());
             int moveScore = 100 * PIECE_VALUES[(int)captured] - PIECE_VALUES[(int)capturing]; // MVVLVA
             moveScore += SEE(board, moves[i]) ? 100'000'000 : -850'000'000;
-            moves[i].setScore(moveScore);
+            scores[i] = moveScore;
         }
         else if (moves[i].typeOf() == moves[i].PROMOTION)
-            moves[i].setScore(-400'000'000);
+            scores[i] = -400'000'000;
         else if (killerMoves[plyFromRoot][0] == moves[i] || killerMoves[plyFromRoot][1] == moves[i])
-            moves[i].setScore(-700'000'000);
+            scores[i] = -700'000'000;
         else
-            moves[i].setScore(-1'000'000'000);
+            scores[i] = -1'000'000'000;
     }
-    moves.sort();
+
+    return scores;
 }
 
 inline int qSearch(int alpha, int beta, int plyFromRoot)
@@ -74,10 +76,16 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
     movegen::legalmoves<MoveGenType::CAPTURE>(captures, board);
     U64 boardKey = board.zobrist();
     U64 indexInTT = 0x7FFFFF & boardKey;
-    orderMoves(boardKey, indexInTT, captures, plyFromRoot);
+    int *scores = scoreMoves(captures, boardKey, indexInTT, plyFromRoot);
 
-    for (const auto &capture : captures)
+    for (int i = 0; i < captures.size(); i++)
     {
+        // Incrementally sort moves
+        for (int j = i + 1; j < captures.size(); j++)
+            if (scores[j] > scores[i])
+                (scores[i], scores[j], captures[i], captures[j]) = (scores[j], scores[i], captures[j], captures[i]);
+        Move capture = captures[i];
+
         board.makeMove(capture);
         int score = -qSearch(-beta, -alpha, plyFromRoot + 1);
         board.unmakeMove(capture);
@@ -154,12 +162,17 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
         }
     }
 
-    orderMoves(boardKey, indexInTT, moves, plyFromRoot);
+    int *scores = scoreMoves(moves, boardKey, indexInTT, plyFromRoot);
     int bestEval = NEG_INFINITY;
     Move bestMove;
     for (int i = 0; i < moves.size(); i++)
     {
+        // Incrementally sort moves
+        for (int j = i + 1; j < moves.size(); j++)
+            if (scores[j] > scores[i])
+                (scores[i], scores[j], moves[i], moves[j]) = (scores[j], scores[i], moves[j], moves[i]);
         Move move = moves[i];
+
         board.makeMove(move);
 
         // PVS (Principal variation search)
