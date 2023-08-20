@@ -27,7 +27,7 @@ chrono::steady_clock::time_point start;
 float timeForThisTurn;
 Board board;
 Move bestMoveRoot, bestMoveRootAsp;
-int score;
+int globalScore;
 Move killerMoves[512][2];
 
 inline bool isTimeUp()
@@ -35,7 +35,7 @@ inline bool isTimeUp()
     return (chrono::steady_clock::now() - start) / std::chrono::milliseconds(1) >= timeForThisTurn;
 }
 
-inline void orderMoves(U64 boardKey, U64 indexInTT, Movelist &moves, int plyFromRoot)
+inline void orderMoves(Movelist &moves, U64 boardKey, U64 indexInTT, int plyFromRoot)
 {
     for (int i = 0; i < moves.size(); i++)
     {
@@ -65,7 +65,7 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
 
     int eval = evaluate(board);
     if (eval >= beta)
-        return beta;
+        return eval;
 
     if (alpha < eval)
         alpha = eval;
@@ -74,7 +74,8 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
     movegen::legalmoves<MoveGenType::CAPTURE>(captures, board);
     U64 boardKey = board.zobrist();
     U64 indexInTT = 0x7FFFFF & boardKey;
-    orderMoves(boardKey, indexInTT, captures, plyFromRoot);
+    orderMoves(captures, boardKey, indexInTT, plyFromRoot);
+    int bestScore = eval;
 
     for (const auto &capture : captures)
     {
@@ -82,13 +83,18 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
         int score = -qSearch(-beta, -alpha, plyFromRoot + 1);
         board.unmakeMove(capture);
 
+        if (score > bestScore)
+            bestScore = score;
+        else
+            continue;
+
         if (score >= beta)
             return score; // in CPW: return beta;
         if (score > alpha)
             alpha = score;
     }
 
-    return alpha;
+    return bestScore;
 }
 
 inline void savePotentialKillerMove(Move move, int plyFromRoot)
@@ -148,13 +154,13 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
             int eval = -search(depth - 3, plyFromRoot + 1, -beta, -alpha, false);
             board.unmakeNullMove();
             if (eval >= beta)
-                return beta;
+                return eval;
             if (isTimeUp())
                 return POS_INFINITY;
         }
     }
 
-    orderMoves(boardKey, indexInTT, moves, plyFromRoot);
+    orderMoves(moves, boardKey, indexInTT, plyFromRoot);
     int bestEval = NEG_INFINITY;
     Move bestMove;
     for (int i = 0; i < moves.size(); i++)
@@ -215,23 +221,23 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
 inline void aspiration(int maxDepth)
 {
     int delta = 25;
-    int alpha = max(NEG_INFINITY, score - delta);
-    int beta = min(POS_INFINITY, score + delta);
+    int alpha = max(NEG_INFINITY, globalScore - delta);
+    int beta = min(POS_INFINITY, globalScore + delta);
     int depth = maxDepth;
 
     while (!isTimeUp())
     {
-        score = search(depth, 0, alpha, beta);
+        globalScore = search(depth, 0, alpha, beta);
         if (isTimeUp())
             break;
 
-        if (score >= beta)
+        if (globalScore >= beta)
         {
             beta = min(beta + delta, POS_INFINITY);
             bestMoveRootAsp = bestMoveRoot;
             depth--;
         }
-        else if (score <= alpha)
+        else if (globalScore <= alpha)
         {
             beta = (alpha + beta) / 2;
             alpha = max(alpha - delta, NEG_INFINITY);
@@ -253,7 +259,7 @@ inline int iterativeDeepening(float millisecondsLeft)
     while (!isTimeUp())
     {
         if (iterationDepth < 6)
-            score = search(iterationDepth, 0, NEG_INFINITY, POS_INFINITY);
+            globalScore = search(iterationDepth, 0, NEG_INFINITY, POS_INFINITY);
         else
             aspiration(iterationDepth);
         iterationDepth++;

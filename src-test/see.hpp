@@ -5,6 +5,8 @@
 using namespace chess;
 using namespace std;
 
+int PIECE_VALUES_FOR_SEE[6] = {100, 450, 450, 650, 1250, 0};
+
 inline int squareBit(Square sq)
 {
     return U64(1) << (int)sq;
@@ -16,12 +18,12 @@ inline int gain(const Board &board, Move &move)
         return 0;
 
     if (move.typeOf() == move.ENPASSANT)
-        return PIECE_VALUES[0];
+        return PIECE_VALUES_FOR_SEE[0];
 
-    int score = PIECE_VALUES[(int)board.at<PieceType>(move.to())];
+    int score = PIECE_VALUES_FOR_SEE[(int)board.at<PieceType>(move.to())];
 
     if (move.typeOf() == move.PROMOTION)
-        score += PIECE_VALUES[(int)move.promotionType()] - PIECE_VALUES[0]; // gain promotion, lose the pawn
+        score += PIECE_VALUES_FOR_SEE[(int)move.promotionType()] - PIECE_VALUES_FOR_SEE[0]; // gain promotion, lose the pawn
 
     return score;
 }
@@ -82,7 +84,7 @@ inline bool SEE(const Board &board, Move &move, int threshold = 0)
 
     Square square = move.to();
     PieceType next = move.typeOf() == move.PROMOTION ? move.promotionType() : board.at<PieceType>(move.from());
-    score -= PIECE_VALUES[(int)next];
+    score -= PIECE_VALUES_FOR_SEE[(int)next];
     if (score >= 0)
         return true;
 
@@ -115,7 +117,7 @@ inline bool SEE(const Board &board, Move &move, int threshold = 0)
             attackers |= movegen::attacks::rook(square, occupancy) & rooks;
 
         attackers &= occupancy;
-        score = -score - 1 - PIECE_VALUES[(int)next];
+        score = -score - 1 - PIECE_VALUES_FOR_SEE[(int)next];
         us = ~us;
 
         if (score >= 0)
