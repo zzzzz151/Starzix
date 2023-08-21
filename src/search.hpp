@@ -3,6 +3,7 @@
 
 #include <chrono>
 #include <climits>
+#include <cmath>
 #include "chess.hpp"
 #include "eval.hpp"
 #include "see.hpp"
@@ -35,28 +36,27 @@ inline bool isTimeUp()
     return (chrono::steady_clock::now() - start) / std::chrono::milliseconds(1) >= timeForThisTurn;
 }
 
-inline void orderMoves(Movelist &moves, U64 boardKey, U64 indexInTT, int plyFromRoot)
+inline void scoreMoves(Movelist &moves, int *scores, U64 boardKey, U64 indexInTT, int plyFromRoot)
 {
     for (int i = 0; i < moves.size(); i++)
     {
         if (TT[indexInTT].key == boardKey && moves[i] == TT[indexInTT].bestMove)
-            moves[i].setScore(INT_MAX);
+            scores[i] = INT_MAX;
         else if (board.isCapture(moves[i]))
         {
             PieceType captured = board.at<PieceType>(moves[i].to());
             PieceType capturing = board.at<PieceType>(moves[i].from());
             int moveScore = 100 * PIECE_VALUES[(int)captured] - PIECE_VALUES[(int)capturing]; // MVVLVA
             moveScore += SEE(board, moves[i]) ? 100'000'000 : -850'000'000;
-            moves[i].setScore(moveScore);
+            scores[i] = moveScore;
         }
         else if (moves[i].typeOf() == moves[i].PROMOTION)
-            moves[i].setScore(-400'000'000);
+            scores[i] = -400'000'000;
         else if (killerMoves[plyFromRoot][0] == moves[i] || killerMoves[plyFromRoot][1] == moves[i])
-            moves[i].setScore(-700'000'000);
+            scores[i] = -700'000'000;
         else
-            moves[i].setScore(-1'000'000'000);
+            scores[i] = -1'000'000'000;
     }
-    moves.sort();
 }
 
 inline int qSearch(int alpha, int beta, int plyFromRoot)
@@ -70,15 +70,25 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
     if (alpha < eval)
         alpha = eval;
 
-    Movelist captures;
-    movegen::legalmoves<MoveGenType::CAPTURE>(captures, board);
+    Movelist moves;
+    movegen::legalmoves<MoveGenType::CAPTURE>(moves, board);
     U64 boardKey = board.zobrist();
     U64 indexInTT = 0x7FFFFF & boardKey;
-    orderMoves(captures, boardKey, indexInTT, plyFromRoot);
+    int scores[218];
+    scoreMoves(moves, scores, boardKey, indexInTT, plyFromRoot);
     int bestScore = eval;
 
-    for (const auto &capture : captures)
+    for (int i = 0; i < moves.size(); i++)
     {
+        // sort moves incrementally
+        for (int j = i + 1; j < moves.size(); j++)
+            if (scores[j] > scores[i])
+            {
+                swap(moves[i], moves[j]);
+                swap(scores[i], scores[j]);
+            }
+        Move capture = moves[i];
+
         board.makeMove(capture);
         int score = -qSearch(-beta, -alpha, plyFromRoot + 1);
         board.unmakeMove(capture);
@@ -160,11 +170,21 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
         }
     }
 
-    orderMoves(moves, boardKey, indexInTT, plyFromRoot);
+    int scores[218];
+    scoreMoves(moves, scores, boardKey, indexInTT, plyFromRoot);
     int bestEval = NEG_INFINITY;
     Move bestMove;
+    bool canLmr = depth > 1 && plyFromRoot > 0 && !inCheck;
+
     for (int i = 0; i < moves.size(); i++)
     {
+        // sort moves incrementally
+        for (int j = i + 1; j < moves.size(); j++)
+            if (scores[j] > scores[i])
+            {
+                swap(moves[i], moves[j]);
+                swap(scores[i], scores[j]);
+            }
         Move move = moves[i];
         board.makeMove(move);
 
@@ -175,10 +195,17 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
         else
         {
             // LMR (Late move reduction)
-            bool tactical = board.isCapture(move) || move.promotionType() == PieceType::QUEEN || board.inCheck();
-            bool doLMR = i >= 3 && !tactical && !inCheck;
-            eval = -search(depth - 1 - doLMR, plyFromRoot + 1, -alpha - 1, -alpha);
-            if (eval > alpha && (eval < beta || doLMR))
+            int lmr = 0;
+            if (canLmr)
+            {
+                lmr = 0.77 + log(depth) * log(i) / 2.36; // ln(x)
+                lmr -= board.inCheck();                  // reduce checks less
+                lmr -= pv;                               // reduce pv nodes less
+                if (lmr < 0)
+                    lmr = 0;
+            }
+            eval = -search(depth - 1 - lmr, plyFromRoot + 1, -alpha - 1, -alpha);
+            if (eval > alpha && (eval < beta || lmr > 0))
                 eval = -search(depth - 1, plyFromRoot + 1, -beta, -alpha);
         }
 

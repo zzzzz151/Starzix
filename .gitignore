@@ -23,3 +23,5 @@ debug.txt
 **/chessData.csv
 **/data_d9_2021_09_02.binpack
 **/data.csv
+**/train.csv
+**/test.csv

@@ -48,23 +48,21 @@ inline void uciLoop()
         if (received == "quit" || !cin.good())
             break;
         else if (received == "ucinewgame")
-            memset(TT, 0, sizeof(TT)); // Clear TT
+            memset(TT, 0, sizeof(TT)); // clear TT
         else if (received == "isready")
             cout << "readyok\n";
         else if (words[0] == "position")
-        {
             position(words);
-        }
         else if (words[0] == "go")
         {
-            memset(killerMoves, 0, sizeof(killerMoves));
+            memset(killerMoves, 0, sizeof(killerMoves)); // clear killers
             int millisecondsLeft = 60000;
             if (words[1] == "wtime")
                 millisecondsLeft = board.sideToMove() == Color::WHITE ? stoi(words[2]) : stoi(words[4]);
             else if (words[1] == "movetime")
                 millisecondsLeft = stoi(words[2]);
-            int depth = iterativeDeepening(millisecondsLeft);
-            //cout << "depth " << depth << endl;
+            int depthReached = iterativeDeepening(millisecondsLeft);
+            //cout << "depthReached " << depthReached << endl;
             cout << "bestmove " + uci::moveToUci(bestMoveRootAsp == NULL_MOVE ? bestMoveRoot : bestMoveRootAsp) + "\n";
         }
     }
