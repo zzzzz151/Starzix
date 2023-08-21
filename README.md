@@ -22,13 +22,11 @@ Quiescence search
 
 Transposition table
 
-Move ordering with SEE and MVVLVA
+Move ordering (hash move > SEE + MVVLVA > promotions > killer moves (2 per ply) > history heuristic)
 
 Aspiration window
 
 Check extension
-
-Killer moves (2 per ply)
 
 Late move reductions
 

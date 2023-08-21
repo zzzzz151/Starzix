@@ -16,7 +16,7 @@ Move NULL_MOVE;
 const char EXACT = 1, LOWER_BOUND = 2, UPPER_BOUND = 3;
 struct TTEntry
 {
-    U64 key;
+    U64 key = 0;
     int score;
     Move bestMove;
     int depth;
@@ -29,7 +29,8 @@ float timeForThisTurn;
 Board board;
 Move bestMoveRoot, bestMoveRootAsp;
 int globalScore;
-Move killerMoves[512][2];
+Move killerMoves[512][2];   // ply, move
+int historyMoves[2][6][64]; // color, pieceType, squareTo
 
 inline bool isTimeUp()
 {
@@ -40,22 +41,29 @@ inline void scoreMoves(Movelist &moves, int *scores, U64 boardKey, U64 indexInTT
 {
     for (int i = 0; i < moves.size(); i++)
     {
-        if (TT[indexInTT].key == boardKey && moves[i] == TT[indexInTT].bestMove)
+        Move move = moves[i];
+
+        if (TT[indexInTT].key == boardKey && move == TT[indexInTT].bestMove)
             scores[i] = INT_MAX;
-        else if (board.isCapture(moves[i]))
+        else if (board.isCapture(move))
         {
-            PieceType captured = board.at<PieceType>(moves[i].to());
-            PieceType capturing = board.at<PieceType>(moves[i].from());
+            PieceType captured = board.at<PieceType>(move.to());
+            PieceType capturing = board.at<PieceType>(move.from());
             int moveScore = 100 * PIECE_VALUES[(int)captured] - PIECE_VALUES[(int)capturing]; // MVVLVA
-            moveScore += SEE(board, moves[i]) ? 100'000'000 : -850'000'000;
+            moveScore += SEE(board, move) ? 100'000'000 : -850'000'000;
             scores[i] = moveScore;
         }
-        else if (moves[i].typeOf() == moves[i].PROMOTION)
+        else if (move.typeOf() == move.PROMOTION)
             scores[i] = -400'000'000;
-        else if (killerMoves[plyFromRoot][0] == moves[i] || killerMoves[plyFromRoot][1] == moves[i])
+        else if (killerMoves[plyFromRoot][0] == move || killerMoves[plyFromRoot][1] == move)
             scores[i] = -700'000'000;
         else
-            scores[i] = -1'000'000'000;
+        {
+            int stm = (int)board.sideToMove();
+            int pieceType = (int)board.at<PieceType>(move.from());
+            int squareTo = (int)move.to();
+            scores[i] = -1'000'000'000 + historyMoves[stm][pieceType][squareTo];
+        }
     }
 }
 
@@ -105,15 +113,6 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
     }
 
     return bestScore;
-}
-
-inline void savePotentialKillerMove(Move move, int plyFromRoot)
-{
-    if (!board.isCapture(move) && move != killerMoves[plyFromRoot][0])
-    {
-        killerMoves[plyFromRoot][1] = killerMoves[plyFromRoot][0];
-        killerMoves[plyFromRoot][0] = move;
-    }
 }
 
 inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull = true)
@@ -222,7 +221,19 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
                 alpha = bestEval;
             if (alpha >= beta)
             {
-                savePotentialKillerMove(move, plyFromRoot);
+                bool isQuietMove = !board.isCapture(move) && move.typeOf() != move.PROMOTION;
+                if (isQuietMove && move != killerMoves[plyFromRoot][0])
+                {
+                    killerMoves[plyFromRoot][1] = killerMoves[plyFromRoot][0];
+                    killerMoves[plyFromRoot][0] = move;
+                }
+                if (isQuietMove)
+                {
+                    int stm = (int)board.sideToMove();
+                    int pieceType = (int)board.at<PieceType>(move.from());
+                    int squareTo = (int)move.to();
+                    historyMoves[stm][pieceType][squareTo] += depth * depth;
+                }
                 break;
             }
         }
