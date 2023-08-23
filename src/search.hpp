@@ -284,7 +284,7 @@ inline void aspiration(int maxDepth)
         else
             break;
 
-        delta *= 2;
+        delta *= 1.5;
     }
 }
 

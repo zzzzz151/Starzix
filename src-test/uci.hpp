@@ -32,7 +32,7 @@ inline void uciLoop()
 {
     string received;
     getline(cin, received);
-    cout << "id name test\n";
+    cout << "id name NN\n";
     cout << "id author zzzzz\n";
     cout << "uciok\n";
 

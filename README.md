@@ -1,5 +1,7 @@
 # z5 is a UCI C++ chess engine
 
+Currently ~2400 elo (tested against [Barbarossa](https://github.com/nionita/Barbarossa) 0.6).
+
 # How to compile
 
 **Linux**
@@ -22,7 +24,7 @@ Quiescence search
 
 Transposition table
 
-Move ordering (hash move > SEE + MVVLVA > promotions > killer moves (2 per ply) > history heuristic)
+Move ordering (hash move > SEE + MVVLVA > promotions > killer moves > history heuristic)
 
 Aspiration window
 
