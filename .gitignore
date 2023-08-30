@@ -29,9 +29,8 @@ debug.txt
 **/sf_d9_data
 **/sf_d9_data/*
 **/sf_d9_marlinflow.txt
+**/WC.txt
+**/WC_marlinflow.txt
 
 **/testNN.exe
 **/testNN
-
-MantaRay/
-**/net1.json

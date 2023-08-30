@@ -2,73 +2,45 @@
 #define NN_HPP
 
 #include <iostream>
-#include <vector>
-#include <cmath>
-#include <immintrin.h> // Include the appropriate SIMD header
-#include "weights.hpp"
 #include "chess.hpp"
+#include "../MantaRay/Perspective/PerspectiveNNUE.h"
+#include "../MantaRay/Activation/ClippedReLU.h"
 using namespace std;
 using namespace chess;
 
-float sigmoid(float x)
+// Define the network:
+// Format: PerspectiveNetwork<InputType, OutputType, Activation, ...>
+//                      <..., InputSize, HiddenSize, OutputSize, ...>
+//                      <...,       AccumulatorStackSize,        ...>
+//                      <..., Scale, QuantizationFeature, QuantizationOutput>
+//using NeuralNetwork = MantaRay::PerspectiveNetwork<int16_t, int32_t, Activation, 768, 64, 1, 512, 400, 255, 64>;
+using NeuralNetwork = MantaRay::PerspectiveNetwork<int16_t, int32_t, MantaRay::ClippedReLU<int16_t, 0, 255>, 768, 384, 1, 512, 400, 255, 64>;
+
+// Create the input stream:
+MantaRay::MarlinflowStream stream("net1.json");
+//MantaRay::BinaryFileStream stream("Aurora-334ab2818f.nnue");
+
+// Create & load the network from the stream:
+NeuralNetwork network(stream);
+
+inline int32_t evaluate(Board board)
 {
-    return 1.0 / (1.0 + exp(-x));
-}
+    // Need to call these methods before reactivating features from scratch.
+    network.ResetAccumulator();
+    network.RefreshAccumulator();
 
-float relu(float x)
-{
-    return (x > 0) ? x : 0;
-}
-
-float linear(float x)
-{
-    return x;
-}
-
-int predict(int input[769])
-{
-    float dense32[32];
-    for (int i = 0; i < 32; ++i)
-    {
-        float sum = 0.0;
-        for (int j = 0; j < 769; ++j)
-            sum += input[j] * weightsDense32[j][i];
-        sum += biasesDense32[i];
-        dense32[i] = relu(sum);
-    }
-
-    float output = 0.0;
-    for (int i = 0; i < 32; ++i)
-        output += dense32[i] * weightsOutput[i];
-    output += biasOutput;
-
-    if (output < 0)
-        return (int)(output - 0.5);
-    if (output > 0)
-        return (int)(output + 0.5);
-    return 0;
-}
-
-int evaluate(Board board)
-{
-    int input[769];
-    input[768] = (int)board.sideToMove(); // last bit is color to move
-
-    int currentInputIndex = 0;
     for (Color color : {Color::WHITE, Color::BLACK})
-    {
-        // Iterate piece types
         for (int i = 0; i <= 5; i++)
         {
             Bitboard bb = board.pieces((PieceType)i, color);
-            // bb = __builtin_bswap64(bb); // convert to how humans visualize a board
-            bitset<64> bits(bb);
-            for (int i = 0; i < 64; ++i)
-                input[currentInputIndex++] = bits[i];
+            while (bb > 0)
+            {
+                int sq = builtin::poplsb(bb);
+                network.EfficientlyUpdateAccumulator<MantaRay::AccumulatorOperation::Activate>(i, (int)color, sq);
+            }
         }
-    }
 
-    return predict(input);
+    return network.Evaluate((int)board.sideToMove());
 }
 
 #endif

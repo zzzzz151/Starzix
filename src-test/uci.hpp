@@ -77,7 +77,7 @@ inline void uciLoop()
                 millisecondsLeft = stoi(words[2]);
 
             int depthReached = iterativeDeepening(millisecondsLeft);
-            // cout << "depthReached " << depthReached << endl;
+            cout << "depthReached " << depthReached << endl;
             cout << "bestmove " + uci::moveToUci(bestMoveRootAsp == NULL_MOVE ? bestMoveRoot : bestMoveRootAsp) + "\n";
         }
     }
