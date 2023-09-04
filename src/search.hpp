@@ -13,18 +13,20 @@ using namespace std;
 const int POS_INFINITY = 9999999, NEG_INFINITY = -9999999;
 Move NULL_MOVE;
 
-int PIECE_VALUES[7] = {100, 302, 320, 500, 900, 15000, 0};
-
 const char EXACT = 1, LOWER_BOUND = 2, UPPER_BOUND = 3;
 struct TTEntry
 {
     U64 key = 0;
     int score;
     Move bestMove;
-    int depth;
+    int16_t depth;
     char type;
 };
-TTEntry TT[0x800000];
+int TT_SIZE_MB = 64;
+uint32_t NUM_TT_ENTRIES;
+vector<TTEntry> TT;
+
+const int PIECE_VALUES[7] = {100, 302, 320, 500, 900, 15000, 0};
 
 chrono::steady_clock::time_point start;
 float timeForThisTurn;
@@ -39,13 +41,13 @@ inline bool isTimeUp()
     return (chrono::steady_clock::now() - start) / std::chrono::milliseconds(1) >= timeForThisTurn;
 }
 
-inline void scoreMoves(Movelist &moves, int *scores, U64 boardKey, U64 indexInTT, int plyFromRoot)
+inline void scoreMoves(Movelist &moves, int *scores, U64 boardKey, TTEntry &ttEntry, int plyFromRoot)
 {
     for (int i = 0; i < moves.size(); i++)
     {
         Move move = moves[i];
 
-        if (TT[indexInTT].key == boardKey && move == TT[indexInTT].bestMove)
+        if (ttEntry.key == boardKey && move == ttEntry.bestMove)
             scores[i] = INT_MAX;
         else if (board.isCapture(move))
         {
@@ -83,9 +85,9 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
     Movelist moves;
     movegen::legalmoves<MoveGenType::CAPTURE>(moves, board);
     U64 boardKey = board.zobrist();
-    U64 indexInTT = 0x7FFFFF & boardKey;
+    TTEntry ttEntry = TT[boardKey % NUM_TT_ENTRIES];
     int scores[218];
-    scoreMoves(moves, scores, boardKey, indexInTT, plyFromRoot);
+    scoreMoves(moves, scores, boardKey, ttEntry, plyFromRoot);
     int bestScore = eval;
 
     for (int i = 0; i < moves.size(); i++)
@@ -128,13 +130,13 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
         depth++;
 
     U64 boardKey = board.zobrist();
-    U64 indexInTT = 0x7FFFFF & boardKey;
-    if (plyFromRoot > 0 && TT[indexInTT].key == boardKey && TT[indexInTT].depth >= depth)
-        if (TT[indexInTT].type == EXACT || (TT[indexInTT].type == LOWER_BOUND && TT[indexInTT].score >= beta) || (TT[indexInTT].type == UPPER_BOUND && TT[indexInTT].score <= alpha))
-            return TT[indexInTT].score;
+    TTEntry *ttEntry = &TT[boardKey % NUM_TT_ENTRIES];
+    if (plyFromRoot > 0 && ttEntry->key == boardKey && ttEntry->depth >= depth)
+        if (ttEntry->type == EXACT || (ttEntry->type == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->type == UPPER_BOUND && ttEntry->score <= alpha))
+            return ttEntry->score;
 
     // Internal iterative reduction
-    if (TT[indexInTT].key != boardKey && depth > 3)
+    if (ttEntry->key != boardKey && depth > 3)
         depth--;
 
     Movelist moves;
@@ -172,7 +174,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
     }
 
     int scores[218];
-    scoreMoves(moves, scores, boardKey, indexInTT, plyFromRoot);
+    scoreMoves(moves, scores, boardKey, *ttEntry, plyFromRoot);
     int bestEval = NEG_INFINITY;
     Move bestMove;
     bool canLmr = depth > 1 && plyFromRoot > 0 && !inCheck;
@@ -244,16 +246,16 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
             return POS_INFINITY;
     }
 
-    TT[indexInTT].key = boardKey;
-    TT[indexInTT].depth = depth;
-    TT[indexInTT].score = bestEval;
-    TT[indexInTT].bestMove = bestMove;
+    ttEntry->key = boardKey;
+    ttEntry->depth = depth;
+    ttEntry->score = bestEval;
+    ttEntry->bestMove = bestMove;
     if (bestEval <= originalAlpha)
-        TT[indexInTT].type = UPPER_BOUND;
+        ttEntry->type = UPPER_BOUND;
     else if (bestEval >= beta)
-        TT[indexInTT].type = LOWER_BOUND;
+        ttEntry->type = LOWER_BOUND;
     else
-        TT[indexInTT].type = EXACT;
+        ttEntry->type = EXACT;
 
     return bestEval;
 }

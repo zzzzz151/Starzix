@@ -12,6 +12,10 @@ Currently ~2517 elo (tested against [Barbarossa](https://github.com/nionita/Barb
 
 ```g++ -O3 -std=c++17 src/main.cpp -o z5.exe```
 
+# UCI options
+
+Hash - transposition table size in MB from 1 to 512 (default 64)
+
 # Features
 
 Neural network evaluation (768->128x2->1)

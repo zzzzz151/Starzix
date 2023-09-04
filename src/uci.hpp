@@ -40,7 +40,13 @@ inline void uciLoop()
     getline(cin, received);
     cout << "id name z5\n";
     cout << "id author zzzzz\n";
+    cout << "option name Hash type spin default 64 min 1 max 512\n";
     cout << "uciok\n";
+
+    NUM_TT_ENTRIES = (TT_SIZE_MB * 1024 * 1024) / sizeof(TTEntry);
+    TT.clear();
+    TT.resize(NUM_TT_ENTRIES);
+    //cout << "TT_SIZE_MB = " << TT_SIZE_MB << " => " << NUM_TT_ENTRIES << " entries" << endl;
 
     while (true)
     {
@@ -53,11 +59,20 @@ inline void uciLoop()
 
         if (received == "quit" || !cin.good())
             break;
+        else if (words[0] == "setoption" && words[2] == "Hash") // setoption name Hash value 32
+        {
+            TT_SIZE_MB = stoi(words[4]);
+            NUM_TT_ENTRIES = (TT_SIZE_MB * 1024 * 1024) / sizeof(TTEntry);
+            TT.clear();
+            TT.resize(NUM_TT_ENTRIES);
+            //cout << "TT_SIZE_MB = " << TT_SIZE_MB << " => " << NUM_TT_ENTRIES << " entries" << endl;
+        }
         else if (received == "ucinewgame")
         {
             // memset(TT, 0, sizeof(TT)); // clear TT
-            for (int i = 0; i < 0x800000; i++)
-                TT[i].key = 0;
+            //for (int i = 0; i < 0x800000; i++)
+            //    TT[i].key = 0;
+            memset(TT.data(), 0, sizeof(TTEntry) * TT.size());
         }
         else if (received == "isready")
             cout << "readyok\n";
@@ -85,7 +100,7 @@ inline void uciLoop()
                 millisecondsLeft = stoi(words[2]);
 
             int depthReached = iterativeDeepening(millisecondsLeft);
-            cout << "depthReached " << depthReached << endl;
+            //cout << "depthReached " << depthReached << endl;
             cout << "bestmove " + uci::moveToUci(bestMoveRootAsp == NULL_MOVE ? bestMoveRoot : bestMoveRootAsp) + "\n";
         }
     }
