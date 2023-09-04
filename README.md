@@ -1,6 +1,6 @@
 # z5 - UCI C++ chess engine
 
-Currently ~2517 elo (tested against [Barbarossa](https://github.com/nionita/Barbarossa) 0.6).
+Currently ~2565 elo (tested against [Barbarossa](https://github.com/nionita/Barbarossa) 0.6).
 
 # How to compile
 
@@ -18,7 +18,7 @@ Hash - transposition table size in MB from 1 to 512 (default 64)
 
 # Features
 
-Neural network evaluation (768->128x2->1)
+NNUE evaluation (768->128x2->1)
 
 Iterative deepening
 
