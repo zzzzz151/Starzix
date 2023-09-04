@@ -13,10 +13,14 @@ z5
 test
 test.exe
 random_mover
+**/testNN.exe
+**/testNN
 
 games.txt
 games.pgn
 debug.txt
+notes.txt
+stderr.txt
 
 **/random_evals.csv
 **/tactic_evals.csv
@@ -32,5 +36,4 @@ debug.txt
 **/WC.txt
 **/WC_marlinflow.txt
 
-**/testNN.exe
-**/testNN
+sprt.py

@@ -5,7 +5,7 @@
 #include <climits>
 #include <cmath>
 #include "chess.hpp"
-#include "nn.hpp"
+#include "nnue.hpp"
 #include "see.hpp"
 using namespace chess;
 using namespace std;

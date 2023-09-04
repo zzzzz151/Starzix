@@ -4,12 +4,14 @@
 #include <cstring> // for memset()
 #include "chess.hpp"
 #include "search.hpp"
-#include "nn.hpp"
+#include "nnue.hpp"
 using namespace chess;
 using namespace std;
 
 inline void position(vector<string> &words)
 {
+    restartNNUE();
+
     int movesTokenIndex = -1;
     if (words[1] == "startpos")
     {
@@ -26,7 +28,10 @@ inline void position(vector<string> &words)
     }
 
     for (int i = movesTokenIndex + 1; i < words.size(); i++)
-        board.makeMove(uci::uciToMove(board, words[i]));
+    {
+        Move move = uci::uciToMove(board, words[i]);
+        makeMoveAndUpdateNNUE(board, move);
+    }
 }
 
 inline void uciLoop()
@@ -62,9 +67,6 @@ inline void uciLoop()
         }
         else if (words[0] == "go")
         {
-            //network.ResetAccumulator();
-            //network.RefreshAccumulator();
-
             // clear killers
             // memset(killerMoves, 0, sizeof(killerMoves));
             for (int i = 0; i < 512; i++)
