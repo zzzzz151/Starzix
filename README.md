@@ -1,6 +1,6 @@
-# z5 is a UCI C++ chess engine
+# z5 - UCI C++ chess engine
 
-Currently ~2400 elo (tested against [Barbarossa](https://github.com/nionita/Barbarossa) 0.6).
+Currently ~2517 elo (tested against [Barbarossa](https://github.com/nionita/Barbarossa) 0.6).
 
 # How to compile
 
@@ -14,7 +14,7 @@ Currently ~2400 elo (tested against [Barbarossa](https://github.com/nionita/Barb
 
 # Features
 
-PeSTO's tapered evaluation with piece values and PSTs
+Neural network evaluation (768->128x2->1)
 
 Iterative deepening
 
@@ -44,11 +44,11 @@ Time management
 
 [Chess Programming Wiki](https://www.chessprogramming.org/)
 
+[Cutechess for testing](https://github.com/cutechess/cutechess)
+
 [Disservin's move gen (chess-library)](https://github.com/Disservin/chess-library)
 
 [MantaRay for C++ neural network inference](https://github.com/TheBlackPlague/MantaRay)
-
-[Cutechess](https://github.com/cutechess/cutechess)
 
 [Engine Programming Discord](https://discord.gg/pcjr9eXK)
 

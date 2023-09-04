@@ -5,13 +5,15 @@
 #include <climits>
 #include <cmath>
 #include "chess.hpp"
-#include "eval.hpp"
+#include "nn.hpp"
 #include "see.hpp"
 using namespace chess;
 using namespace std;
 
 const int POS_INFINITY = 9999999, NEG_INFINITY = -9999999;
 Move NULL_MOVE;
+
+int PIECE_VALUES[7] = {100, 302, 320, 500, 900, 15000, 0};
 
 const char EXACT = 1, LOWER_BOUND = 2, UPPER_BOUND = 3;
 struct TTEntry
@@ -97,9 +99,9 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
             }
         Move capture = moves[i];
 
-        board.makeMove(capture);
+        makeMoveAndUpdateNNUE(board, capture);
         int score = -qSearch(-beta, -alpha, plyFromRoot + 1);
-        board.unmakeMove(capture);
+        unmakeMoveAndUpdateNNUE(board, capture);
 
         if (score > bestScore)
             bestScore = score;
@@ -185,7 +187,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
                 swap(scores[i], scores[j]);
             }
         Move move = moves[i];
-        board.makeMove(move);
+        makeMoveAndUpdateNNUE(board, move);
 
         // PVS (Principal variation search)
         int eval;
@@ -208,7 +210,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
                 eval = -search(depth - 1, plyFromRoot + 1, -beta, -alpha);
         }
 
-        board.unmakeMove(move);
+        unmakeMoveAndUpdateNNUE(board, move);
 
         if (eval > bestEval)
         {

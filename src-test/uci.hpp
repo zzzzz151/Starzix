@@ -4,6 +4,7 @@
 #include <cstring> // for memset()
 #include "chess.hpp"
 #include "search.hpp"
+#include "nn.hpp"
 using namespace chess;
 using namespace std;
 
@@ -32,7 +33,7 @@ inline void uciLoop()
 {
     string received;
     getline(cin, received);
-    cout << "id name NN\n";
+    cout << "id name test\n";
     cout << "id author zzzzz\n";
     cout << "uciok\n";
 
@@ -56,9 +57,14 @@ inline void uciLoop()
         else if (received == "isready")
             cout << "readyok\n";
         else if (words[0] == "position")
+        {
             position(words);
+        }
         else if (words[0] == "go")
         {
+            //network.ResetAccumulator();
+            //network.RefreshAccumulator();
+
             // clear killers
             // memset(killerMoves, 0, sizeof(killerMoves));
             for (int i = 0; i < 512; i++)

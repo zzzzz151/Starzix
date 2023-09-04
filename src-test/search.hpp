@@ -99,9 +99,9 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
             }
         Move capture = moves[i];
 
-        board.makeMove(capture);
+        makeMoveAndUpdateNNUE(board, capture);
         int score = -qSearch(-beta, -alpha, plyFromRoot + 1);
-        board.unmakeMove(capture);
+        unmakeMoveAndUpdateNNUE(board, capture);
 
         if (score > bestScore)
             bestScore = score;
@@ -187,7 +187,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
                 swap(scores[i], scores[j]);
             }
         Move move = moves[i];
-        board.makeMove(move);
+        makeMoveAndUpdateNNUE(board, move);
 
         // PVS (Principal variation search)
         int eval;
@@ -210,7 +210,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
                 eval = -search(depth - 1, plyFromRoot + 1, -beta, -alpha);
         }
 
-        board.unmakeMove(move);
+        unmakeMoveAndUpdateNNUE(board, move);
 
         if (eval > bestEval)
         {

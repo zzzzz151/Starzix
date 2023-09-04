@@ -94,12 +94,12 @@ inline bool SEE(const Board &board, Move &move, int threshold = 0)
     Bitboard rooks = queens | board.pieces(PieceType::ROOK);
 
     Bitboard attackers = U64(0);
-    attackers |= rooks & movegen::attacks::rook(square, occupancy);
-    attackers |= bishops & movegen::attacks::bishop(square, occupancy);
-    attackers |= board.pieces(PieceType::PAWN, Color::BLACK) & movegen::attacks::pawn(Color::WHITE, square);
-    attackers |= board.pieces(PieceType::PAWN, Color::WHITE) & movegen::attacks::pawn(Color::BLACK, square);
-    attackers |= board.pieces(PieceType::KNIGHT) & movegen::attacks::knight(square);
-    attackers |= board.pieces(PieceType::KING) & movegen::attacks::king(square);
+    attackers |= rooks & attacks::rook(square, occupancy);
+    attackers |= bishops & attacks::bishop(square, occupancy);
+    attackers |= board.pieces(PieceType::PAWN, Color::BLACK) & attacks::pawn(Color::WHITE, square);
+    attackers |= board.pieces(PieceType::PAWN, Color::WHITE) & attacks::pawn(Color::BLACK, square);
+    attackers |= board.pieces(PieceType::KNIGHT) & attacks::knight(square);
+    attackers |= board.pieces(PieceType::KING) & attacks::king(square);
 
     Color us = ~board.sideToMove();
     while (true)
@@ -111,10 +111,10 @@ inline bool SEE(const Board &board, Move &move, int threshold = 0)
         next = popLeastValuable(board, occupancy, ourAttackers, us);
 
         if (next == PieceType::PAWN || next == PieceType::BISHOP || next == PieceType::QUEEN)
-            attackers |= movegen::attacks::bishop(square, occupancy) & bishops;
+            attackers |= attacks::bishop(square, occupancy) & bishops;
 
         if (next == PieceType::ROOK || next == PieceType::QUEEN)
-            attackers |= movegen::attacks::rook(square, occupancy) & rooks;
+            attackers |= attacks::rook(square, occupancy) & rooks;
 
         attackers &= occupancy;
         score = -score - 1 - PIECE_VALUES_FOR_SEE[(int)next];

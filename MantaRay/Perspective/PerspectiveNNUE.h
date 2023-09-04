@@ -48,7 +48,7 @@ namespace MantaRay
                 "This type is currently not supported.");
 
         // Support less sizes in the future, but currently disable.
-        static_assert(InputSize > 32 && HiddenSize > 32, "This network size is currently not supported.");
+        static_assert(InputSize == 768 && HiddenSize >= 32, "This network size is currently not supported.");
 
         // The accumulator stack size should not be 0 or less.
         static_assert(AccumulatorStackSize > 0, "The accumulator stack size must at least be greater than zero.");
