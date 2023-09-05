@@ -28,8 +28,9 @@ vector<TTEntry> TT;
 
 const int PIECE_VALUES[7] = {100, 302, 320, 500, 900, 15000, 0};
 
+U64 nodes;
 chrono::steady_clock::time_point start;
-float timeForThisTurn;
+double millisecondsForThisTurn;
 Board board;
 Move bestMoveRoot, bestMoveRootAsp;
 int globalScore;
@@ -38,7 +39,7 @@ int historyMoves[2][6][64]; // color, pieceType, squareTo
 
 inline bool isTimeUp()
 {
-    return (chrono::steady_clock::now() - start) / std::chrono::milliseconds(1) >= timeForThisTurn;
+    return (chrono::steady_clock::now() - start) / chrono::milliseconds(1) >= millisecondsForThisTurn;
 }
 
 inline void scoreMoves(Movelist &moves, int *scores, U64 boardKey, TTEntry &ttEntry, int plyFromRoot)
@@ -102,6 +103,7 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
         Move capture = moves[i];
 
         board.makeMove(capture);
+        nodes++;
         int score = -qSearch(-beta, -alpha, plyFromRoot + 1);
         board.unmakeMove(capture);
 
@@ -190,6 +192,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
             }
         Move move = moves[i];
         board.makeMove(move);
+        nodes++;
 
         // PVS (Principal variation search)
         int eval;
@@ -292,21 +295,43 @@ inline void aspiration(int maxDepth)
     }
 }
 
-inline int iterativeDeepening(float millisecondsLeft)
+inline void iterativeDeepening(bool info = false)
 {
-    start = chrono::steady_clock::now();
-    timeForThisTurn = millisecondsLeft / (float)30;
+    bestMoveRoot = NULL_MOVE;
     bestMoveRootAsp = NULL_MOVE;
     int iterationDepth = 1;
-    while (!isTimeUp())
+    nodes = 0;
+    while (true)
     {
+        Move before = bestMoveRoot;
+        Move beforeAsp = bestMoveRootAsp;
         if (iterationDepth < 6)
             globalScore = search(iterationDepth, 0, NEG_INFINITY, POS_INFINITY);
         else
             aspiration(iterationDepth);
+
+        if (isTimeUp())
+        {
+            bestMoveRoot = before;
+            bestMoveRootAsp = beforeAsp;
+            break;
+        }
+
+        if (info)
+        {
+            double millisecondsElapsed = (chrono::steady_clock::now() - start) / chrono::milliseconds(1);
+            double nps;
+            if (millisecondsElapsed == 0)
+                nps = nodes;
+            else
+                nps = nodes / millisecondsElapsed;
+            nps *= 1000.0;
+            string moveUci = bestMoveRootAsp == NULL_MOVE ? uci::moveToUci(bestMoveRoot) : uci::moveToUci(bestMoveRootAsp);
+            cout << "info depth " << iterationDepth << " time " << round(millisecondsElapsed) << " nodes " << nodes << " nps " << (U64)round(nps) << " score cp " << globalScore << " pv " << moveUci << endl;
+        }
+
         iterationDepth++;
     }
-    return iterationDepth;
 }
 
 #endif

@@ -82,6 +82,8 @@ inline void uciLoop()
         }
         else if (words[0] == "go")
         {
+            start = chrono::steady_clock::now();
+
             // clear killers
             // memset(killerMoves, 0, sizeof(killerMoves));
             for (int i = 0; i < 512; i++)
@@ -93,14 +95,17 @@ inline void uciLoop()
             // clear history moves
             memset(&historyMoves[0][0][0], 0, sizeof(historyMoves));
 
-            int millisecondsLeft = 60000;
+            millisecondsForThisTurn = 60000;
             if (words[1] == "wtime")
-                millisecondsLeft = board.sideToMove() == Color::WHITE ? stoi(words[2]) : stoi(words[4]);
+            {
+                U64 millisecondsLeft = board.sideToMove() == Color::WHITE ? stoi(words[2]) : stoi(words[4]);
+                millisecondsForThisTurn = millisecondsLeft / 30.000;
+            }
             else if (words[1] == "movetime")
-                millisecondsLeft = stoi(words[2]);
+                millisecondsForThisTurn = stoi(words[2]);
 
-            int depthReached = iterativeDeepening(millisecondsLeft);
-            //cout << "depthReached " << depthReached << endl;
+            iterativeDeepening();
+
             cout << "bestmove " + uci::moveToUci(bestMoveRootAsp == NULL_MOVE ? bestMoveRoot : bestMoveRootAsp) + "\n";
         }
         else if (words[0] == "eval")

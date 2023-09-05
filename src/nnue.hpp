@@ -15,7 +15,7 @@ using NeuralNetwork = MantaRay::PerspectiveNetwork<int16_t, int32_t, MantaRay::C
 
 // Create the input stream:
 MantaRay::MarlinflowStream stream("net.json");
-//MantaRay::BinaryFileStream stream("net.bin");
+//MantaRay::BinaryFileStream stream("jw.bin");
 
 // Create & load the network from the stream:
 NeuralNetwork network(stream);
