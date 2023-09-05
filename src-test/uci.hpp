@@ -10,8 +10,6 @@ using namespace std;
 
 inline void position(vector<string> &words)
 {
-    restartNNUE();
-
     int movesTokenIndex = -1;
     if (words[1] == "startpos")
     {
@@ -21,16 +19,18 @@ inline void position(vector<string> &words)
     else if (words[1] == "fen")
     {
         string fen = "";
-        for (int i = 2; i < 8; i++)
-            fen += words[i];
+        int i = 0;
+        for (i = 2; i < words.size() && words[i] != "moves"; i++)
+            fen += words[i] + " ";
+        fen.pop_back(); // remove last whitespace
         board = Board(fen);
-        movesTokenIndex = 8;
+        movesTokenIndex = i;
     }
 
     for (int i = movesTokenIndex + 1; i < words.size(); i++)
     {
         Move move = uci::uciToMove(board, words[i]);
-        makeMoveAndUpdateNNUE(board, move);
+        board.makeMove(move);
     }
 }
 
@@ -102,6 +102,10 @@ inline void uciLoop()
             int depthReached = iterativeDeepening(millisecondsLeft);
             //cout << "depthReached " << depthReached << endl;
             cout << "bestmove " + uci::moveToUci(bestMoveRootAsp == NULL_MOVE ? bestMoveRoot : bestMoveRootAsp) + "\n";
+        }
+        else if (words[0] == "eval")
+        {
+            cout << "eval: " << network.Evaluate((int)board.sideToMove()) << " cp" << endl;
         }
     }
 }

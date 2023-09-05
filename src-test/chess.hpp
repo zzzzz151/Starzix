@@ -45,6 +45,7 @@ VERSION: 0.1.7
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include "nnue.hpp"
 
 namespace chess
 {
@@ -1706,6 +1707,9 @@ const std::string squareToString[64] = {
 
     inline void Board::setFenInternal(std::string fen)
     {
+        network.ResetAccumulator();
+        network.RefreshAccumulator();
+
         original_fen_ = fen;
 
         std::fill(std::begin(board_), std::end(board_), Piece::NONE);
@@ -2124,6 +2128,10 @@ const std::string squareToString[64] = {
         board_[sq] = piece;
 
         occ_all_ |= (1ULL << sq);
+
+        PieceType pieceType = utils::typeOfPiece(piece);
+        Color color = Board::color(piece);
+        network.EfficientlyUpdateAccumulator<MantaRay::AccumulatorOperation::Activate>((int)pieceType, (int)color, sq);
     }
 
     inline void Board::removePiece(Piece piece, Square sq)
@@ -2135,6 +2143,10 @@ const std::string squareToString[64] = {
         pieces_bb_[int(color(piece))][int(utils::typeOfPiece(piece))] &= ~(1ULL << sq);
 
         occ_all_ &= ~(1ULL << sq);
+
+        PieceType pieceType = utils::typeOfPiece(piece);
+        Color color = Board::color(piece);
+        network.EfficientlyUpdateAccumulator<MantaRay::AccumulatorOperation::Deactivate>((int)pieceType, (int)color, sq);
     }
 
     inline void Board::makeMove(const Move &move)

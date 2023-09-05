@@ -75,7 +75,7 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
 {
     // Quiescence saarch: search capture moves until a 'quiet' position is reached
 
-    int eval = evaluate(board);
+    int eval = network.Evaluate((int)board.sideToMove());
     if (eval >= beta)
         return eval;
 
@@ -101,9 +101,9 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
             }
         Move capture = moves[i];
 
-        makeMoveAndUpdateNNUE(board, capture);
+        board.makeMove(capture);
         int score = -qSearch(-beta, -alpha, plyFromRoot + 1);
-        unmakeMoveAndUpdateNNUE(board, capture);
+        board.unmakeMove(capture);
 
         if (score > bestScore)
             bestScore = score;
@@ -152,7 +152,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
     bool pv = beta - alpha > 1;
     if (!pv && plyFromRoot > 0 && depth <= 7 && !inCheck)
     {
-        int eval = evaluate(board);
+        int eval = network.Evaluate((int)board.sideToMove());
         if (eval >= beta + 53 * depth)
             return eval;
     }
@@ -189,7 +189,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
                 swap(scores[i], scores[j]);
             }
         Move move = moves[i];
-        makeMoveAndUpdateNNUE(board, move);
+        board.makeMove(move);
 
         // PVS (Principal variation search)
         int eval;
@@ -212,7 +212,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
                 eval = -search(depth - 1, plyFromRoot + 1, -beta, -alpha);
         }
 
-        unmakeMoveAndUpdateNNUE(board, move);
+        board.unmakeMove(move);
 
         if (eval > bestEval)
         {
