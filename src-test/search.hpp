@@ -123,6 +123,9 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
     if (plyFromRoot > 0 && board.isRepetition())
         return 0;
 
+    if (isTimeUp())
+        return 0;
+
     int originalAlpha = alpha;
     bool inCheck = board.inCheck();
     if (inCheck)
@@ -147,30 +150,44 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
     if (depth <= 0)
         return qSearch(alpha, beta, plyFromRoot);
 
-    // RFP (Reverse futility pruning)
-    bool pv = beta - alpha > 1;
-    if (!pv && plyFromRoot > 0 && depth <= 7 && !inCheck)
-    {
-        int eval = network.Evaluate((int)board.sideToMove());
-        if (eval >= beta + 53 * depth)
-            return eval;
-    }
+    bool pvNode = beta - alpha > 1 || plyFromRoot == 0;
 
-    // NMP (Null move pruning)
-    if (!pv && plyFromRoot > 0 && depth >= 3 && !inCheck && doNull)
+    if (!pvNode && !inCheck)
     {
-        bool hasAtLeast1Piece = board.pieces(PieceType::KNIGHT, board.sideToMove()) > 0 || board.pieces(PieceType::BISHOP, board.sideToMove()) > 0 || board.pieces(PieceType::ROOK, board.sideToMove()) > 0 || board.pieces(PieceType::QUEEN, board.sideToMove()) > 0;
-        if (hasAtLeast1Piece)
+        int eval;
+        bool evalSet = false;
+        
+        // RFP (Reverse futility pruning)
+        if (depth <= 8)
         {
-            board.makeNullMove();
-            int eval = -search(depth - 3, plyFromRoot + 1, -beta, -alpha, false);
-            board.unmakeNullMove();
-            if (eval >= beta)
+            eval = network.Evaluate((int)board.sideToMove());
+            evalSet = true;
+            if (eval >= beta + 75 * depth)
                 return eval;
-            if (isTimeUp())
-                return POS_INFINITY;
+        }
+
+        // NMP (Null move pruning)
+        if (depth >= 3 && doNull)
+        {
+            bool hasAtLeast1Piece = board.pieces(PieceType::KNIGHT, board.sideToMove()) > 0 || board.pieces(PieceType::BISHOP, board.sideToMove()) > 0 || board.pieces(PieceType::ROOK, board.sideToMove()) > 0 || board.pieces(PieceType::QUEEN, board.sideToMove()) > 0;
+            if (!hasAtLeast1Piece)
+                goto skipNmp;
+            if (!evalSet)
+                eval = network.Evaluate((int)board.sideToMove());
+            if (eval < beta)
+                goto skipNmp;
+
+            board.makeNullMove();
+            int score = -search(depth - 3 - depth / 3, plyFromRoot + 1, -beta, -alpha, false);
+            board.unmakeNullMove();
+            if (score >= POS_INFINITY - 256)
+                return beta;
+            if (score >= beta)
+                return score;
         }
     }
+
+skipNmp:
 
     int scores[218];
     scoreMoves(moves, scores, boardKey, *ttEntry, plyFromRoot);
@@ -203,7 +220,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
             {
                 lmr = 0.77 + log(depth) * log(i) / 2.36; // ln(x)
                 lmr -= board.inCheck();                  // reduce checks less
-                lmr -= pv;                               // reduce pv nodes less
+                lmr -= pvNode;                           // reduce pv nodes less
                 if (lmr < 0)
                     lmr = 0;
             }
@@ -241,9 +258,6 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
                 break;
             }
         }
-
-        if (isTimeUp())
-            return POS_INFINITY;
     }
 
     ttEntry->key = boardKey;
@@ -267,7 +281,7 @@ inline int aspiration(int maxDepth, int score)
     int beta = min(POS_INFINITY, score + delta);
     int depth = maxDepth;
 
-    while (!isTimeUp())
+    while (true)
     {
         score = search(depth, 0, alpha, beta);
 
