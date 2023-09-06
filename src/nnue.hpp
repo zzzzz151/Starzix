@@ -1,10 +1,8 @@
 #ifndef NNUE_HPP
 #define NNUE_HPP
 
-#include <iostream>
 #include "../MantaRay/Perspective/PerspectiveNNUE.h"
 #include "../MantaRay/Activation/ClippedReLU.h"
-using namespace std;
 
 // Define the network:
 // Format: PerspectiveNetwork<InputType, OutputType, Activation, ...>

@@ -34,6 +34,19 @@ inline void position(vector<string> &words)
     }
 }
 
+inline void sendInfo(int depth, int score)
+{
+    double millisecondsElapsed = (chrono::steady_clock::now() - start) / chrono::milliseconds(1);
+    double nps = millisecondsElapsed == 0 ? nodes : nodes / millisecondsElapsed * 1000.0;
+    cout << "info depth " << depth
+         << " time " << round(millisecondsElapsed)
+         << " nodes " << nodes
+         << " nps " << (U64)round(nps)
+         << " score cp " << score
+         << " pv " << uci::moveToUci(bestMoveRoot)
+         << endl;
+}
+
 inline void uciLoop()
 {
     string received;
@@ -41,12 +54,15 @@ inline void uciLoop()
     cout << "id name test\n";
     cout << "id author zzzzz\n";
     cout << "option name Hash type spin default 64 min 1 max 512\n";
+    cout << "option name Info type check default false\n";
     cout << "uciok\n";
 
     NUM_TT_ENTRIES = (TT_SIZE_MB * 1024 * 1024) / sizeof(TTEntry);
     TT.clear();
     TT.resize(NUM_TT_ENTRIES);
-    //cout << "TT_SIZE_MB = " << TT_SIZE_MB << " => " << NUM_TT_ENTRIES << " entries" << endl;
+    // cout << "TT_SIZE_MB = " << TT_SIZE_MB << " => " << NUM_TT_ENTRIES << " entries" << endl;
+
+    bool info = false;
 
     while (true)
     {
@@ -59,18 +75,30 @@ inline void uciLoop()
 
         if (received == "quit" || !cin.good())
             break;
-        else if (words[0] == "setoption" && words[2] == "Hash") // setoption name Hash value 32
+        else if (words[0] == "setoption") // setoption name Hash value 32
         {
-            TT_SIZE_MB = stoi(words[4]);
-            NUM_TT_ENTRIES = (TT_SIZE_MB * 1024 * 1024) / sizeof(TTEntry);
-            TT.clear();
-            TT.resize(NUM_TT_ENTRIES);
-            //cout << "TT_SIZE_MB = " << TT_SIZE_MB << " => " << NUM_TT_ENTRIES << " entries" << endl;
+            string optionName = words[2];
+            string optionValue = words[4];
+            if (optionName == "Hash")
+            {
+                TT_SIZE_MB = stoi(optionValue);
+                NUM_TT_ENTRIES = (TT_SIZE_MB * 1024 * 1024) / sizeof(TTEntry);
+                TT.clear();
+                TT.resize(NUM_TT_ENTRIES);
+                // cout << "TT_SIZE_MB = " << TT_SIZE_MB << " => " << NUM_TT_ENTRIES << " entries" << endl;
+            }
+            else if (optionName == "Info")
+            {
+                if (optionValue == "true" || optionValue == "True")
+                    info = true;
+                else if (optionValue == "false" || optionValue == "False")
+                    info = false;
+            }
         }
         else if (received == "ucinewgame")
         {
             // memset(TT, 0, sizeof(TT)); // clear TT
-            //for (int i = 0; i < 0x800000; i++)
+            // for (int i = 0; i < 0x800000; i++)
             //    TT[i].key = 0;
             memset(TT.data(), 0, sizeof(TTEntry) * TT.size());
         }
@@ -104,9 +132,8 @@ inline void uciLoop()
             else if (words[1] == "movetime")
                 millisecondsForThisTurn = stoi(words[2]);
 
-            iterativeDeepening();
-
-            cout << "bestmove " + uci::moveToUci(bestMoveRootAsp == NULL_MOVE ? bestMoveRoot : bestMoveRootAsp) + "\n";
+            Move bestMove = iterativeDeepening(info);
+            cout << "bestmove " + uci::moveToUci(bestMove) + "\n";
         }
         else if (words[0] == "eval")
         {

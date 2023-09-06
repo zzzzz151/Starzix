@@ -1,6 +1,6 @@
 # z5 - UCI C++ chess engine
 
-Currently ~2565 elo (tested against [Barbarossa](https://github.com/nionita/Barbarossa) 0.6).
+Currently ~2600 elo (tested against [Barbarossa](https://github.com/nionita/Barbarossa) 0.6).
 
 # How to compile
 
@@ -14,15 +14,17 @@ Currently ~2565 elo (tested against [Barbarossa](https://github.com/nionita/Barb
 
 # UCI options
 
-Hash - transposition table size in MB from 1 to 512 (default 64)
+Hash (int, default 64) - transposition table size in MB from 1 to 512
+
+Info (bool, default false) - print info for every iterative deepening iteration
 
 # Features
 
 NNUE evaluation (768->128x2->1)
 
-Iterative deepening
-
 Negamax with alpha beta pruning and PVS
+
+Iterative deepening
 
 Quiescence search
 

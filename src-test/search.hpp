@@ -1,12 +1,10 @@
 #ifndef SEARCH_HPP
 #define SEARCH_HPP
 
-#include <chrono>
-#include <climits>
-#include <cmath>
 #include "chess.hpp"
 #include "nnue.hpp"
 #include "see.hpp"
+inline void sendInfo(int depth, int score);
 using namespace chess;
 using namespace std;
 
@@ -32,8 +30,7 @@ U64 nodes;
 chrono::steady_clock::time_point start;
 double millisecondsForThisTurn;
 Board board;
-Move bestMoveRoot, bestMoveRootAsp;
-int globalScore;
+Move bestMoveRoot;
 Move killerMoves[512][2];   // ply, move
 int historyMoves[2][6][64]; // color, pieceType, squareTo
 
@@ -263,26 +260,26 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
     return bestEval;
 }
 
-inline void aspiration(int maxDepth)
+inline int aspiration(int maxDepth, int score)
 {
     int delta = 25;
-    int alpha = max(NEG_INFINITY, globalScore - delta);
-    int beta = min(POS_INFINITY, globalScore + delta);
+    int alpha = max(NEG_INFINITY, score - delta);
+    int beta = min(POS_INFINITY, score + delta);
     int depth = maxDepth;
 
     while (!isTimeUp())
     {
-        globalScore = search(depth, 0, alpha, beta);
+        score = search(depth, 0, alpha, beta);
+
         if (isTimeUp())
             break;
 
-        if (globalScore >= beta)
+        if (score >= beta)
         {
             beta = min(beta + delta, POS_INFINITY);
-            bestMoveRootAsp = bestMoveRoot;
             depth--;
         }
-        else if (globalScore <= alpha)
+        else if (score <= alpha)
         {
             beta = (alpha + beta) / 2;
             alpha = max(alpha - delta, NEG_INFINITY);
@@ -293,45 +290,38 @@ inline void aspiration(int maxDepth)
 
         delta *= 1.5;
     }
+
+    return score;
 }
 
-inline void iterativeDeepening(bool info = false)
+inline Move iterativeDeepening(bool info = false)
 {
     bestMoveRoot = NULL_MOVE;
-    bestMoveRootAsp = NULL_MOVE;
-    int iterationDepth = 1;
     nodes = 0;
+
+    int iterationDepth = 1, score = 0;
     while (true)
     {
         Move before = bestMoveRoot;
-        Move beforeAsp = bestMoveRootAsp;
         if (iterationDepth < 6)
-            globalScore = search(iterationDepth, 0, NEG_INFINITY, POS_INFINITY);
+            score = search(iterationDepth, 0, NEG_INFINITY, POS_INFINITY);
         else
-            aspiration(iterationDepth);
+            score = aspiration(iterationDepth, score);
 
         if (isTimeUp())
         {
             bestMoveRoot = before;
-            bestMoveRootAsp = beforeAsp;
+            sendInfo(iterationDepth, score);
             break;
         }
 
         if (info)
-        {
-            double millisecondsElapsed = (chrono::steady_clock::now() - start) / chrono::milliseconds(1);
-            double nps;
-            if (millisecondsElapsed == 0)
-                nps = nodes;
-            else
-                nps = nodes / millisecondsElapsed;
-            nps *= 1000.0;
-            string moveUci = bestMoveRootAsp == NULL_MOVE ? uci::moveToUci(bestMoveRoot) : uci::moveToUci(bestMoveRootAsp);
-            cout << "info depth " << iterationDepth << " time " << round(millisecondsElapsed) << " nodes " << nodes << " nps " << (U64)round(nps) << " score cp " << globalScore << " pv " << moveUci << endl;
-        }
+            sendInfo(iterationDepth, score);
 
         iterationDepth++;
     }
+
+    return bestMoveRoot;
 }
 
 #endif
