@@ -179,9 +179,9 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
 
     int scores[218];
     scoreMoves(moves, scores, boardKey, *ttEntry, plyFromRoot);
-    int bestEval = NEG_INFINITY;
+    int bestScore = NEG_INFINITY;
     Move bestMove;
-    bool canLmr = depth > 1 && plyFromRoot > 0 && !inCheck;
+    bool canLmr = depth > 1 && !inCheck;
 
     for (int i = 0; i < moves.size(); i++)
     {
@@ -197,9 +197,9 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
         nodes++;
 
         // PVS (Principal variation search)
-        int eval;
+        int score;
         if (i == 0)
-            eval = -search(depth - 1, plyFromRoot + 1, -beta, -alpha);
+            score = -search(depth - 1, plyFromRoot + 1, -beta, -alpha);
         else
         {
             // LMR (Late move reduction)
@@ -212,22 +212,22 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
                 if (lmr < 0)
                     lmr = 0;
             }
-            eval = -search(depth - 1 - lmr, plyFromRoot + 1, -alpha - 1, -alpha);
-            if (eval > alpha && (eval < beta || lmr > 0))
-                eval = -search(depth - 1, plyFromRoot + 1, -beta, -alpha);
+            score = -search(depth - 1 - lmr, plyFromRoot + 1, -alpha - 1, -alpha);
+            if (score > alpha && (score < beta || lmr > 0))
+                score = -search(depth - 1, plyFromRoot + 1, -beta, -alpha);
         }
 
         board.unmakeMove(move);
 
-        if (eval > bestEval)
+        if (score > bestScore)
         {
-            bestEval = eval;
+            bestScore = score;
             bestMove = move;
             if (plyFromRoot == 0)
                 bestMoveRoot = move;
 
-            if (bestEval > alpha)
-                alpha = bestEval;
+            if (bestScore > alpha)
+                alpha = bestScore;
             if (alpha >= beta)
             {
                 bool isQuietMove = !board.isCapture(move) && move.typeOf() != move.PROMOTION;
@@ -250,16 +250,16 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
 
     ttEntry->key = boardKey;
     ttEntry->depth = depth;
-    ttEntry->score = bestEval;
+    ttEntry->score = bestScore;
     ttEntry->bestMove = bestMove;
-    if (bestEval <= originalAlpha)
+    if (bestScore <= originalAlpha)
         ttEntry->type = UPPER_BOUND;
-    else if (bestEval >= beta)
+    else if (bestScore >= beta)
         ttEntry->type = LOWER_BOUND;
     else
         ttEntry->type = EXACT;
 
-    return bestEval;
+    return bestScore;
 }
 
 inline int aspiration(int maxDepth, int score)
