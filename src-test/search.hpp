@@ -154,40 +154,28 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
 
     if (!pvNode && !inCheck)
     {
-        int eval;
-        bool evalSet = false;
-        
+        int eval = network.Evaluate((int)board.sideToMove());
+
         // RFP (Reverse futility pruning)
-        if (depth <= 8)
-        {
-            eval = network.Evaluate((int)board.sideToMove());
-            evalSet = true;
-            if (eval >= beta + 75 * depth)
-                return eval;
-        }
+        if (depth <= 8 && eval >= beta + 75 * depth)
+            return eval;
 
         // NMP (Null move pruning)
-        if (depth >= 3 && doNull)
+        if (depth >= 3 && doNull && eval >= beta)
         {
             bool hasAtLeast1Piece = board.pieces(PieceType::KNIGHT, board.sideToMove()) > 0 || board.pieces(PieceType::BISHOP, board.sideToMove()) > 0 || board.pieces(PieceType::ROOK, board.sideToMove()) > 0 || board.pieces(PieceType::QUEEN, board.sideToMove()) > 0;
-            if (!hasAtLeast1Piece)
-                goto skipNmp;
-            if (!evalSet)
-                eval = network.Evaluate((int)board.sideToMove());
-            if (eval < beta)
-                goto skipNmp;
-
-            board.makeNullMove();
-            int score = -search(depth - 3 - depth / 3, plyFromRoot + 1, -beta, -alpha, false);
-            board.unmakeNullMove();
-            if (score >= POS_INFINITY - 256)
-                return beta;
-            if (score >= beta)
-                return score;
+            if (hasAtLeast1Piece)
+            {
+                board.makeNullMove();
+                int score = -search(depth - 3 - depth / 3, plyFromRoot + 1, -beta, -alpha, false);
+                board.unmakeNullMove();
+                if (score >= POS_INFINITY - 256)
+                    return beta;
+                if (score >= beta)
+                    return score;
+            }
         }
     }
-
-skipNmp:
 
     int scores[218];
     scoreMoves(moves, scores, boardKey, *ttEntry, plyFromRoot);
