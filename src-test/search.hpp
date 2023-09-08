@@ -138,7 +138,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
             return ttEntry->score;
 
     // Internal iterative reduction
-    if (ttEntry->key != boardKey && depth > 3)
+    if (ttEntry->key != boardKey && depth > 3 && !inCheck)
         depth--;
 
     Movelist moves;
