@@ -119,16 +119,20 @@ inline void uciLoop()
             // clear history moves
             memset(&historyMoves[0][0][0], 0, sizeof(historyMoves));
 
-            millisecondsForThisTurn = 60000;
+            int milliseconds = 60000;
+            byte timeType = (byte)-1;
             if (words[1] == "wtime")
             {
-                U64 millisecondsLeft = board.sideToMove() == Color::WHITE ? stoi(words[2]) : stoi(words[4]);
-                millisecondsForThisTurn = millisecondsLeft / 30.000;
+                milliseconds = board.sideToMove() == Color::WHITE ? stoi(words[2]) : stoi(words[4]);
+                timeType = TIME_TYPE_NORMAL_GAME;
             }
             else if (words[1] == "movetime")
-                millisecondsForThisTurn = stoi(words[2]);
+            {
+                milliseconds = stoi(words[2]);
+                timeType = TIME_TYPE_MOVE_TIME;
+            }
 
-            Move bestMove = iterativeDeepening(info);
+            Move bestMove = iterativeDeepening(milliseconds, timeType);
             cout << "bestmove " + uci::moveToUci(bestMove) + "\n";
         }
         else if (words[0] == "eval")

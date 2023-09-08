@@ -804,6 +804,8 @@ const std::string squareToString[64] = {
 
         [[nodiscard]] constexpr PieceType typeOfPiece(Piece piece)
         {
+            if (piece == Piece::NONE)
+                return PieceType::NONE;
             return static_cast<PieceType>(static_cast<int>(piece) % 6);
         }
 

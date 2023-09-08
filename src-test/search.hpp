@@ -28,15 +28,19 @@ const int PIECE_VALUES[7] = {100, 302, 320, 500, 900, 15000, 0};
 
 U64 nodes;
 chrono::steady_clock::time_point start;
-double millisecondsForThisTurn;
+int millisecondsForThisTurn;
+bool isTimeUp = false;
 Board board;
 Move bestMoveRoot;
 Move killerMoves[512][2];   // ply, move
 int historyMoves[2][6][64]; // color, pieceType, squareTo
 
-inline bool isTimeUp()
+inline bool checkIsTimeUp()
 {
-    return (chrono::steady_clock::now() - start) / chrono::milliseconds(1) >= millisecondsForThisTurn;
+    if (isTimeUp)
+        return true;
+    isTimeUp = (chrono::steady_clock::now() - start) / chrono::milliseconds(1) >= millisecondsForThisTurn;
+    return isTimeUp;
 }
 
 inline void scoreMoves(Movelist &moves, int *scores, U64 boardKey, TTEntry &ttEntry, int plyFromRoot)
@@ -52,7 +56,8 @@ inline void scoreMoves(Movelist &moves, int *scores, U64 boardKey, TTEntry &ttEn
             PieceType captured = board.at<PieceType>(move.to());
             PieceType capturing = board.at<PieceType>(move.from());
             int moveScore = 100 * PIECE_VALUES[(int)captured] - PIECE_VALUES[(int)capturing]; // MVVLVA
-            // moveScore += SEE(board, move) ? 100'000'000 : -850'000'000;
+            if (!SEE(board, move))
+                moveScore -= 1'500'000'000;
             scores[i] = moveScore;
         }
         else if (move.typeOf() == move.PROMOTION)
@@ -123,8 +128,11 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
     if (plyFromRoot > 0 && board.isRepetition())
         return 0;
 
-    if (isTimeUp())
+    if (checkIsTimeUp())
         return 0;
+
+    if (depth < 0)
+        depth = 0;
 
     int originalAlpha = alpha;
     bool inCheck = board.inCheck();
@@ -219,7 +227,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
 
         board.unmakeMove(move);
 
-        if (isTimeUp())
+        if (checkIsTimeUp())
             return 0;
 
         if (score > bestScore)
@@ -276,7 +284,7 @@ inline int aspiration(int maxDepth, int score)
     {
         score = search(depth, 0, alpha, beta);
 
-        if (isTimeUp())
+        if (checkIsTimeUp())
             return 0;
 
         if (score >= beta)
@@ -299,10 +307,19 @@ inline int aspiration(int maxDepth, int score)
     return score;
 }
 
-inline Move iterativeDeepening(bool info = false)
+const byte TIME_TYPE_NORMAL_GAME = (byte)0, TIME_TYPE_MOVE_TIME = (byte)1;
+inline Move iterativeDeepening(int milliseconds, byte timeType, bool info = false)
 {
     bestMoveRoot = NULL_MOVE;
     nodes = 0;
+    isTimeUp = false;
+
+    if (timeType == TIME_TYPE_NORMAL_GAME)
+        millisecondsForThisTurn = milliseconds / 30.0;
+    else if (timeType == TIME_TYPE_MOVE_TIME)
+        millisecondsForThisTurn = milliseconds;
+    else
+        millisecondsForThisTurn = 60000; // default 1 minute
 
     int iterationDepth = 1, score = 0;
     while (true)
@@ -313,7 +330,7 @@ inline Move iterativeDeepening(bool info = false)
         else
             score = aspiration(iterationDepth, score);
 
-        if (isTimeUp())
+        if (checkIsTimeUp())
         {
             bestMoveRoot = before;
             sendInfo(iterationDepth, score);

@@ -1,3 +1,4 @@
+
 #ifndef SEE_HPP
 #define SEE_HPP
 
@@ -5,131 +6,61 @@
 using namespace chess;
 using namespace std;
 
-int PIECE_VALUES_FOR_SEE[6] = {100, 450, 450, 650, 1250, 0};
+const int SEE_PIECE_VALUES[7] = {93, 308, 346, 521, 994, 20000, 0};
 
-inline int squareBit(Square sq)
+inline bool SEE(Board &board, Move move, int threshold = 0)
 {
-    return U64(1) << (int)sq;
-}
+    int from = (int)move.from();
+    int to = (int)move.to();
 
-inline int gain(const Board &board, Move &move)
-{
-    if (move.typeOf() == move.CASTLING)
-        return 0;
-
-    if (move.typeOf() == move.ENPASSANT)
-        return PIECE_VALUES_FOR_SEE[0];
-
-    int score = PIECE_VALUES_FOR_SEE[(int)board.at<PieceType>(move.to())];
-
-    if (move.typeOf() == move.PROMOTION)
-        score += PIECE_VALUES_FOR_SEE[(int)move.promotionType()] - PIECE_VALUES_FOR_SEE[0]; // gain promotion, lose the pawn
-
-    return score;
-}
-
-inline PieceType popLeastValuable(const Board &board, Bitboard &occ, Bitboard attackers, Color color)
-{
-    Bitboard bb = attackers & board.pieces(PieceType::PAWN, color);
-    if (bb > 0)
-    {
-        occ ^= 1ULL << builtin::lsb(bb);
-        return PieceType::PAWN;
-    }
-
-    bb = attackers & board.pieces(PieceType::KNIGHT, color);
-    if (bb > 0)
-    {
-        occ ^= 1ULL << builtin::lsb(bb);
-        return PieceType::KNIGHT;
-    }
-
-    bb = attackers & board.pieces(PieceType::BISHOP, color);
-    if (bb > 0)
-    {
-        occ ^= 1ULL << builtin::lsb(bb);
-        return PieceType::BISHOP;
-    }
-
-    bb = attackers & board.pieces(PieceType::ROOK, color);
-    if (bb > 0)
-    {
-        occ ^= 1ULL << builtin::lsb(bb);
-        return PieceType::ROOK;
-    }
-
-    bb = attackers & board.pieces(PieceType::QUEEN, color);
-    if (bb > 0)
-    {
-        occ ^= 1ULL << builtin::lsb(bb);
-        return PieceType::QUEEN;
-    }
-
-    bb = attackers & board.pieces(PieceType::KING, color);
-    if (bb > 0)
-    {
-        occ ^= 1ULL << builtin::lsb(bb);
-        return PieceType::KING;
-    }
-
-    return PieceType::NONE;
-}
-
-// SEE (static exchange evaluation)
-inline bool SEE(const Board &board, Move &move, int threshold = 0)
-{
-    int score = gain(board, move) - threshold;
-    if (score < 0)
+    PieceType target = board.at<PieceType>(move.to());
+    int value = SEE_PIECE_VALUES[(int)target] - threshold;
+    if (value < 0)
         return false;
 
-    Square square = move.to();
-    PieceType next = move.typeOf() == move.PROMOTION ? move.promotionType() : board.at<PieceType>(move.from());
-    score -= PIECE_VALUES_FOR_SEE[(int)next];
-    if (score >= 0)
+    PieceType attacker = board.at<PieceType>(move.from());
+    value -= SEE_PIECE_VALUES[(int)attacker];
+    if (value >= 0)
         return true;
 
-    Bitboard occupancy = board.occ() ^ squareBit(move.from()) ^ squareBit(square);
-    Bitboard queens = board.pieces(PieceType::QUEEN);
-    Bitboard bishops = queens | board.pieces(PieceType::BISHOP);
-    Bitboard rooks = queens | board.pieces(PieceType::ROOK);
+    U64 occupied = (board.occ() ^ (1ULL << from)) | (1ULL << to);
+    U64 attackers = attacks::attackers(board, Color::WHITE, move.to(), occupied) | attacks::attackers(board, Color::BLACK, move.to(), occupied);
+    attackers &= occupied;
+    U64 queens = board.pieces(PieceType::QUEEN);
+    U64 bishops = board.pieces(PieceType::BISHOP) | queens;
+    U64 rooks = board.pieces(PieceType::ROOK) | queens;
+    Color stm = ~board.sideToMove();
 
-    Bitboard attackers = U64(0);
-    attackers |= rooks & attacks::rook(square, occupancy);
-    attackers |= bishops & attacks::bishop(square, occupancy);
-    attackers |= board.pieces(PieceType::PAWN, Color::BLACK) & attacks::pawn(Color::WHITE, square);
-    attackers |= board.pieces(PieceType::PAWN, Color::WHITE) & attacks::pawn(Color::BLACK, square);
-    attackers |= board.pieces(PieceType::KNIGHT) & attacks::knight(square);
-    attackers |= board.pieces(PieceType::KING) & attacks::king(square);
-
-    Color us = ~board.sideToMove();
     while (true)
     {
-        Bitboard ourAttackers = attackers & board.us(us);
-        if (ourAttackers == 0)
+        attackers &= occupied;
+        U64 myAttackers = attackers & board.us(stm);
+        if (myAttackers == 0)
             break;
 
-        next = popLeastValuable(board, occupancy, ourAttackers, us);
+        int pt;
+        for (pt = 0; pt <= 5; pt++)
+            if ((myAttackers & board.pieces((PieceType)pt)) > 0)
+                break;
 
-        if (next == PieceType::PAWN || next == PieceType::BISHOP || next == PieceType::QUEEN)
-            attackers |= attacks::bishop(square, occupancy) & bishops;
-
-        if (next == PieceType::ROOK || next == PieceType::QUEEN)
-            attackers |= attacks::rook(square, occupancy) & rooks;
-
-        attackers &= occupancy;
-        score = -score - 1 - PIECE_VALUES_FOR_SEE[(int)next];
-        us = ~us;
-
-        if (score >= 0)
+        stm = ~stm;
+        if ((value = -value - 1 - SEE_PIECE_VALUES[pt]) >= 0)
         {
-            // if our only attacker is our king, but the opponent still has defenders
-            if (next == PieceType::KING && (attackers & board.us(us)) > 0)
-                us = ~us;
+            if ((PieceType)pt == PieceType::KING && (attackers & board.us(stm)) > 0)
+                stm = ~stm;
             break;
         }
+
+        U64 x = builtin::lsb(myAttackers & board.pieces((PieceType)pt));
+        occupied ^= (1ULL << x);
+
+        if ((PieceType)pt == PieceType::PAWN || (PieceType)pt == PieceType::BISHOP || (PieceType)pt == PieceType::QUEEN)
+            attackers |= attacks::bishop(move.to(), occupied) & bishops;
+        if ((PieceType)pt == PieceType::ROOK || (PieceType)pt == PieceType::QUEEN)
+            attackers |= attacks::rook(move.to(), occupied) & rooks;
     }
 
-    return board.sideToMove() != us;
+    return stm != board.sideToMove();
 }
 
 #endif

@@ -30,7 +30,7 @@ Quiescence search
 
 Transposition table
 
-Move ordering (hash move > SEE + MVVLVA > promotions > killer moves > history heuristic)
+Move ordering (hash move > good captures by SEE + MVVLVA > promotions > killer moves > history heuristic > bad captures)
 
 Aspiration window
 
