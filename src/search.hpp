@@ -52,7 +52,7 @@ inline void scoreMoves(Movelist &moves, int *scores, U64 boardKey, TTEntry &ttEn
             PieceType captured = board.at<PieceType>(move.to());
             PieceType capturing = board.at<PieceType>(move.from());
             int moveScore = 100 * PIECE_VALUES[(int)captured] - PIECE_VALUES[(int)capturing]; // MVVLVA
-            moveScore += SEE(board, move) ? 100'000'000 : -850'000'000;
+            //moveScore += SEE(board, move) ? 100'000'000 : -850'000'000;
             scores[i] = moveScore;
         }
         else if (move.typeOf() == move.PROMOTION)
@@ -138,7 +138,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
             return ttEntry->score;
 
     // Internal iterative reduction
-    if (ttEntry->key != boardKey && depth > 3)
+    if (ttEntry->key != boardKey && depth > 3 && !inCheck)
         depth--;
 
     Movelist moves;
@@ -219,6 +219,9 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
 
         board.unmakeMove(move);
 
+        if (isTimeUp())
+            return 0;
+
         if (score > bestScore)
         {
             bestScore = score;
@@ -274,7 +277,7 @@ inline int aspiration(int maxDepth, int score)
         score = search(depth, 0, alpha, beta);
 
         if (isTimeUp())
-            break;
+            return 0;
 
         if (score >= beta)
         {

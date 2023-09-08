@@ -62,6 +62,7 @@ inline void uciLoop()
     TT.resize(NUM_TT_ENTRIES);
     // cout << "TT_SIZE_MB = " << TT_SIZE_MB << " => " << NUM_TT_ENTRIES << " entries" << endl;
 
+    int numRowsOfKillerMoves = sizeof(killerMoves) / sizeof(killerMoves[0]);
     bool info = false;
 
     while (true)
@@ -97,28 +98,23 @@ inline void uciLoop()
         }
         else if (received == "ucinewgame")
         {
-            // memset(TT, 0, sizeof(TT)); // clear TT
-            // for (int i = 0; i < 0x800000; i++)
-            //    TT[i].key = 0;
+             // clear TT
             memset(TT.data(), 0, sizeof(TTEntry) * TT.size());
-        }
-        else if (received == "isready")
-            cout << "readyok\n";
-        else if (words[0] == "position")
-        {
-            position(words);
-        }
-        else if (words[0] == "go")
-        {
-            start = chrono::steady_clock::now();
 
             // clear killers
-            // memset(killerMoves, 0, sizeof(killerMoves));
-            for (int i = 0; i < 512; i++)
+            for (int i = 0; i < numRowsOfKillerMoves; i++)
             {
                 killerMoves[i][0] = NULL_MOVE;
                 killerMoves[i][1] = NULL_MOVE;
             }
+        }
+        else if (received == "isready")
+            cout << "readyok\n";
+        else if (words[0] == "position")
+            position(words);
+        else if (words[0] == "go")
+        {
+            start = chrono::steady_clock::now();
 
             // clear history moves
             memset(&historyMoves[0][0][0], 0, sizeof(historyMoves));
@@ -136,9 +132,7 @@ inline void uciLoop()
             cout << "bestmove " + uci::moveToUci(bestMove) + "\n";
         }
         else if (words[0] == "eval")
-        {
-            cout << "eval: " << network.Evaluate((int)board.sideToMove()) << " cp" << endl;
-        }
+            cout << "eval " << network.Evaluate((int)board.sideToMove()) << " cp" << endl;
     }
 }
 
