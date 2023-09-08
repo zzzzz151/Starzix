@@ -98,7 +98,7 @@ inline void uciLoop()
         }
         else if (received == "ucinewgame")
         {
-             // clear TT
+            // clear TT
             memset(TT.data(), 0, sizeof(TTEntry) * TT.size());
 
             // clear killers

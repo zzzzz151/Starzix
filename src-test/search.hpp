@@ -52,7 +52,7 @@ inline void scoreMoves(Movelist &moves, int *scores, U64 boardKey, TTEntry &ttEn
             PieceType captured = board.at<PieceType>(move.to());
             PieceType capturing = board.at<PieceType>(move.from());
             int moveScore = 100 * PIECE_VALUES[(int)captured] - PIECE_VALUES[(int)capturing]; // MVVLVA
-            //moveScore += SEE(board, move) ? 100'000'000 : -850'000'000;
+            // moveScore += SEE(board, move) ? 100'000'000 : -850'000'000;
             scores[i] = moveScore;
         }
         else if (move.typeOf() == move.PROMOTION)
@@ -132,7 +132,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
         depth++;
 
     U64 boardKey = board.zobrist();
-    TTEntry *ttEntry = &TT[boardKey % NUM_TT_ENTRIES];
+    TTEntry *ttEntry = &(TT[boardKey % NUM_TT_ENTRIES]);
     if (plyFromRoot > 0 && ttEntry->key == boardKey && ttEntry->depth >= depth)
         if (ttEntry->type == EXACT || (ttEntry->type == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->type == UPPER_BOUND && ttEntry->score <= alpha))
             return ttEntry->score;
