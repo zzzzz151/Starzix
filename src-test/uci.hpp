@@ -132,7 +132,7 @@ inline void uciLoop()
                 timeType = TIME_TYPE_MOVE_TIME;
             }
 
-            Move bestMove = iterativeDeepening(milliseconds, timeType);
+            Move bestMove = iterativeDeepening(milliseconds, timeType, info);
             cout << "bestmove " + uci::moveToUci(bestMove) + "\n";
         }
         else if (words[0] == "eval")
