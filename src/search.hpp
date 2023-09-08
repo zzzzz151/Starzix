@@ -324,7 +324,9 @@ inline Move iterativeDeepening(int milliseconds, byte timeType, bool info = fals
     int iterationDepth = 1, score = 0;
     while (true)
     {
+        int scoreBefore = score;
         Move before = bestMoveRoot;
+
         if (iterationDepth < 6)
             score = search(iterationDepth, 0, NEG_INFINITY, POS_INFINITY);
         else
@@ -333,7 +335,7 @@ inline Move iterativeDeepening(int milliseconds, byte timeType, bool info = fals
         if (checkIsTimeUp())
         {
             bestMoveRoot = before;
-            sendInfo(iterationDepth, score);
+            sendInfo(iterationDepth - 1, scoreBefore);
             break;
         }
 
