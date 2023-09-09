@@ -1,6 +1,6 @@
 # z5 - UCI C++ chess engine
 
-Currently ~2600 elo (tested against [Barbarossa](https://github.com/nionita/Barbarossa) 0.6).
+Currently ~2760 elo (tested against [4ku](https://github.com/kz04px/4ku) 3.0).
 
 # How to compile
 
