@@ -8,9 +8,48 @@
 using namespace chess;
 using namespace std;
 
+int numRowsOfKillerMoves = sizeof(killerMoves) / sizeof(killerMoves[0]);
+bool info = false;
+
+inline void setoption(vector<string> &words) // e.g. "setoption name Hash value 32"
+{
+    string optionName = words[2];
+    string optionValue = words[4];
+
+    if (optionName == "Hash" || optionName == "hash")
+    {
+        TT_SIZE_MB = stoi(optionValue);
+        NUM_TT_ENTRIES = (TT_SIZE_MB * 1024 * 1024) / sizeof(TTEntry);
+        TT.clear();
+        TT.resize(NUM_TT_ENTRIES);
+        // cout << "TT_SIZE_MB = " << TT_SIZE_MB << " => " << NUM_TT_ENTRIES << " entries" << endl;
+    }
+    else if (optionName == "Info" || optionName == "info")
+    {
+        if (optionValue == "true" || optionValue == "True")
+            info = true;
+        else if (optionValue == "false" || optionValue == "False")
+            info = false;
+    }
+}
+
+inline void ucinewgame()
+{
+    // clear TT
+    memset(TT.data(), 0, sizeof(TTEntry) * TT.size());
+
+    // clear killers
+    for (int i = 0; i < numRowsOfKillerMoves; i++)
+    {
+        killerMoves[i][0] = NULL_MOVE;
+        killerMoves[i][1] = NULL_MOVE;
+    }
+}
+
 inline void position(vector<string> &words)
 {
     int movesTokenIndex = -1;
+
     if (words[1] == "startpos")
     {
         board = Board(STARTPOS);
@@ -32,6 +71,31 @@ inline void position(vector<string> &words)
         Move move = uci::uciToMove(board, words[i]);
         board.makeMove(move);
     }
+}
+
+inline void go(vector<string> &words)
+{
+    start = chrono::steady_clock::now();
+
+    // clear history moves
+    memset(&historyMoves[0][0][0], 0, sizeof(historyMoves));
+
+    int milliseconds = 60000;
+    byte timeType = (byte)-1;
+
+    if (words[1] == "wtime")
+    {
+        milliseconds = board.sideToMove() == Color::WHITE ? stoi(words[2]) : stoi(words[4]);
+        timeType = TIME_TYPE_NORMAL_GAME;
+    }
+    else if (words[1] == "movetime")
+    {
+        milliseconds = stoi(words[2]);
+        timeType = TIME_TYPE_MOVE_TIME;
+    }
+
+    Move bestMove = iterativeDeepening(milliseconds, timeType, info);
+    cout << "bestmove " + uci::moveToUci(bestMove) + "\n";
 }
 
 inline void sendInfo(int depth, int score)
@@ -62,9 +126,6 @@ inline void uciLoop()
     TT.resize(NUM_TT_ENTRIES);
     // cout << "TT_SIZE_MB = " << TT_SIZE_MB << " => " << NUM_TT_ENTRIES << " entries" << endl;
 
-    int numRowsOfKillerMoves = sizeof(killerMoves) / sizeof(killerMoves[0]);
-    bool info = false;
-
     while (true)
     {
         getline(cin, received);
@@ -76,65 +137,16 @@ inline void uciLoop()
 
         if (received == "quit" || !cin.good())
             break;
-        else if (words[0] == "setoption") // setoption name Hash value 32
-        {
-            string optionName = words[2];
-            string optionValue = words[4];
-            if (optionName == "Hash")
-            {
-                TT_SIZE_MB = stoi(optionValue);
-                NUM_TT_ENTRIES = (TT_SIZE_MB * 1024 * 1024) / sizeof(TTEntry);
-                TT.clear();
-                TT.resize(NUM_TT_ENTRIES);
-                // cout << "TT_SIZE_MB = " << TT_SIZE_MB << " => " << NUM_TT_ENTRIES << " entries" << endl;
-            }
-            else if (optionName == "Info")
-            {
-                if (optionValue == "true" || optionValue == "True")
-                    info = true;
-                else if (optionValue == "false" || optionValue == "False")
-                    info = false;
-            }
-        }
+        else if (words[0] == "setoption") // e.g. "setoption name Hash value 32"
+            setoption(words);
         else if (received == "ucinewgame")
-        {
-            // clear TT
-            memset(TT.data(), 0, sizeof(TTEntry) * TT.size());
-
-            // clear killers
-            for (int i = 0; i < numRowsOfKillerMoves; i++)
-            {
-                killerMoves[i][0] = NULL_MOVE;
-                killerMoves[i][1] = NULL_MOVE;
-            }
-        }
+            ucinewgame();
         else if (received == "isready")
             cout << "readyok\n";
         else if (words[0] == "position")
             position(words);
         else if (words[0] == "go")
-        {
-            start = chrono::steady_clock::now();
-
-            // clear history moves
-            memset(&historyMoves[0][0][0], 0, sizeof(historyMoves));
-
-            int milliseconds = 60000;
-            byte timeType = (byte)-1;
-            if (words[1] == "wtime")
-            {
-                milliseconds = board.sideToMove() == Color::WHITE ? stoi(words[2]) : stoi(words[4]);
-                timeType = TIME_TYPE_NORMAL_GAME;
-            }
-            else if (words[1] == "movetime")
-            {
-                milliseconds = stoi(words[2]);
-                timeType = TIME_TYPE_MOVE_TIME;
-            }
-
-            Move bestMove = iterativeDeepening(milliseconds, timeType, info);
-            cout << "bestmove " + uci::moveToUci(bestMove) + "\n";
-        }
+            go(words);
         else if (words[0] == "eval")
             cout << "eval " << network.Evaluate((int)board.sideToMove()) << " cp" << endl;
     }
