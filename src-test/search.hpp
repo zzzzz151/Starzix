@@ -61,8 +61,8 @@ int millisecondsForThisTurn;
 bool isTimeUp = false;
 Board board;
 Move bestMoveRoot;
-Move killerMoves[512][2]; // ply, move
-int killerMovesNumRows = 512;
+Move killerMoves[100][2]; // ply, move
+int killerMovesNumRows = 100;
 int historyMoves[2][6][64];       // color, pieceType, squareTo
 int lmrTable[MAX_DEPTH + 2][218]; // depth, move (lmrTable initialized in main.cpp)
 int lmrTableNumRows = MAX_DEPTH + 2, lmrTableNumCols = 218;
