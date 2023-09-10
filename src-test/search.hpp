@@ -50,6 +50,9 @@ const double ASPIRATION_DELTA_MULTIPLIER = 1.5;
 
 // ----- End tunable params -----
 
+// ----- Global vars -----
+
+const byte TIME_TYPE_NORMAL_GAME = (byte)0, TIME_TYPE_MOVE_TIME = (byte)1;
 const int POS_INFINITY = 9999999, NEG_INFINITY = -POS_INFINITY, MIN_MATE_SCORE = POS_INFINITY - 512;
 Move NULL_MOVE;
 U64 nodes;
@@ -75,6 +78,8 @@ struct TTEntry
 };
 uint32_t NUM_TT_ENTRIES;
 vector<TTEntry> TT;
+
+// ----- End global vars -----
 
 inline bool checkIsTimeUp()
 {
@@ -343,8 +348,6 @@ inline int aspiration(int maxDepth, int score)
 
     return score;
 }
-
-const byte TIME_TYPE_NORMAL_GAME = (byte)0, TIME_TYPE_MOVE_TIME = (byte)1;
 
 inline Move iterativeDeepening(int milliseconds, byte timeType, bool info = false)
 {
