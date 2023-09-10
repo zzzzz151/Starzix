@@ -3,10 +3,9 @@
 #define SEE_HPP
 
 #include "chess.hpp"
+#include "search.hpp" // contains SEE_PIECE_VALUES and PAWN_INDEX
+extern const int SEE_PIECE_VALUES[7], PAWN_INDEX;
 using namespace chess;
-
-const int SEE_PIECE_VALUES[7] = {100, 300, 300, 500, 900, 0, 0};
-const int PAWN_INDEX = 0;
 
 inline int gain(const Board &board, Move &move)
 {

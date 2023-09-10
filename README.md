@@ -1,6 +1,6 @@
 # z5 - UCI C++ chess engine
 
-Currently ~2760 elo (tested against [4ku](https://github.com/kz04px/4ku) 3.0).
+Currently ~2780 elo (tested against [4ku](https://github.com/kz04px/4ku) 3.0).
 
 # How to compile
 
@@ -39,6 +39,8 @@ Check extension
 Late move reductions
 
 Null move pruning
+
+Futility pruning
 
 Reverse futility pruning
 

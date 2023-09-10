@@ -80,7 +80,7 @@ inline void go(vector<string> &words)
     // clear history moves
     memset(&historyMoves[0][0][0], 0, sizeof(historyMoves));
 
-    int milliseconds = 60000;
+    int milliseconds = DEFAULT_TIME_MILLISECONDS;
     byte timeType = (byte)-1;
 
     if (words[1] == "wtime")
@@ -117,7 +117,7 @@ inline void uciLoop()
     getline(cin, received);
     cout << "id name test\n";
     cout << "id author zzzzz\n";
-    cout << "option name Hash type spin default 64 min 1 max 512\n";
+    cout << "option name Hash type spin default " << TT_SIZE_MB << " min 1 max 512\n";
     cout << "option name Info type check default false\n";
     cout << "uciok\n";
 

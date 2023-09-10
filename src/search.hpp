@@ -4,12 +4,21 @@
 #include "chess.hpp"
 #include "nnue.hpp"
 #include "see.hpp"
-inline void sendInfo(int depth, int score);
+inline void sendInfo(int depth, int score); // from uci.hpp
 using namespace chess;
 using namespace std;
 
-const int POS_INFINITY = 9999999, NEG_INFINITY = -9999999;
+const int POS_INFINITY = 9999999, NEG_INFINITY = -POS_INFINITY, MIN_MATE_SCORE = POS_INFINITY - 512;
 Move NULL_MOVE;
+
+U64 nodes;
+chrono::steady_clock::time_point start;
+int millisecondsForThisTurn;
+bool isTimeUp = false;
+Board board;
+Move bestMoveRoot;
+Move killerMoves[512][2];   // ply, move
+int historyMoves[2][6][64]; // color, pieceType, squareTo
 
 const char EXACT = 1, LOWER_BOUND = 2, UPPER_BOUND = 3;
 struct TTEntry
@@ -20,20 +29,41 @@ struct TTEntry
     int16_t depth;
     char type;
 };
-int TT_SIZE_MB = 64;
 uint32_t NUM_TT_ENTRIES;
 vector<TTEntry> TT;
 
-const int PIECE_VALUES[7] = {100, 302, 320, 500, 900, 15000, 0};
+// Tunable params
 
-U64 nodes;
-chrono::steady_clock::time_point start;
-int millisecondsForThisTurn;
-bool isTimeUp = false;
-Board board;
-Move bestMoveRoot;
-Move killerMoves[512][2];   // ply, move
-int historyMoves[2][6][64]; // color, pieceType, squareTo
+const uint32_t DEFAULT_TIME_MILLISECONDS = 60000; // default 1 minute
+
+const uint8_t MAX_DEPTH = 50;
+
+int TT_SIZE_MB = 64; // default (and current) TT size in MB
+
+extern const int PIECE_VALUES[7] = {100, 302, 320, 500, 900, 15000, 0},
+                 SEE_PIECE_VALUES[7] = {100, 300, 300, 500, 900, 0, 0},
+                 PAWN_INDEX = 0;
+
+const int HASH_MOVE_SCORE = INT_MAX,
+          GOOD_CAPTURE_SCORE = 1'500'000'000,
+          PROMOTION_SCORE = 1'000'000'000,
+          KILLER_SCORE = 500'000'000,
+          HISTORY_SCORE = 0,
+          BAD_CAPTURE_SCORE = -500'000'000;
+
+const uint8_t IIR_MIN_DEPTH = 4;
+
+const uint8_t RFP_MIN_DEPTH = 8, RFP_DEPTH_MULTIPLIER = 75;
+
+const uint8_t NMP_MIN_DEPTH = 3, NMP_BASE_REDUCTION = 3, NMP_REDUCTION_DIVISOR = 3;
+
+const uint8_t FP_MAX_DEPTH = 7, FP_BASE = 160, FP_LMR_MULTIPLIER = 65;
+
+const uint8_t LMR_MIN_DEPTH = 2;
+const double LMR_BASE = 0.77, LMR_DIVISOR = 2.36;
+
+const uint8_t ASPIRATION_MIN_DEPTH = 6, ASPIRATION_INITIAL_DELTA = 25;
+const double ASPIRATION_DELTA_MULTIPLIER = 1.5;
 
 inline bool checkIsTimeUp()
 {
@@ -50,26 +80,25 @@ inline void scoreMoves(Movelist &moves, int *scores, U64 boardKey, TTEntry &ttEn
         Move move = moves[i];
 
         if (ttEntry.key == boardKey && move == ttEntry.bestMove)
-            scores[i] = INT_MAX;
+            scores[i] = HASH_MOVE_SCORE;
         else if (board.isCapture(move))
         {
             PieceType captured = board.at<PieceType>(move.to());
             PieceType capturing = board.at<PieceType>(move.from());
-            int moveScore = 100 * PIECE_VALUES[(int)captured] - PIECE_VALUES[(int)capturing]; // MVVLVA
-            if (!SEE(board, move))
-                moveScore -= 1'500'000'000;
+            int moveScore = SEE(board, move) ? GOOD_CAPTURE_SCORE : BAD_CAPTURE_SCORE;
+            moveScore += 100 * PIECE_VALUES[(int)captured] - PIECE_VALUES[(int)capturing]; // MVVLVA
             scores[i] = moveScore;
         }
         else if (move.typeOf() == move.PROMOTION)
-            scores[i] = -400'000'000;
+            scores[i] = PROMOTION_SCORE;
         else if (killerMoves[plyFromRoot][0] == move || killerMoves[plyFromRoot][1] == move)
-            scores[i] = -700'000'000;
+            scores[i] = KILLER_SCORE;
         else
         {
             int stm = (int)board.sideToMove();
             int pieceType = (int)board.at<PieceType>(move.from());
             int squareTo = (int)move.to();
-            scores[i] = -1'000'000'000 + historyMoves[stm][pieceType][squareTo];
+            scores[i] = HISTORY_SCORE + historyMoves[stm][pieceType][squareTo];
         }
     }
 }
@@ -87,12 +116,14 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
 
     Movelist moves;
     movegen::legalmoves<MoveGenType::CAPTURE>(moves, board);
+
     U64 boardKey = board.zobrist();
     TTEntry ttEntry = TT[boardKey % NUM_TT_ENTRIES];
+
     int scores[218];
     scoreMoves(moves, scores, boardKey, ttEntry, plyFromRoot);
-    int bestScore = eval;
 
+    int bestScore = eval;
     for (int i = 0; i < moves.size(); i++)
     {
         // sort moves incrementally
@@ -145,39 +176,39 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
         if (ttEntry->type == EXACT || (ttEntry->type == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->type == UPPER_BOUND && ttEntry->score <= alpha))
             return ttEntry->score;
 
-    // Internal iterative reduction
-    if (ttEntry->key != boardKey && depth > 3 && !inCheck)
+    // IIR (Internal iterative reduction)
+    if (ttEntry->key != boardKey && depth >= IIR_MIN_DEPTH && !inCheck)
         depth--;
 
     Movelist moves;
     movegen::legalmoves(moves, board);
 
     if (moves.empty())
-        return inCheck ? NEG_INFINITY + plyFromRoot : 0; // else it's draw
+        return inCheck ? NEG_INFINITY + plyFromRoot : 0; // checkmate or draw
 
     if (depth <= 0)
         return qSearch(alpha, beta, plyFromRoot);
 
     bool pvNode = beta - alpha > 1 || plyFromRoot == 0;
 
+    int eval = network.Evaluate((int)board.sideToMove());
     if (!pvNode && !inCheck)
     {
-        int eval = network.Evaluate((int)board.sideToMove());
 
         // RFP (Reverse futility pruning)
-        if (depth <= 8 && eval >= beta + 75 * depth)
+        if (depth <= RFP_MIN_DEPTH && eval >= beta + RFP_DEPTH_MULTIPLIER * depth)
             return eval;
 
         // NMP (Null move pruning)
-        if (depth >= 3 && doNull && eval >= beta)
+        if (depth >= NMP_MIN_DEPTH && doNull && eval >= beta)
         {
             bool hasAtLeast1Piece = board.pieces(PieceType::KNIGHT, board.sideToMove()) > 0 || board.pieces(PieceType::BISHOP, board.sideToMove()) > 0 || board.pieces(PieceType::ROOK, board.sideToMove()) > 0 || board.pieces(PieceType::QUEEN, board.sideToMove()) > 0;
             if (hasAtLeast1Piece)
             {
                 board.makeNullMove();
-                int score = -search(depth - 3 - depth / 3, plyFromRoot + 1, -beta, -alpha, false);
+                int score = -search(depth - NMP_BASE_REDUCTION - depth / NMP_REDUCTION_DIVISOR, plyFromRoot + 1, -beta, -alpha, false);
                 board.unmakeNullMove();
-                if (score >= POS_INFINITY - 256)
+                if (score >= MIN_MATE_SCORE)
                     return beta;
                 if (score >= beta)
                     return score;
@@ -189,7 +220,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
     scoreMoves(moves, scores, boardKey, *ttEntry, plyFromRoot);
     int bestScore = NEG_INFINITY;
     Move bestMove;
-    bool canLmr = depth > 1 && !inCheck;
+    bool canLmr = depth >= LMR_MIN_DEPTH && !inCheck;
 
     for (int i = 0; i < moves.size(); i++)
     {
@@ -201,6 +232,20 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
                 swap(scores[i], scores[j]);
             }
         Move move = moves[i];
+
+        bool quietOrLosing = scores[i] < KILLER_SCORE;
+        int lmr = 0;
+        bool lmrSet = false;
+
+        // FP (Futility pruning)
+        if (plyFromRoot > 0 && depth <= FP_MAX_DEPTH && !inCheck && quietOrLosing && bestScore > -MIN_MATE_SCORE && alpha < MIN_MATE_SCORE)
+        {
+            lmr = LMR_BASE + log(depth) * log(i) / LMR_DIVISOR; // ln(x)
+            lmrSet = true;
+            if (eval + FP_BASE + max(depth - lmr, 0) * FP_LMR_MULTIPLIER <= alpha)
+                continue;
+        }
+
         board.makeMove(move);
         nodes++;
 
@@ -211,12 +256,12 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
         else
         {
             // LMR (Late move reduction)
-            int lmr = 0;
             if (canLmr)
             {
-                lmr = 0.77 + log(depth) * log(i) / 2.36; // ln(x)
-                lmr -= board.inCheck();                  // reduce checks less
-                lmr -= pvNode;                           // reduce pv nodes less
+                if (!lmrSet)
+                    lmr = LMR_BASE + log(depth) * log(i) / LMR_DIVISOR; // ln(x)
+                lmr -= board.inCheck();                                 // reduce checks less
+                lmr -= pvNode;                                          // reduce pv nodes less
                 if (lmr < 0)
                     lmr = 0;
             }
@@ -275,7 +320,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
 
 inline int aspiration(int maxDepth, int score)
 {
-    int delta = 25;
+    int delta = ASPIRATION_INITIAL_DELTA;
     int alpha = max(NEG_INFINITY, score - delta);
     int beta = min(POS_INFINITY, score + delta);
     int depth = maxDepth;
@@ -301,7 +346,7 @@ inline int aspiration(int maxDepth, int score)
         else
             break;
 
-        delta *= 1.5;
+        delta *= ASPIRATION_DELTA_MULTIPLIER;
     }
 
     return score;
@@ -319,22 +364,22 @@ inline Move iterativeDeepening(int milliseconds, byte timeType, bool info = fals
     else if (timeType == TIME_TYPE_MOVE_TIME)
         millisecondsForThisTurn = milliseconds;
     else
-        millisecondsForThisTurn = 60000; // default 1 minute
+        millisecondsForThisTurn = DEFAULT_TIME_MILLISECONDS;
 
     int iterationDepth = 1, score = 0;
-    while (true)
+    while (iterationDepth <= MAX_DEPTH)
     {
         int scoreBefore = score;
-        Move before = bestMoveRoot;
+        Move moveBefore = bestMoveRoot;
 
-        if (iterationDepth < 6)
+        if (iterationDepth < ASPIRATION_MIN_DEPTH)
             score = search(iterationDepth, 0, NEG_INFINITY, POS_INFINITY);
         else
             score = aspiration(iterationDepth, score);
 
         if (checkIsTimeUp())
         {
-            bestMoveRoot = before;
+            bestMoveRoot = moveBefore;
             sendInfo(iterationDepth - 1, scoreBefore);
             break;
         }
