@@ -31,6 +31,7 @@ VERSION: 0.1.7
 #ifndef CHESS_HPP
 #define CHESS_HPP
 
+#include "nnue.hpp"
 #include <algorithm>
 #include <array>
 #include <bitset>
@@ -45,7 +46,6 @@ VERSION: 0.1.7
 #include <unordered_map>
 #include <utility>
 #include <vector>
-#include "nnue.hpp"
 
 namespace chess
 {

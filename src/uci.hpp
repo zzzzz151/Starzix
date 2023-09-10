@@ -1,14 +1,15 @@
 #ifndef UCI_HPP
 #define UCI_HPP
 
-#include <cstring> // for memset()
 #include "chess.hpp"
-#include "search.hpp"
+#include "main.cpp"
+inline void initTT();
 #include "nnue.hpp"
+#include "search.hpp"
+#include <cstring> // for memset()
 using namespace chess;
 using namespace std;
 
-int numRowsOfKillerMoves = sizeof(killerMoves) / sizeof(killerMoves[0]);
 bool info = false;
 
 inline void setoption(vector<string> &words) // e.g. "setoption name Hash value 32"
@@ -19,10 +20,7 @@ inline void setoption(vector<string> &words) // e.g. "setoption name Hash value 
     if (optionName == "Hash" || optionName == "hash")
     {
         TT_SIZE_MB = stoi(optionValue);
-        NUM_TT_ENTRIES = (TT_SIZE_MB * 1024 * 1024) / sizeof(TTEntry);
-        TT.clear();
-        TT.resize(NUM_TT_ENTRIES);
-        // cout << "TT_SIZE_MB = " << TT_SIZE_MB << " => " << NUM_TT_ENTRIES << " entries" << endl;
+        initTT();
     }
     else if (optionName == "Info" || optionName == "info")
     {
@@ -39,7 +37,7 @@ inline void ucinewgame()
     memset(TT.data(), 0, sizeof(TTEntry) * TT.size());
 
     // clear killers
-    for (int i = 0; i < numRowsOfKillerMoves; i++)
+    for (int i = 0; i < killerMovesNumRows; i++)
     {
         killerMoves[i][0] = NULL_MOVE;
         killerMoves[i][1] = NULL_MOVE;
@@ -120,11 +118,6 @@ inline void uciLoop()
     cout << "option name Hash type spin default " << TT_SIZE_MB << " min 1 max 512\n";
     cout << "option name Info type check default false\n";
     cout << "uciok\n";
-
-    NUM_TT_ENTRIES = (TT_SIZE_MB * 1024 * 1024) / sizeof(TTEntry);
-    TT.clear();
-    TT.resize(NUM_TT_ENTRIES);
-    // cout << "TT_SIZE_MB = " << TT_SIZE_MB << " => " << NUM_TT_ENTRIES << " entries" << endl;
 
     while (true)
     {
