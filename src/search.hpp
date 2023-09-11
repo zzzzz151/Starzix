@@ -126,14 +126,19 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
     if (eval >= beta) return eval;
     if (alpha < eval) alpha = eval;
 
+    U64 boardKey = board.zobrist();
+    TTEntry *ttEntry = &(TT[boardKey % NUM_TT_ENTRIES]);
+
+    // probe TT
+    if (plyFromRoot > 0 && ttEntry->key == boardKey)
+        if (ttEntry->type == EXACT || (ttEntry->type == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->type == UPPER_BOUND && ttEntry->score <= alpha))
+            return ttEntry->score;
+
     Movelist moves;
     movegen::legalmoves<MoveGenType::CAPTURE>(moves, board);
 
-    U64 boardKey = board.zobrist();
-    TTEntry ttEntry = TT[boardKey % NUM_TT_ENTRIES];
-
     int scores[218];
-    scoreMoves(moves, scores, boardKey, ttEntry, plyFromRoot);
+    scoreMoves(moves, scores, boardKey, *ttEntry, plyFromRoot);
 
     int bestScore = eval;
     for (int i = 0; i < moves.size(); i++)
@@ -161,6 +166,21 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
         if (score > alpha) alpha = score;
     }
 
+    if (ttEntry->depth <= 0)
+    {
+        // save in TT
+        ttEntry->key = boardKey;
+        ttEntry->depth = 0;
+        ttEntry->score = bestScore;
+        ttEntry->bestMove = NULL_MOVE;
+        if (bestScore <= alpha)
+            ttEntry->type = UPPER_BOUND;
+        else if (bestScore >= beta)
+            ttEntry->type = LOWER_BOUND;
+        else
+            ttEntry->type = EXACT;
+    }
+
     return bestScore;
 }
 
@@ -179,6 +199,8 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
 
     U64 boardKey = board.zobrist();
     TTEntry *ttEntry = &(TT[boardKey % NUM_TT_ENTRIES]);
+
+    // Probe TT
     if (plyFromRoot > 0 && ttEntry->key == boardKey && ttEntry->depth >= depth)
         if (ttEntry->type == EXACT || (ttEntry->type == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->type == UPPER_BOUND && ttEntry->score <= alpha))
             return ttEntry->score;
@@ -302,6 +324,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
         }
     }
 
+    // Save in TT
     ttEntry->key = boardKey;
     ttEntry->depth = depth;
     ttEntry->score = bestScore;
