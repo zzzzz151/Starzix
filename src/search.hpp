@@ -106,7 +106,9 @@ inline void scoreMoves(Movelist &moves, int *scores, U64 boardKey, TTEntry &ttEn
         }
         else if (move.typeOf() == move.PROMOTION)
             scores[i] = PROMOTION_SCORE;
-        else if (killerMoves[plyFromRoot][0] == move || killerMoves[plyFromRoot][1] == move)
+        else if (killerMoves[plyFromRoot][0] == move)
+            scores[i] = KILLER_SCORE + 1;
+        else if (killerMoves[plyFromRoot][1] == move)
             scores[i] = KILLER_SCORE;
         else
         {
@@ -151,6 +153,10 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
                 swap(scores[i], scores[j]);
             }
         Move capture = moves[i];
+
+        // SEE pruning (skip bad captures)
+        if (!SEE(board, capture))
+            continue;
 
         board.makeMove(capture);
         nodes++;

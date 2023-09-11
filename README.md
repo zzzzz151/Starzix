@@ -26,7 +26,7 @@ Negamax with alpha beta pruning and PVS
 
 Iterative deepening
 
-Quiescence search
+Quiescence search with SEE pruning
 
 Transposition table
 
