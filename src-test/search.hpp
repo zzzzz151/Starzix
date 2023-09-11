@@ -40,6 +40,9 @@ const uint8_t FP_MAX_DEPTH = 7,
               FP_BASE = 160,
               FP_LMR_MULTIPLIER = 65;
 
+const uint8_t LMP_MAX_DEPTH = 8,
+              LMP_MIN_MOVES_BASE = 3;
+
 const uint8_t LMR_MIN_DEPTH = 2;
 const double LMR_BASE = 0.77,
              LMR_DIVISOR = 2.36;
@@ -255,7 +258,6 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
     scoreMoves(moves, scores, boardKey, *ttEntry, plyFromRoot);
     int bestScore = NEG_INFINITY;
     Move bestMove;
-    bool canLmr = depth >= LMR_MIN_DEPTH && !inCheck;
 
     for (int i = 0; i < moves.size(); i++)
     {
@@ -271,22 +273,29 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
         bool quietOrLosing = scores[i] < KILLER_SCORE;
         int lmr = lmrTable[depth][i];
 
-        // FP (Futility pruning)
-        if (plyFromRoot > 0 && depth <= FP_MAX_DEPTH && !inCheck && quietOrLosing && bestScore > -MIN_MATE_SCORE && alpha < MIN_MATE_SCORE)
-            if (eval + FP_BASE + max(depth - lmr, 0) * FP_LMR_MULTIPLIER <= alpha)
-                continue;
+        // Move loop pruning
+        if (plyFromRoot > 0 && quietOrLosing && bestScore > -MIN_MATE_SCORE)
+        {
+            // LMP (Late move pruning)
+            if (!inCheck && !pvNode && depth <= LMP_MAX_DEPTH && i >= LMP_MIN_MOVES_BASE + depth * depth * 2)
+                break;
+
+            // FP (Futility pruning)
+            if (!inCheck && depth <= FP_MAX_DEPTH && alpha < MIN_MATE_SCORE && eval + FP_BASE + max(depth - lmr, 0) * FP_LMR_MULTIPLIER <= alpha)
+                break;
+        }
 
         board.makeMove(move);
         nodes++;
 
         // PVS (Principal variation search)
         int score = 0;
-        if (i == 0)
+        if (i == 0) // best move of prev iteration aka hash move
             score = -search(depth - 1, plyFromRoot + 1, -beta, -alpha);
         else
         {
             // LMR (Late move reduction)
-            if (canLmr)
+            if (!inCheck && depth >= LMR_MIN_DEPTH)
             {
                 lmr -= board.inCheck(); // reduce checks less
                 lmr -= pvNode;          // reduce pv nodes less

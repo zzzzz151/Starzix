@@ -26,15 +26,17 @@ Negamax with alpha beta pruning and PVS
 
 Iterative deepening
 
-Quiescence search with SEE pruning
-
 Transposition table
+
+Quiescence search with SEE pruning
 
 Move ordering (hash move > good captures by SEE + MVVLVA > promotions > killer moves > history heuristic > bad captures)
 
 Aspiration window
 
 Check extension
+
+Internal iterative reduction
 
 Late move reductions
 
@@ -44,7 +46,7 @@ Futility pruning
 
 Reverse futility pruning
 
-Internal iterative reduction
+Late move pruning
 
 Time management
 
