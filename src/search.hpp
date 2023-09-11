@@ -27,6 +27,10 @@ const int HASH_MOVE_SCORE = INT_MAX,
           HISTORY_SCORE = 0,
           BAD_CAPTURE_SCORE = -500'000'000;
 
+const uint8_t ASPIRATION_MIN_DEPTH = 6,
+              ASPIRATION_INITIAL_DELTA = 25;
+const double ASPIRATION_DELTA_MULTIPLIER = 1.5;
+
 const uint8_t IIR_MIN_DEPTH = 4;
 
 const uint8_t RFP_MIN_DEPTH = 8,
@@ -43,13 +47,12 @@ const uint8_t FP_MAX_DEPTH = 7,
 const uint8_t LMP_MAX_DEPTH = 8,
               LMP_MIN_MOVES_BASE = 3;
 
+const uint8_t SEE_PRUNING_MAX_DEPTH = 9;
+const int SEE_PRUNING_THRESHOLD = -50;
+
 const uint8_t LMR_MIN_DEPTH = 2;
 const double LMR_BASE = 0.77,
              LMR_DIVISOR = 2.36;
-
-const uint8_t ASPIRATION_MIN_DEPTH = 6,
-              ASPIRATION_INITIAL_DELTA = 25;
-const double ASPIRATION_DELTA_MULTIPLIER = 1.5;
 
 // ----- End tunable params -----
 
@@ -270,11 +273,11 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
             }
         Move move = moves[i];
 
-        bool quietOrLosing = scores[i] < KILLER_SCORE;
+        bool historyMoveOrLosing = scores[i] < KILLER_SCORE;
         int lmr = lmrTable[depth][i];
 
         // Move loop pruning
-        if (plyFromRoot > 0 && quietOrLosing && bestScore > -MIN_MATE_SCORE)
+        if (plyFromRoot > 0 && historyMoveOrLosing && bestScore > -MIN_MATE_SCORE)
         {
             // LMP (Late move pruning)
             if (!inCheck && !pvNode && depth <= LMP_MAX_DEPTH && i >= LMP_MIN_MOVES_BASE + depth * depth * 2)
@@ -283,6 +286,10 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
             // FP (Futility pruning)
             if (!inCheck && depth <= FP_MAX_DEPTH && alpha < MIN_MATE_SCORE && eval + FP_BASE + max(depth - lmr, 0) * FP_LMR_MULTIPLIER <= alpha)
                 break;
+
+            // SEE pruning
+            if (depth <= SEE_PRUNING_MAX_DEPTH && !SEE(board, move, depth * SEE_PRUNING_THRESHOLD))
+                continue;
         }
 
         board.makeMove(move);

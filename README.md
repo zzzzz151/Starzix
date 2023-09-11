@@ -32,7 +32,7 @@ Quiescence search with SEE pruning
 
 Move ordering (hash move > good captures by SEE + MVVLVA > promotions > killer moves > history heuristic > bad captures)
 
-Aspiration window
+Aspiration windows
 
 Check extension
 
@@ -42,11 +42,13 @@ Late move reductions
 
 Null move pruning
 
-Futility pruning
-
 Reverse futility pruning
 
+Futility pruning
+
 Late move pruning
+
+SEE depth-based pruning
 
 Time management
 
