@@ -42,8 +42,8 @@ const uint8_t NMP_MIN_DEPTH = 3,
               NMP_REDUCTION_DIVISOR = 3;
 
 const uint8_t FP_MAX_DEPTH = 7,
-              FP_BASE = 160,
-              FP_LMR_MULTIPLIER = 65;
+              FP_BASE = 120,
+              FP_MULTIPLIER = 65;
 
 const uint8_t LMP_MAX_DEPTH = 8,
               LMP_MIN_MOVES_BASE = 3;
@@ -51,9 +51,9 @@ const uint8_t LMP_MAX_DEPTH = 8,
 const uint8_t SEE_PRUNING_MAX_DEPTH = 9;
 const int SEE_PRUNING_THRESHOLD = -50;
 
-const uint8_t LMR_MIN_DEPTH = 2;
-const double LMR_BASE = 0.77,
-             LMR_DIVISOR = 2.36;
+const uint8_t LMR_MIN_DEPTH = 1;
+const double LMR_BASE = 1,
+             LMR_DIVISOR = 2;
 
 // ----- End tunable params -----
 
@@ -228,8 +228,8 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
     if (depth <= 0) return qSearch(alpha, beta, plyFromRoot);
 
     bool pvNode = beta - alpha > 1 || plyFromRoot == 0;
-
     int eval = network.Evaluate((int)board.sideToMove());
+
     if (!pvNode && !inCheck)
     {
         // RFP (Reverse futility pruning)
@@ -284,7 +284,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
                 break;
 
             // FP (Futility pruning)
-            if (!inCheck && depth <= FP_MAX_DEPTH && alpha < MIN_MATE_SCORE && eval + FP_BASE + max(depth - lmr, 0) * FP_LMR_MULTIPLIER <= alpha)
+            if (!inCheck && depth <= FP_MAX_DEPTH && alpha < MIN_MATE_SCORE && eval + FP_BASE + max(depth - lmr, 0) * FP_MULTIPLIER <= alpha)
                 break;
 
             // SEE pruning
