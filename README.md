@@ -16,8 +16,6 @@ Currently ~2800 elo (tested against [4ku](https://github.com/kz04px/4ku) 3.0).
 
 Hash (int, default 64) - transposition table size in MB from 1 to 512
 
-Info (bool, default false) - print info for every iterative deepening iteration
-
 # Features
 
 NNUE evaluation (768->128x2->1)

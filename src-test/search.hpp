@@ -4,6 +4,7 @@
 #include "chess.hpp"
 #include "nnue.hpp"
 #include "see.hpp"
+#include <unordered_map>
 inline void sendInfo(int depth, int score); // from uci.hpp
 using namespace chess;
 using namespace std;
@@ -58,14 +59,13 @@ const double LMR_BASE = 0.77,
 
 // ----- Global vars -----
 
-const byte TIME_TYPE_NORMAL_GAME = (byte)0, TIME_TYPE_MOVE_TIME = (byte)1;
 const int POS_INFINITY = 9999999, NEG_INFINITY = -POS_INFINITY, MIN_MATE_SCORE = POS_INFINITY - 512;
 Move NULL_MOVE;
+Board board;
 U64 nodes;
 chrono::steady_clock::time_point start;
 int millisecondsForThisTurn;
 bool isTimeUp = false;
-Board board;
 Move bestMoveRoot;
 Move killerMoves[100][2]; // ply, move
 int killerMovesNumRows = 100;
@@ -161,8 +161,7 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
         Move capture = moves[i];
 
         // SEE pruning (skip bad captures)
-        if (!SEE(board, capture))
-            continue;
+        if (!SEE(board, capture)) continue;
 
         board.makeMove(capture);
         nodes++;
@@ -251,6 +250,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
                 board.makeNullMove();
                 int score = -search(depth - NMP_BASE_REDUCTION - depth / NMP_REDUCTION_DIVISOR, plyFromRoot + 1, -beta, -alpha, false);
                 board.unmakeNullMove();
+
                 if (score >= MIN_MATE_SCORE) return beta;
                 if (score >= beta) return score;
             }
@@ -326,6 +326,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
             if (plyFromRoot == 0) bestMoveRoot = move;
 
             if (bestScore > alpha) alpha = bestScore;
+
             if (alpha >= beta)
             {
                 bool isQuietMove = !board.isCapture(move) && move.typeOf() != move.PROMOTION;
@@ -394,16 +395,26 @@ inline int aspiration(int maxDepth, int score)
     return score;
 }
 
-inline Move iterativeDeepening(int milliseconds, byte timeType, bool info = false)
+inline Move iterativeDeepening(unordered_map<string, string> timeInfo)
 {
-    bestMoveRoot = NULL_MOVE;
+    // Reset some global vars
+    start = chrono::steady_clock::now();
     nodes = 0;
     isTimeUp = false;
 
-    if (timeType == TIME_TYPE_NORMAL_GAME)
+    int milliseconds = stoi(timeInfo["milliseconds"]);
+    // In some cases, need to save 10ms for shenanigans
+
+    if (timeInfo["type"] == "suddendeath") // sudden death
         millisecondsForThisTurn = milliseconds / 30.0;
-    else if (timeType == TIME_TYPE_MOVE_TIME)
-        millisecondsForThisTurn = milliseconds;
+    else if (timeInfo["type"] == "movestogo") // moves to go (e.g. 40/15 means +15 time units every 40 moves)
+    {
+        int movesToGo = stoi(timeInfo["movestogo"]);
+        millisecondsForThisTurn = milliseconds / movesToGo;
+        millisecondsForThisTurn -= min(milliseconds / 10.0, 10.0);
+    }
+    else if (timeInfo["type"] == "movetime")
+        millisecondsForThisTurn = milliseconds - min(milliseconds / 10.0, 10.0);
     else
         millisecondsForThisTurn = DEFAULT_TIME_MILLISECONDS;
 
@@ -421,12 +432,11 @@ inline Move iterativeDeepening(int milliseconds, byte timeType, bool info = fals
         if (checkIsTimeUp())
         {
             bestMoveRoot = moveBefore;
-            sendInfo(iterationDepth - 1, scoreBefore);
+            sendInfo(iterationDepth, scoreBefore);
             break;
         }
 
-        if (info) sendInfo(iterationDepth, score);
-
+        sendInfo(iterationDepth, score);
         iterationDepth++;
     }
 

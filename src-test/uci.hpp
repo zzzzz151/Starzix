@@ -10,8 +10,6 @@ inline void initTT();
 using namespace chess;
 using namespace std;
 
-bool info = false;
-
 inline void setoption(vector<string> &words) // e.g. "setoption name Hash value 32"
 {
     string optionName = words[2];
@@ -21,13 +19,6 @@ inline void setoption(vector<string> &words) // e.g. "setoption name Hash value 
     {
         TT_SIZE_MB = stoi(optionValue);
         initTT();
-    }
-    else if (optionName == "Info" || optionName == "info")
-    {
-        if (optionValue == "true" || optionValue == "True")
-            info = true;
-        else if (optionValue == "false" || optionValue == "False")
-            info = false;
     }
 }
 
@@ -73,26 +64,29 @@ inline void position(vector<string> &words)
 
 inline void go(vector<string> &words)
 {
-    start = chrono::steady_clock::now();
-
     // clear history moves
     memset(&historyMoves[0][0][0], 0, sizeof(historyMoves));
 
-    int milliseconds = DEFAULT_TIME_MILLISECONDS;
-    byte timeType = (byte)-1;
+    std::unordered_map<string, string> timeInfo;
+    timeInfo["type"] = "suddendeath";
 
-    if (words[1] == "wtime")
+    for (int i = 0; i < words.size(); i++)
     {
-        milliseconds = board.sideToMove() == Color::WHITE ? stoi(words[2]) : stoi(words[4]);
-        timeType = TIME_TYPE_NORMAL_GAME;
-    }
-    else if (words[1] == "movetime")
-    {
-        milliseconds = stoi(words[2]);
-        timeType = TIME_TYPE_MOVE_TIME;
+        if ((words[i] == "wtime" && board.sideToMove() == Color::WHITE) || (words[i] == "btime" && board.sideToMove() == Color::BLACK))
+            timeInfo["milliseconds"] = words[i + 1];
+        else if (words[i] == "movestogo")
+        {
+            timeInfo["type"] = "movestogo";
+            timeInfo["movestogo"] = words[i + 1];
+        }
+        else if (words[i] == "movetime")
+        {
+            timeInfo["type"] = "movetime";
+            timeInfo["milliseconds"] = words[i + 1];
+        }
     }
 
-    Move bestMove = iterativeDeepening(milliseconds, timeType, info);
+    Move bestMove = iterativeDeepening(timeInfo);
     cout << "bestmove " + uci::moveToUci(bestMove) + "\n";
 }
 
@@ -100,6 +94,7 @@ inline void sendInfo(int depth, int score)
 {
     double millisecondsElapsed = (chrono::steady_clock::now() - start) / chrono::milliseconds(1);
     double nps = millisecondsElapsed == 0 ? nodes : nodes / millisecondsElapsed * 1000.0;
+
     cout << "info depth " << depth
          << " time " << round(millisecondsElapsed)
          << " nodes " << nodes
@@ -116,7 +111,6 @@ inline void uciLoop()
     cout << "id name test\n";
     cout << "id author zzzzz\n";
     cout << "option name Hash type spin default " << TT_SIZE_MB << " min 1 max 512\n";
-    cout << "option name Info type check default false\n";
     cout << "uciok\n";
 
     while (true)
