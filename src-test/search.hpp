@@ -1,10 +1,11 @@
 #ifndef SEARCH_HPP
 #define SEARCH_HPP
 
+// clang-format off
+#include <unordered_map>
 #include "chess.hpp"
 #include "nnue.hpp"
 #include "see.hpp"
-#include <unordered_map>
 inline void sendInfo(int depth, int score); // from uci.hpp
 using namespace chess;
 using namespace std;
@@ -50,12 +51,6 @@ const uint8_t LMP_MAX_DEPTH = 8,
 
 const uint8_t SEE_PRUNING_MAX_DEPTH = 9;
 const int SEE_PRUNING_THRESHOLD = -50;
-
-const uint8_t SE_MIN_DEPTH = 8,
-              SE_DEPTH_MARGIN = 3,
-              SE_DEPTH_MULTIPLIER = 2,
-              SE_DOUBLE_EXTENSION_MARGIN = 22,
-              SE_DOUBLE_EXTENSION_LIMIT = 5;
 
 const uint8_t LMR_MIN_DEPTH = 1;
 const double LMR_BASE = 1,
@@ -190,18 +185,15 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
         ttEntry->depth = 0;
         ttEntry->score = bestScore;
         ttEntry->bestMove = NULL_MOVE;
-        if (bestScore <= alpha)
-            ttEntry->type = UPPER_BOUND;
-        else if (bestScore >= beta)
-            ttEntry->type = LOWER_BOUND;
-        else
-            ttEntry->type = EXACT;
+        if (bestScore <= alpha) ttEntry->type = UPPER_BOUND;
+        else if (bestScore >= beta) ttEntry->type = LOWER_BOUND;
+        else ttEntry->type = EXACT;
     }
 
     return bestScore;
 }
 
-inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull = true, Move singularMove = NULL_MOVE)
+inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull = true)
 {
     if (plyFromRoot > 0 && board.isRepetition()) return 0;
 
@@ -218,7 +210,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
     TTEntry *ttEntry = &(TT[boardKey % NUM_TT_ENTRIES]);
 
     // Probe TT
-    if (plyFromRoot > 0 && ttEntry->key == boardKey && ttEntry->depth >= depth && singularMove == NULL_MOVE)
+    if (plyFromRoot > 0 && ttEntry->key == boardKey && ttEntry->depth >= depth)
         if (ttEntry->type == EXACT || (ttEntry->type == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->type == UPPER_BOUND && ttEntry->score <= alpha))
             return ttEntry->score;
 
@@ -267,9 +259,6 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
     scoreMoves(moves, scores, boardKey, *ttEntry, plyFromRoot);
     int bestScore = NEG_INFINITY;
     Move bestMove;
-    bool trySingular = singularMove == NULL_MOVE && plyFromRoot > 0 && depth >= SE_MIN_DEPTH &&
-                       boardKey == ttEntry->key && ttEntry->depth >= depth - SE_DEPTH_MARGIN &&
-                       ttEntry->type != UPPER_BOUND && abs(ttEntry->score) < MIN_MATE_SCORE;
 
     for (int i = 0; i < moves.size(); i++)
     {
@@ -281,8 +270,6 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
                 swap(scores[i], scores[j]);
             }
         Move move = moves[i];
-
-        if (move == singularMove) continue; // move is singular in a singular search
 
         bool historyMoveOrLosing = scores[i] < KILLER_SCORE;
         int lmr = lmrTable[depth][i];
@@ -306,20 +293,10 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
         board.makeMove(move);
         nodes++;
 
-        // SE (Singular extensions)
-        int singularExtension = 0;
-        if (trySingular && move == ttEntry->bestMove)
-        {
-            int sBeta = ttEntry->score - depth * SE_DEPTH_MULTIPLIER;
-            int sDepth = (depth - 1) / 2;
-            int score = search(sDepth, plyFromRoot, sBeta - 1, sBeta, false, move);
-            if (score < sBeta) singularExtension = 1;
-        }
-
         // PVS (Principal variation search)
         int score = 0;
         if (i == 0) // best move of prev iteration aka hash move
-            score = -search(depth - 1 + singularExtension, plyFromRoot + 1, -beta, -alpha);
+            score = -search(depth - 1, plyFromRoot + 1, -beta, -alpha);
         else
         {
             // LMR (Late move reduction)
@@ -332,9 +309,9 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
             else
                 lmr = 0;
 
-            score = -search(depth - 1 + singularExtension - lmr, plyFromRoot + 1, -alpha - 1, -alpha);
+            score = -search(depth - 1 - lmr, plyFromRoot + 1, -alpha - 1, -alpha);
             if (score > alpha && (score < beta || lmr > 0))
-                score = -search(depth - 1 + singularExtension, plyFromRoot + 1, -beta, -alpha);
+                score = -search(depth - 1, plyFromRoot + 1, -beta, -alpha);
         }
 
         board.unmakeMove(move);
@@ -373,12 +350,9 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
     ttEntry->depth = depth;
     ttEntry->score = bestScore;
     ttEntry->bestMove = bestMove;
-    if (bestScore <= originalAlpha)
-        ttEntry->type = UPPER_BOUND;
-    else if (bestScore >= beta)
-        ttEntry->type = LOWER_BOUND;
-    else
-        ttEntry->type = EXACT;
+    if (bestScore <= originalAlpha) ttEntry->type = UPPER_BOUND;
+    else if (bestScore >= beta) ttEntry->type = LOWER_BOUND;
+    else ttEntry->type = EXACT;
 
     return bestScore;
 }

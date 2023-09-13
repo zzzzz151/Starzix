@@ -1,10 +1,11 @@
 #ifndef SEARCH_HPP
 #define SEARCH_HPP
 
+// clang-format off
+#include <unordered_map>
 #include "chess.hpp"
 #include "nnue.hpp"
 #include "see.hpp"
-#include <unordered_map>
 inline void sendInfo(int depth, int score); // from uci.hpp
 using namespace chess;
 using namespace std;
@@ -184,12 +185,9 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
         ttEntry->depth = 0;
         ttEntry->score = bestScore;
         ttEntry->bestMove = NULL_MOVE;
-        if (bestScore <= alpha)
-            ttEntry->type = UPPER_BOUND;
-        else if (bestScore >= beta)
-            ttEntry->type = LOWER_BOUND;
-        else
-            ttEntry->type = EXACT;
+        if (bestScore <= alpha) ttEntry->type = UPPER_BOUND;
+        else if (bestScore >= beta) ttEntry->type = LOWER_BOUND;
+        else ttEntry->type = EXACT;
     }
 
     return bestScore;
@@ -352,12 +350,9 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool doNull =
     ttEntry->depth = depth;
     ttEntry->score = bestScore;
     ttEntry->bestMove = bestMove;
-    if (bestScore <= originalAlpha)
-        ttEntry->type = UPPER_BOUND;
-    else if (bestScore >= beta)
-        ttEntry->type = LOWER_BOUND;
-    else
-        ttEntry->type = EXACT;
+    if (bestScore <= originalAlpha) ttEntry->type = UPPER_BOUND;
+    else if (bestScore >= beta) ttEntry->type = LOWER_BOUND;
+    else ttEntry->type = EXACT;
 
     return bestScore;
 }
