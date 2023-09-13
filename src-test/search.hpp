@@ -80,7 +80,7 @@ struct TTEntry
     U64 key = 0;
     int score;
     Move bestMove;
-    int16_t depth;
+    uint8_t depth;
     char type;
 };
 uint32_t NUM_TT_ENTRIES;
