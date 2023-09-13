@@ -2,6 +2,7 @@
 #ifndef SEE_HPP
 #define SEE_HPP
 
+// clang-format off
 #include "chess.hpp"
 #include "search.hpp" // contains SEE_PIECE_VALUES and PAWN_INDEX
 extern const int SEE_PIECE_VALUES[7], PAWN_INDEX;

@@ -1,6 +1,7 @@
 #ifndef UCI_HPP
 #define UCI_HPP
 
+// clang-format-off
 #include "chess.hpp"
 #include "main.cpp"
 inline void initTT();
@@ -28,7 +29,8 @@ inline void ucinewgame()
     memset(TT.data(), 0, sizeof(TTEntry) * TT.size());
 
     // clear killers
-    for (int i = 0; i < killerMovesNumRows; i++)
+    int numRows = sizeof(killerMoves) / sizeof(killerMoves[0]);
+    for (int i = 0; i < numRows; i++)
     {
         killerMoves[i][0] = NULL_MOVE;
         killerMoves[i][1] = NULL_MOVE;
@@ -64,33 +66,11 @@ inline void position(vector<string> &words)
 
 inline void go(vector<string> &words)
 {
-    // clear history moves
-    memset(&historyMoves[0][0][0], 0, sizeof(historyMoves));
-
-    std::unordered_map<string, string> timeInfo;
-    timeInfo["type"] = "suddendeath";
-
-    for (int i = 0; i < words.size(); i++)
-    {
-        if ((words[i] == "wtime" && board.sideToMove() == Color::WHITE) || (words[i] == "btime" && board.sideToMove() == Color::BLACK))
-            timeInfo["milliseconds"] = words[i + 1];
-        else if (words[i] == "movestogo")
-        {
-            timeInfo["type"] = "movestogo";
-            timeInfo["movestogo"] = words[i + 1];
-        }
-        else if (words[i] == "movetime")
-        {
-            timeInfo["type"] = "movetime";
-            timeInfo["milliseconds"] = words[i + 1];
-        }
-    }
-
-    Move bestMove = iterativeDeepening(timeInfo);
+    Move bestMove = iterativeDeepening(words);
     cout << "bestmove " + uci::moveToUci(bestMove) + "\n";
 }
 
-inline void sendInfo(int depth, int score)
+inline void info(int depth, int score)
 {
     double millisecondsElapsed = (chrono::steady_clock::now() - start) / chrono::milliseconds(1);
     double nps = millisecondsElapsed == 0 ? nodes : nodes / millisecondsElapsed * 1000.0;

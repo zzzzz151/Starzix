@@ -1,6 +1,7 @@
 #ifndef MAIN_CPP
 #define MAIN_CPP
 
+// clang-format off
 #include "search.hpp"
 #include "uci.hpp"
 
@@ -14,8 +15,11 @@ inline void initTT()
 
 inline void initLmrTable()
 {
-    for (int depth = 0; depth < lmrTableNumRows; depth++)
-        for (int move = 0; move < lmrTableNumCols; move++)
+    int numRows = sizeof(lmrTable) / sizeof(lmrTable[0]);
+    int numCols = sizeof(lmrTable[0]) / sizeof(lmrTable[0][0]); 
+
+    for (int depth = 0; depth < numRows; depth++)
+        for (int move = 0; move < numCols; move++)
             // log(x) is ln(x)
             // add 0.5 to round to nearest int
             lmrTable[depth][move] = depth == 0 || move == 0 ? 0 : (int)(LMR_BASE + log(depth) * log(move) / LMR_DIVISOR + 0.5);
