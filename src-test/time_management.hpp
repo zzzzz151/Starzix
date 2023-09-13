@@ -8,7 +8,7 @@ chrono::steady_clock::time_point start;
 int millisecondsForThisTurn;
 bool isTimeUp = false;
 
-inline void setUpTime(vector<string> &words, Color color = Color::WHITE)
+inline void setupTime(vector<string> &words, Color color = Color::WHITE)
 {
     start = chrono::steady_clock::now();
     isTimeUp = false;
@@ -49,7 +49,6 @@ inline void setUpTime(vector<string> &words, Color color = Color::WHITE)
 
     if (millisecondsForThisTurn == -1) millisecondsForThisTurn = 60000; // default 1 minute (this line should never happen)
 
-    cout << "time defined " << millisecondsForThisTurn << endl;
 }
 
 inline bool checkIsTimeUp()
