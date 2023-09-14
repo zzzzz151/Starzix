@@ -73,7 +73,9 @@ inline void go(vector<string> &words)
 inline void info(int depth, int score)
 {
     double millisecondsElapsed = (chrono::steady_clock::now() - start) / chrono::milliseconds(1);
-    double nps = millisecondsElapsed == 0 ? nodes : nodes / millisecondsElapsed * 1000.0;
+    double nps = nodes * 1000.0;
+    if (millisecondsElapsed > 0)
+        nps /= millisecondsElapsed;
 
     cout << "info depth " << depth
          << " time " << round(millisecondsElapsed)
