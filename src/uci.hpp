@@ -73,14 +73,13 @@ inline void go(vector<string> &words)
 inline void info(int depth, int score)
 {
     double millisecondsElapsed = (chrono::steady_clock::now() - start) / chrono::milliseconds(1);
-    double nps = nodes * 1000.0;
-    if (millisecondsElapsed > 0)
-        nps /= millisecondsElapsed;
+    U64 nps = nodes / (millisecondsElapsed > 0 ? millisecondsElapsed : 1) * 1000;
 
     cout << "info depth " << depth
+         << " seldepth " << maxPlyReached + 1
          << " time " << round(millisecondsElapsed)
          << " nodes " << nodes
-         << " nps " << (U64)round(nps)
+         << " nps " << nps
          << " score cp " << score
          << " pv " << uci::moveToUci(bestMoveRoot)
          << endl;

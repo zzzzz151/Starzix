@@ -25,7 +25,7 @@ inline void setupTime(vector<string> &words, Color color = Color::WHITE)
             if (movesToGo != -1)
             {
                 millisecondsForThisTurn = milliseconds / movesToGo;
-                if (movesToGo == 1) millisecondsForThisTurn -= min(5.0, milliseconds / 5.0);
+                if (movesToGo == 1) millisecondsForThisTurn -= min(5.0, milliseconds / 2.0);
             }
             else
                 millisecondsForThisTurn = milliseconds / 30.0;
@@ -36,13 +36,13 @@ inline void setupTime(vector<string> &words, Color color = Color::WHITE)
             if (milliseconds != -1) 
             {
                 millisecondsForThisTurn = milliseconds / movesToGo;
-                if (movesToGo == 1) millisecondsForThisTurn -= min(5.0, milliseconds / 5.0);
+                if (movesToGo == 1) millisecondsForThisTurn -= min(5.0, milliseconds / 2.0);
             }
         }
         else if (words[i] == "movetime")
         {
             milliseconds = stoi(words[i + 1]);
-            millisecondsForThisTurn = milliseconds - min(5.0, milliseconds / 5.0);
+            millisecondsForThisTurn = milliseconds - min(5.0, milliseconds / 2.0);
             break;
         }
     }

@@ -2,7 +2,6 @@
 #define SEARCH_HPP
 
 // clang-format off
-#include <unordered_map>
 #include "chess.hpp"
 #include "nnue.hpp"
 #include "see.hpp"
@@ -13,7 +12,7 @@ using namespace std;
 
 // ----- Tunable params ------
 
-const uint8_t MAX_DEPTH = 50;
+const uint8_t MAX_DEPTH = 100;
 
 int TT_SIZE_MB = 64; // default (and current) TT size in MB
 
@@ -64,6 +63,7 @@ Move NULL_MOVE;
 Board board;
 Move bestMoveRoot;
 U64 nodes;
+int maxPlyReached;
 Move killerMoves[MAX_DEPTH*2][2]; // ply, move
 int historyMoves[2][6][64];       // color, pieceType, squareTo
 int lmrTable[MAX_DEPTH + 2][218]; // depth, move (lmrTable initialized in main.cpp)
@@ -182,6 +182,7 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
 
 inline int search(int depth, int plyFromRoot, int alpha, int beta, bool skipNmp = false)
 {
+    if (plyFromRoot > maxPlyReached) maxPlyReached = plyFromRoot;
     if (plyFromRoot > 0 && board.isRepetition()) return 0;
     if (checkIsTimeUp()) return 0;
 
@@ -245,7 +246,6 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool skipNmp 
 
     for (int i = 0; i < moves.size(); i++)
     {
-
         // sort moves incrementally
         for (int j = i + 1; j < moves.size(); j++)
             if (scores[j] > scores[i])
@@ -280,10 +280,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool skipNmp 
         // PVS (Principal variation search)
         int score = 0;
         if (i == 0) // best move of prev iteration aka hash move
-        {
-            //if (plyFromRoot == 0) cout << "First move being analysed (ply=0, depth=" << depth << ") " << uci::moveToUci(move) << endl;
             score = -search(depth - 1, plyFromRoot + 1, -beta, -alpha);
-        }
         else
         {
             // LMR (Late move reduction)
@@ -355,7 +352,7 @@ inline int aspiration(int maxDepth, int score)
     {
         score = search(depth, 0, alpha, beta);
 
-        if (checkIsTimeUp()) return score;
+        if (checkIsTimeUp()) return 0;
 
         if (score >= beta)
         {
@@ -385,17 +382,27 @@ inline Move iterativeDeepening(vector<string> &words)
     memset(&historyMoves[0][0][0], 0, sizeof(historyMoves));
 
     nodes = 0;
+    maxPlyReached = -1;
     int iterationDepth = 1, score = 0;
 
     while (iterationDepth <= MAX_DEPTH)
     {
+        int scoreBefore = score;
+        Move moveBefore = bestMoveRoot;
+
         if (iterationDepth < ASPIRATION_MIN_DEPTH)
             score = search(iterationDepth, 0, NEG_INFINITY, POS_INFINITY);
         else
             score = aspiration(iterationDepth, score);
 
+        if (checkIsTimeUp())
+        {
+            bestMoveRoot = moveBefore;
+            info(iterationDepth, scoreBefore);
+            break;
+        }
+
         info(iterationDepth, score);
-        if (checkIsTimeUp()) break;
         iterationDepth++;
     }
 
