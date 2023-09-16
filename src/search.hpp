@@ -33,7 +33,7 @@ const double ASPIRATION_DELTA_MULTIPLIER = 1.5;
 
 const uint8_t IIR_MIN_DEPTH = 4;
 
-const uint8_t RFP_MIN_DEPTH = 8,
+const uint8_t RFP_MAX_DEPTH = 8,
               RFP_DEPTH_MULTIPLIER = 75;
 
 const uint8_t NMP_MIN_DEPTH = 3,
@@ -211,7 +211,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool skipNmp 
     if (!pvNode && !inCheck)
     {
         // RFP (Reverse futility pruning)
-        if (depth <= RFP_MIN_DEPTH && eval >= beta + RFP_DEPTH_MULTIPLIER * depth)
+        if (depth <= RFP_MAX_DEPTH && eval >= beta + RFP_DEPTH_MULTIPLIER * depth)
             return eval;
 
         // NMP (Null move pruning)
