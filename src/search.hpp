@@ -45,7 +45,7 @@ const uint8_t FP_MAX_DEPTH = 7,
               FP_MULTIPLIER = 65;
 
 const uint8_t LMP_MAX_DEPTH = 8,
-              LMP_MIN_MOVES_BASE = 3;
+              LMP_MIN_MOVES_BASE = 2;
 
 const uint8_t SEE_PRUNING_MAX_DEPTH = 9;
 const int SEE_PRUNING_THRESHOLD = -50;
@@ -262,7 +262,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool skipNmp 
         if (plyFromRoot > 0 && historyMoveOrLosing && bestScore > -MIN_MATE_SCORE)
         {
             // LMP (Late move pruning)
-            if (!inCheck && !pvNode && depth <= LMP_MAX_DEPTH && i >= LMP_MIN_MOVES_BASE + depth * depth * 2)
+            if (!inCheck && !pvNode && depth <= LMP_MAX_DEPTH && i >= LMP_MIN_MOVES_BASE + pvNode + depth * depth * 2)
                 break;
 
             // FP (Futility pruning)
@@ -307,8 +307,8 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool skipNmp 
 
             if (bestScore > alpha) 
             {
-                alpha = bestScore;
                 bestMove = move;
+                alpha = bestScore;
                 if (plyFromRoot == 0) bestMoveRoot = move;
             }
 
