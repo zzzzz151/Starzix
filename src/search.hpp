@@ -304,10 +304,13 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool skipNmp 
         if (score > bestScore)
         {
             bestScore = score;
-            bestMove = move;
-            if (plyFromRoot == 0) bestMoveRoot = move;
 
-            if (bestScore > alpha) alpha = bestScore;
+            if (bestScore > alpha) 
+            {
+                alpha = bestScore;
+                bestMove = move;
+                if (plyFromRoot == 0) bestMoveRoot = move;
+            }
 
             if (alpha >= beta)
             {
