@@ -9,6 +9,7 @@
 inline void info(int depth, int score); // from uci.hpp
 using namespace chess;
 using namespace std;
+inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp = false);
 
 // ----- Tunable params ------
 
@@ -52,7 +53,8 @@ const int SEE_PRUNING_THRESHOLD = -50;
 
 const uint8_t LMR_MIN_DEPTH = 1;
 const double LMR_BASE = 1,
-             LMR_DIVISOR = 2;
+             LMR_DIVISOR = 2,
+             LMR_HISTORY_DIVISOR = 8192;
 
 // ----- End tunable params -----
 
@@ -180,7 +182,36 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
     return bestScore;
 }
 
-inline int search(int depth, int plyFromRoot, int alpha, int beta, bool skipNmp = false)
+// PVS (Principal variation search)
+inline int pvs(int depth, int alpha, int beta, int plyFromRoot, const Move &move, int moveScore, int lmr, bool inCheck, bool pvNode)
+{
+    // LMR (Late move reduction)
+    if (!inCheck && depth >= LMR_MIN_DEPTH && moveScore < KILLER_SCORE)
+    {
+        lmr -= board.inCheck(); // reduce checks less
+        lmr -= pvNode;          // reduce pv nodes less
+        if (!board.isCapture(move))
+        {
+            // This move is a non-killer quiet
+            int stm = (int)board.sideToMove();
+            int pieceType = (int)board.at<PieceType>(move.from());
+            int squareTo = (int)move.to();
+            // reduce moves with good history less and vice versa
+            lmr -= round(historyMoves[stm][pieceType][squareTo] / LMR_HISTORY_DIVISOR);
+        }
+        if (lmr < 0) lmr = 0;
+    }
+    else
+        lmr = 0;
+
+    int score = -search(depth - 1 - lmr, -alpha - 1, -alpha, plyFromRoot + 1);
+    if (score > alpha && (score < beta || lmr > 0))
+        score = -search(depth - 1, -beta, -alpha, plyFromRoot + 1);
+
+    return score;
+}
+
+inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp) // skipNmp defaults to false
 {
     if (plyFromRoot > maxPlyReached) maxPlyReached = plyFromRoot;
     if (plyFromRoot > 0 && board.isRepetition()) return 0;
@@ -215,23 +246,14 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool skipNmp 
             return eval;
 
         // NMP (Null move pruning)
-        if (depth >= NMP_MIN_DEPTH && !skipNmp && eval >= beta)
+        if (depth >= NMP_MIN_DEPTH && !skipNmp && eval >= beta && board.hasAtLeast1Piece())
         {
-            bool hasAtLeast1Piece =
-                board.pieces(PieceType::KNIGHT, board.sideToMove()) > 0 ||
-                board.pieces(PieceType::BISHOP, board.sideToMove()) > 0 ||
-                board.pieces(PieceType::ROOK, board.sideToMove()) > 0 ||
-                board.pieces(PieceType::QUEEN, board.sideToMove()) > 0;
+            board.makeNullMove();
+            int score = -search(depth - NMP_BASE_REDUCTION - depth / NMP_REDUCTION_DIVISOR, -beta, -alpha, plyFromRoot + 1, true);
+            board.unmakeNullMove();
 
-            if (hasAtLeast1Piece)
-            {
-                board.makeNullMove();
-                int score = -search(depth - NMP_BASE_REDUCTION - depth / NMP_REDUCTION_DIVISOR, plyFromRoot + 1, -beta, -alpha, true);
-                board.unmakeNullMove();
-
-                if (score >= MIN_MATE_SCORE) return beta;
-                if (score >= beta) return score;
-            }
+            if (score >= MIN_MATE_SCORE) return beta;
+            if (score >= beta) return score;
         }
     }
 
@@ -258,7 +280,7 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool skipNmp 
         bool historyMoveOrLosing = scores[i] < KILLER_SCORE;
         int lmr = lmrTable[depth][i];
 
-        // Move loop pruning
+        // Moves loop pruning
         if (plyFromRoot > 0 && historyMoveOrLosing && bestScore > -MIN_MATE_SCORE)
         {
             // LMP (Late move pruning)
@@ -276,28 +298,8 @@ inline int search(int depth, int plyFromRoot, int alpha, int beta, bool skipNmp 
 
         board.makeMove(move);
         nodes++;
-
-        // PVS (Principal variation search)
-        int score = 0;
-        if (i == 0) // best move of prev iteration aka hash move
-            score = -search(depth - 1, plyFromRoot + 1, -beta, -alpha);
-        else
-        {
-            // LMR (Late move reduction)
-            if (!inCheck && depth >= LMR_MIN_DEPTH)
-            {
-                lmr -= board.inCheck(); // reduce checks less
-                lmr -= pvNode;          // reduce pv nodes less
-                if (lmr < 0) lmr = 0;
-            }
-            else
-                lmr = 0;
-
-            score = -search(depth - 1 - lmr, plyFromRoot + 1, -alpha - 1, -alpha);
-            if (score > alpha && (score < beta || lmr > 0))
-                score = -search(depth - 1, plyFromRoot + 1, -beta, -alpha);
-        }
-
+        int score = i == 0 ? -search(depth - 1, -beta, -alpha, plyFromRoot + 1) 
+                           : pvs(depth, alpha, beta, plyFromRoot, move, scores[i], lmr, inCheck, pvNode);
         board.unmakeMove(move);
         if (checkIsTimeUp()) return 0;
 
@@ -353,7 +355,7 @@ inline int aspiration(int maxDepth, int score)
 
     while (true)
     {
-        score = search(depth, 0, alpha, beta);
+        score = search(depth, alpha, beta, 0);
 
         if (checkIsTimeUp()) return 0;
 
@@ -393,10 +395,8 @@ inline Move iterativeDeepening(vector<string> &words)
         int scoreBefore = score;
         Move moveBefore = bestMoveRoot;
 
-        if (iterationDepth < ASPIRATION_MIN_DEPTH)
-            score = search(iterationDepth, 0, NEG_INFINITY, POS_INFINITY);
-        else
-            score = aspiration(iterationDepth, score);
+        score = iterationDepth >= ASPIRATION_MIN_DEPTH ? aspiration(iterationDepth, score) 
+                                                       : search(iterationDepth, NEG_INFINITY, POS_INFINITY, 0);
 
         if (checkIsTimeUp())
         {

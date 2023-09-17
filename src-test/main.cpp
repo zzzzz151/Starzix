@@ -21,8 +21,7 @@ inline void initLmrTable()
     for (int depth = 0; depth < numRows; depth++)
         for (int move = 0; move < numCols; move++)
             // log(x) is ln(x)
-            // add 0.5 to round to nearest int
-            lmrTable[depth][move] = depth == 0 || move == 0 ? 0 : (int)(LMR_BASE + log(depth) * log(move) / LMR_DIVISOR + 0.5);
+            lmrTable[depth][move] = depth == 0 || move == 0 ? 0 : round(LMR_BASE + log(depth) * log(move) / LMR_DIVISOR);
 }
 
 int main()

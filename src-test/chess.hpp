@@ -31,6 +31,7 @@ VERSION: 0.1.7
 #ifndef CHESS_HPP
 #define CHESS_HPP
 
+// clang-format off
 #include "nnue.hpp"
 #include <algorithm>
 #include <array>
@@ -61,7 +62,6 @@ namespace chess
      * Enumerations                                                              *
     \****************************************************************************/
 
-    // clang-format off
 enum Square : uint8_t {
     SQ_A1, SQ_B1, SQ_C1, SQ_D1, SQ_E1, SQ_F1, SQ_G1, SQ_H1,
     SQ_A2, SQ_B2, SQ_C2, SQ_D2, SQ_E2, SQ_F2, SQ_G2, SQ_H2,
@@ -73,7 +73,6 @@ enum Square : uint8_t {
     SQ_A8, SQ_B8, SQ_C8, SQ_D8, SQ_E8, SQ_F8, SQ_G8, SQ_H8,
     NO_SQ
 };
-    // clang-format on
 
     enum class MoveGenType : uint8_t
     {
@@ -241,7 +240,6 @@ enum Square : uint8_t {
 
     static const std::string STARTPOS = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-    // clang-format off
 const std::string squareToString[64] = {
     "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1",
     "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2",
@@ -252,7 +250,6 @@ const std::string squareToString[64] = {
     "a7", "b7", "c7", "d7", "e7", "f7", "g7", "h7",
     "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8",
 };
-    // clang-format on
 
     /// @brief Convert a char to the internal Piece representation
     /// @param c
@@ -1671,6 +1668,10 @@ const std::string squareToString[64] = {
         /// @return
         [[nodiscard]] bool inCheck() const;
 
+        /// @brief Checks if side to move has 1 piece thats not pawn and not king
+        /// @return
+        [[nodiscard]] bool hasAtLeast1Piece() const;
+
         /// @brief Regenerates the zobrist hash key
         /// @return
         [[nodiscard]] U64 zobrist() const;
@@ -2120,6 +2121,14 @@ const std::string squareToString[64] = {
     }
 
     inline bool Board::inCheck() const { return isAttacked(kingSq(side_to_move_), ~side_to_move_); }
+
+    inline bool Board::hasAtLeast1Piece() const
+    {
+        return pieces(PieceType::KNIGHT, sideToMove()) > 0 
+               || pieces(PieceType::BISHOP, sideToMove()) > 0 
+               || pieces(PieceType::ROOK, sideToMove()) > 0
+               || pieces(PieceType::QUEEN, sideToMove()) > 0;
+    }
 
     inline void Board::placePiece(Piece piece, Square sq)
     {
@@ -3117,7 +3126,6 @@ const std::string squareToString[64] = {
             }
         }
 
-        // clang-format off
 // pre-calculated lookup table for pawn attacks
 static constexpr Bitboard PawnAttacks[2][MAX_SQ] = {
     // white pawn attacks
@@ -3157,8 +3165,6 @@ static constexpr Bitboard PawnAttacks[2][MAX_SQ] = {
         0x28000000000000, 0x50000000000000, 0xa0000000000000, 0x40000000000000
       }
 };
-
-        // clang-format on
 
         // pre-calculated lookup table for knight attacks
         static constexpr Bitboard KnightAttacks[MAX_SQ] = {
