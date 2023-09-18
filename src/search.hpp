@@ -120,6 +120,7 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
 {
     // Quiescence saarch: search capture moves until a 'quiet' position is reached
 
+    int originalAlpha = alpha;
     int eval = network.Evaluate((int)board.sideToMove());
     if (eval >= beta) return eval;
     if (alpha < eval) alpha = eval;
@@ -174,7 +175,7 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
         ttEntry->depth = 0;
         ttEntry->score = bestScore;
         ttEntry->bestMove = NULL_MOVE;
-        if (bestScore <= alpha) ttEntry->type = UPPER_BOUND;
+        if (bestScore <= originalAlpha) ttEntry->type = UPPER_BOUND;
         else if (bestScore >= beta) ttEntry->type = LOWER_BOUND;
         else ttEntry->type = EXACT;
     }
