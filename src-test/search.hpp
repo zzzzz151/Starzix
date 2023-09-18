@@ -388,11 +388,11 @@ inline Move iterativeDeepening(vector<string> &words)
     memset(&historyMoves[0][0][0], 0, sizeof(historyMoves));
 
     nodes = 0;
-    maxPlyReached = -1;
     int iterationDepth = 1, score = 0;
 
     while (iterationDepth <= MAX_DEPTH)
     {
+        maxPlyReached = -1;
         int scoreBefore = score;
         Move moveBefore = bestMoveRoot;
 
