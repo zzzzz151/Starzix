@@ -60,4 +60,10 @@ inline bool checkIsTimeUp()
     return isTimeUp;
 }
 
+inline int millisecondsLeftForThisTurn()
+{
+    int millisecondsElapsed = (chrono::steady_clock::now() - start) / chrono::milliseconds(1);
+    return millisecondsForThisTurn - millisecondsElapsed;
+}
+
 #endif

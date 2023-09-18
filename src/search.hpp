@@ -48,7 +48,7 @@ const int SEE_PRUNING_NOISY_THRESHOLD = -90,
 const uint8_t LMR_MIN_DEPTH = 1;
 const double LMR_BASE = 1,
              LMR_DIVISOR = 2,
-             LMR_HISTORY_DIVISOR = 8192;
+             LMR_HISTORY_DIVISOR = 1024;
 
 // ----- End tunable params -----
 
