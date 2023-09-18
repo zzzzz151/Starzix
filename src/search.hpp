@@ -3,9 +3,9 @@
 
 // clang-format off
 #include "chess.hpp"
+#include "time_management.hpp"
 #include "nnue.hpp"
 #include "see.hpp"
-#include "time_management.hpp"
 inline void info(int depth, int score); // from uci.hpp
 using namespace chess;
 using namespace std;
@@ -20,13 +20,6 @@ int TT_SIZE_MB = 64; // default (and current) TT size in MB
 extern const int PIECE_VALUES[7] = {100, 302, 320, 500, 900, 15000, 0},
                  SEE_PIECE_VALUES[7] = {100, 300, 300, 500, 900, 0, 0},
                  PAWN_INDEX = 0;
-
-const int HASH_MOVE_SCORE = INT_MAX,
-          GOOD_CAPTURE_SCORE = 1'500'000'000,
-          PROMOTION_SCORE = 1'000'000'000,
-          KILLER_SCORE = 500'000'000,
-          HISTORY_SCORE = 0, // non-killer quiets
-          BAD_CAPTURE_SCORE = -500'000'000;
 
 const uint8_t ASPIRATION_MIN_DEPTH = 6,
               ASPIRATION_INITIAL_DELTA = 25;
@@ -85,37 +78,7 @@ vector<TTEntry> TT;
 
 // ----- End global vars -----
 
-inline void scoreMoves(Movelist &moves, int *scores, U64 boardKey, TTEntry &ttEntry, int plyFromRoot)
-{
-    for (int i = 0; i < moves.size(); i++)
-    {
-        Move move = moves[i];
-
-        if (ttEntry.key == boardKey && move == ttEntry.bestMove)
-            scores[i] = HASH_MOVE_SCORE;
-        else if (board.isCapture(move))
-        {
-            PieceType captured = board.at<PieceType>(move.to());
-            PieceType capturing = board.at<PieceType>(move.from());
-            int moveScore = SEE(board, move) ? GOOD_CAPTURE_SCORE : BAD_CAPTURE_SCORE;
-            moveScore += 100 * PIECE_VALUES[(int)captured] - PIECE_VALUES[(int)capturing]; // MVVLVA
-            scores[i] = moveScore;
-        }
-        else if (move.typeOf() == move.PROMOTION)
-            scores[i] = PROMOTION_SCORE;
-        else if (killerMoves[plyFromRoot][0] == move)
-            scores[i] = KILLER_SCORE + 1;
-        else if (killerMoves[plyFromRoot][1] == move)
-            scores[i] = KILLER_SCORE;
-        else
-        {
-            int stm = (int)board.sideToMove();
-            int pieceType = (int)board.at<PieceType>(move.from());
-            int squareTo = (int)move.to();
-            scores[i] = HISTORY_SCORE + historyMoves[stm][pieceType][squareTo];
-        }
-    }
-}
+#include "move_scoring.hpp"
 
 inline int qSearch(int alpha, int beta, int plyFromRoot)
 {
@@ -143,14 +106,7 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
     int bestScore = eval;
     for (int i = 0; i < moves.size(); i++)
     {
-        // sort moves incrementally
-        for (int j = i + 1; j < moves.size(); j++)
-            if (scores[j] > scores[i])
-            {
-                swap(moves[i], moves[j]);
-                swap(scores[i], scores[j]);
-            }
-        Move capture = moves[i];
+        Move capture = incrementalSort(moves, scores, i);
 
         // SEE pruning (skip bad captures)
         if (!SEE(board, capture)) continue;
@@ -160,10 +116,8 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
         int score = -qSearch(-beta, -alpha, plyFromRoot + 1);
         board.unmakeMove(capture);
 
-        if (score > bestScore)
-            bestScore = score;
-        else
-            continue;
+        if (score > bestScore) bestScore = score;
+        else continue;
 
         if (score >= beta) return score; // in CPW: return beta;
         if (score > alpha) alpha = score;
@@ -270,15 +224,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
 
     for (int i = 0; i < moves.size(); i++)
     {
-        // sort moves incrementally
-        for (int j = i + 1; j < moves.size(); j++)
-            if (scores[j] > scores[i])
-            {
-                swap(moves[i], moves[j]);
-                swap(scores[i], scores[j]);
-            }
-        Move move = moves[i];
-
+        Move move = incrementalSort(moves, scores, i);
         bool historyMoveOrLosing = scores[i] < KILLER_SCORE;
         int lmr = lmrTable[depth][i];
 
@@ -335,7 +281,6 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
         }
 
         break; // Beta cutoff
-        
     }
 
     // Save in TT
@@ -383,10 +328,8 @@ inline int aspiration(int maxDepth, int score)
     return score;
 }
 
-inline Move iterativeDeepening(vector<string> &words)
+inline Move iterativeDeepening()
 {
-    setupTime(words, board.sideToMove());
-
     // clear history moves
     memset(&historyMoves[0][0][0], 0, sizeof(historyMoves));
 

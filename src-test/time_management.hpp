@@ -2,6 +2,8 @@
 #define TIME_MANAGEMENT_HPP
 
 // clang-format off
+#include "chess.hpp"
+using namespace chess;
 using namespace std;
 
 chrono::steady_clock::time_point start;

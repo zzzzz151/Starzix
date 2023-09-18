@@ -66,7 +66,8 @@ inline void position(vector<string> &words)
 
 inline void go(vector<string> &words)
 {
-    Move bestMove = iterativeDeepening(words);
+    setupTime(words, board.sideToMove());
+    Move bestMove = iterativeDeepening();
     cout << "bestmove " + uci::moveToUci(bestMove) + "\n";
 }
 
