@@ -303,35 +303,36 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
         board.unmakeMove(move);
         if (checkIsTimeUp()) return 0;
 
-        if (score > bestScore)
+        if (score <= bestScore) continue;
+        bestScore = score;
+        bestMove = move;
+
+        if (bestScore > alpha) 
         {
-            bestScore = score;
-
-            if (bestScore > alpha) 
-            {
-                bestMove = move;
-                alpha = bestScore;
-                if (plyFromRoot == 0) bestMoveRoot = move;
-            }
-
-            if (alpha >= beta)
-            {
-                bool isQuietMove = !board.isCapture(move) && move.typeOf() != move.PROMOTION;
-                if (isQuietMove && move != killerMoves[plyFromRoot][0])
-                {
-                    killerMoves[plyFromRoot][1] = killerMoves[plyFromRoot][0];
-                    killerMoves[plyFromRoot][0] = move;
-                }
-                if (isQuietMove)
-                {
-                    int stm = (int)board.sideToMove();
-                    int pieceType = (int)board.at<PieceType>(move.from());
-                    int squareTo = (int)move.to();
-                    historyMoves[stm][pieceType][squareTo] += depth * depth;
-                }
-                break;
-            }
+            alpha = bestScore;
+            if (plyFromRoot == 0) bestMoveRoot = move;
         }
+
+        if (alpha < beta) continue;
+
+        // Beta cutoff
+
+        bool isQuietMove = !board.isCapture(move) && move.typeOf() != move.PROMOTION;
+        if (isQuietMove && move != killerMoves[plyFromRoot][0])
+        {
+            killerMoves[plyFromRoot][1] = killerMoves[plyFromRoot][0];
+            killerMoves[plyFromRoot][0] = move;
+        }
+        if (isQuietMove)
+        {
+            int stm = (int)board.sideToMove();
+            int pieceType = (int)board.at<PieceType>(move.from());
+            int squareTo = (int)move.to();
+            historyMoves[stm][pieceType][squareTo] += depth * depth;
+        }
+
+        break; // Beta cutoff
+        
     }
 
     // Save in TT
