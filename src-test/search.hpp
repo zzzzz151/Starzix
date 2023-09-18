@@ -49,7 +49,8 @@ const uint8_t LMP_MAX_DEPTH = 8,
               LMP_MIN_MOVES_BASE = 2;
 
 const uint8_t SEE_PRUNING_MAX_DEPTH = 9;
-const int SEE_PRUNING_THRESHOLD = -50;
+const int SEE_PRUNING_NOISY_THRESHOLD = -90,
+          SEE_PRUNING_QUIET_THRESHOLD = -50;
 
 const uint8_t LMR_MIN_DEPTH = 1;
 const double LMR_BASE = 1,
@@ -293,7 +294,8 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
                 break;
 
             // SEE pruning
-            if (depth <= SEE_PRUNING_MAX_DEPTH && !SEE(board, move, depth * SEE_PRUNING_THRESHOLD))
+            bool isNoisy = board.isCapture(move) || move.typeOf() == move.PROMOTION;
+            if (depth <= SEE_PRUNING_MAX_DEPTH && !SEE(board, move, depth * (isNoisy ? SEE_PRUNING_NOISY_THRESHOLD : SEE_PRUNING_QUIET_THRESHOLD)))
                 continue;
         }
 
