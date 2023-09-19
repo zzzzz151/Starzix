@@ -90,9 +90,8 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
     if (alpha < eval) alpha = eval;
 
     U64 boardKey = board.zobrist();
-    TTEntry *ttEntry = &(TT[boardKey % NUM_TT_ENTRIES]);
-
     // probe TT
+    TTEntry *ttEntry = &(TT[boardKey % NUM_TT_ENTRIES]);
     if (plyFromRoot > 0 && ttEntry->key == boardKey)
         if (ttEntry->type == EXACT || (ttEntry->type == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->type == UPPER_BOUND && ttEntry->score <= alpha))
             return ttEntry->score;
@@ -174,7 +173,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
     if (checkIsTimeUp()) return 0;
 
     bool inCheck = board.inCheck();
-    if (inCheck) depth++;
+    if (inCheck) depth++; // Check extension
 
     int originalAlpha = alpha;
     U64 boardKey = board.zobrist();
@@ -232,7 +231,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
         if (plyFromRoot > 0 && historyMoveOrLosing && bestScore > -MIN_MATE_SCORE)
         {
             // LMP (Late move pruning)
-            if (!inCheck && !pvNode && depth <= LMP_MAX_DEPTH && i >= LMP_MIN_MOVES_BASE + pvNode + depth * depth * 2)
+            if (!inCheck && !pvNode && depth <= LMP_MAX_DEPTH && i >= LMP_MIN_MOVES_BASE + depth * depth * 2)
                 break;
 
             // FP (Futility pruning)
@@ -245,10 +244,14 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
                 continue;
         }
 
+        // 7th-rank-pawn extension
+        Rank rank = utils::squareRank(move.to());
+        int extension = board.at<PieceType>(move.from()) == PieceType::PAWN && (rank == Rank::RANK_2 || rank == Rank::RANK_7);
+
         board.makeMove(move);
         nodes++;
-        int score = i == 0 ? -search(depth - 1, -beta, -alpha, plyFromRoot + 1) 
-                           : pvs(depth, alpha, beta, plyFromRoot, move, scores[i], lmr, inCheck, pvNode);
+        int score = i == 0 ? -search(depth - 1 + extension, -beta, -alpha, plyFromRoot + 1) 
+                           : pvs(depth + extension, alpha, beta, plyFromRoot, move, scores[i], lmr, inCheck, pvNode);
         board.unmakeMove(move);
         if (checkIsTimeUp()) return 0;
 

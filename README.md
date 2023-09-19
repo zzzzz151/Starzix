@@ -32,7 +32,7 @@ Move ordering (hash move > good captures by SEE + MVVLVA > promotions > killer m
 
 Aspiration windows
 
-Check extension
+Check and 7th-rank-pawn extensions
 
 Internal iterative reduction
 
