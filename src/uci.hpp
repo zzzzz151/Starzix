@@ -90,7 +90,7 @@ inline void uciLoop()
 {
     string received;
     getline(cin, received);
-    cout << "id name z5\n";
+    cout << "id name test\n";
     cout << "id author zzzzz\n";
     cout << "option name Hash type spin default " << TT_SIZE_MB << " min 1 max 512\n";
     cout << "uciok\n";

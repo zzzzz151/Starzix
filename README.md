@@ -28,7 +28,7 @@ Transposition table
 
 Quiescence search with SEE pruning
 
-Move ordering (hash move > good captures by SEE + MVVLVA > promotions > killer moves > history heuristic > bad captures)
+Move ordering (hash move > good captures by SEE + MVVLVA > promotions > killer moves > countermove > history heuristic > bad captures)
 
 Aspiration windows
 

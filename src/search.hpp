@@ -9,7 +9,6 @@
 inline void info(int depth, int score); // from uci.hpp
 using namespace chess;
 using namespace std;
-inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp = false);
 
 // ----- Tunable params ------
 
@@ -63,6 +62,7 @@ int maxPlyReached;
 Move killerMoves[MAX_DEPTH*2][2]; // ply, move
 int historyMoves[2][6][64];       // color, pieceType, squareTo
 int lmrTable[MAX_DEPTH + 2][218]; // depth, move (lmrTable initialized in main.cpp)
+Move counterMove;
 
 const char INVALID = 0, EXACT = 1, LOWER_BOUND = 2, UPPER_BOUND = 3;
 struct TTEntry
@@ -79,6 +79,8 @@ vector<TTEntry> TT;
 // ----- End global vars -----
 
 #include "move_scoring.hpp"
+
+inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp = false);
 
 inline int qSearch(int alpha, int beta, int plyFromRoot)
 {
@@ -277,6 +279,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
         }
         if (isQuietMove)
         {
+            counterMove = move;
             int stm = (int)board.sideToMove();
             int pieceType = (int)board.at<PieceType>(move.from());
             int squareTo = (int)move.to();
@@ -336,6 +339,7 @@ inline Move iterativeDeepening()
     // clear history moves
     memset(&historyMoves[0][0][0], 0, sizeof(historyMoves));
 
+    counterMove = NULL_MOVE;
     nodes = 0;
     int iterationDepth = 1, score = 0;
 

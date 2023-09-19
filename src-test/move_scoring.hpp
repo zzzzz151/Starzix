@@ -36,6 +36,8 @@ inline void scoreMoves(Movelist &moves, int *scores, U64 boardKey, TTEntry &ttEn
             scores[i] = KILLER_SCORE + 1;
         else if (killerMoves[plyFromRoot][1] == move)
             scores[i] = KILLER_SCORE;
+        else if (move == counterMove)
+            scores[i] = KILLER_SCORE - 1;
         else
         {
             int stm = (int)board.sideToMove();
