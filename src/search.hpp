@@ -186,6 +186,10 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
         if (ttEntry->type == EXACT || (ttEntry->type == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->type == UPPER_BOUND && ttEntry->score <= alpha))
             return ttEntry->score;
 
+    // IIR (Internal iterative reduction)
+    if (ttEntry->key != boardKey && depth >= IIR_MIN_DEPTH && !inCheck)
+        depth--;
+
     Movelist moves;
     movegen::legalmoves(moves, board);
 
@@ -214,9 +218,6 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
         }
     }
 
-    // IIR (Internal iterative reduction)
-    if (ttEntry->key != boardKey && depth >= IIR_MIN_DEPTH && !inCheck)
-        depth--;
 
     int scores[218];
     scoreMoves(moves, scores, boardKey, *ttEntry, plyFromRoot);

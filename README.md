@@ -59,6 +59,3 @@ Time management
 [Disservin's move gen (chess-library)](https://github.com/Disservin/chess-library)
 
 [MantaRay for C++ neural network inference](https://github.com/TheBlackPlague/MantaRay)
-
-[Engine Programming Discord](https://discord.gg/pcjr9eXK)
-
