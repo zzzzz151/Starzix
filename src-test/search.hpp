@@ -171,7 +171,7 @@ inline int pvs(int depth, int alpha, int beta, int plyFromRoot, const Move &move
 inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp) // skipNmp defaults to false
 {
     if (plyFromRoot > maxPlyReached) maxPlyReached = plyFromRoot;
-    if (plyFromRoot > 0 && board.isRepetition()) return 0;
+    if (plyFromRoot > 0 && board.isRepetition(1)) return 0;
     if (checkIsTimeUp()) return 0;
 
     bool inCheck = board.inCheck();
