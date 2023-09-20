@@ -1,6 +1,6 @@
 # z5 - UCI C++ chess engine
 
-Currently ~2970 elo (tested against [4ku](https://github.com/kz04px/4ku) 3.0).
+Currently ~3070 elo (tested against [amoeba](https://github.com/abulmo/amoeba) 3.4).
 
 # How to compile
 
