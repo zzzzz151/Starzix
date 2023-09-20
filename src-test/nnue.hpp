@@ -13,7 +13,8 @@
 using NeuralNetwork = MantaRay::PerspectiveNetwork<int16_t, int32_t, MantaRay::ClippedReLU<int16_t, 0, 255>, 768, 128, 1, 512, 400, 255, 64>;
 
 // Create the input stream:
-MantaRay::MarlinflowStream stream("nets/net_128_500M_0wdl.json");
+//MantaRay::MarlinflowStream stream("net_128_500M_0wdl.json");
+MantaRay::BinaryFileStream stream("net_128_500M_0wdl.nnue");
 
 // Create & load the network from the stream:
 NeuralNetwork network(stream);

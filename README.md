@@ -2,13 +2,7 @@
 
 Currently ~3070 elo (tested against [amoeba](https://github.com/abulmo/amoeba) 3.4).
 
-# How to compile
-
-**Linux**
-
-```make``` to create the 'z5' binary
-
-**Windows**
+# How to build
 
 ```g++ -O3 -std=c++17 src/main.cpp -o z5.exe```
 
