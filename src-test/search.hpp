@@ -96,7 +96,11 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
     TTEntry *ttEntry = &(TT[boardKey % NUM_TT_ENTRIES]);
     if (plyFromRoot > 0 && ttEntry->key == boardKey)
         if (ttEntry->type == EXACT || (ttEntry->type == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->type == UPPER_BOUND && ttEntry->score <= alpha))
-            return ttEntry->score;
+        {
+            int ret = ttEntry->score;
+            if (abs(ret) >= MIN_MATE_SCORE) ret += ret < 0 ? plyFromRoot : -plyFromRoot;
+            return ret;
+        }
 
     Movelist moves;
     movegen::legalmoves<MoveGenType::CAPTURE>(moves, board);
@@ -130,6 +134,7 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
         ttEntry->key = boardKey;
         ttEntry->depth = 0;
         ttEntry->score = bestScore;
+        if (abs(bestScore) >= MIN_MATE_SCORE) ttEntry->score += bestScore < 0 ? -plyFromRoot : plyFromRoot;
         ttEntry->bestMove = NULL_MOVE;
         if (bestScore <= originalAlpha) ttEntry->type = UPPER_BOUND;
         else if (bestScore >= beta) ttEntry->type = LOWER_BOUND;
@@ -184,7 +189,11 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
     TTEntry *ttEntry = &(TT[boardKey % NUM_TT_ENTRIES]);
     if (plyFromRoot > 0 && ttEntry->key == boardKey && ttEntry->depth >= depth)
         if (ttEntry->type == EXACT || (ttEntry->type == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->type == UPPER_BOUND && ttEntry->score <= alpha))
-            return ttEntry->score;
+        {
+            int ret = ttEntry->score;
+            if (abs(ret) >= MIN_MATE_SCORE) ret += ret < 0 ? plyFromRoot : -plyFromRoot;
+            return ret;
+        }
 
     // IIR (Internal iterative reduction)
     if (ttEntry->key != boardKey && depth >= IIR_MIN_DEPTH && !inCheck)
@@ -217,7 +226,6 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
             if (score >= beta) return score;
         }
     }
-
 
     int scores[218];
     scoreMoves(moves, scores, boardKey, *ttEntry, plyFromRoot);
@@ -294,6 +302,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
     ttEntry->key = boardKey;
     ttEntry->depth = depth;
     ttEntry->score = bestScore;
+    if (abs(bestScore) >= MIN_MATE_SCORE) ttEntry->score += bestScore < 0 ? -plyFromRoot : plyFromRoot;
     ttEntry->bestMove = bestMove;
     if (bestScore <= originalAlpha) ttEntry->type = UPPER_BOUND;
     else if (bestScore >= beta) ttEntry->type = LOWER_BOUND;

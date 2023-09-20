@@ -73,6 +73,15 @@ inline void go(vector<string> &words)
 
 inline void info(int depth, int score)
 {
+    bool isMate = abs(score) >= MIN_MATE_SCORE;
+    int movesToMate = 0;
+    if (isMate)
+    {
+        int pliesToMate = POS_INFINITY - abs(score);
+        movesToMate = round(pliesToMate / 2.0);
+        if (score < 0) movesToMate *= -1; // we are getting mated
+    }
+
     double millisecondsElapsed = (chrono::steady_clock::now() - start) / chrono::milliseconds(1);
     U64 nps = nodes / (millisecondsElapsed > 0 ? millisecondsElapsed : 1) * 1000;
 
@@ -81,7 +90,7 @@ inline void info(int depth, int score)
          << " time " << round(millisecondsElapsed)
          << " nodes " << nodes
          << " nps " << nps
-         << " score cp " << score
+         << (isMate ? " score mate " : " score cp ") << (isMate ? movesToMate : score)
          << " pv " << uci::moveToUci(bestMoveRoot)
          << endl;
 }
