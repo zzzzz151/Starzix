@@ -14,42 +14,34 @@ inline void setupTime(vector<string> &words, Color color = Color::WHITE)
 {
     start = chrono::steady_clock::now();
     isTimeUp = false;
-    millisecondsForThisTurn = -1;
-    int milliseconds = -1, movesToGo = -1;
+    int milliseconds = -1, movesToGo = -1, increment = 0;
+    bool isMoveTime = false;
 
     // With movestogo or movetime, save 5ms for shenanigans
 
     for (int i = 0; i < words.size(); i++)
     {
         if ((words[i] == "wtime" && color == Color::WHITE) || (words[i] == "btime" && color == Color::BLACK))
-        {
             milliseconds = stoi(words[i + 1]);
-            if (movesToGo != -1)
-            {
-                millisecondsForThisTurn = milliseconds / movesToGo;
-                if (movesToGo == 1) millisecondsForThisTurn -= min(5.0, milliseconds / 2.0);
-            }
-            else
-                millisecondsForThisTurn = milliseconds / 30.0;
-        }
+        else if ((words[i] == "winc" && color == Color::WHITE) || (words[i] == "binc" && color == Color::BLACK))
+            increment = stoi(words[i+1]);
         else if (words[i] == "movestogo")
-        {
-            int movesToGo = stoi(words[i + 1]);
-            if (milliseconds != -1) 
-            {
-                millisecondsForThisTurn = milliseconds / movesToGo;
-                if (movesToGo == 1) millisecondsForThisTurn -= min(5.0, milliseconds / 2.0);
-            }
-        }
+            movesToGo = stoi(words[i + 1]);
         else if (words[i] == "movetime")
         {
             milliseconds = stoi(words[i + 1]);
-            millisecondsForThisTurn = milliseconds - min(5.0, milliseconds / 2.0);
-            break;
+            isMoveTime = true;
         }
     }
 
-    if (millisecondsForThisTurn == -1) millisecondsForThisTurn = 60000; // default 1 minute (this line should never happen)
+    if (isMoveTime || movesToGo == 1)
+        // save 5ms for shenanigans
+        millisecondsForThisTurn = milliseconds - min(5, milliseconds / 2); 
+    else if (movesToGo != -1)
+    	millisecondsForThisTurn = milliseconds / movesToGo;
+    else
+        // if invalid, use 1 min by default, else it's "go wtime 10000 btime 10000 winc 100 binc 100"
+        millisecondsForThisTurn = milliseconds == -1 ? 60000 : round(milliseconds / 15.0);
 
 }
 
