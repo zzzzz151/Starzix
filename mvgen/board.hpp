@@ -17,60 +17,61 @@ class Board
     Piece pieces[64];
     uint64_t occupied, piecesBitboards[6][2];
     bool castlingRights[4];
-    uint8_t colorToMove;
-    uint8_t enPassantTargetSquare;
-    uint16_t pliesSincePawnAdvanceOrCapture;
+    const static uint8_t CASTLING_RIGHT_WHITE_SHORT = 0,
+                         CASTLING_RIGHT_WHITE_LONG = 1,
+                         CASTLING_RIGHT_BLACK_SHORT = 2,
+                         CASTLING_RIGHT_BLACK_LONG = 3;
+    Color colorToMove;
+    Square enPassantTargetSquare;
+    uint16_t pliesSincePawnMoveOrCapture;
     uint16_t currentMoveCounter;
 
     inline Board(string fen)
     {
-        // parse the fen into pieces[64]
-        // example: rn1qkb1r/ppp1pppp/3p1n2/5b2/3PP3/3B4/PPP2PPP/RNBQK1NR w KQkq - 2 4
-
-        occupied = 0;
-        for (int i = 0; i < 6; i++)
-        {
-            piecesBitboards[i][WHITE] = 0;
-            piecesBitboards[i][BLACK] = 0;
-        }
-
         vector<string> fenSplit = splitString(fen, ' ');
 
-        processFenRows(fenSplit[0]);
-
+        parseFenRows(fenSplit[0]);
         colorToMove = fenSplit[1] == "b" ? BLACK : WHITE;
-
-        processCastlingRights(fenSplit[2]);
+        parseFenCastlingRights(fenSplit[2]);
 
         string strEnPassantSquare = fenSplit[3];
-        enPassantTargetSquare = strEnPassantSquare == "-" ? 0 : stringToSquare(strEnPassantSquare);
+        enPassantTargetSquare = strEnPassantSquare == "-" ? 0 : strToSquare(strEnPassantSquare);
 
-        pliesSincePawnAdvanceOrCapture = stoi(fenSplit[4]);
+        pliesSincePawnMoveOrCapture = stoi(fenSplit[4]);
         currentMoveCounter = fenSplit.size() >= 6 ? stoi(fenSplit[5]) : 1;
     }
 
-    inline void processFenRows(string fenRows)
+    inline void parseFenRows(string fenRows)
     {
-        int currentSquare = 0;
+        for (int sq= 0; sq < 64; sq++)
+            pieces[sq] = Piece::NONE;
+
+        occupied = (uint64_t)0;
+
+        for (int pt = 0; pt < 6; pt++)
+            piecesBitboards[pt][WHITE] = piecesBitboards[pt][BLACK] = 0;
+
+        int currentRank = 7; // start from top rank
+        int currentFile = 0;
         for (int i = 0; i < fenRows.length(); i++)
         {
             char thisChar = fenRows[i];
             if (thisChar == '/')
-                continue;
-
-            if (isdigit(thisChar))
             {
-                for (int j = 0; j < charToInt(thisChar); j++)
-                    placePiece(Piece::NONE, currentSquare);
-                continue;
+                currentRank--;
+                currentFile = 0;
             }
-
-            placePiece(charToPiece[thisChar], currentSquare);
-            currentSquare++;
+            else if (isdigit(thisChar))
+                currentFile += charToInt(thisChar);
+            else
+            {
+                placePiece(charToPiece[thisChar], currentRank * 8 + currentFile);
+                currentFile++;
+            }
         }
     }
 
-    inline void processCastlingRights(string fenCastlingRights)
+    inline void parseFenCastlingRights(string fenCastlingRights)
     {
         for (int i = 0; i < 4; i++)
             castlingRights[i] = false;
@@ -91,14 +92,23 @@ class Board
     {
         string fen = "";
 
-        for (int i = 0; i < 8; i++)
+        for (int rank = 7; rank >= 0; rank--)
         {
-            string fenRow = "";
             int emptySoFar = 0;
-
-            for (int j = 0; j < 8; j++)
-                processSquareToFenRow(fenRow, i * 8 + j, emptySoFar);
-            fen += fenRow + "/";
+            for (int file = 0; file < 8; file++)
+            {
+                Square square = rank * 8 + file;
+                Piece piece = pieces[square];
+                if (piece != Piece::NONE) {
+                    if (emptySoFar > 0) fen += to_string(emptySoFar);
+                    fen += string(1, pieceToChar[piece]);
+                    emptySoFar = 0;
+                }
+                else
+                    emptySoFar++;
+            }
+            if (emptySoFar > 0) fen += to_string(emptySoFar);
+            fen += "/";
         }
         fen.pop_back(); // remove last '/'
 
@@ -115,43 +125,18 @@ class Board
         string strEnPassantSquare = enPassantTargetSquare == 0 ? "-" : squareToStr[enPassantTargetSquare];
         fen += " " + strEnPassantSquare;
         
-        fen += " " + to_string(pliesSincePawnAdvanceOrCapture);
+        fen += " " + to_string(pliesSincePawnMoveOrCapture);
         fen += " " + to_string(currentMoveCounter);
 
         return fen;
     }
 
-    inline void processSquareToFenRow(string &fenRow, int square, int &emptySoFar)
-    {
-        Piece piece = pieces[square];
-        if (piece == Piece::NONE)
-        {
-            if (squareFile(square) == 'h')
-            {
-                fenRow += to_string(emptySoFar + 1);
-                emptySoFar = 0;
-            }
-            else
-                emptySoFar++;
-        }
-        else 
-        {
-            if (emptySoFar > 0)
-            { 
-                fenRow += to_string(emptySoFar); 
-                emptySoFar = 0;
-            }
-            fenRow += pieceToChar[piece];
-        }
-
-    }
-
     inline void printBoard()
     {
         string str = "";
-        for (uint8_t i = 0; i < 8; i++)
+        for (Square i = 0; i < 8; i++)
         {
-            for (uint8_t j = 0; j < 8; j++)
+            for (Square j = 0; j < 8; j++)
             {
                 int square = i * 8 + j;
                 str += pieces[square] == Piece::NONE ? "." : string(1, pieceToChar[pieces[square]]);
@@ -163,30 +148,53 @@ class Board
         cout << str;
     }
 
-    inline uint64_t getPiecesBitboard(PieceType pieceType, char color = NULL_COLOR)
+    inline PieceType pieceTypeAt(Square square)
+    {
+        return pieceToPieceType(pieces[square]);
+    }
+
+    inline uint64_t getPiecesBitboard(PieceType pieceType, Color color = NULL_COLOR)
     {
         if (color == NULL_COLOR)
             return piecesBitboards[(uint8_t)pieceType][WHITE] | piecesBitboards[(uint8_t)pieceType][BLACK];
         return piecesBitboards[(uint8_t)pieceType][color];
     }
 
-    inline void placePiece(Piece piece, uint8_t square)
+    inline void placePiece(Piece piece, Square square)
     {
-        PieceType pieceType = pieceToPieceType(piece);
-        char color = pieceColor(piece);
-        
         pieces[square] = piece;
-        uint64_t squareBit = 1ULL << square;
-        occupied |= squareBit;
-        piecesBitboards[(uint8_t)pieceType][color] |= squareBit;
+
+        PieceType pieceType = pieceToPieceType(piece);
+        Color color = pieceColor(piece);
+        uint64_t squareBit = (1ULL << square);
+        if (piece != Piece::NONE)
+        {
+            occupied |= squareBit;
+            piecesBitboards[(uint8_t)pieceType][color] |= squareBit;
+        }
+        else
+        {
+            occupied &= ~squareBit;
+            piecesBitboards[(uint8_t)pieceType][color] &= ~squareBit;
+        }
     }
 
-    inline void removePiece(uint8_t square)
+    inline void removePiece(Square square)
     {
+        if (pieces[square] == Piece::NONE) return;
+        PieceType pieceType = pieceToPieceType(pieces[square]);
+        Color color = pieceColor(pieces[square]);
         pieces[square] = Piece::NONE;
+        uint64_t squareBit = (1ULL << square);
+        occupied ^= squareBit;
+        piecesBitboards[(uint8_t)pieceType][color] ^= squareBit;
     }
 
-    inline void 
+    inline vector<Move> getMoves()
+    {
+        return vector<Move>();
+    }
+
 
 };
 

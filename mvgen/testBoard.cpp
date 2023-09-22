@@ -1,14 +1,14 @@
+// clang-format off
 #include <iostream>
+#include <bitset>
+#include <string>
 #include "board.hpp"
-#include "builtin.hpp"
 using namespace std;
 
 int failed = 0, passed = 0;
 
 template <typename T> void test(string testName, T got, T expected)
 {
-    cout << "Test: " << testName << endl;
-
     if (expected != got)
     {
         cout << "[FAILED]";
@@ -19,8 +19,10 @@ template <typename T> void test(string testName, T got, T expected)
         cout << "[PASSED]";
         passed++;
     }
-    cout << endl << "Expected: " << expected << endl << "Got: " << got << endl << endl;
+    cout << " Test: " << testName << endl;
+    if (expected != got) cout << "Expected: " << expected << endl << "Got: " << got << endl;
 
+    cout << endl;
 }
 
 int main()
@@ -35,7 +37,10 @@ int main()
     test("fen",  board2.getFen(), (string)"1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 w Qk f6 0 15");
     test("fen", board3.getFen(), (string)"1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 b Qk f6 0 1");
 
-    test("occupied", popcount(board.occupied), 16);
+    bitset<64> got(board.occupied);  
+    bitset<64> expected(0xffff00000000ffffULL);  
+    test("occupied", got, expected);
+
     test("pieces bitboard", popcount(board.getPiecesBitboard(PieceType::KING)), 2);
     test("pieces bitboard", popcount(board.getPiecesBitboard(PieceType::KING, WHITE)), 1);
 
@@ -45,7 +50,17 @@ int main()
     test("popcount()", popcount((uint64_t)5), 2); // 5 = 101
     test("lsb()", 1ULL << lsb((uint64_t)12), (uint64_t)4); // 12 = 1100
 
+    test("strToSquare()", strToSquare("b7"), (Square)49);
+
     test("sizeof(Move)", sizeof(Move), 2ULL); // 2 bytes
+
+    board = Board("rnb1kbnr/1P1pqppp/4p3/2p5/8/8/P1PPPPPP/RNBQKBNR w KQkq - 1 5");
+    Move move = Move("b7c8b", board.pieceTypeAt(strToSquare("b7")));
+    test("move.from", (int)move.from(), (int)strToSquare("b7"));
+    test("move.to", (int)move.to(), (int)strToSquare("c8"));
+    test("move uci", move.toUci(), (string)"b7c8b");
+    test("move", (int)move.getTypeFlag(), (int)move.BISHOP_PROMOTION_FLAG);
+    test("move", (int)move.getPromotionPieceType(), (int)PieceType::BISHOP);
 
     cout << "Passed: " << passed << endl;
     cout << "Failed: " << failed << endl;

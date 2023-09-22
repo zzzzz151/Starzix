@@ -9,6 +9,9 @@ using namespace std;
 
 const string START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
+using Square = uint8_t;
+using Color = char;
+
 const string squareToStr[64] = {
     "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1",
     "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2",
@@ -20,7 +23,7 @@ const string squareToStr[64] = {
     "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8",
 };
 
-const char WHITE = 0, BLACK = 1, NULL_COLOR = 2;
+const Color WHITE = 0, BLACK = 1, NULL_COLOR = 2;
 
 enum class PieceType : uint8_t
 {
@@ -77,14 +80,10 @@ unordered_map<Piece, char> pieceToChar = {
     {Piece::BLACK_BISHOP, 'b'},
     {Piece::BLACK_ROOK, 'r'},
     {Piece::BLACK_QUEEN, 'q'},
-    {Piece::BLACK_KING, 'k'}};
+    {Piece::BLACK_KING, 'k'}
+};
 
-const uint8_t CASTLING_RIGHT_WHITE_SHORT = 0,
-              CASTLING_RIGHT_WHITE_LONG = 1,
-              CASTLING_RIGHT_BLACK_SHORT = 2,
-              CASTLING_RIGHT_BLACK_LONG = 3;
-
-const uint64 ROOK_MAGICS[64] = { 
+const uint64_t ROOK_MAGICS[64] = { 
     0xc80001828100040ULL,  0x26004408400010ULL, 0x1060040000202048ULL, 0x110141100800888ULL,  
     0x84420501a000802ULL, 0x1803002905002224ULL, 0x104380106000182ULL, 0x208201001041ULL,  
     0x4080118100002020ULL, 0x1c40120100004020ULL, 0x1009040000802020ULL, 0x884002800841010ULL,  
@@ -103,7 +102,7 @@ const uint64 ROOK_MAGICS[64] = {
     0x410484200860422ULL, 0x180b0201090b2004ULL,  0x1100040124410282ULL, 0x1820a101000443ULL
 };
 
-const uint64 BISHOP_MAGICS[64] = { 
+const uint64_t BISHOP_MAGICS[64] = { 
     0x1841160051a00401ULL, 0x202000012224a02ULL, 0x284003005412542ULL, 0x2800a220c40502ULL,
     0x68005050040308ULL, 0x440802c810020230ULL, 0x240034002014417ULL, 0x45202411310208aULL, 
     0x1a08410602016172ULL, 0x830464044100e08ULL, 0x411a31a010040808ULL, 0x200124000484405ULL,

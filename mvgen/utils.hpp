@@ -4,6 +4,8 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <algorithm>
+#include "types.hpp"
 using namespace std;
 
 inline vector<string> splitString(string str, char delimiter)
@@ -18,6 +20,18 @@ inline vector<string> splitString(string str, char delimiter)
     return strSplit;
 }
 
+inline void printBitboard(uint64_t bb)
+{
+    std::bitset<64> b(bb);
+    std::string str_bitset = b.to_string();
+    for (int i = 0; i < 64; i += 8)
+    {
+        std::string x = str_bitset.substr(i, 8);
+        reverse(x.begin(), x.end());
+        std::cout << x << std::endl;
+    }
+}
+
 inline int charToInt(char myChar)
 {
     return myChar - '0';
@@ -29,19 +43,19 @@ inline PieceType pieceToPieceType(Piece piece)
     return (PieceType)((uint8_t)piece % 6);
 }
 
-inline char pieceColor(Piece piece)
+inline Color pieceColor(Piece piece)
 {
     if ((uint8_t)piece <= 5) return WHITE;
     else if ((uint8_t)piece <= 11) return BLACK;
     else return NULL_COLOR;
 }
 
-inline uint8_t stringToSquare(string square)
+inline Square strToSquare(string strSquare)
 {
-    return (square[0] - 'a') + (square[1] - '1') * 8;
+    return (strSquare[0] - 'a') + (strSquare[1] - '1') * 8;
 }
 
-inline char squareFile(uint8_t square)
+inline char squareFile(Square square)
 {
     int file = square & 7;
     switch (file)
@@ -67,9 +81,14 @@ inline char squareFile(uint8_t square)
     }
 }
 
-inline uint8_t squareRank(uint8_t square)
+inline uint8_t squareRank(Square square)
 {
     return square >> 3;
+}
+
+inline bool isBackRank(uint8_t rank)
+{
+    return rank == 0 || rank == 7;
 }
 
 #endif
