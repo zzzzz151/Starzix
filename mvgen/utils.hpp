@@ -1,25 +1,25 @@
 #ifndef UTILS_HPP
-#define UTILS_hpp
+#define UTILS_HPP
 
-// clang-format off
-#include <vector>
-#include <string>
 #include <sstream>
+#include <string>
+#include <vector>
 using namespace std;
 
 inline vector<string> splitString(string str, char delimiter)
 {
     vector<string> strSplit;
-    stringstream ss(str); 
+    stringstream ss(str);
     string token;
 
-    while (getline(ss, token, delimiter)) 
+    while (getline(ss, token, delimiter))
         strSplit.push_back(token);
 
     return strSplit;
 }
 
-inline int charToInt(char myChar) {
+inline int charToInt(char myChar)
+{
     return myChar - '0';
 }
 
@@ -29,12 +29,21 @@ inline PieceType pieceToPieceType(Piece piece)
     return (PieceType)((uint8_t)piece % 6);
 }
 
-inline uint8_t stringToSquare(string square) {
+inline char pieceColor(Piece piece)
+{
+    if ((uint8_t)piece <= 5) return WHITE;
+    else if ((uint8_t)piece <= 11) return BLACK;
+    else return NULL_COLOR;
+}
+
+inline uint8_t stringToSquare(string square)
+{
     return (square[0] - 'a') + (square[1] - '1') * 8;
 }
 
-inline char squareFile(uint8_t square) { 
-    int file = square & 7; 
+inline char squareFile(uint8_t square)
+{
+    int file = square & 7;
     switch (file)
     {
         case 0:
@@ -58,7 +67,8 @@ inline char squareFile(uint8_t square) {
     }
 }
 
-inline uint8_t squareRank(uint8_t square) { 
+inline uint8_t squareRank(uint8_t square)
+{
     return square >> 3;
 }
 
