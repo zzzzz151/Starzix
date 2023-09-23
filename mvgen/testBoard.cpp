@@ -73,17 +73,44 @@ int main()
     test("move.BISHOP_PROMOTION_FLAG", (int)move.getTypeFlag(), (int)move.BISHOP_PROMOTION_FLAG);
     test("move.getPromotionPieceType() == bishop", (int)move.getPromotionPieceType(), (int)PieceType::BISHOP);
 
-    board = Board("rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/p1P2P2/RNBQK2R b KQkq - 0 9");
-    // moves a2b1q e1g1 g7g5 h5g6 f6g4
-    board.makeMove(Move::fromUci("a2b1q", board.pieces)); // queen promotion by black
-    board.makeMove(Move::fromUci("e1g1", board.pieces)); // white castles short
-    board.makeMove(Move::fromUci("g7g5", board.pieces)); // black allows enpassant
-    board.makeMove(Move::fromUci("h5g6", board.pieces)); // white takes on passant
-    board.makeMove(Move::fromUci("f6g4", board.pieces)); // black captures white pawn with black knight
-    board.makeMove(Move::fromUci("a1a2", board.pieces)); // white moves rook up (test 50move counter)
-    test("makeMove()", board.getFen(), (string)"rnbqkb1r/4pp1p/1p1p2P1/2p5/2BP2n1/4PN2/R1P2P2/1qBQ1RK1 b kq - 1 12");
+    board = Board("rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/2P2P2/RqBQ1RK1 b kq - 1 10");
+    board.makeMove(Move::fromUci("g7g5", board.pieces));
+    test("makeMove() creates en passant", board.getFen(), (string)"rnbqkb1r/4pp1p/1p1p1n2/2p3pP/2BP2P1/4PN2/2P2P2/RqBQ1RK1 w kq g6 0 11");
 
+    board = Board("rnbqkbnr/pppppp1p/8/8/1P4pP/3P4/P1P1PPP1/RNBQKBNR b KQkq h3 0 3");
+    board.makeMove(Move::fromUci("g4h3", board.pieces));
+    test("makeMove() creates en passant v2", board.getFen(), (string)"rnbqkbnr/pppppp1p/8/8/1P6/3P3p/P1P1PPP1/RNBQKBNR w KQkq - 0 4");
+
+    board = Board("rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/p1P2P2/RNBQK2R b KQkq - 5 9");
+    // queen promotion by black
+    Move move1 = Move::fromUci("a2b1q", board.pieces);
+    board.makeMove(move1); 
+    // white castles short
+    Move move2 = Move::fromUci("e1g1", board.pieces);
+    board.makeMove(move2); 
+    // black allows enpassant
+    Move move3 = Move::fromUci("g7g5", board.pieces);
+    board.makeMove(move3); 
+    // white takes on passant
+    Move move4 = Move::fromUci("h5g6", board.pieces);
+    board.makeMove(move4); 
+    // black captures white pawn with black knight
+    Move move5 = Move::fromUci("f6g4", board.pieces);
+    board.makeMove(move5); 
+    // white moves rook up (test 50move counter)
+    Move move6 = Move::fromUci("a1a2", board.pieces);
+    board.makeMove(move6); 
+
+    test("makeMove()", board.getFen(), (string)"rnbqkb1r/4pp1p/1p1p2P1/2p5/2BP2n1/4PN2/R1P2P2/1qBQ1RK1 b kq - 1 12");
     test("zobrist", board.getZobristHash(), Board("rnbqkb1r/4pp1p/1p1p2P1/2p5/2BP2n1/4PN2/R1P2P2/1qBQ1RK1 b kq - 1 12").getZobristHash());
+
+    board.undoMove(move6);
+    board.undoMove(move5); 
+    board.undoMove(move4); 
+    board.undoMove(move3); 
+    board.undoMove(move2);
+    board.undoMove(move1);
+    test("undoMove()", board.getFen(), (string)"rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/p1P2P2/RNBQK2R b KQkq - 5 9");
 
     cout << "Passed: " << passed << endl;
     cout << "Failed: " << failed << endl;

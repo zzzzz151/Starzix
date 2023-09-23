@@ -75,7 +75,7 @@ struct Move
             return Move(from, to, pieceType, promotionPieceType);
         }
 
-        if (pieceType == PieceType::PAWN && boardPieces[to] == Piece::NONE)
+        if (pieceType == PieceType::PAWN && boardPieces[to] == Piece::NONE && squareFile(from) != squareFile(to))
             return Move(from, to, PieceType::PAWN, PieceType::NONE, true);
 
         return Move(from, to, pieceType);
