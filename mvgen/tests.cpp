@@ -2,6 +2,7 @@
 #include <iostream>
 #include <bitset>
 #include <string>
+#include "attacks.hpp"
 #include "move.hpp"
 #include "board.hpp"
 using namespace std;
@@ -36,15 +37,13 @@ inline void printMoves(Move* moves, int size)
 
 uint64_t perft(Board board, int depth)
 {
-    Move moves[218];
-    int numMoves = board.getMoves(moves);
-
-    if (depth == 1) return numMoves;
     if (depth == 0) return 1;
+
+    MoveList moves = board.getMoves();
+    if (depth == 1) return moves.size();
         
     uint64_t nodes = 0;
-
-    for (int i = 0; i < numMoves; i++) {
+    for (int i = 0; i < moves.size(); i++) {
         board.makeMove(moves[i]);
         nodes += perft(board, depth - 1);
         board.undoMove(moves[i]);
@@ -58,6 +57,7 @@ int main()
     cout << "Running board tests..." << endl << endl;
 
     Board::initZobrist();
+    initMoves();
 
     Board board = Board(START_FEN);
     Board board2 = Board("1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 w Qk f6 0 15");
@@ -142,6 +142,7 @@ int main()
     Move moves[218];
 
     board = Board(START_FEN);
+    test("perft(0)", perft(board, 0), 1ULL);
     test("perft(1)", perft(board, 1), 20ULL);
     test("perft(2)", perft(board, 2), 400ULL);
     test("perft(3)", perft(board, 3), 8902ULL);

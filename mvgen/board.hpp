@@ -9,22 +9,25 @@
 #include "builtin.hpp"
 #include "utils.hpp"
 #include "move.hpp"
+#include "attacks.hpp"
 using namespace std;
 
 struct BoardInfo
 {
     public:
 
-    bool castlingRights[4];
+    bool castlingRights[2][2]; // castlingRights[color][CASTLE_SHORT or CASTLE_LONG]
     Square enPassantTargetSquare;
     uint16_t pliesSincePawnMoveOrCapture;
     Piece capturedPiece;
 
-    inline BoardInfo(bool *argCastlingRights, Square argEnPassantTargetSquare, 
-    uint16_t argPliesSincePawnMoveOrCapture, Piece argCapturedPiece)
+    inline BoardInfo(bool argCastlingRights[2][2], Square argEnPassantTargetSquare, 
+                     uint16_t argPliesSincePawnMoveOrCapture, Piece argCapturedPiece)
     {
-        for (int i = 0; i < 4; i++)
-            castlingRights[i] = argCastlingRights[i];
+        castlingRights[WHITE][0] = argCastlingRights[WHITE][0];
+        castlingRights[WHITE][1] = argCastlingRights[WHITE][1];
+        castlingRights[BLACK][0] = argCastlingRights[BLACK][0];
+        castlingRights[BLACK][1] = argCastlingRights[BLACK][1];
 
         enPassantTargetSquare = argEnPassantTargetSquare;
         pliesSincePawnMoveOrCapture = argPliesSincePawnMoveOrCapture;
@@ -39,23 +42,18 @@ class Board
 
     Piece pieces[64];
     uint64_t occupied, piecesBitboards[6][2];
-    bool castlingRights[4];
-    const static uint8_t CASTLING_RIGHT_WHITE_SHORT = 0,
-                         CASTLING_RIGHT_WHITE_LONG = 1,
-                         CASTLING_RIGHT_BLACK_SHORT = 2,
-                         CASTLING_RIGHT_BLACK_LONG = 3;
+    bool castlingRights[2][2]; // castlingRights[color][isLong]
+    const static uint8_t CASTLE_SHORT = 0, CASTLE_LONG = 1;
     Color colorToMove;
     Square enPassantTargetSquare;
     uint16_t pliesSincePawnMoveOrCapture, currentMoveCounter;
     static inline uint64_t zobristTable[64][12];
     static inline uint64_t zobristTable2[10];
     vector<BoardInfo> states;
-    uint64_t numStates;
 
     inline Board(string fen)
     {
         states = {};
-        numStates = 0;
 
         vector<string> fenSplit = splitString(fen, ' ');
 
@@ -102,18 +100,20 @@ class Board
 
     inline void parseFenCastlingRights(string fenCastlingRights)
     {
-        for (int i = 0; i < 4; i++)
-            castlingRights[i] = false;
+        castlingRights[WHITE][CASTLE_SHORT] = false;
+        castlingRights[WHITE][CASTLE_LONG] = false;
+        castlingRights[BLACK][CASTLE_SHORT] = false;
+        castlingRights[BLACK][CASTLE_LONG] = false;
 
         if (fenCastlingRights == "-") return;
 
         for (int i = 0; i < fenCastlingRights.length(); i++)
         {
             char thisChar = fenCastlingRights[i];
-            if (thisChar == 'K') castlingRights[CASTLING_RIGHT_WHITE_SHORT] = true;
-            else if (thisChar == 'Q') castlingRights[CASTLING_RIGHT_WHITE_LONG] = true;
-            else if (thisChar == 'k') castlingRights[CASTLING_RIGHT_BLACK_SHORT] = true;
-            else if (thisChar == 'q') castlingRights[CASTLING_RIGHT_BLACK_LONG] = true;
+            if (thisChar == 'K') castlingRights[WHITE][CASTLE_SHORT] = true;
+            else if (thisChar == 'Q') castlingRights[WHITE][CASTLE_LONG] = true;
+            else if (thisChar == 'k') castlingRights[BLACK][CASTLE_SHORT] = true;
+            else if (thisChar == 'q') castlingRights[BLACK][CASTLE_LONG] = true;
         }
     }
 
@@ -144,10 +144,10 @@ class Board
         fen += colorToMove == BLACK ? " b " : " w ";
 
         string strCastlingRights = "";
-        if (castlingRights[CASTLING_RIGHT_WHITE_SHORT]) strCastlingRights += "K";
-        if (castlingRights[CASTLING_RIGHT_WHITE_LONG]) strCastlingRights += "Q";
-        if (castlingRights[CASTLING_RIGHT_BLACK_SHORT]) strCastlingRights += "k";
-        if (castlingRights[CASTLING_RIGHT_BLACK_LONG]) strCastlingRights += "q";
+        if (castlingRights[WHITE][CASTLE_SHORT]) strCastlingRights += "K";
+        if (castlingRights[WHITE][CASTLE_LONG]) strCastlingRights += "Q";
+        if (castlingRights[BLACK][CASTLE_SHORT]) strCastlingRights += "k";
+        if (castlingRights[BLACK][CASTLE_LONG]) strCastlingRights += "q";
         if (strCastlingRights.size() == 0) strCastlingRights = "-";
         fen += strCastlingRights;
 
@@ -202,6 +202,16 @@ class Board
         return bb;
     }
 
+    inline uint64_t getUs()
+    {
+        return getColorBitboard(colorToMove);
+    }
+
+    inline uint64_t getThem()
+    {
+        return getColorBitboard(colorToMove == WHITE ? BLACK : WHITE);
+    }
+
     inline void placePiece(Piece piece, Square square)
     {
         if (piece == Piece::NONE) return;
@@ -249,7 +259,10 @@ class Board
 
     inline uint64_t getCastlingHash()
     {
-        return castlingRights[0] + 2 * castlingRights[1] + 4 * castlingRights[3] + 8 * castlingRights[4];
+        return castlingRights[WHITE][CASTLE_SHORT] 
+               + 2 * castlingRights[WHITE][CASTLE_LONG] 
+               + 4 * castlingRights[BLACK][CASTLE_SHORT] 
+               + 8 * castlingRights[BLACK][CASTLE_LONG];
     }
 
     inline uint64_t getZobristHash()
@@ -315,11 +328,6 @@ class Board
             else if (to == 2) { removePiece(0); placePiece(Piece::WHITE_ROOK, 3); }
             else if (to == 62) { removePiece(63); placePiece(Piece::BLACK_ROOK, 61); }
             else if (to == 58) { removePiece(56); placePiece(Piece::BLACK_ROOK, 59); }
-
-            if (colorToMove == WHITE)
-                castlingRights[CASTLING_RIGHT_WHITE_SHORT] = castlingRights[CASTLING_RIGHT_WHITE_LONG] = false;
-            else 
-                castlingRights[CASTLING_RIGHT_BLACK_SHORT] = castlingRights[CASTLING_RIGHT_BLACK_LONG] = false;
         }
         else if (typeFlag == move.EN_PASSANT_FLAG)
         {
@@ -328,6 +336,10 @@ class Board
         }
 
         piecesProcessed:
+
+        PieceType pieceTypeMoved = pieceToPieceType(pieces[to]);
+        if (pieceTypeMoved == PieceType::KING || pieceTypeMoved == PieceType::ROOK)
+            castlingRights[colorToMove][CASTLE_SHORT] = castlingRights[colorToMove][CASTLE_LONG] = false;
 
         colorToMove = colorToMove == WHITE ? BLACK : WHITE;
         if (colorToMove == WHITE)
@@ -347,32 +359,17 @@ class Board
 
             bool pawnTwoUp = (rankFrom == 1 && rankTo == 3) || (rankFrom == 6 && rankTo == 4);
             if (!pawnTwoUp) return;
-
             char file = squareFile(from);
-            if (colorToMove == BLACK)
-            {
-                if (file == 'a' && pieces[to+1] == Piece::BLACK_PAWN)
-                    enPassantTargetSquare = to-8;
-                else if (file == 'h' && pieces[to-1] == Piece::BLACK_PAWN)
-                    enPassantTargetSquare = to-8;
-                else if (pieces[to-1] == Piece::BLACK_PAWN)
-                    enPassantTargetSquare = to-8;
-                else if (pieces[to+1] == Piece::BLACK_PAWN)
-                    enPassantTargetSquare = to-8;
-            }
-            else
-            {
-                if (file == 'a' && pieces[to+1] == Piece::WHITE_PAWN)
-                    enPassantTargetSquare = to+8;
-                else if (file == 'h' && pieces[to-1] == Piece::WHITE_PAWN)
-                    enPassantTargetSquare = to+8;
-                else if (pieces[to-1] == Piece::WHITE_PAWN)
-                    enPassantTargetSquare = to+8;
-                else if (pieces[to+1] == Piece::WHITE_PAWN)
-                    enPassantTargetSquare = to+8;
-            }
-        }
 
+             // we already switched colorToMove
+            Square possibleEnPassantTargetSquare = colorToMove == BLACK ? to-8 : to+8;
+            Piece enemyPawnPiece = colorToMove == BLACK ? Piece::BLACK_PAWN : Piece::WHITE_PAWN;
+
+            if (file != 'a' && pieces[to-1] == enemyPawnPiece)
+                enPassantTargetSquare = possibleEnPassantTargetSquare;
+            else if (file != 'h' && pieces[to+1] == enemyPawnPiece)
+                enPassantTargetSquare = possibleEnPassantTargetSquare;
+        }
 
     }
 
@@ -383,7 +380,7 @@ class Board
         Square to = move.to();
         auto typeFlag = move.getTypeFlag();
 
-        Piece capturedPiece = states[numStates - 1].capturedPiece;
+        Piece capturedPiece = states[states.size()-1].capturedPiece;
         Piece piece = pieces[to];
         removePiece(to);
 
@@ -449,30 +446,29 @@ class Board
 
     inline void pushState(Piece capturedPiece)
     {
-        BoardInfo state = BoardInfo(castlingRights, enPassantTargetSquare, 
-                                    pliesSincePawnMoveOrCapture, capturedPiece);
-
+        BoardInfo state = BoardInfo(castlingRights, enPassantTargetSquare, pliesSincePawnMoveOrCapture, capturedPiece);
         states.push_back(state); // append
-        numStates++;
     }
 
     inline void pullState()
     {
-        BoardInfo state = states[numStates - 1];
+        BoardInfo state = states[states.size()-1];
         states.pop_back();
-        numStates--;
 
-        for (int i = 0; i < 4; i++)
-            castlingRights[i] = state.castlingRights[i];
+        castlingRights[WHITE][CASTLE_SHORT] = state.castlingRights[WHITE][CASTLE_SHORT];
+        castlingRights[WHITE][CASTLE_LONG] = state.castlingRights[WHITE][CASTLE_LONG];
+        castlingRights[BLACK][CASTLE_SHORT] = state.castlingRights[BLACK][CASTLE_SHORT];
+        castlingRights[BLACK][CASTLE_LONG] = state.castlingRights[BLACK][CASTLE_LONG];
 
         enPassantTargetSquare = state.enPassantTargetSquare;
         pliesSincePawnMoveOrCapture = state.pliesSincePawnMoveOrCapture;
     }
 
-    inline int getMoves(Move* moves)
+    inline MoveList getMoves(bool capturesOnly = false)
     {
-        int currentMove = 0;
-        uint64_t us = getColorBitboard(colorToMove);
+        uint64_t us = getUs();
+        uint64_t us2 = us;
+        MoveList moveList;
 
         while (us > 0)
         {
@@ -480,104 +476,69 @@ class Board
             uint64_t squareBit = (1ULL << square);
             Piece piece = pieces[square];
             PieceType pieceType = pieceToPieceType(piece);
-            vector<Move> thisMoves = {};
 
             if (pieceType == PieceType::PAWN)
-                thisMoves = pawnMoves(square);
+                getPawnMoves(square, moveList);
             else if (pieceType == PieceType::KNIGHT)
-                thisMoves = knightMoves(square);
-
-            for (Move move : thisMoves)
-            {
-                //cout << "Gennerated move " << move.toUci() << endl;
-                moves[currentMove++] = move;
-            }
-            
+                getKnightMoves(square, us2, moveList);
+            else if (pieceType == PieceType::KING)
+                getKingMoves(square, us2, moveList);
         }
 
-        return currentMove; // return num of moves
+        return moveList;
     }
 
-    inline vector<Move> pawnMoves(Square square)
+    inline void getPawnMoves(Square square, MoveList &moveList)
     {
         Piece piece = pieces[square];
-        Color color = pieceColor(piece);
+        Color enemyColor = colorToMove == WHITE ? BLACK : WHITE;
         uint8_t rank = squareRank(square);
         char file = squareFile(square);
-        vector<Move> moves = {};
+        const uint8_t SQUARE_ONE_UP = square + (colorToMove == WHITE ? 8 : -8),
+                      SQUARE_TWO_UP = square + (colorToMove == WHITE ? 16 : -16),
+                      SQUARE_DIAGONAL_LEFT = square + (colorToMove == WHITE ? 7 : -9),
+                      SQUARE_DIAGONAL_RIGHT = square + (colorToMove == WHITE ? 9 : -7);
 
-        if (color == WHITE) // white pawn
-        {
-            const uint8_t SQUARE_ONE_UP = square + 8,
-                          SQUARE_TWO_UP  = square + 16,
-                          SQUARE_UP_LEFT = square + 7,
-                          SQUARE_UP_RIGHT = square + 9;
+        // 1 up
+        if (pieces[SQUARE_ONE_UP] == Piece::NONE)
+            moveList.add(Move(square, SQUARE_ONE_UP, PieceType::PAWN));
 
-            // 1 up
-            if (pieces[SQUARE_ONE_UP] == Piece::NONE)
-                moves.push_back(Move(square, SQUARE_ONE_UP, PieceType::PAWN));
+        // 2 up
+        if ((rank == 1 && colorToMove == WHITE) || (rank == 6 && colorToMove == BLACK))
+            if (pieces[SQUARE_TWO_UP] == Piece::NONE)
+                moveList.add(Move(square, SQUARE_TWO_UP, PieceType::PAWN));
 
-            // 2 up
-            if (rank == 1 && pieces[SQUARE_TWO_UP] == Piece::NONE)
-                moves.push_back(Move(square, SQUARE_TWO_UP, PieceType::PAWN));
+        // diagonal left
+        if (file != 'a')
+            if (pieceColor(pieces[SQUARE_DIAGONAL_LEFT]) == enemyColor || enPassantTargetSquare == SQUARE_DIAGONAL_LEFT)
+                moveList.add(Move(square, SQUARE_DIAGONAL_LEFT, PieceType::PAWN, PieceType::NONE, enPassantTargetSquare == SQUARE_DIAGONAL_LEFT));
 
-            // up left capture
-            if (file != 'a' && (pieceColor(pieces[SQUARE_UP_LEFT]) == BLACK || enPassantTargetSquare == SQUARE_UP_LEFT))
-                moves.push_back(Move(square, SQUARE_UP_LEFT, PieceType::PAWN, PieceType::NONE, enPassantTargetSquare == SQUARE_UP_LEFT));
-
-            // up right capture
-            if (file != 'h' && (pieceColor(pieces[SQUARE_UP_RIGHT]) == BLACK || enPassantTargetSquare == SQUARE_UP_RIGHT))
-                moves.push_back(Move(square, SQUARE_UP_RIGHT, PieceType::PAWN, PieceType::NONE, enPassantTargetSquare == SQUARE_UP_RIGHT));
-        }
-        else // black pawn
-        {
-            const uint8_t SQUARE_ONE_DOWN = square - 8,
-                          SQUARE_TWO_DOWN  = square - 16,
-                          SQUARE_DOWN_LEFT = square - 9,
-                          SQUARE_DOWN_RIGHT = square - 7;
-
-            // 1 down
-            if (pieces[SQUARE_ONE_DOWN] == Piece::NONE)
-                moves.push_back(Move(square, SQUARE_ONE_DOWN, PieceType::PAWN));
-
-            // 2 up
-            if (rank == 6 && pieces[SQUARE_TWO_DOWN] == Piece::NONE)
-                moves.push_back(Move(square, SQUARE_TWO_DOWN, PieceType::PAWN));
-
-            // down right capture
-            if (file != 'a' && (pieceColor(pieces[SQUARE_DOWN_LEFT]) == BLACK || enPassantTargetSquare == SQUARE_DOWN_LEFT))
-                moves.push_back(Move(square, SQUARE_DOWN_LEFT, PieceType::PAWN, PieceType::NONE, enPassantTargetSquare == SQUARE_DOWN_LEFT));
-
-            // down left capture
-            if (file != 'h' && (pieceColor(pieces[SQUARE_DOWN_RIGHT]) == BLACK || enPassantTargetSquare == SQUARE_DOWN_RIGHT))
-                moves.push_back(Move(square, SQUARE_DOWN_RIGHT, PieceType::PAWN, PieceType::NONE, enPassantTargetSquare == SQUARE_DOWN_RIGHT));
-        }
-
-        return moves;
+        // diagonal right
+        if (file != 'h')
+            if (pieceColor(pieces[SQUARE_DIAGONAL_RIGHT]) == enemyColor || enPassantTargetSquare == SQUARE_DIAGONAL_RIGHT)
+                moveList.add(Move(square, SQUARE_DIAGONAL_RIGHT, PieceType::PAWN, PieceType::NONE, enPassantTargetSquare == SQUARE_DIAGONAL_RIGHT));
     }
 
-    inline vector<Move> knightMoves(Square square)
+    inline void getKnightMoves(Square square, uint64_t us, MoveList &moveList)
     {
-        vector<Move> moves = {};
-        int intSquare = (int)square;
-        int possibleTargetSquares[8] = {intSquare-2+8, intSquare-2-8, intSquare+16-1, intSquare+16+1,
-                                        intSquare+2+8, intSquare+2-8, intSquare-16-1, intSquare-16+1};
-
-        for (int possibleTargetSquare : possibleTargetSquares)
+        uint64_t thisKnightMoves = knightMoves[square] & ~us;
+        while (thisKnightMoves > 0)
         {
-            if (possibleTargetSquare < 0 || possibleTargetSquare > 63) continue;
-
-            if (abs((int)squareRank(square) - (int)squareRank(possibleTargetSquare)) 
-            + abs((int)squareFile(square) - (int)squareFile(possibleTargetSquare))
-            != 3)
-                continue;
-
-            if (pieceColor(pieces[possibleTargetSquare]) != colorToMove)
-                moves.push_back(Move(square, possibleTargetSquare, PieceType::KNIGHT));
+            Square targetSquare = poplsb(thisKnightMoves);
+            moveList.add(Move(square, targetSquare, PieceType::KNIGHT));
         }
-
-        return moves;
     }
+
+    inline void getKingMoves(Square square, uint64_t us, MoveList &moveList)
+    {
+        uint64_t thisKingMoves = kingMoves[square] & ~us;
+        while (thisKingMoves > 0)
+        {
+            Square targetSquare = poplsb(thisKingMoves);
+            moveList.add(Move(square, targetSquare, PieceType::KNIGHT));
+        }
+    }
+
 
     inline bool isSquareAttacked(int square)
     {

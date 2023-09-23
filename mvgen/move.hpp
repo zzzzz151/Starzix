@@ -122,6 +122,29 @@ struct Move
     
 };
 
-#include "board.hpp"
+struct MoveList
+{
+    private:
+
+    Move moves[218];
+    uint8_t numMoves = 0;
+
+    public:
+
+    inline void add(Move move)
+    {
+        moves[numMoves++] = move;
+    }
+
+    inline uint8_t size()
+    {
+        return numMoves;
+    }
+
+    inline Move operator[](uint8_t i)
+    {
+        return moves[i];
+    }
+};
 
 #endif
