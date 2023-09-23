@@ -194,6 +194,14 @@ class Board
         return piecesBitboards[(uint8_t)pieceType][color];
     }
 
+    inline uint64_t getColorBitboard(Color color)
+    {
+        uint64_t bb = 0;
+        for (int pt = 0; pt <= 5; pt++)
+            bb |= piecesBitboards[pt][color];
+        return bb;
+    }
+
     inline void placePiece(Piece piece, Square square)
     {
         if (piece == Piece::NONE) return;
@@ -461,9 +469,119 @@ class Board
         pliesSincePawnMoveOrCapture = state.pliesSincePawnMoveOrCapture;
     }
 
-    inline vector<Move> getMoves()
+    inline int getMoves(Move* moves)
     {
-        return vector<Move>();
+        int currentMove = 0;
+        uint64_t us = getColorBitboard(colorToMove);
+
+        while (us > 0)
+        {
+            Square square = poplsb(us);
+            uint64_t squareBit = (1ULL << square);
+            Piece piece = pieces[square];
+            PieceType pieceType = pieceToPieceType(piece);
+            vector<Move> thisMoves = {};
+
+            if (pieceType == PieceType::PAWN)
+                thisMoves = pawnMoves(square);
+            else if (pieceType == PieceType::KNIGHT)
+                thisMoves = knightMoves(square);
+
+            for (Move move : thisMoves)
+            {
+                //cout << "Gennerated move " << move.toUci() << endl;
+                moves[currentMove++] = move;
+            }
+            
+        }
+
+        return currentMove; // return num of moves
+    }
+
+    inline vector<Move> pawnMoves(Square square)
+    {
+        Piece piece = pieces[square];
+        Color color = pieceColor(piece);
+        uint8_t rank = squareRank(square);
+        char file = squareFile(square);
+        vector<Move> moves = {};
+
+        if (color == WHITE) // white pawn
+        {
+            const uint8_t SQUARE_ONE_UP = square + 8,
+                          SQUARE_TWO_UP  = square + 16,
+                          SQUARE_UP_LEFT = square + 7,
+                          SQUARE_UP_RIGHT = square + 9;
+
+            // 1 up
+            if (pieces[SQUARE_ONE_UP] == Piece::NONE)
+                moves.push_back(Move(square, SQUARE_ONE_UP, PieceType::PAWN));
+
+            // 2 up
+            if (rank == 1 && pieces[SQUARE_TWO_UP] == Piece::NONE)
+                moves.push_back(Move(square, SQUARE_TWO_UP, PieceType::PAWN));
+
+            // up left capture
+            if (file != 'a' && (pieceColor(pieces[SQUARE_UP_LEFT]) == BLACK || enPassantTargetSquare == SQUARE_UP_LEFT))
+                moves.push_back(Move(square, SQUARE_UP_LEFT, PieceType::PAWN, PieceType::NONE, enPassantTargetSquare == SQUARE_UP_LEFT));
+
+            // up right capture
+            if (file != 'h' && (pieceColor(pieces[SQUARE_UP_RIGHT]) == BLACK || enPassantTargetSquare == SQUARE_UP_RIGHT))
+                moves.push_back(Move(square, SQUARE_UP_RIGHT, PieceType::PAWN, PieceType::NONE, enPassantTargetSquare == SQUARE_UP_RIGHT));
+        }
+        else // black pawn
+        {
+            const uint8_t SQUARE_ONE_DOWN = square - 8,
+                          SQUARE_TWO_DOWN  = square - 16,
+                          SQUARE_DOWN_LEFT = square - 9,
+                          SQUARE_DOWN_RIGHT = square - 7;
+
+            // 1 down
+            if (pieces[SQUARE_ONE_DOWN] == Piece::NONE)
+                moves.push_back(Move(square, SQUARE_ONE_DOWN, PieceType::PAWN));
+
+            // 2 up
+            if (rank == 6 && pieces[SQUARE_TWO_DOWN] == Piece::NONE)
+                moves.push_back(Move(square, SQUARE_TWO_DOWN, PieceType::PAWN));
+
+            // down right capture
+            if (file != 'a' && (pieceColor(pieces[SQUARE_DOWN_LEFT]) == BLACK || enPassantTargetSquare == SQUARE_DOWN_LEFT))
+                moves.push_back(Move(square, SQUARE_DOWN_LEFT, PieceType::PAWN, PieceType::NONE, enPassantTargetSquare == SQUARE_DOWN_LEFT));
+
+            // down left capture
+            if (file != 'h' && (pieceColor(pieces[SQUARE_DOWN_RIGHT]) == BLACK || enPassantTargetSquare == SQUARE_DOWN_RIGHT))
+                moves.push_back(Move(square, SQUARE_DOWN_RIGHT, PieceType::PAWN, PieceType::NONE, enPassantTargetSquare == SQUARE_DOWN_RIGHT));
+        }
+
+        return moves;
+    }
+
+    inline vector<Move> knightMoves(Square square)
+    {
+        vector<Move> moves = {};
+        int intSquare = (int)square;
+        int possibleTargetSquares[8] = {intSquare-2+8, intSquare-2-8, intSquare+16-1, intSquare+16+1,
+                                        intSquare+2+8, intSquare+2-8, intSquare-16-1, intSquare-16+1};
+
+        for (int possibleTargetSquare : possibleTargetSquares)
+        {
+            if (possibleTargetSquare < 0 || possibleTargetSquare > 63) continue;
+
+            if (abs((int)squareRank(square) - (int)squareRank(possibleTargetSquare)) 
+            + abs((int)squareFile(square) - (int)squareFile(possibleTargetSquare))
+            != 3)
+                continue;
+
+            if (pieceColor(pieces[possibleTargetSquare]) != colorToMove)
+                moves.push_back(Move(square, possibleTargetSquare, PieceType::KNIGHT));
+        }
+
+        return moves;
+    }
+
+    inline bool isSquareAttacked(int square)
+    {
+        return false;
     }
 
     

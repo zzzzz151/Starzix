@@ -5,6 +5,7 @@
 #include "types.hpp"
 #include "builtin.hpp"
 #include "utils.hpp"
+using namespace std;
 
 struct Move
 {
@@ -20,6 +21,8 @@ struct Move
 
     // 16 bits: ffffff tttttt FFFF (f = from, t = to, F = flag)  
     uint16_t moveEncoded = 0;
+
+    Move() = default;
 
     // Custom == operator
     bool operator==(const Move& other) const {

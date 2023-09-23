@@ -6,6 +6,7 @@
 #include "board.hpp"
 using namespace std;
 
+
 int failed = 0, passed = 0;
 
 template <typename T> void test(string testName, T got, T expected)
@@ -24,6 +25,32 @@ template <typename T> void test(string testName, T got, T expected)
     if (expected != got) cout << "Expected: " << expected << endl << "Got: " << got << endl;
 
     cout << endl;
+}
+
+inline void printMoves(Move* moves, int size)
+{
+    for (int i = 0; i < size; i++)
+        cout << moves[i].toUci() << (i != size - 1 ? ", " : "");
+    cout << endl;
+}
+
+uint64_t perft(Board board, int depth)
+{
+    Move moves[218];
+    int numMoves = board.getMoves(moves);
+
+    if (depth == 1) return numMoves;
+    if (depth == 0) return 1;
+        
+    uint64_t nodes = 0;
+
+    for (int i = 0; i < numMoves; i++) {
+        board.makeMove(moves[i]);
+        nodes += perft(board, depth - 1);
+        board.undoMove(moves[i]);
+    }
+
+    return nodes;
 }
 
 int main()
@@ -111,6 +138,20 @@ int main()
     board.undoMove(move2);
     board.undoMove(move1);
     test("undoMove()", board.getFen(), (string)"rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/p1P2P2/RNBQK2R b KQkq - 5 9");
+
+    Move moves[218];
+
+    board = Board(START_FEN);
+    test("perft(1)", perft(board, 1), 20ULL);
+    test("perft(2)", perft(board, 2), 400ULL);
+    test("perft(3)", perft(board, 3), 8902ULL);
+    //test("perft(4)", perft(board, 4), 197281ULL);
+    //test("perft(5)", perft(board, 5), 4865609ULL);
+    //test("perft(6)", perft(board, 6), 119060324ULL);
+
+    // kiwipete
+    //board = Board("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ");
+    //test("perft(4) kiwipete", perft(board, 4), 4085603ULL);
 
     cout << "Passed: " << passed << endl;
     cout << "Failed: " << failed << endl;
