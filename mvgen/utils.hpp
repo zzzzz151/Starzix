@@ -91,4 +91,9 @@ inline bool isBackRank(uint8_t rank)
     return rank == 0 || rank == 7;
 }
 
+inline PieceType pieceTypeAt(Square sq, Piece* boardPieces)
+{
+    return pieceToPieceType(boardPieces[sq]);
+}
+
 #endif

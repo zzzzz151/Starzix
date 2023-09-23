@@ -4,11 +4,19 @@
 // clang-format off
 #include <cstdint>
 #include <vector>
+#include <random>
 #include "types.hpp"
 #include "builtin.hpp"
 #include "utils.hpp"
 #include "move.hpp"
 using namespace std;
+
+struct BoardInfo
+{
+    Piece pieces[64];
+    uint64_t occupied, piecesBitboards[6][2];
+    bool castlingRights[4];
+};
 
 class Board
 {
@@ -25,6 +33,9 @@ class Board
     Square enPassantTargetSquare;
     uint16_t pliesSincePawnMoveOrCapture;
     uint16_t currentMoveCounter;
+    uint64_t zobristHash;
+    static inline uint64_t zobristTable[64][12];
+    static inline uint64_t zobristTable2[10];
 
     inline Board(string fen)
     {
@@ -153,6 +164,11 @@ class Board
         return pieceToPieceType(pieces[square]);
     }
 
+    inline PieceType pieceTypeAt(string square)
+    {
+        return pieceTypeAt(strToSquare(square));
+    }
+
     inline uint64_t getPiecesBitboard(PieceType pieceType, Color color = NULL_COLOR)
     {
         if (color == NULL_COLOR)
@@ -190,12 +206,134 @@ class Board
         piecesBitboards[(uint8_t)pieceType][color] ^= squareBit;
     }
 
+    inline static void initZobrist()
+    {
+        random_device rd;  // Create a random device to seed the random number generator
+        mt19937_64 gen(rd());  // Create a 64-bit Mersenne Twister random number generator
+
+        for (int sq = 0; sq < 64; sq++)
+            for (int pt = 0; pt < 12; pt++)
+            {
+                uniform_int_distribution<uint64_t> distribution;
+                uint64_t randomNum = distribution(gen);
+                zobristTable[sq][pt] = randomNum;
+            }
+
+        for (int i = 0; i < 10; i++)
+        {
+            uniform_int_distribution<uint64_t> distribution;
+            uint64_t randomNum = distribution(gen);
+            zobristTable2[i] = randomNum;
+        }
+    }
+
+    inline uint64_t getCastlingHash()
+    {
+        return castlingRights[0] + 2 * castlingRights[1] + 4 * castlingRights[3] + 8 * castlingRights[4];
+    }
+
+    inline uint64_t getZobristHash()
+    {
+        uint64_t hash = zobristTable2[0];
+        if (colorToMove == BLACK)
+            hash ^= zobristTable2[1];
+
+        hash ^= getCastlingHash();
+
+        if (enPassantTargetSquare != 0)
+            hash ^= zobristTable2[2] / (uint64_t)(squareFile(enPassantTargetSquare) * squareFile(enPassantTargetSquare));
+
+        for (int sq = 0; sq < 64; sq++)
+        {
+            Piece piece = pieces[sq];
+            if (piece == Piece::NONE) continue;
+            hash ^= zobristTable[sq][(int)piece];
+        }
+
+        return hash;
+    }
+
+    inline void makeMove(Move move)
+    {
+        Square from = move.from();
+        Square to = move.to();
+        auto typeFlag = move.getTypeFlag();
+        bool capture = isCapture(move);
+
+        Piece piece = pieces[from];
+        removePiece(from);
+        removePiece(to);
+
+        if (typeFlag == move.QUEEN_PROMOTION_FLAG)
+        {
+            placePiece(colorToMove == WHITE ? Piece::WHITE_QUEEN : Piece::BLACK_QUEEN, to);
+            goto piecesProcessed;
+        }
+        else if (typeFlag == move.KNIGHT_PROMOTION_FLAG)
+        {
+            placePiece(colorToMove == WHITE ? Piece::WHITE_KNIGHT : Piece::BLACK_KNIGHT, to);
+            goto piecesProcessed;
+        }
+        else if (typeFlag == move.BISHOP_PROMOTION_FLAG)
+        {
+            placePiece(colorToMove == WHITE ? Piece::WHITE_BISHOP : Piece::BLACK_BISHOP, to);
+            goto piecesProcessed;
+        }
+        else if (typeFlag == move.ROOK_PROMOTION_FLAG)
+        {
+            placePiece(colorToMove == WHITE ? Piece::WHITE_ROOK : Piece::BLACK_ROOK, to);
+            goto piecesProcessed;
+        }
+
+        placePiece(piece, to);
+
+        if (typeFlag == move.CASTLING_FLAG)
+        {
+            if (to == 6) { removePiece(7); placePiece(Piece::WHITE_ROOK, 5); }
+            else if (to == 2) { removePiece(0); placePiece(Piece::WHITE_ROOK, 3); }
+            else if (to == 62) { removePiece(63); placePiece(Piece::BLACK_ROOK, 61); }
+            else if (to == 58) { removePiece(56); placePiece(Piece::BLACK_ROOK, 59); }
+
+            if (colorToMove == WHITE)
+                castlingRights[CASTLING_RIGHT_WHITE_SHORT] = castlingRights[CASTLING_RIGHT_WHITE_LONG] = false;
+            else 
+                castlingRights[CASTLING_RIGHT_BLACK_SHORT] = castlingRights[CASTLING_RIGHT_BLACK_LONG] = false;
+        }
+        else if (typeFlag == move.EN_PASSANT_FLAG)
+        {
+            Square capturedPawnSquare = colorToMove == WHITE ? to - 8 : to + 8;
+            removePiece(capturedPawnSquare);
+            enPassantTargetSquare = 0;
+        }
+
+        piecesProcessed:
+
+        colorToMove = colorToMove == WHITE ? BLACK : WHITE;
+        if (colorToMove == WHITE)
+            currentMoveCounter++;
+
+        if (pieceToPieceType(piece) == PieceType::PAWN || capture)
+            pliesSincePawnMoveOrCapture = 0;
+        else
+            pliesSincePawnMoveOrCapture++;
+
+    }
+
+    inline bool isCapture(Move move)
+    {
+        if (move.getTypeFlag() == move.EN_PASSANT_FLAG) return true;
+        if (pieces[move.to()] != Piece::NONE) return true;
+        return false;
+    }
+
     inline vector<Move> getMoves()
     {
         return vector<Move>();
     }
 
-
+    
 };
+
+#include "move.hpp"
 
 #endif
