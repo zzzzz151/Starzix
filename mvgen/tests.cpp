@@ -7,7 +7,6 @@
 #include "board.hpp"
 using namespace std;
 
-
 int failed = 0, passed = 0;
 
 template <typename T> void test(string testName, T got, T expected)
@@ -25,13 +24,6 @@ template <typename T> void test(string testName, T got, T expected)
     cout << " Test: " << testName << endl;
     if (expected != got) cout << "Expected: " << expected << endl << "Got: " << got << endl;
 
-    cout << endl;
-}
-
-inline void printMoves(Move* moves, int size)
-{
-    for (int i = 0; i < size; i++)
-        cout << moves[i].toUci() << (i != size - 1 ? ", " : "");
     cout << endl;
 }
 

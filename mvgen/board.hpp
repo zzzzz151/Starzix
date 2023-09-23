@@ -8,8 +8,8 @@
 #include "types.hpp"
 #include "builtin.hpp"
 #include "utils.hpp"
-#include "move.hpp"
 #include "attacks.hpp"
+#include "move.hpp"
 using namespace std;
 
 struct BoardInfo
@@ -547,7 +547,5 @@ class Board
 
     
 };
-
-#include "move.hpp"
 
 #endif
