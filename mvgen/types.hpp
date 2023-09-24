@@ -83,6 +83,9 @@ unordered_map<Piece, char> pieceToChar = {
     {Piece::BLACK_KING, 'k'}
 };
 
+const int LEFT = 0, UP_LEFT = 1, UP = 2, UP_RIGHT = 3, RIGHT = 4, DOWN_RIGHT = 5, DOWN = 6, DOWN_LEFT = 7;
+const int dirOffsets[8] = {-1, 7, 8, 9, 1, -7, -8, -9};
+
 const uint64_t ROOK_MAGICS[64] = { 
     0xc80001828100040ULL,  0x26004408400010ULL, 0x1060040000202048ULL, 0x110141100800888ULL,  
     0x84420501a000802ULL, 0x1803002905002224ULL, 0x104380106000182ULL, 0x208201001041ULL,  
