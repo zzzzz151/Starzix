@@ -353,7 +353,6 @@ class Board
         if (inCheck())
         {
             // move is illegal
-            //cout << "ILLEGAL " << move.toUci() << endl;
             color = nextColor;
             undoMove();
             return false;
