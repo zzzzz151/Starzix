@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <vector>
 #include <random>
+#include <bitset>
 #include "types.hpp"
 #include "builtin.hpp"
 #include "utils.hpp"
@@ -68,6 +69,8 @@ class Board
         initMoves();
         initialized = true;
     }
+
+    Board() = default;
 
     inline Board(string fen)
     {

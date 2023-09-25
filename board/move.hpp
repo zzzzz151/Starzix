@@ -70,8 +70,12 @@ struct Move
         if (pieceType == PieceType::PAWN && boardPieces[to] == Piece::NONE && squareFile(from) != squareFile(to))
             return Move(from, to, EN_PASSANT_FLAG);
 
-        if (pieceType == PieceType::KING && (abs((int)to - (int)from)) > 1)
-            return Move(from, to, CASTLING_FLAG);
+        if (pieceType == PieceType::KING)
+        {
+            int bitboardSquaresMoved = (int)to - (int)from;
+            if (bitboardSquaresMoved == 2 || bitboardSquaresMoved == -2)
+                return Move(from, to, CASTLING_FLAG);
+        }
 
         return Move(from, to, NORMAL_FLAG);
     }

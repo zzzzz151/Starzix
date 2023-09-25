@@ -110,6 +110,9 @@ inline uint64_t perftCaptures(Board &board, int depth)
 
 int main()
 {    
+    Board test = Board("8/8/8/4R2p/4k3/8/7K/B7 b - - 0 143");
+    cout << test.makeMove("e4d3") << endl;
+
     Board board = Board(START_FEN);
     Board board2 = Board("1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 w Qk f6 0 15");
     Board board3 = Board("1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 b Qk f6 0");
