@@ -1,29 +1,19 @@
-.vscode
 .vscode/
-**/.vscode
-**/.vscode/
-
-.ipynb_checkpoints
+.vscode
 .ipynb_checkpoints/
-**/.ipynb_checkpoints
-**/.ipynb_checkpoints/
+.ipynb_checkpoints
 
-src-test
 src-test/
-**/src-test
-**/src-test/
-.src-test
-.src-test/
-**/.src-test
-**/.src-test/
+src-test
+**/tests.exe
+**/tests
 
 z5.exe
 z5
 test
 test.exe
 random_mover
-**/testNN.exe
-**/testNN
+random_mover.exe
 
 games.txt
 games.pgn
@@ -31,25 +21,14 @@ debug.txt
 notes.txt
 stderr.txt
 
-**/random_evals.csv
-**/tactic_evals.csv
-**/chessData.csv
 **/data_d9_2021_09_02.binpack
-**/data.csv
-**/train.csv
-**/test.csv
 **/sf_d9.plain
 **/sf_d9_data
 **/sf_d9_data/*
 **/sf_d9_marlinflow.txt
-**/WC.txt
-**/WC_marlinflow.txt
 
 sprt.py
 testSEE.cpp
 testSEE.exe
 see.epd
 4moves_noob.epd
-
-**/tests.exe
-**/tests
