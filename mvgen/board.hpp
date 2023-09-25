@@ -482,7 +482,7 @@ class Board
     inline bool isCapture(Move move)
     {
         if (move.typeFlag() == move.EN_PASSANT_FLAG) return true;
-        if (pieces[move.to()] != Piece::NONE) return true;
+        if (pieceColor(pieces[move.to()]) == enemyColor()) return true;
         return false;
     }
 
@@ -627,8 +627,7 @@ class Board
             moves.add(Move(square, targetSquare, Move::NORMAL_FLAG));
         }
 
-
-        if (square == (color == WHITE ? 4 : 60) && !inCheck())
+        if (!capturesOnly && square == (color == WHITE ? 4 : 60) && !inCheck())
         {
             if (castlingRights[color][CASTLE_SHORT]
             && pieces[square+1] == Piece::NONE
@@ -673,7 +672,7 @@ class Board
                 }
                 else
                 {
-                    if (pieceColor(pieceHere) != color) 
+                    if (pieceColor(pieceHere) != color)
                         // this is a capture
                         moves.add(Move(square, targetSquare, Move::NORMAL_FLAG));
                     break;

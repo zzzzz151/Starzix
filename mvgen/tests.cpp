@@ -12,7 +12,6 @@ const string POSITION3 = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ";
 const string POSITION4 = "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1";
 const string POSITION4_MIRRORED = "r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1 ";
 const string POSITION5 = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8  ";
-const string POSITION6 = "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10 ";
 
 template <typename T> void test(string testName, T got, T expected)
 {
@@ -32,14 +31,15 @@ template <typename T> void test(string testName, T got, T expected)
 
 inline uint64_t perft(Board &board, int depth, bool capturesOnly = false)
 {
-    if (depth == 0) return (capturesOnly ? 0 : 1);
+    if (depth == 0) return 1;
 
     MovesList moves = board.pseudolegalMoves(capturesOnly);        
     uint64_t nodes = 0;
 
     for (int i = 0; i < moves.size(); i++) 
     {
-        if (!board.makeMove(moves[i])) continue;
+        if (!board.makeMove(moves[i]))
+            continue;
         nodes += perft(board, depth - 1, capturesOnly);
         board.undoMove();
     }
@@ -47,9 +47,9 @@ inline uint64_t perft(Board &board, int depth, bool capturesOnly = false)
     return nodes;
 }
 
-inline void perftDivide(Board board, int depth, bool capturesOnly = false)
+inline void perftDivide(Board board, int depth)
 {
-    MovesList moves = board.pseudolegalMoves(capturesOnly); 
+    MovesList moves = board.pseudolegalMoves(); 
 
     if (moves.size() == 0)
          return;
@@ -58,7 +58,7 @@ inline void perftDivide(Board board, int depth, bool capturesOnly = false)
     for (int i = 0; i < moves.size(); i++) 
     {
         if (!board.makeMove(moves[i])) continue;
-        uint64_t nodes = perft(board, depth - 1, capturesOnly);
+        uint64_t nodes = perft(board, depth - 1);
         cout << moves[i].toUci() << ": " << nodes << endl;
         totalNodes += nodes;
         board.undoMove();
@@ -76,45 +76,36 @@ inline void perftBench(Board &board, int depth, bool capturesOnly = false)
     cout << "perft depth " << depth << " time " << millisecondsElapsed << " nodes " << nodes << " nps " << nps << " fen " << board.fen() << endl;
 }
 
-
-inline void printLegalMoves(Board board)
+inline uint64_t perftCaptures(Board &board, int depth)
 {
-    MovesList moves = board.pseudolegalMoves();
-    int castles = 0;
-    int promotions = 0;
-    int normals = 0;
-    int enPassants = 0;
-    int illegals = 0;
+    if (depth == 0) return 0;
 
-    uint64_t a = board.zobristHash();
-
-    for (int i = 0; i < moves.size(); i++)
+    uint64_t legalCaptures = 0;
+    if (depth == 1)
     {
-        if (!board.makeMove(moves[i])) 
+        MovesList moves = board.pseudolegalMoves(true); // captures only
+        for (int i = 0; i < moves.size(); i++) 
         {
-            illegals++;
-            cout << "Skipping illegal move " << moves[i].toUci() << endl;
-            continue;
+            if (!board.makeMove(moves[i]))
+                continue;
+            legalCaptures++;
+            board.undoMove();
         }
-        board.undoMove();
-        cout << moves[i].toUci() << endl;
-        uint16_t flag = moves[i].typeFlag();
-        if (flag == Move::CASTLING_FLAG)
-            castles++;
-        else if (flag == Move::NORMAL_FLAG)
-            normals++;
-        else if (flag == Move::EN_PASSANT_FLAG)
-            enPassants++;
-        else if (moves[i].promotionPieceType() != PieceType::NONE)
-            promotions++;
+        return legalCaptures;
     }
 
-    cout << "Normals: " << normals << endl;
-    cout << "Castles: " << castles << endl;
-    cout << "Promotions: " << promotions << endl;
-    cout << "En passants: " << enPassants << endl;
-    cout << "Illegals: " << illegals << endl;
-    cout << endl;
+    MovesList moves = board.pseudolegalMoves();        
+    uint64_t nodes = 0;
+
+    for (int i = 0; i < moves.size(); i++) 
+    {
+        if (!board.makeMove(moves[i]))
+            continue;
+        nodes += perftCaptures(board, depth - 1);
+        board.undoMove();
+    }
+
+    return nodes;
 }
 
 int main()
@@ -221,23 +212,20 @@ int main()
     test("fen is what we expect after 6x undoMove()", board.fen(), (string)"rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/p1P2P2/RNBQK2R b KQkq - 5 9");
     test("zobristHash is same after making and undoing moves", board.zobristHash(), zobristHashBefore);
 
+    board = Board(START_FEN);
     Board boardPos2 = Board(POSITION2_KIWIPETE);
     Board boardPos3 = Board(POSITION3);
     Board boardPos4 = Board(POSITION4);
     Board boardPos4Mirrored = Board(POSITION4_MIRRORED);
     Board boardPos5 = Board(POSITION5);
-    Board boardpos6 = Board(POSITION6);
 
-    
     test("perft(1) position 2 kiwipete", perft(boardPos2, 1), 48ULL);
     test("perft(1) position 3", perft(boardPos3, 1), 14ULL);
     test("perft(1) position 4", perft(boardPos4, 1), 6ULL);
     test("perft(1) position 4 mirrored", perft(boardPos4Mirrored, 1), 6ULL);
     test("perft(1) position 5", perft(boardPos5, 1), 44ULL);
-    test("perft(1) position 6", perft(boardpos6, 1), 46ULL);
     test("perft(5) position 2 kiwipete", perft(boardPos2, 5), 193690690ULL);
 
-    board = Board(START_FEN);
     test("perft(0)", perft(board, 0), 1ULL);
     test("perft(1)", perft(board, 1), 20ULL);
     test("perft(2)", perft(board, 2), 400ULL);
@@ -246,12 +234,23 @@ int main()
     test("perft(5)", perft(board, 5), 4865609ULL);
     test("perft(6)", perft(board, 6), 119060324ULL);
 
-    test("perft(0) captures", perft(board, 0, true), 0ULL);
-    test("perft(1) captures", perft(board, 1, true), 0ULL);
-    test("perft(2) captures", perft(board, 2, true), 0ULL);
-    test("perft(3) captures", perft(board, 3, true), 34ULL);
+    test("perft(0) captures", perftCaptures(board, 0), 0ULL);
+    test("perft(1) captures", perftCaptures(board, 1), 0ULL);
+    test("perft(2) captures", perftCaptures(board, 2), 0ULL);
+    test("perft(3) captures", perftCaptures(board, 3), 34ULL);
+    test("perft(4) captures", perftCaptures(board, 4), 1576ULL);
+    test("perft(5) captures", perftCaptures(board, 5), 82719ULL);
+    test("perft(6) captures", perftCaptures(board, 6), 2812008ULL);
+
+    test("perft(0) captures, pos2 kiwipete", perftCaptures(boardPos2, 0), 0ULL);
+    test("perft(1) captures, pos2 kiwipete", perftCaptures(boardPos2, 1), 8ULL);
+    test("perft(2) captures, pos2 kiwipete", perftCaptures(boardPos2, 2), 351ULL);
+    test("perft(3) captures, pos2 kiwipete", perftCaptures(boardPos2, 3), 17102ULL);
+    test("perft(4) captures, pos2 kiwipete", perftCaptures(boardPos2, 4), 757163ULL);
+    test("perft(5) captures, pos2 kiwipete", perftCaptures(boardPos2, 5), 35043416ULL);
 
     perftBench(board, 6);
+    perftBench(boardPos2, 5);
 
     cout << "Passed: " << passed << endl;
     cout << "Failed: " << failed;
