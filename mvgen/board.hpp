@@ -43,6 +43,8 @@ class Board
 {
     private:
 
+    inline static bool initialized = false;
+
     Piece pieces[64];
     uint64_t occupied, piecesBitboards[6][2];
 
@@ -60,8 +62,18 @@ class Board
     
     public:
 
+    inline static void init()
+    {
+        initZobrist();
+        initMoves();
+        initialized = true;
+    }
+
     inline Board(string fen)
     {
+        if (!initialized)
+            init();
+
         states = {};
 
         fen = trim(fen);
@@ -252,8 +264,6 @@ class Board
         piecesBitboards[(uint8_t)pieceType][color] ^= squareBit;
     }
 
-    public:
-
     inline static void initZobrist()
     {
         random_device rd;  // Create a random device to seed the random number generator
@@ -274,6 +284,8 @@ class Board
             zobristTable2[i] = randomNum;
         }
     }
+
+    public:
 
     inline uint64_t zobristHash()
     {
