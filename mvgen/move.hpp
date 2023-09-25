@@ -2,6 +2,7 @@
 #define MOVE_HPP
 
 // clang-format off
+#include <cassert>
 #include "types.hpp"
 #include "builtin.hpp"
 #include "utils.hpp"
@@ -75,20 +76,11 @@ struct Move
         return Move(from, to, NORMAL_FLAG);
     }
 
-    inline Square from()
-    {
-        return (moveEncoded >> 10) & 0b111111;
-    }
+    inline Square from() { return (moveEncoded >> 10) & 0b111111; }
 
-    inline Square to()
-    {
-        return (moveEncoded >> 4) & 0b111111;
-    }
+    inline Square to() { return (moveEncoded >> 4) & 0b111111; }
 
-    inline uint16_t typeFlag()
-    {
-        return moveEncoded & 0x000F;
-    }
+    inline uint16_t typeFlag() { return moveEncoded & 0x000F; }
 
     inline PieceType promotionPieceType()
     {
@@ -122,18 +114,15 @@ struct MovesList
 
     public:
 
-    inline void add(Move move)
-    {
-        moves[numMoves++] = move;
+    inline void add(Move move) { 
+        assert(numMoves < 218);
+        moves[numMoves++] = move; 
     }
 
-    inline uint8_t size()
-    {
-        return numMoves;
-    }
+    inline uint8_t size() { return numMoves; }
 
-    inline Move operator[](uint8_t i)
-    {
+    inline Move operator[](int i) {
+        assert(i >= 0 && i < numMoves);
         return moves[i];
     }
 };

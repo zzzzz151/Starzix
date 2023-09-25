@@ -37,13 +37,9 @@ inline uint64_t shiftLeft(uint64_t bb) {
 	return (bb >> 1ULL) & 0x7f7f7f7f7f7f7f7fULL;
 }
 
-inline uint64_t shiftUp(uint64_t bb) {
-	return bb << 8ULL;
-}
+inline uint64_t shiftUp(uint64_t bb) { return bb << 8ULL; }
 
-inline uint64_t shiftDown(uint64_t bb) {
-	return bb >> 8ULL;
-}
+inline uint64_t shiftDown(uint64_t bb) { return bb >> 8ULL; }
 
 inline void initMoves()
 {
@@ -77,10 +73,7 @@ inline char squareFile(Square square)
     }
 }
 
-inline uint8_t squareRank(Square square)
-{
-    return square >> 3;
-}
+inline uint8_t squareRank(Square square) { return square >> 3; }
 
 inline vector<string> splitString(string str, char delimiter)
 {
@@ -106,20 +99,17 @@ inline string trim(string &str) {
 
 inline void printBitboard(uint64_t bb)
 {
-    std::bitset<64> b(bb);
-    std::string str_bitset = b.to_string();
+    bitset<64> b(bb);
+    string str_bitset = b.to_string();
     for (int i = 0; i < 64; i += 8)
     {
-        std::string x = str_bitset.substr(i, 8);
+        string x = str_bitset.substr(i, 8);
         reverse(x.begin(), x.end());
-        std::cout << x << std::endl;
+        cout << x << endl;
     }
 }
 
-inline int charToInt(char myChar)
-{
-    return myChar - '0';
-}
+inline int charToInt(char myChar) { return myChar - '0'; }
 
 inline PieceType pieceToPieceType(Piece piece)
 {
@@ -129,9 +119,22 @@ inline PieceType pieceToPieceType(Piece piece)
 
 inline Color pieceColor(Piece piece)
 {
-    if ((uint8_t)piece <= 5) return WHITE;
-    else if ((uint8_t)piece <= 11) return BLACK;
-    else return NULL_COLOR;
+    if ((uint8_t)piece <= 5) 
+        return WHITE;
+    else if ((uint8_t)piece <= 11) 
+        return BLACK;
+    else 
+        return  NULL_COLOR;
+}
+
+inline Piece makePiece(PieceType pieceType, Color color)
+{
+    if (color == NULL_COLOR || pieceType == PieceType::NONE)
+        return Piece::NONE;
+    int piece = (int)pieceType;
+    if (color == BLACK) 
+        piece += 6;
+    return (Piece)piece;
 }
 
 inline Square strToSquare(string strSquare)
@@ -155,6 +158,13 @@ inline bool isEdgeSquare(Square square)
 inline PieceType pieceTypeAt(Square sq, Piece* boardPieces)
 {
     return pieceToPieceType(boardPieces[sq]);
+}
+
+inline Color oppColor(Color color)
+{
+    if (color == NULL_COLOR) 
+        return NULL_COLOR;
+    return color == WHITE ? BLACK : WHITE;
 }
 
 inline bool isForbiddenDirection(int dir, Square square, uint8_t rank, char file)

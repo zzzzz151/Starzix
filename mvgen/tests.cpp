@@ -41,7 +41,7 @@ inline uint64_t perft(Board &board, int depth, bool capturesOnly = false)
     {
         if (!board.makeMove(moves[i])) continue;
         nodes += perft(board, depth - 1, capturesOnly);
-        board.undoMove(moves[i]);
+        board.undoMove();
     }
 
     return nodes;
@@ -61,7 +61,7 @@ inline void perftDivide(Board board, int depth, bool capturesOnly = false)
         uint64_t nodes = perft(board, depth - 1, capturesOnly);
         cout << moves[i].toUci() << ": " << nodes << endl;
         totalNodes += nodes;
-        board.undoMove(moves[i]);
+        board.undoMove();
     }
 
     cout << "Total: " << totalNodes << endl;
@@ -96,7 +96,7 @@ inline void printLegalMoves(Board board)
             cout << "Skipping illegal move " << moves[i].toUci() << endl;
             continue;
         }
-        board.undoMove(moves[i]);
+        board.undoMove();
         cout << moves[i].toUci() << endl;
         uint16_t flag = moves[i].typeFlag();
         if (flag == Move::CASTLING_FLAG)
@@ -121,7 +121,7 @@ int main()
 {
     Board::initZobrist();
     initMoves();
-
+    
     Board board = Board(START_FEN);
     Board board2 = Board("1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 w Qk f6 0 15");
     Board board3 = Board("1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 b Qk f6 0");
@@ -166,74 +166,59 @@ int main()
     test("move.promotionPieceType() == bishop", (int)move.promotionPieceType(), (int)PieceType::BISHOP);
 
     board = Board("rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/2P2P2/RqBQ1RK1 b kq - 1 10");
-    board.makeMove(Move::fromUci("g7g5", board.piecesBySquare()));
+    board.makeMove("g7g5");
     test("makeMove() creates en passant", board.fen(), (string)"rnbqkb1r/4pp1p/1p1p1n2/2p3pP/2BP2P1/4PN2/2P2P2/RqBQ1RK1 w kq g6 0 11");
 
     board = Board("rnbqkbnr/pppppp1p/8/8/1P4pP/3P4/P1P1PPP1/RNBQKBNR b KQkq h3 0 3");
-    board.makeMove(Move::fromUci("g4h3", board.piecesBySquare()));
+    board.makeMove("g4h3");
     test("makeMove() creates en passant v2", board.fen(), (string)"rnbqkbnr/pppppp1p/8/8/1P6/3P3p/P1P1PPP1/RNBQKBNR w KQkq - 0 4");
 
     board = Board(START_FEN);
     test("isRepetition()", board.isRepetition(), false);
-    board.makeMove(Move::fromUci("e2e4", board.piecesBySquare()));
+    board.makeMove("e2e4");
     test("isRepetition()", board.isRepetition(), false);
-    board.makeMove(Move::fromUci("d7d5", board.piecesBySquare()));
+    board.makeMove("d7d5");
     test("isRepetition()", board.isRepetition(), false);
-    board.makeMove(Move::fromUci("b1c3", board.piecesBySquare()));
+    board.makeMove("b1c3");
     test("isRepetition()", board.isRepetition(), false);
-    board.makeMove(Move::fromUci("b8c6", board.piecesBySquare()));
+    board.makeMove("b8c6");
     test("isRepetition()", board.isRepetition(), false);
-    board.makeMove(Move::fromUci("c3b1", board.piecesBySquare()));
+    board.makeMove("c3b1");
     test("isRepetition()", board.isRepetition(), false);
-    board.makeMove(Move::fromUci("c6b8", board.piecesBySquare()));
+    board.makeMove("c6b8");
     test("isRepetition()", board.isRepetition(), true);
-    board.makeMove(Move::fromUci("g1h3", board.piecesBySquare()));
+    board.makeMove("g1h3");
     test("isRepetition()", board.isRepetition(), false);
 
     board = Board(POSITION2_KIWIPETE); 
-    test("isSquareAttacked() #1", board.isSquareAttacked(strToSquare("c3")), true);
-    test("isSquareAttacked() #2", board.isSquareAttacked(strToSquare("f3")), false);
-    test("isSquareAttacked() #3", board.isSquareAttacked(strToSquare("e1")), false);
-    test("isSquareAttacked() #4", board.isSquareAttacked(strToSquare("e5")), false);
-    test("isSquareAttacked() #5", board.isSquareAttacked(strToSquare("d5")), true);
-    test("isSquareAttacked() #6", board.isSquareAttacked(strToSquare("e2")), true);
-    test("isSquareAttacked() #7 (empty sq attacked)", board.isSquareAttacked(strToSquare("a3")), true);
-    test("isSquareAttacked() #8 (empty sq not attacked)", board.isSquareAttacked(strToSquare("b3")), false);
-    board = Board("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ");
-    test("isSquareAttacked() #9", board.isSquareAttacked(strToSquare("a5")), false);
+    test("isSquareAttacked() #1 (empty sq attacked by us)", board.isSquareAttacked("e3", board.colorToMove()), true);
+    test("isSquareAttacked() #2 (empty sq not attacked by us)", board.isSquareAttacked("a5", board.colorToMove()), false);
+    test("isSquareAttacked() #3 (empty sq attacked by enemy)", board.isSquareAttacked("d6", board.enemyColor()), true);
+    test("isSquareAttacked() #4 (empty sq not attacked by enemy)", board.isSquareAttacked("b3", board.enemyColor()), false);
+    test("isSquareAttacked() #5 (we can capture enemy in this square)", board.isSquareAttacked("d7", board.colorToMove()), true);
+    test("isSquareAttacked() #6 (we cannot capture enemy in this square)", board.isSquareAttacked("b4", board.colorToMove()), false);
+    test("isSquareAttacked() #7 (enemy can capture us in this square)", board.isSquareAttacked("e2", board.enemyColor()), true);
+    test("isSquareAttacked() #8 (enemy cannot capture us in this square)", board.isSquareAttacked("h2", board.enemyColor()), false);
+
+    board = Board("rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/p1P2P2/RNBQK2R b KQkq - 5 9");
+    test("inCheck() returns false", board.inCheck(), false);
 
     board = Board("rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/p1P2P2/RNBQK2R b KQkq - 5 9");
     uint64_t zobristHashBefore = board.zobristHash();
-
-    // queen promotion by black
-    Move move1 = Move::fromUci("a2b1q", board.piecesBySquare());
-    board.makeMove(move1); 
-    // white castles short
-    Move move2 = Move::fromUci("e1g1", board.piecesBySquare());
-    board.makeMove(move2); 
-    // black allows enpassant
-    Move move3 = Move::fromUci("g7g5", board.piecesBySquare());
-    board.makeMove(move3); 
-    // white takes on passant
-    Move move4 = Move::fromUci("h5g6", board.piecesBySquare());
-    board.makeMove(move4); 
-    // black captures white pawn with black knight
-    Move move5 = Move::fromUci("f6g4", board.piecesBySquare());
-    board.makeMove(move5); 
-    // white moves rook up (test 50move counter)
-    Move move6 = Move::fromUci("a1a2", board.piecesBySquare());
-    board.makeMove(move6); 
-
-    test("makeMove()", board.fen(), (string)"rnbqkb1r/4pp1p/1p1p2P1/2p5/2BP2n1/4PN2/R1P2P2/1qBQ1RK1 b kq - 1 12");
+    string myMoves[6] = { "a2b1q", // black promotes to queen
+                          "e1g1", // white castles short
+                          "g7g5", // black allows enpassant
+                          "h5g6", // white takes on passant
+                          "f6g4", // black captures white pawn with black knight
+                          "a1a2" }; // white moves rook up (test 50move counter)
+    for (string myMove : myMoves)
+        board.makeMove(myMove);
+    test("fen is what we expect after 6x makeMove()", board.fen(), (string)"rnbqkb1r/4pp1p/1p1p2P1/2p5/2BP2n1/4PN2/R1P2P2/1qBQ1RK1 b kq - 1 12");
     test("zobristHash is what we expect after making moves", board.zobristHash(), Board("rnbqkb1r/4pp1p/1p1p2P1/2p5/2BP2n1/4PN2/R1P2P2/1qBQ1RK1 b kq - 1 12").zobristHash());
 
-    board.undoMove(move6);
-    board.undoMove(move5); 
-    board.undoMove(move4); 
-    board.undoMove(move3); 
-    board.undoMove(move2);
-    board.undoMove(move1);
-    test("undoMove()", board.fen(), (string)"rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/p1P2P2/RNBQK2R b KQkq - 5 9");
+    for (int i = 5; i >= 0; i--)
+        board.undoMove();
+    test("fen is what we expect after 6x undoMove()", board.fen(), (string)"rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/p1P2P2/RNBQK2R b KQkq - 5 9");
     test("zobristHash is same after making and undoing moves", board.zobristHash(), zobristHashBefore);
 
     Board boardPos2 = Board(POSITION2_KIWIPETE);
@@ -267,16 +252,6 @@ int main()
     test("perft(3) captures", perft(board, 3, true), 34ULL);
 
     perftBench(board, 6);
-    
-
-    /*
-    boardPos2.makeMove(Move::fromUci("a1b1", board.piecesBySquare()));
-    boardPos2.makeMove(Move::fromUci("b4c3", board.piecesBySquare()));
-    boardPos2.makeMove(Move::fromUci("b1a1", board.piecesBySquare()));
-    boardPos2.makeMove(Move::fromUci("c3b2", board.piecesBySquare()));
-    cout << "--------------" << endl;
-    perftDivide(boardPos2, 1);
-    */
 
     cout << "Passed: " << passed << endl;
     cout << "Failed: " << failed;
