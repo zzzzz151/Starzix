@@ -2,10 +2,17 @@
 #include <iostream>
 #include <bitset>
 #include <string>
+#include <chrono>
 #include "board.hpp"
 using namespace std;
 
 int failed = 0, passed = 0;
+const string POSITION2_KIWIPETE = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ";
+const string POSITION3 = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ";
+const string POSITION4 = "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1";
+const string POSITION4_MIRRORED = "r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1 ";
+const string POSITION5 = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8  ";
+const string POSITION6 = "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10 ";
 
 template <typename T> void test(string testName, T got, T expected)
 {
@@ -21,19 +28,17 @@ template <typename T> void test(string testName, T got, T expected)
     }
     cout << " Test: " << testName << endl;
     if (expected != got) cout << "Expected: " << expected << endl << "Got: " << got << endl;
-
-    cout << endl;
 }
 
-uint64_t perft(Board board, int depth, bool capturesOnly = false)
+inline uint64_t perft(Board &board, int depth, bool capturesOnly = false)
 {
     if (depth == 0) return (capturesOnly ? 0 : 1);
 
-    MovesList moves = board.pseudolegalMoves(capturesOnly);
-    if (depth == 1) return moves.size();
-        
+    MovesList moves = board.pseudolegalMoves(capturesOnly);        
     uint64_t nodes = 0;
-    for (int i = 0; i < moves.size(); i++) {
+
+    for (int i = 0; i < moves.size(); i++) 
+    {
         if (!board.makeMove(moves[i])) continue;
         nodes += perft(board, depth - 1, capturesOnly);
         board.undoMove(moves[i]);
@@ -42,10 +47,78 @@ uint64_t perft(Board board, int depth, bool capturesOnly = false)
     return nodes;
 }
 
+inline void perftDivide(Board board, int depth, bool capturesOnly = false)
+{
+    MovesList moves = board.pseudolegalMoves(capturesOnly); 
+
+    if (moves.size() == 0)
+         return;
+
+    uint64_t totalNodes = 0;
+    for (int i = 0; i < moves.size(); i++) 
+    {
+        if (!board.makeMove(moves[i])) continue;
+        uint64_t nodes = perft(board, depth - 1, capturesOnly);
+        cout << moves[i].toUci() << ": " << nodes << endl;
+        totalNodes += nodes;
+        board.undoMove(moves[i]);
+    }
+
+    cout << "Total: " << totalNodes << endl;
+}
+
+inline void perftBench(Board &board, int depth, bool capturesOnly = false)
+{
+    chrono::steady_clock::time_point start =  chrono::steady_clock::now();
+    uint64_t nodes = perft(board, depth, capturesOnly);
+    int millisecondsElapsed = (chrono::steady_clock::now() - start) / chrono::milliseconds(1);
+    uint64_t nps = nodes / (millisecondsElapsed > 0 ? millisecondsElapsed : 1) * 1000;
+    cout << "perft depth " << depth << " time " << millisecondsElapsed << " nodes " << nodes << " nps " << nps << " fen " << board.fen() << endl;
+}
+
+
+inline void printLegalMoves(Board board)
+{
+    MovesList moves = board.pseudolegalMoves();
+    int castles = 0;
+    int promotions = 0;
+    int normals = 0;
+    int enPassants = 0;
+    int illegals = 0;
+
+    uint64_t a = board.zobristHash();
+
+    for (int i = 0; i < moves.size(); i++)
+    {
+        if (!board.makeMove(moves[i])) 
+        {
+            illegals++;
+            cout << "Skipping illegal move " << moves[i].toUci() << endl;
+            continue;
+        }
+        board.undoMove(moves[i]);
+        cout << moves[i].toUci() << endl;
+        uint16_t flag = moves[i].typeFlag();
+        if (flag == Move::CASTLING_FLAG)
+            castles++;
+        else if (flag == Move::NORMAL_FLAG)
+            normals++;
+        else if (flag == Move::EN_PASSANT_FLAG)
+            enPassants++;
+        else if (moves[i].promotionPieceType() != PieceType::NONE)
+            promotions++;
+    }
+
+    cout << "Normals: " << normals << endl;
+    cout << "Castles: " << castles << endl;
+    cout << "Promotions: " << promotions << endl;
+    cout << "En passants: " << enPassants << endl;
+    cout << "Illegals: " << illegals << endl;
+    cout << endl;
+}
+
 int main()
 {
-    cout << "Running board tests..." << endl << endl;
-
     Board::initZobrist();
     initMoves();
 
@@ -76,11 +149,11 @@ int main()
 
     test("sizeof(Move)", sizeof(Move), 2ULL); // 2 bytes
 
-    Move move = Move(49, 55, PieceType::KNIGHT);
+    Move move = Move(49, 55, Move::NORMAL_FLAG);
     test("normal move.from", (int)(move.from()), 49);
     test("normal move.to", (int)move.to(), 55);
 
-    move = Move("e1", "g1", PieceType::KING);
+    move = Move("e1", "g1", Move::CASTLING_FLAG);
     test("castling move.from", squareToStr[(int)move.from()], (string)"e1");
     test("castling move.to", squareToStr[(int)move.to()], (string)"g1");
     test("move.flag=castling", move.typeFlag(), move.CASTLING_FLAG);
@@ -100,8 +173,24 @@ int main()
     board.makeMove(Move::fromUci("g4h3", board.piecesBySquare()));
     test("makeMove() creates en passant v2", board.fen(), (string)"rnbqkbnr/pppppp1p/8/8/1P6/3P3p/P1P1PPP1/RNBQKBNR w KQkq - 0 4");
 
-    // kiwipete
-    board = Board("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - "); 
+    board = Board(START_FEN);
+    test("isRepetition()", board.isRepetition(), false);
+    board.makeMove(Move::fromUci("e2e4", board.piecesBySquare()));
+    test("isRepetition()", board.isRepetition(), false);
+    board.makeMove(Move::fromUci("d7d5", board.piecesBySquare()));
+    test("isRepetition()", board.isRepetition(), false);
+    board.makeMove(Move::fromUci("b1c3", board.piecesBySquare()));
+    test("isRepetition()", board.isRepetition(), false);
+    board.makeMove(Move::fromUci("b8c6", board.piecesBySquare()));
+    test("isRepetition()", board.isRepetition(), false);
+    board.makeMove(Move::fromUci("c3b1", board.piecesBySquare()));
+    test("isRepetition()", board.isRepetition(), false);
+    board.makeMove(Move::fromUci("c6b8", board.piecesBySquare()));
+    test("isRepetition()", board.isRepetition(), true);
+    board.makeMove(Move::fromUci("g1h3", board.piecesBySquare()));
+    test("isRepetition()", board.isRepetition(), false);
+
+    board = Board(POSITION2_KIWIPETE); 
     test("isSquareAttacked() #1", board.isSquareAttacked(strToSquare("c3")), true);
     test("isSquareAttacked() #2", board.isSquareAttacked(strToSquare("f3")), false);
     test("isSquareAttacked() #3", board.isSquareAttacked(strToSquare("e1")), false);
@@ -110,8 +199,12 @@ int main()
     test("isSquareAttacked() #6", board.isSquareAttacked(strToSquare("e2")), true);
     test("isSquareAttacked() #7 (empty sq attacked)", board.isSquareAttacked(strToSquare("a3")), true);
     test("isSquareAttacked() #8 (empty sq not attacked)", board.isSquareAttacked(strToSquare("b3")), false);
+    board = Board("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ");
+    test("isSquareAttacked() #9", board.isSquareAttacked(strToSquare("a5")), false);
 
     board = Board("rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/p1P2P2/RNBQK2R b KQkq - 5 9");
+    uint64_t zobristHashBefore = board.zobristHash();
+
     // queen promotion by black
     Move move1 = Move::fromUci("a2b1q", board.piecesBySquare());
     board.makeMove(move1); 
@@ -132,7 +225,7 @@ int main()
     board.makeMove(move6); 
 
     test("makeMove()", board.fen(), (string)"rnbqkb1r/4pp1p/1p1p2P1/2p5/2BP2n1/4PN2/R1P2P2/1qBQ1RK1 b kq - 1 12");
-    test("zobrist", board.zobristHash(), Board("rnbqkb1r/4pp1p/1p1p2P1/2p5/2BP2n1/4PN2/R1P2P2/1qBQ1RK1 b kq - 1 12").zobristHash());
+    test("zobristHash is what we expect after making moves", board.zobristHash(), Board("rnbqkb1r/4pp1p/1p1p2P1/2p5/2BP2n1/4PN2/R1P2P2/1qBQ1RK1 b kq - 1 12").zobristHash());
 
     board.undoMove(move6);
     board.undoMove(move5); 
@@ -141,30 +234,52 @@ int main()
     board.undoMove(move2);
     board.undoMove(move1);
     test("undoMove()", board.fen(), (string)"rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/p1P2P2/RNBQK2R b KQkq - 5 9");
+    test("zobristHash is same after making and undoing moves", board.zobristHash(), zobristHashBefore);
+
+    Board boardPos2 = Board(POSITION2_KIWIPETE);
+    Board boardPos3 = Board(POSITION3);
+    Board boardPos4 = Board(POSITION4);
+    Board boardPos4Mirrored = Board(POSITION4_MIRRORED);
+    Board boardPos5 = Board(POSITION5);
+    Board boardpos6 = Board(POSITION6);
+
+    
+    test("perft(1) position 2 kiwipete", perft(boardPos2, 1), 48ULL);
+    test("perft(1) position 3", perft(boardPos3, 1), 14ULL);
+    test("perft(1) position 4", perft(boardPos4, 1), 6ULL);
+    test("perft(1) position 4 mirrored", perft(boardPos4Mirrored, 1), 6ULL);
+    test("perft(1) position 5", perft(boardPos5, 1), 44ULL);
+    test("perft(1) position 6", perft(boardpos6, 1), 46ULL);
+    test("perft(5) position 2 kiwipete", perft(boardPos2, 5), 193690690ULL);
 
     board = Board(START_FEN);
-    //test("perft(0)", perft(board, 0), 1ULL);
-    //test("perft(1)", perft(board, 1), 20ULL);
-    //test("perft(2)", perft(board, 2), 400ULL);
-    //test("perft(3)", perft(board, 3), 8902ULL);
-    //test("perft(4)", perft(board, 4), 197281ULL);
-    //test("perft(5)", perft(board, 5), 4865609ULL);
-    //test("perft(6)", perft(board, 6), 119060324ULL);
+    test("perft(0)", perft(board, 0), 1ULL);
+    test("perft(1)", perft(board, 1), 20ULL);
+    test("perft(2)", perft(board, 2), 400ULL);
+    test("perft(3)", perft(board, 3), 8902ULL);
+    test("perft(4)", perft(board, 4), 197281ULL);
+    test("perft(5)", perft(board, 5), 4865609ULL);
+    test("perft(6)", perft(board, 6), 119060324ULL);
 
-    //test("perft(0) captures", perft(board, 0, true), 0ULL);
-    //test("perft(1) captures", perft(board, 1, true), 0ULL);
-    //test("perft(2) captures", perft(board, 2, true), 0ULL);
-    //test("perft(3) captures", perft(board, 3, true), 34ULL);
+    test("perft(0) captures", perft(board, 0, true), 0ULL);
+    test("perft(1) captures", perft(board, 1, true), 0ULL);
+    test("perft(2) captures", perft(board, 2, true), 0ULL);
+    test("perft(3) captures", perft(board, 3, true), 34ULL);
 
-    // kiwipete
-    //board = Board("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ");
-    //test("perft(4) kiwipete", perft(board, 4), 4085603ULL);
+    perftBench(board, 6);
+    
 
-    board = Board("rnb1kbnr/pp1pppBp/8/q1p5/1P6/8/P1PPPPPP/RN1QKBNR b KQkq - 0 3");
-    cout << (int)board.pseudolegalMoves(true).size() << endl;
+    /*
+    boardPos2.makeMove(Move::fromUci("a1b1", board.piecesBySquare()));
+    boardPos2.makeMove(Move::fromUci("b4c3", board.piecesBySquare()));
+    boardPos2.makeMove(Move::fromUci("b1a1", board.piecesBySquare()));
+    boardPos2.makeMove(Move::fromUci("c3b2", board.piecesBySquare()));
+    cout << "--------------" << endl;
+    perftDivide(boardPos2, 1);
+    */
 
     cout << "Passed: " << passed << endl;
-    cout << "Failed: " << failed << endl;
+    cout << "Failed: " << failed;
 
     return 0;
 }

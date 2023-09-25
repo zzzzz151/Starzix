@@ -9,6 +9,11 @@ using namespace std;
 
 struct Move
 {
+    private:
+
+    // 16 bits: ffffff tttttt FFFF (f = from, t = to, F = flag)  
+    uint16_t moveEncoded = 0;
+
     public:
 
     const static uint16_t NORMAL_FLAG = 0x0000,
@@ -21,47 +26,12 @@ struct Move
 
     constexpr static uint16_t PROMOTION_FLAGS[4] = {QUEEN_PROMOTION_FLAG, KNIGHT_PROMOTION_FLAG, BISHOP_PROMOTION_FLAG, ROOK_PROMOTION_FLAG};
 
-    // 16 bits: ffffff tttttt FFFF (f = from, t = to, F = flag)  
-    uint16_t moveEncoded = 0;
-
     Move() = default;
 
     // Custom == operator
     bool operator==(const Move& other) const {
         return moveEncoded == other.moveEncoded;
     }
-
-    inline Move(Square from, Square to, PieceType pieceType, PieceType promotionPieceType = PieceType::QUEEN, bool isEnPassant = false)
-    {
-        // from/to: 00100101
-        // (uint16_t)from/to: 00000000 00100101
-
-        moveEncoded = ((uint16_t)from << 10);
-        moveEncoded |= ((uint16_t)to << 4);
-
-        if (isEnPassant) 
-            moveEncoded |= EN_PASSANT_FLAG;
-        else if (pieceType == PieceType::PAWN)
-        {
-            if (!squareIsBackRank(to)) return;
-            if (promotionPieceType == PieceType::QUEEN) moveEncoded |= QUEEN_PROMOTION_FLAG;
-            else if (promotionPieceType == PieceType::KNIGHT) moveEncoded |=  KNIGHT_PROMOTION_FLAG;
-            else if (promotionPieceType == PieceType::BISHOP) moveEncoded |= BISHOP_PROMOTION_FLAG;
-            else if (promotionPieceType == PieceType::ROOK) moveEncoded |= ROOK_PROMOTION_FLAG;
-        }
-        else if (pieceType == PieceType::KING)
-        {
-            // white castle
-            if (from == 4 && (to == 6 || to == 2))
-                moveEncoded |= CASTLING_FLAG;
-            // black castle
-            else if (from == 60 && (to == 62 || to == 58))
-                moveEncoded |= CASTLING_FLAG;
-        }
-        
-    }
-
-    inline Move (string from, string to, PieceType pieceType) : Move(strToSquare(from), strToSquare(to), pieceType) {}
 
     inline Move(Square from, Square to, uint16_t typeFlag)
     {
@@ -71,29 +41,38 @@ struct Move
         moveEncoded = ((uint16_t)from << 10);
         moveEncoded |= ((uint16_t)to << 4);
         moveEncoded |= typeFlag;
-        
     }
+
+    inline Move (string from, string to, uint16_t typeFlag) : Move(strToSquare(from), strToSquare(to), typeFlag) {}
 
     static inline Move fromUci(string uci, Piece* boardPieces)
     {
         Square from = strToSquare(uci.substr(0,2));
         Square to = strToSquare(uci.substr(2,4));
-        PieceType pieceType = pieceTypeAt(from, boardPieces);
 
         if (uci.size() == 5) // promotion
         {
             char promotionLowerCase = uci.back(); // last char of string
-            PieceType promotionPieceType = PieceType::QUEEN;
-            if (promotionLowerCase == 'n') promotionPieceType = PieceType::KNIGHT;
-            else if (promotionLowerCase == 'b') promotionPieceType = PieceType::BISHOP;
-            else if (promotionLowerCase == 'r') promotionPieceType = PieceType::ROOK;
-            return Move(from, to, pieceType, promotionPieceType);
+            uint16_t typeFlag = QUEEN_PROMOTION_FLAG;
+
+            if (promotionLowerCase == 'n') 
+                typeFlag = KNIGHT_PROMOTION_FLAG;
+            else if (promotionLowerCase == 'b') 
+                typeFlag = BISHOP_PROMOTION_FLAG;
+            else if (promotionLowerCase == 'r') 
+                typeFlag = ROOK_PROMOTION_FLAG;
+
+            return Move(from, to, typeFlag);
         }
 
+        PieceType pieceType = pieceTypeAt(from, boardPieces);
         if (pieceType == PieceType::PAWN && boardPieces[to] == Piece::NONE && squareFile(from) != squareFile(to))
-            return Move(from, to, PieceType::PAWN, PieceType::NONE, true);
+            return Move(from, to, EN_PASSANT_FLAG);
 
-        return Move(from, to, pieceType);
+        if (pieceType == PieceType::KING && (abs((int)to - (int)from)) > 1)
+            return Move(from, to, CASTLING_FLAG);
+
+        return Move(from, to, NORMAL_FLAG);
     }
 
     inline Square from()

@@ -15,12 +15,13 @@ struct BoardInfo
 {
     public:
 
+    uint64_t zobristHash;
     bool castlingRights[2][2]; // castlingRights[color][CASTLE_SHORT or CASTLE_LONG]
     Square enPassantTargetSquare;
     uint16_t pliesSincePawnMoveOrCapture;
     Piece capturedPiece;
 
-    inline BoardInfo(bool argCastlingRights[2][2], Square argEnPassantTargetSquare, 
+    inline BoardInfo(uint64_t argZobristHash, bool argCastlingRights[2][2], Square argEnPassantTargetSquare, 
                      uint16_t argPliesSincePawnMoveOrCapture, Piece argCapturedPiece)
     {
         castlingRights[WHITE][0] = argCastlingRights[WHITE][0];
@@ -28,6 +29,7 @@ struct BoardInfo
         castlingRights[BLACK][0] = argCastlingRights[BLACK][0];
         castlingRights[BLACK][1] = argCastlingRights[BLACK][1];
 
+        zobristHash = argZobristHash;
         enPassantTargetSquare = argEnPassantTargetSquare;
         pliesSincePawnMoveOrCapture = argPliesSincePawnMoveOrCapture;
         capturedPiece = argCapturedPiece;
@@ -173,7 +175,7 @@ class Board
     inline void printBoard()
     {
         string str = "";
-        for (Square i = 0; i < 8; i++)
+        for (int i = 7; i >= 0; i--)
         {
             for (Square j = 0; j < 8; j++)
             {
@@ -326,6 +328,8 @@ class Board
         auto typeFlag = move.typeFlag();
         bool capture = isCapture(move);
         pushState(pieces[to]);
+        Color colorPlaying = color;
+        Color nextColor = colorPlaying == WHITE ? BLACK : WHITE;
 
         Piece piece = pieces[from];
         removePiece(from);
@@ -356,10 +360,26 @@ class Board
 
         if (typeFlag == move.CASTLING_FLAG)
         {
-            if (to == 6) { removePiece(7); placePiece(Piece::WHITE_ROOK, 5); }
-            else if (to == 2) { removePiece(0); placePiece(Piece::WHITE_ROOK, 3); }
-            else if (to == 62) { removePiece(63); placePiece(Piece::BLACK_ROOK, 61); }
-            else if (to == 58) { removePiece(56); placePiece(Piece::BLACK_ROOK, 59); }
+            if (to == 6) 
+            { 
+                removePiece(7); 
+                placePiece(Piece::WHITE_ROOK, 5); 
+            }
+            else if (to == 2)
+            { 
+                removePiece(0);
+                placePiece(Piece::WHITE_ROOK, 3); 
+            }
+            else if (to == 62) 
+            { 
+                removePiece(63);
+                placePiece(Piece::BLACK_ROOK, 61); 
+            }
+            else if (to == 58) 
+            { 
+                removePiece(56);
+                placePiece(Piece::BLACK_ROOK, 59); 
+            }
         }
         else if (typeFlag == move.EN_PASSANT_FLAG)
         {
@@ -369,19 +389,33 @@ class Board
 
         piecesProcessed:
 
+        color = nextColor;
+        if (nextColor == WHITE) currentMoveCounter++;
+
         if (inCheck())
         {
+            // move is illegal
             undoMove(move);
-            return false; // move is illegal
+            return false;
         }
 
         PieceType pieceTypeMoved = pieceToPieceType(pieces[to]);
-        if (pieceTypeMoved == PieceType::KING || pieceTypeMoved == PieceType::ROOK)
-            castlingRights[color][CASTLE_SHORT] = castlingRights[color][CASTLE_LONG] = false;
-
-        color = color == WHITE ? BLACK : WHITE;
-        if (color == WHITE)
-            currentMoveCounter++;
+        if (pieceTypeMoved == PieceType::KING) 
+            castlingRights[colorPlaying][CASTLE_SHORT] = castlingRights[colorPlaying][CASTLE_LONG] = false;
+        else if (piece == Piece::WHITE_ROOK)
+        {
+            if (from == 0)
+                castlingRights[WHITE][CASTLE_LONG] = false;
+            else if (from == 7)
+                castlingRights[WHITE][CASTLE_SHORT] = false;
+        }
+        else if (piece == Piece::BLACK_ROOK)
+        {
+            if (from == 56)
+                castlingRights[BLACK][CASTLE_LONG] = false;
+            else if (from == 63)
+                castlingRights[BLACK][CASTLE_SHORT] = false;
+        }
 
         if (pieceToPieceType(piece) == PieceType::PAWN || capture)
             pliesSincePawnMoveOrCapture = 0;
@@ -401,8 +435,8 @@ class Board
                 char file = squareFile(from);
 
                 // we already switched color
-                Square possibleEnPassantTargetSquare = color == BLACK ? to-8 : to+8;
-                Piece enemyPawnPiece = color == BLACK ? Piece::BLACK_PAWN : Piece::WHITE_PAWN;
+                Square possibleEnPassantTargetSquare = colorPlaying == WHITE ? to-8 : to+8;
+                Piece enemyPawnPiece =  colorPlaying == WHITE ? Piece::BLACK_PAWN : Piece::WHITE_PAWN;
 
                 if (file != 'a' && pieces[to-1] == enemyPawnPiece)
                     enPassantTargetSquare = possibleEnPassantTargetSquare;
@@ -490,7 +524,7 @@ class Board
 
     inline void pushState(Piece capturedPiece)
     {
-        BoardInfo state = BoardInfo(castlingRights, enPassantTargetSquare, pliesSincePawnMoveOrCapture, capturedPiece);
+        BoardInfo state = BoardInfo(zobristHash(), castlingRights, enPassantTargetSquare, pliesSincePawnMoveOrCapture, capturedPiece);
         states.push_back(state); // append
     }
 
@@ -509,6 +543,19 @@ class Board
     }
 
     public:
+
+    inline bool isRepetition()
+    {
+        if (states.size() <= 1) return false;
+        uint64_t thisZobristHash = zobristHash();
+
+        for (int i = states.size()-2; i >= 0 && i >= states.size() - pliesSincePawnMoveOrCapture - 1; i -= 2)
+            if (states[i].zobristHash == thisZobristHash)
+                return true;
+
+        return false;
+    }
+
 
     inline MovesList pseudolegalMoves(bool capturesOnly = false)
     {
@@ -548,16 +595,13 @@ class Board
                       SQUARE_DIAGONAL_RIGHT = square + (color == WHITE ? 9 : -7);
 
         // diagonal left
-        if (file != 'a' && (pieceColor(pieces[SQUARE_DIAGONAL_LEFT]) == enemyColor || enPassantTargetSquare == SQUARE_DIAGONAL_LEFT))
+        if (file != 'a')
         {
-            if (squareIsBackRank(SQUARE_DIAGONAL_LEFT))
-            {
-                moves.add(Move(square, SQUARE_DIAGONAL_LEFT, Move::QUEEN_PROMOTION_FLAG));
-                moves.add(Move(square, SQUARE_DIAGONAL_LEFT, Move::KNIGHT_PROMOTION_FLAG));
-                moves.add(Move(square, SQUARE_DIAGONAL_LEFT, Move::BISHOP_PROMOTION_FLAG));
-                moves.add(Move(square, SQUARE_DIAGONAL_LEFT, Move::ROOK_PROMOTION_FLAG));
-            }
-            else
+            if (enPassantTargetSquare == SQUARE_DIAGONAL_LEFT)
+                moves.add(Move(square, SQUARE_DIAGONAL_LEFT, Move::EN_PASSANT_FLAG));
+            else if (squareIsBackRank(SQUARE_DIAGONAL_LEFT) && pieceColor(pieces[SQUARE_DIAGONAL_LEFT]) == enemyColor)
+                addPromotions(square, SQUARE_DIAGONAL_LEFT, moves);
+            else if (pieceColor(pieces[SQUARE_DIAGONAL_LEFT]) == enemyColor)
                 moves.add(Move(square, SQUARE_DIAGONAL_LEFT, Move::NORMAL_FLAG));
         }
 
@@ -566,7 +610,7 @@ class Board
         {
             if (enPassantTargetSquare == SQUARE_DIAGONAL_RIGHT)
                 moves.add(Move(square, SQUARE_DIAGONAL_RIGHT, Move::EN_PASSANT_FLAG));
-            else if (squareIsBackRank(SQUARE_DIAGONAL_RIGHT))
+            else if (squareIsBackRank(SQUARE_DIAGONAL_RIGHT) && pieceColor(pieces[SQUARE_DIAGONAL_RIGHT]) == enemyColor)
                 addPromotions(square, SQUARE_DIAGONAL_RIGHT, moves);
             else if (pieceColor(pieces[SQUARE_DIAGONAL_RIGHT]) == enemyColor)
                 moves.add(Move(square, SQUARE_DIAGONAL_RIGHT, Move::NORMAL_FLAG));
@@ -574,14 +618,22 @@ class Board
 
         if (capturesOnly) return;
         
-        // 1 up
+        // pawn 1 up
         if (pieces[SQUARE_ONE_UP] == Piece::NONE)
-            moves.add(Move(square, SQUARE_ONE_UP, PieceType::PAWN));
+        {
+            if (squareIsBackRank(SQUARE_ONE_UP))
+            {
+                addPromotions(square, SQUARE_ONE_UP, moves);
+                return;
+            }
 
-        // 2 up
-        if ((rank == 1 && color == WHITE) || (rank == 6 && color == BLACK))
-            if (pieces[SQUARE_TWO_UP] == Piece::NONE)
-                moves.add(Move(square, SQUARE_TWO_UP, PieceType::PAWN));
+            moves.add(Move(square, SQUARE_ONE_UP, Move::NORMAL_FLAG));
+
+            // pawn 2 up
+            if (pieces[SQUARE_TWO_UP] == Piece::NONE
+            && ((rank == 1 && color == WHITE) || (rank == 6 && color == BLACK)))
+                moves.add(Move(square, SQUARE_TWO_UP, Move::NORMAL_FLAG));
+        }
 
     }
 
@@ -605,7 +657,7 @@ class Board
             Square targetSquare = poplsb(thisKnightMoves);
             if (capturesOnly && pieceColor(pieces[targetSquare]) != enemyColor)
                 continue;
-            moves.add(Move(square, targetSquare, PieceType::KNIGHT));
+            moves.add(Move(square, targetSquare, Move::NORMAL_FLAG));
         }
     }
 
@@ -619,50 +671,70 @@ class Board
             Square targetSquare = poplsb(thisKingMoves);
             if (capturesOnly && pieceColor(pieces[targetSquare]) != enemyColor)
                 continue;
-            moves.add(Move(square, targetSquare, PieceType::KNIGHT));
+            moves.add(Move(square, targetSquare, Move::NORMAL_FLAG));
+        }
+
+
+        if (square == (color == WHITE ? 4 : 60) && !inCheck())
+        {
+            if (castlingRights[color][CASTLE_SHORT]
+            && pieces[square+1] == Piece::NONE
+            && pieces[square+2] == Piece::NONE
+            && pieces[square+3] == (color == WHITE ? Piece::WHITE_ROOK : Piece::BLACK_ROOK)
+            && !isSquareAttacked(square+1) 
+            && !isSquareAttacked(square+2))
+                moves.add(Move(square, square+2, Move::CASTLING_FLAG));
+
+            if (castlingRights[color][CASTLE_LONG]
+            && pieces[square-1] == Piece::NONE
+            && pieces[square-2] == Piece::NONE
+            && pieces[square-3] == Piece::NONE
+            && pieces[square-4] == (color == WHITE ? Piece::WHITE_ROOK : Piece::BLACK_ROOK)
+            && !isSquareAttacked(square-1) 
+            && !isSquareAttacked(square-2))
+                moves.add(Move(square, square-2, Move::CASTLING_FLAG));
         }
     }
 
     inline void slidingPiecePseudolegalMoves(Square square, PieceType pieceType, MovesList &moves, bool capturesOnly = false)
     {
-        int dirOffsetsStartIndex = 0, dirOffsetsEndIndex = 7;
-        getDirOffsetsIndexes(square, dirOffsetsStartIndex, dirOffsetsEndIndex);
-        int numDirections = dirOffsetsEndIndex - dirOffsetsStartIndex + 1;
-        int currentDirOffsetsIndex = dirOffsetsStartIndex - 1;
+        uint8_t rank = squareRank(square);
+        char file = squareFile(square);
+        int startIndex = (pieceType == PieceType::BISHOP ? 4 : 0);
+        int endIndex = (pieceType == PieceType::ROOK ? 3 : 7);
         int currentSquaresFromSource = 1;
 
-        for (int i = 1; i <= numDirections; i++)
+        for (int dir = startIndex; dir <= endIndex ; dir++)
         {
-            currentDirOffsetsIndex++;
-            if (currentDirOffsetsIndex >= 8) 
-                currentDirOffsetsIndex = 0;
+            if (isForbiddenDirection(dir, square, rank, file)) continue;
 
-            bool isDiagonalDirection = currentDirOffsetsIndex % 2 != 0;
-            if (pieceType == PieceType::BISHOP && !isDiagonalDirection)
-                continue;
-            if (pieceType == PieceType::ROOK && isDiagonalDirection)
-                continue;
-
-            int lastTargetSquare = -9999;
             while (true) // go in this direction
             {
-                int targetSquare = square + currentSquaresFromSource * dirOffsets[currentDirOffsetsIndex];
+                int targetSquare = square + currentSquaresFromSource * directionsOffsets[dir];
                 Piece pieceHere = pieces[targetSquare];
 
                 if (pieceHere == Piece::NONE)
                 { 
-                    if (!capturesOnly) moves.add(Move(square, targetSquare, pieceType));
+                    if (!capturesOnly) moves.add(Move(square, targetSquare, Move::NORMAL_FLAG));
                     currentSquaresFromSource++;
                 }
                 else
                 {
                     if (pieceColor(pieceHere) != color) 
                         // capture
-                        moves.add(Move(square, targetSquare, pieceType));
+                        moves.add(Move(square, targetSquare, Move::NORMAL_FLAG));
                     break;
                 }
 
-                if (isEdgeSquare(targetSquare))
+                char targetSquareFile = squareFile(targetSquare);
+                uint8_t targetSquareRank = squareRank(targetSquare);
+                if (directionWillHitFileH[dir] && targetSquareFile == 'h')
+                    break;
+                if (directionWillHitFileA[dir] && targetSquareFile == 'a')
+                    break;
+                if (directionWillHitRank7[dir] && targetSquareRank == 7)
+                    break;
+                if (directionWillHitRank0[dir] && targetSquareRank == 0)
                     break;
             }
 
@@ -673,26 +745,23 @@ class Board
     inline bool isSquareAttacked(Square square)
     {
         // idea: put a super piece in this square and see if its attacks intersect with an enemy piece
-        
-        int dirOffsetsStartIndex = 0, dirOffsetsEndIndex = 7;
-        getDirOffsetsIndexes(square, dirOffsetsStartIndex, dirOffsetsEndIndex);
-        int numDirections = dirOffsetsEndIndex - dirOffsetsStartIndex + 1;
-        int currentDirOffsetsIndex = dirOffsetsStartIndex - 1;
+
+        uint8_t rank = squareRank(square);
+        char file = squareFile(square);
         int currentSquaresFromSource = 1;
 
-        for (int i = 1; i <= numDirections; i++)
+        for (int dir = 0; dir < 8; dir++)
         {
-            currentDirOffsetsIndex++;
-            if (currentDirOffsetsIndex >= 8) 
-                currentDirOffsetsIndex = 0;
+            if (isForbiddenDirection(dir, square, rank, file)) continue;
+
             while (true) // go in this direction
             {
-                int targetSquare = square + currentSquaresFromSource * dirOffsets[currentDirOffsetsIndex];
+                int targetSquare = square + currentSquaresFromSource * directionsOffsets[dir];
                 if (pieces[targetSquare] == Piece::NONE)
                     currentSquaresFromSource++;
                 else if (pieceColor(pieces[targetSquare]) != color)
                 {
-                    bool isDiagonalDirection = currentDirOffsetsIndex % 2 != 0;
+                    bool isDiagonalDirection = dir > 3;
                     PieceType pieceTypeHere = pieceToPieceType(pieces[targetSquare]);
 
                     if (pieceTypeHere == PieceType::QUEEN 
@@ -705,7 +774,15 @@ class Board
                 else // friendly piece here
                     break;
 
-                if (isEdgeSquare(targetSquare)) 
+                char targetSquareFile = squareFile(targetSquare);
+                uint8_t targetSquareRank = squareRank(targetSquare);
+                if (directionWillHitFileH[dir] && targetSquareFile == 'h')
+                    break;
+                if (directionWillHitFileA[dir] && targetSquareFile == 'a')
+                    break;
+                if (directionWillHitRank7[dir] && targetSquareRank == 7)
+                    break;
+                if (directionWillHitRank0[dir] && targetSquareRank == 0)
                     break;
             }
 
@@ -718,10 +795,10 @@ class Board
         uint64_t thisKnightMoves = knightMoves[square] & ~usBb;
         if ((thisKnightMoves & piecesBitboards[(int)PieceType::KNIGHT][enemyColor]) > 0) return true;
 
-
         uint64_t thisKingMoves = kingMoves[square] & ~usBb;
-        if ((thisKingMoves & piecesBitboards[(int)PieceType::KING][enemyColor]) > 0) return true;
-
+        Square enemyKingSquare = lsb(piecesBitboards[(int)PieceType::KING][enemyColor]);
+        uint64_t enemyKingMoves = kingMoves[enemyKingSquare] & ~them(); 
+        if ((thisKingMoves & enemyKingMoves) > 0) return true;
 
         if (color == WHITE)
         {
