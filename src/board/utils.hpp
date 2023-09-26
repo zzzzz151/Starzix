@@ -4,6 +4,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <iostream>
 #include <algorithm>
 #include "types.hpp"
 using namespace std;

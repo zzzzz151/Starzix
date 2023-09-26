@@ -6,7 +6,7 @@
 #include <vector>
 #include <cstdlib>   // For rand() and srand()
 #include <ctime>     // For time()
-#include "board.hpp"
+#include "../src-test/board/board.hpp"
 using namespace std;
 
 Board board;

@@ -10,6 +10,7 @@
 #include "builtin.hpp"
 #include "utils.hpp"
 #include "move.hpp"
+#include "../nnue.hpp"
 using namespace std;
 
 struct BoardInfo
@@ -56,6 +57,7 @@ class Board
     Square enPassantTargetSquare;
     uint16_t pliesSincePawnMoveOrCapture, currentMoveCounter;
 
+    vector<Square> nullMoveEnPassantSquares;    
     vector<BoardInfo> states;
 
     static inline uint64_t zobristTable[64][12];
@@ -77,7 +79,11 @@ class Board
         if (!initialized)
             init();
 
+        network.ResetAccumulator();
+        network.RefreshAccumulator();
+
         states = {};
+        nullMoveEnPassantSquares = {};
 
         fen = trim(fen);
         vector<string> fenSplit = splitString(fen, ' ');
@@ -222,18 +228,18 @@ class Board
 
     inline uint64_t occupancy() { return occupied; }
 
-    inline uint64_t pieceBitboard(PieceType pieceType, Color color = NULL_COLOR)
+    inline uint64_t pieceBitboard(PieceType pieceType, Color argColor = NULL_COLOR)
     {
-        if (color == NULL_COLOR)
+        if (argColor == NULL_COLOR)
             return piecesBitboards[(uint8_t)pieceType][WHITE] | piecesBitboards[(uint8_t)pieceType][BLACK];
-        return piecesBitboards[(uint8_t)pieceType][color];
+        return piecesBitboards[(uint8_t)pieceType][argColor];
     }
 
-    inline uint64_t colorBitboard(Color color)
+    inline uint64_t colorBitboard(Color argColor)
     {
         uint64_t bb = 0;
         for (int pt = 0; pt <= 5; pt++)
-            bb |= piecesBitboards[pt][color];
+            bb |= piecesBitboards[pt][argColor];
         return bb;
     }
 
@@ -254,17 +260,24 @@ class Board
 
         occupied |= squareBit;
         piecesBitboards[(uint8_t)pieceType][color] |= squareBit;
+
+        network.EfficientlyUpdateAccumulator<MantaRay::AccumulatorOperation::Activate>((int)pieceType, (int)color, square);
     }
 
     inline void removePiece(Square square)
     {
         if (pieces[square] == Piece::NONE) return;
+
         PieceType pieceType = pieceToPieceType(pieces[square]);
         Color color = pieceColor(pieces[square]);
+
         pieces[square] = Piece::NONE;
+
         uint64_t squareBit = (1ULL << square);
         occupied ^= squareBit;
         piecesBitboards[(uint8_t)pieceType][color] ^= squareBit;
+
+        network.EfficientlyUpdateAccumulator<MantaRay::AccumulatorOperation::Deactivate>((int)pieceType, (int)color, square);
     }
 
     inline static void initZobrist()
@@ -496,8 +509,10 @@ class Board
 
     inline bool isCapture(Move move)
     {
-        if (move.typeFlag() == move.EN_PASSANT_FLAG) return true;
-        if (pieceColor(pieces[move.to()]) == enemyColor()) return true;
+        if (move.typeFlag() == move.EN_PASSANT_FLAG) 
+            return true;
+        if (pieceColor(pieces[move.to()]) == enemyColor()) 
+            return true;
         return false;
     }
 
@@ -557,10 +572,10 @@ class Board
         Piece piece = pieces[square];
         uint8_t rank = squareRank(square);
         char file = squareFile(square);
-        const uint8_t SQUARE_ONE_UP = square + (color == WHITE ? 8 : -8),
-                      SQUARE_TWO_UP = square + (color == WHITE ? 16 : -16),
-                      SQUARE_DIAGONAL_LEFT = square + (color == WHITE ? 7 : -9),
-                      SQUARE_DIAGONAL_RIGHT = square + (color == WHITE ? 9 : -7);
+        const int SQUARE_ONE_UP = square + (color == WHITE ? 8 : -8),
+                  SQUARE_TWO_UP = square + (color == WHITE ? 16 : -16),
+                  SQUARE_DIAGONAL_LEFT = square + (color == WHITE ? 7 : -9),
+                  SQUARE_DIAGONAL_RIGHT = square + (color == WHITE ? 9 : -7);
 
         // diagonal left
         if (file != 'a')
@@ -663,10 +678,6 @@ class Board
         }
     }
 
-    // in types.hpp: const int LEFT = 0, UP = 1, RIGHT = 2, DOWN = 3, UP_LEFT = 4, UP_RIGHT = 5, DOWN_RIGHT = 6, DOWN_LEFT = 7;
-    constexpr static int DIRECTIONS[8][2] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}, {1, -1}, {1, 1}, {-1, 1}, {-1, -1}};
-    const static int RANK = 0, FILE = 1;
-
     inline void slidingPiecePseudolegalMoves(Square square, PieceType pieceType, MovesList &moves, bool capturesOnly = false)
     {
         int rank = squareRank(square);
@@ -676,8 +687,8 @@ class Board
 
         for (int dir = startIndex; dir <= endIndex ; dir++)
         {
-            int targetRank = rank + DIRECTIONS[dir][RANK];
-            char targetFile = file + DIRECTIONS[dir][FILE];
+            int targetRank = rank + DIRECTIONS[dir][RANK_INDEX];
+            char targetFile = file + DIRECTIONS[dir][FILE_INDEX];
 
             while (targetRank >= 0 && targetRank <= 7 && targetFile >= 'a' && targetFile <= 'h')
             {
@@ -697,8 +708,8 @@ class Board
                     break;
                 }
 
-                targetRank += DIRECTIONS[dir][RANK];
-                targetFile +=  DIRECTIONS[dir][FILE];
+                targetRank += DIRECTIONS[dir][RANK_INDEX];
+                targetFile +=  DIRECTIONS[dir][FILE_INDEX];
             }
         }
     }
@@ -722,8 +733,8 @@ class Board
 
         for (int dir = 0; dir < 8; dir++)
         {
-            int targetRank = rank + DIRECTIONS[dir][RANK];
-            char targetFile = file + DIRECTIONS[dir][FILE];
+            int targetRank = rank + DIRECTIONS[dir][RANK_INDEX];
+            char targetFile = file + DIRECTIONS[dir][FILE_INDEX];
 
             while (targetRank >= 0 && targetRank <= 7 && targetFile >= 'a' && targetFile <= 'h')
             {
@@ -744,8 +755,8 @@ class Board
                 else if (pieceColor(pieces[targetSquare]) == colorDefending) // friendly piece here
                     break;
 
-                targetRank += DIRECTIONS[dir][RANK];
-                targetFile +=  DIRECTIONS[dir][FILE];
+                targetRank += DIRECTIONS[dir][RANK_INDEX];
+                targetFile +=  DIRECTIONS[dir][FILE_INDEX];
             }
 
         }
@@ -764,8 +775,8 @@ class Board
 
         // DEBUG  cout << "not attacked by kings" << endl;
  
-        const uint8_t SQUARE_DIAGONAL_LEFT = square + (colorAttacking == WHITE ? -9 : 7),
-                      SQUARE_DIAGONAL_RIGHT = square + (colorAttacking == WHITE ? -7 : 9);
+        const int SQUARE_DIAGONAL_LEFT = square + (colorAttacking == WHITE ? -9 : 7),
+                  SQUARE_DIAGONAL_RIGHT = square + (colorAttacking == WHITE ? -7 : 9);
         Piece pawnAttacking = colorAttacking == WHITE ? Piece::WHITE_PAWN : Piece::BLACK_PAWN;
 
         if ((colorDefending == WHITE && rank == 7) || (colorDefending == BLACK && rank == 0))
@@ -796,6 +807,38 @@ class Board
         return isSquareAttacked(ourKingSquare, enemyColor());
     }
 
+    inline void makeNullMove()
+    {
+        color = enemyColor();
+        if (color == WHITE)
+            currentMoveCounter++;
+
+        nullMoveEnPassantSquares.push_back(enPassantTargetSquare); // append
+        enPassantTargetSquare = 0;
+    }
+
+    inline void undoNullMove()
+    {
+        color = enemyColor();
+        if (color == BLACK)
+            currentMoveCounter--;
+
+        enPassantTargetSquare = nullMoveEnPassantSquares[nullMoveEnPassantSquares.size()-1];
+        nullMoveEnPassantSquares.pop_back(); // remove last element
+    }
+
+    inline bool hasAtLeast1Piece(Color argColor = NULL_COLOR)
+    {
+        if (argColor == NULL_COLOR) 
+            argColor = color;
+
+        // p, n, b, r, q, k
+        for (int pt = 1; pt <= 4; pt++)
+            if (piecesBitboards[pt][argColor] > 0)
+                return true;
+
+        return false;
+    }
     
 };
 

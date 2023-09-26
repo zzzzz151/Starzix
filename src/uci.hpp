@@ -2,13 +2,12 @@
 #define UCI_HPP
 
 // clang-format-off
-#include "chess.hpp"
+#include <cstring> // for memset()
+#include "board/board.hpp"
 #include "main.cpp"
 inline void initTT();
 #include "nnue.hpp"
 #include "search.hpp"
-#include <cstring> // for memset()
-using namespace chess;
 using namespace std;
 
 inline void setoption(vector<string> &words) // e.g. "setoption name Hash value 32"
@@ -43,7 +42,7 @@ inline void position(vector<string> &words)
 
     if (words[1] == "startpos")
     {
-        board = Board(STARTPOS);
+        board = Board(START_FEN);
         movesTokenIndex = 2;
     }
     else if (words[1] == "fen")
@@ -58,17 +57,14 @@ inline void position(vector<string> &words)
     }
 
     for (int i = movesTokenIndex + 1; i < words.size(); i++)
-    {
-        Move move = uci::uciToMove(board, words[i]);
-        board.makeMove(move);
-    }
+        board.makeMove(words[i]);
 }
 
 inline void go(vector<string> &words)
 {
-    setupTime(words, board.sideToMove());
+    setupTime(words, board.colorToMove());
     Move bestMove = iterativeDeepening();
-    cout << "bestmove " + uci::moveToUci(bestMove) + "\n";
+    cout << "bestmove " + bestMove.toUci() + "\n";
 }
 
 inline void info(int depth, int score)
@@ -83,7 +79,7 @@ inline void info(int depth, int score)
     }
 
     double millisecondsElapsed = (chrono::steady_clock::now() - start) / chrono::milliseconds(1);
-    U64 nps = nodes / (millisecondsElapsed > 0 ? millisecondsElapsed : 1) * 1000;
+    uint64_t nps = nodes / (millisecondsElapsed > 0 ? millisecondsElapsed : 1) * 1000;
 
     cout << "info depth " << depth
          << " seldepth " << maxPlyReached + 1
@@ -91,7 +87,7 @@ inline void info(int depth, int score)
          << " nodes " << nodes
          << " nps " << nps
          << (isMate ? " score mate " : " score cp ") << (isMate ? movesToMate : score)
-         << " pv " << uci::moveToUci(bestMoveRoot)
+         << " pv " << bestMoveRoot.toUci()
          << endl;
 }
 
@@ -126,7 +122,7 @@ inline void uciLoop()
         else if (words[0] == "go")
             go(words);
         else if (words[0] == "eval")
-            cout << "eval " << network.Evaluate((int)board.sideToMove()) << " cp" << endl;
+            cout << "eval " << network.Evaluate((int)board.colorToMove()) << " cp" << endl;
     }
 }
 

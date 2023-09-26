@@ -3,7 +3,7 @@
 #include <bitset>
 #include <string>
 #include <chrono>
-#include "board.hpp"
+#include "../src-test/board/board.hpp"
 using namespace std;
 
 int failed = 0, passed = 0;
@@ -148,7 +148,6 @@ int main()
     test("castling move.to", squareToStr[(int)move.to()], (string)"g1");
     test("move.flag=castling", move.typeFlag(), move.CASTLING_FLAG);
 
-    
     board = Board("rnb1kbnr/1P1pqppp/4p3/2p5/8/8/P1PPPPPP/RNBQKBNR w KQkq - 1 5");
     move = Move::fromUci("b7c8b", board.piecesBySquare());
     test("Move::fromUci() == move.toUci()", move.toUci(), (string)"b7c8b");
@@ -192,6 +191,12 @@ int main()
 
     board = Board("rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/p1P2P2/RNBQK2R b KQkq - 5 9");
     test("inCheck() returns false", board.inCheck(), false);
+
+    board = Board("1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 w Qk f6 0 15");
+    board.makeNullMove();
+    test("makeNullMove() fen", board.fen(), (string)"1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 b Qk - 0 15");
+    board.undoNullMove();
+    test("undoNullMove() fen", board.fen(), (string)"1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 w Qk f6 0 15");
 
     board = Board("rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/p1P2P2/RNBQK2R b KQkq - 5 9");
     uint64_t zobristHashBefore = board.zobristHash();

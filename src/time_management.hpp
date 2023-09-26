@@ -2,15 +2,13 @@
 #define TIME_MANAGEMENT_HPP
 
 // clang-format off
-#include "chess.hpp"
-using namespace chess;
 using namespace std;
 
 chrono::steady_clock::time_point start;
 int millisecondsForThisTurn;
 bool isTimeUp = false;
 
-inline void setupTime(vector<string> &words, Color color = Color::WHITE)
+inline void setupTime(vector<string> &words, Color color)
 {
     start = chrono::steady_clock::now();
     isTimeUp = false;
@@ -21,9 +19,9 @@ inline void setupTime(vector<string> &words, Color color = Color::WHITE)
 
     for (int i = 0; i < words.size(); i++)
     {
-        if ((words[i] == "wtime" && color == Color::WHITE) || (words[i] == "btime" && color == Color::BLACK))
+        if ((words[i] == "wtime" && color == WHITE) || (words[i] == "btime" && color == BLACK))
             milliseconds = stoi(words[i + 1]);
-        else if ((words[i] == "winc" && color == Color::WHITE) || (words[i] == "binc" && color == Color::BLACK))
+        else if ((words[i] == "winc" && color == WHITE) || (words[i] == "binc" && color == BLACK))
             increment = stoi(words[i+1]);
         else if (words[i] == "movestogo")
             movesToGo = stoi(words[i + 1]);

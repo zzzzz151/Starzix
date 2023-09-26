@@ -17,13 +17,14 @@ struct Move
 
     public:
 
-    const static uint16_t NORMAL_FLAG = 0x0000,
-                          CASTLING_FLAG = 0x0001,
-                          EN_PASSANT_FLAG = 0x0002,
-                          KNIGHT_PROMOTION_FLAG = 0x0003,
-                          BISHOP_PROMOTION_FLAG = 0x0004,
-                          ROOK_PROMOTION_FLAG = 0x0005,
-                          QUEEN_PROMOTION_FLAG = 0x0006;
+    const static uint16_t NULL_FLAG = 0x0000,
+                          NORMAL_FLAG = 0x0001,
+                          CASTLING_FLAG = 0x0002,
+                          EN_PASSANT_FLAG = 0x0003,
+                          KNIGHT_PROMOTION_FLAG = 0x0004,
+                          BISHOP_PROMOTION_FLAG = 0x0005,
+                          ROOK_PROMOTION_FLAG = 0x0006,
+                          QUEEN_PROMOTION_FLAG = 0x0007;
 
     constexpr static uint16_t PROMOTION_FLAGS[4] = {QUEEN_PROMOTION_FLAG, KNIGHT_PROMOTION_FLAG, BISHOP_PROMOTION_FLAG, ROOK_PROMOTION_FLAG};
 
@@ -32,6 +33,11 @@ struct Move
     // Custom == operator
     bool operator==(const Move& other) const {
         return moveEncoded == other.moveEncoded;
+    }
+
+    // Custom != operator
+    bool operator!=(const Move& other) const {
+        return moveEncoded != other.moveEncoded;
     }
 
     inline Move(Square from, Square to, uint16_t typeFlag)
@@ -44,7 +50,7 @@ struct Move
         moveEncoded |= typeFlag;
     }
 
-    inline Move (string from, string to, uint16_t typeFlag) : Move(strToSquare(from), strToSquare(to), typeFlag) {}
+    inline Move(string from, string to, uint16_t typeFlag) : Move(strToSquare(from), strToSquare(to), typeFlag) {}
 
     static inline Move fromUci(string uci, Piece* boardPieces)
     {
@@ -113,13 +119,13 @@ struct MovesList
 {
     private:
 
-    Move moves[218];
+    Move moves[255];
     uint8_t numMoves = 0;
 
     public:
 
     inline void add(Move move) { 
-        assert(numMoves < 218);
+        assert(numMoves < 255);
         moves[numMoves++] = move; 
     }
 
@@ -128,6 +134,14 @@ struct MovesList
     inline Move operator[](int i) {
         assert(i >= 0 && i < numMoves);
         return moves[i];
+    }
+
+    inline void swap(int i, int j)
+    {
+    	assert(i >= 0 && j >= 0 && i < numMoves && j < numMoves);
+        Move temp = moves[i];
+        moves[i] = moves[j];
+        moves[j] = temp;
     }
 };
 

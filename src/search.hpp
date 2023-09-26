@@ -2,12 +2,11 @@
 #define SEARCH_HPP
 
 // clang-format off
-#include "chess.hpp"
+#include "board/board.hpp"
 #include "time_management.hpp"
 #include "nnue.hpp"
 #include "see.hpp"
 inline void info(int depth, int score); // from uci.hpp
-using namespace chess;
 using namespace std;
 
 // ----- Tunable params ------
@@ -16,9 +15,7 @@ const uint8_t MAX_DEPTH = 100;
 
 int TT_SIZE_MB = 64; // default (and current) TT size in MB
 
-extern const int PIECE_VALUES[7] = {100, 302, 320, 500, 900, 15000, 0},
-                 SEE_PIECE_VALUES[7] = {100, 300, 300, 500, 900, 0, 0},
-                 PAWN_INDEX = 0;
+extern const int PIECE_VALUES[7] = {100, 302, 320, 500, 900, 15000, 0};
 
 const uint8_t ASPIRATION_MIN_DEPTH = 6,
               ASPIRATION_INITIAL_DELTA = 25;
@@ -57,7 +54,7 @@ const int POS_INFINITY = 9999999, NEG_INFINITY = -POS_INFINITY, MIN_MATE_SCORE =
 Move NULL_MOVE;
 Board board;
 Move bestMoveRoot;
-U64 nodes;
+uint64_t nodes;
 int maxPlyReached;
 Move killerMoves[MAX_DEPTH*2][2]; // ply, move
 int historyMoves[2][6][64];       // color, pieceType, squareTo
@@ -67,7 +64,7 @@ Move counterMove;
 const char INVALID = 0, EXACT = 1, LOWER_BOUND = 2, UPPER_BOUND = 3;
 struct TTEntry
 {
-    U64 key = 0;
+    uint64_t key = 0;
     int score = 0;
     Move bestMove = NULL_MOVE;
     uint8_t depth = 0;
@@ -87,11 +84,13 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
     // Quiescence saarch: search capture moves until a 'quiet' position is reached
 
     int originalAlpha = alpha;
-    int eval = network.Evaluate((int)board.sideToMove());
-    if (eval >= beta) return eval;
-    if (alpha < eval) alpha = eval;
+    int eval = network.Evaluate((int)board.colorToMove());
+    if (eval >= beta) 
+        return eval;
+    if (alpha < eval) 
+        alpha = eval;
 
-    U64 boardKey = board.zobrist();
+    uint64_t boardKey = board.zobristHash();
     // probe TT
     TTEntry *ttEntry = &(TT[boardKey % NUM_TT_ENTRIES]);
     if (plyFromRoot > 0 && ttEntry->key == boardKey)
@@ -102,10 +101,9 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
             return ret;
         }
 
-    Movelist moves;
-    movegen::legalmoves<MoveGenType::CAPTURE>(moves, board);
+    MovesList moves = board.pseudolegalMoves(true);
 
-    int scores[218];
+    int scores[255];
     scoreMoves(moves, scores, boardKey, *ttEntry, plyFromRoot);
 
     int bestScore = eval;
@@ -116,36 +114,49 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
         // SEE pruning (skip bad captures)
         if (!SEE(board, capture)) continue;
 
-        board.makeMove(capture);
+        if (!board.makeMove(capture))
+            continue; // illegal move
+
         nodes++;
         int score = -qSearch(-beta, -alpha, plyFromRoot + 1);
-        board.unmakeMove(capture);
+        board.undoMove();
 
-        if (score > bestScore) bestScore = score;
-        else continue;
+        if (score > bestScore) 
+            bestScore = score;
+        else 
+            continue;
 
-        if (score >= beta) return score; // in CPW: return beta;
-        if (score > alpha) alpha = score;
+        if (score >= beta) 
+            return score;
+        if (score > alpha) 
+            alpha = score;
     }
 
     if (ttEntry->depth <= 0)
     {
         // save in TT
+
         ttEntry->key = boardKey;
         ttEntry->depth = 0;
         ttEntry->score = bestScore;
-        if (abs(bestScore) >= MIN_MATE_SCORE) ttEntry->score += bestScore < 0 ? -plyFromRoot : plyFromRoot;
         ttEntry->bestMove = NULL_MOVE;
-        if (bestScore <= originalAlpha) ttEntry->type = UPPER_BOUND;
-        else if (bestScore >= beta) ttEntry->type = LOWER_BOUND;
-        else ttEntry->type = EXACT;
+
+        if (abs(bestScore) >= MIN_MATE_SCORE) 
+            ttEntry->score += bestScore < 0 ? -plyFromRoot : plyFromRoot;
+
+        if (bestScore <= originalAlpha) 
+            ttEntry->type = UPPER_BOUND;
+        else if (bestScore >= beta) 
+            ttEntry->type = LOWER_BOUND;
+        else 
+            ttEntry->type = EXACT;
     }
 
     return bestScore;
 }
 
 // PVS (Principal variation search)
-inline int pvs(int depth, int alpha, int beta, int plyFromRoot, const Move &move, int moveScore, int lmr, bool inCheck, bool pvNode)
+inline int pvs(int depth, int alpha, int beta, int plyFromRoot, Move &move, int moveScore, int lmr, bool inCheck, bool pvNode)
 {
     // LMR (Late move reduction)
     if (!inCheck && depth >= LMR_MIN_DEPTH && moveScore < KILLER_SCORE)
@@ -155,8 +166,8 @@ inline int pvs(int depth, int alpha, int beta, int plyFromRoot, const Move &move
         if (!board.isCapture(move))
         {
             // This move is a non-killer quiet
-            int stm = (int)board.sideToMove();
-            int pieceType = (int)board.at<PieceType>(move.from());
+            int stm = (int)board.colorToMove();
+            int pieceType = (int)board.pieceTypeAt(move.from());
             int squareTo = (int)move.to();
             // reduce moves with good history less and vice versa
             lmr -= round(historyMoves[stm][pieceType][squareTo] / LMR_HISTORY_DIVISOR);
@@ -175,15 +186,20 @@ inline int pvs(int depth, int alpha, int beta, int plyFromRoot, const Move &move
 
 inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp) // skipNmp defaults to false
 {
-    if (plyFromRoot > maxPlyReached) maxPlyReached = plyFromRoot;
-    if (plyFromRoot > 0 && board.isRepetition(1)) return 0;
-    if (checkIsTimeUp()) return 0;
+    if (plyFromRoot > maxPlyReached) 
+        maxPlyReached = plyFromRoot;
+
+    if (plyFromRoot > 0 && board.isRepetition()) 
+        return 0;
+
+    if (checkIsTimeUp()) 
+        return 0;
 
     bool inCheck = board.inCheck();
     if (inCheck) depth++; // Check extension
 
     int originalAlpha = alpha;
-    U64 boardKey = board.zobrist();
+    uint64_t boardKey = board.zobristHash();
 
     // Probe TT
     TTEntry *ttEntry = &(TT[boardKey % NUM_TT_ENTRIES]);
@@ -199,15 +215,12 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
     if (ttEntry->key != boardKey && depth >= IIR_MIN_DEPTH && !inCheck)
         depth--;
 
-    Movelist moves;
-    movegen::legalmoves(moves, board);
-
-    if (moves.empty()) return inCheck ? NEG_INFINITY + plyFromRoot : 0; // checkmate or draw
+    MovesList moves = board.pseudolegalMoves();
 
     if (depth <= 0) return qSearch(alpha, beta, plyFromRoot);
 
     bool pvNode = beta - alpha > 1 || plyFromRoot == 0;
-    int eval = network.Evaluate((int)board.sideToMove());
+    int eval = network.Evaluate((int)board.colorToMove());
 
     if (!pvNode && !inCheck)
     {
@@ -220,29 +233,30 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
         {
             board.makeNullMove();
             int score = -search(depth - NMP_BASE_REDUCTION - depth / NMP_REDUCTION_DIVISOR, -beta, -alpha, plyFromRoot + 1, true);
-            board.unmakeNullMove();
+            board.undoNullMove();
 
             if (score >= MIN_MATE_SCORE) return beta;
             if (score >= beta) return score;
         }
     }
 
-    int scores[218];
+    int scores[255];
     scoreMoves(moves, scores, boardKey, *ttEntry, plyFromRoot);
     int bestScore = NEG_INFINITY;
     Move bestMove;
+    uint8_t legalMovesPlayed = 0;
 
     for (int i = 0; i < moves.size(); i++)
     {
         Move move = incrementalSort(moves, scores, i);
         bool historyMoveOrLosing = scores[i] < KILLER_SCORE;
-        int lmr = lmrTable[depth][i];
+        int lmr = lmrTable[depth][legalMovesPlayed];
 
         // Moves loop pruning
         if (plyFromRoot > 0 && historyMoveOrLosing && bestScore > -MIN_MATE_SCORE)
         {
             // LMP (Late move pruning)
-            if (!inCheck && !pvNode && depth <= LMP_MAX_DEPTH && i >= LMP_MIN_MOVES_BASE + depth * depth * 2)
+            if (!inCheck && !pvNode && depth <= LMP_MAX_DEPTH && legalMovesPlayed >= LMP_MIN_MOVES_BASE + depth * depth * 2)
                 break;
 
             // FP (Futility pruning)
@@ -250,20 +264,25 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
                 break;
 
             // SEE pruning
-            bool isNoisy = board.isCapture(move) || move.typeOf() == move.PROMOTION;
+            bool isNoisy = board.isCapture(move) || move.promotionPieceType() != PieceType::NONE;
             if (depth <= SEE_PRUNING_MAX_DEPTH && !SEE(board, move, depth * (isNoisy ? SEE_PRUNING_NOISY_THRESHOLD : SEE_PRUNING_QUIET_THRESHOLD)))
                 continue;
         }
 
-        // 7th-rank-pawn extension
-        Rank rank = utils::squareRank(move.to());
-        int extension = board.at<PieceType>(move.from()) == PieceType::PAWN && (rank == Rank::RANK_2 || rank == Rank::RANK_7);
+        if (!board.makeMove(move))
+            continue; // illegal move
 
-        board.makeMove(move);
+        legalMovesPlayed++;
         nodes++;
-        int score = i == 0 ? -search(depth - 1 + extension, -beta, -alpha, plyFromRoot + 1) 
-                           : pvs(depth + extension, alpha, beta, plyFromRoot, move, scores[i], lmr, inCheck, pvNode);
-        board.unmakeMove(move);
+
+        // 7th-rank-pawn extension
+        uint8_t rank = squareRank(move.to());
+        int extension = board.pieceTypeAt(move.to()) == PieceType::PAWN && (rank == 2 || rank == 7);
+
+        int score = legalMovesPlayed == 1 ? -search(depth - 1 + extension, -beta, -alpha, plyFromRoot + 1) 
+                                          : pvs(depth + extension, alpha, beta, plyFromRoot, move, scores[i], lmr, inCheck, pvNode);
+
+        board.undoMove();
         if (checkIsTimeUp()) return 0;
 
         if (score <= bestScore) continue;
@@ -280,7 +299,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
 
         // Beta cutoff
 
-        bool isQuietMove = !board.isCapture(move) && move.typeOf() != move.PROMOTION;
+        bool isQuietMove = !board.isCapture(move) && move.promotionPieceType() == PieceType::NONE;
         if (isQuietMove && move != killerMoves[plyFromRoot][0])
         {
             killerMoves[plyFromRoot][1] = killerMoves[plyFromRoot][0];
@@ -289,8 +308,8 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
         if (isQuietMove)
         {
             counterMove = move;
-            int stm = (int)board.sideToMove();
-            int pieceType = (int)board.at<PieceType>(move.from());
+            int stm = (int)board.colorToMove();
+            int pieceType = (int)board.pieceTypeAt(move.from());
             int squareTo = (int)move.to();
             historyMoves[stm][pieceType][squareTo] += depth * depth;
         }
@@ -298,15 +317,25 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
         break; // Beta cutoff
     }
 
+    if (legalMovesPlayed == 0) 
+        return inCheck ? NEG_INFINITY + plyFromRoot : 0; // checkmate/draw
+
     // Save in TT
+
     ttEntry->key = boardKey;
     ttEntry->depth = depth;
-    ttEntry->score = bestScore;
-    if (abs(bestScore) >= MIN_MATE_SCORE) ttEntry->score += bestScore < 0 ? -plyFromRoot : plyFromRoot;
     ttEntry->bestMove = bestMove;
-    if (bestScore <= originalAlpha) ttEntry->type = UPPER_BOUND;
-    else if (bestScore >= beta) ttEntry->type = LOWER_BOUND;
-    else ttEntry->type = EXACT;
+    ttEntry->score = bestScore;
+
+    if (abs(bestScore) >= MIN_MATE_SCORE) 
+        ttEntry->score += bestScore < 0 ? -plyFromRoot : plyFromRoot;
+
+    if (bestScore <= originalAlpha) 
+        ttEntry->type = UPPER_BOUND;
+    else if (bestScore >= beta) 
+        ttEntry->type = LOWER_BOUND;
+    else 
+        ttEntry->type = EXACT;
 
     return bestScore;
 }
@@ -349,6 +378,7 @@ inline Move iterativeDeepening()
     // clear history moves
     memset(&historyMoves[0][0][0], 0, sizeof(historyMoves));
 
+    bestMoveRoot = NULL_MOVE;
     counterMove = NULL_MOVE;
     nodes = 0;
     int iterationDepth = 1, score = 0;
