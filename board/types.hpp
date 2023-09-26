@@ -84,10 +84,5 @@ unordered_map<Piece, char> pieceToChar = {
 };
 
 const int LEFT = 0, UP = 1, RIGHT = 2, DOWN = 3, UP_LEFT = 4, UP_RIGHT = 5, DOWN_RIGHT = 6, DOWN_LEFT = 7;
-const int directionsOffsets[8] = {-1, 8, 1, -8, 7, 9, -7, -9};
-const bool directionWillHitFileA[8] = {true, false, false, false, true, false, false, true},
-           directionWillHitFileH[8] = {false, false, true, false, false, true, true, false},
-           directionWillHitRank0[8] = {false, false, false, true, false, false, true, true},
-           directionWillHitRank7[8] = {false, true, false, false, true, true, false, false};
 
 #endif

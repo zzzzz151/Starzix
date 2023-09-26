@@ -663,27 +663,31 @@ class Board
         }
     }
 
+    // in types.hpp: const int LEFT = 0, UP = 1, RIGHT = 2, DOWN = 3, UP_LEFT = 4, UP_RIGHT = 5, DOWN_RIGHT = 6, DOWN_LEFT = 7;
+    constexpr static int DIRECTIONS[8][2] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}, {1, -1}, {1, 1}, {-1, 1}, {-1, -1}};
+    const static int RANK = 0, FILE = 1;
+
     inline void slidingPiecePseudolegalMoves(Square square, PieceType pieceType, MovesList &moves, bool capturesOnly = false)
     {
-        uint8_t rank = squareRank(square);
+        int rank = squareRank(square);
         char file = squareFile(square);
         int startIndex = (pieceType == PieceType::BISHOP ? 4 : 0);
         int endIndex = (pieceType == PieceType::ROOK ? 3 : 7);
-        int currentSquaresFromSource = 1;
 
         for (int dir = startIndex; dir <= endIndex ; dir++)
         {
-            if (isForbiddenDirection(dir, square, rank, file)) continue;
+            int targetRank = rank + DIRECTIONS[dir][RANK];
+            char targetFile = file + DIRECTIONS[dir][FILE];
 
-            while (true) // go in this direction
+            while (targetRank >= 0 && targetRank <= 7 && targetFile >= 'a' && targetFile <= 'h')
             {
-                int targetSquare = square + currentSquaresFromSource * directionsOffsets[dir];
-                Piece pieceHere = pieces[targetSquare];
+                int targetSquare = targetRank * 8 + (targetFile - 97); // 'a' = 97, 'h' = 104
 
+                Piece pieceHere = pieces[targetSquare];
                 if (pieceHere == Piece::NONE)
                 { 
-                    if (!capturesOnly) moves.add(Move(square, targetSquare, Move::NORMAL_FLAG));
-                    currentSquaresFromSource++;
+                    if (!capturesOnly) 
+                        moves.add(Move(square, targetSquare, Move::NORMAL_FLAG));
                 }
                 else
                 {
@@ -693,19 +697,9 @@ class Board
                     break;
                 }
 
-                char targetSquareFile = squareFile(targetSquare);
-                uint8_t targetSquareRank = squareRank(targetSquare);
-                if (directionWillHitFileH[dir] && targetSquareFile == 'h')
-                    break;
-                if (directionWillHitFileA[dir] && targetSquareFile == 'a')
-                    break;
-                if (directionWillHitRank7[dir] && targetSquareRank == 7)
-                    break;
-                if (directionWillHitRank0[dir] && targetSquareRank == 0)
-                    break;
+                targetRank += DIRECTIONS[dir][RANK];
+                targetFile +=  DIRECTIONS[dir][FILE];
             }
-
-            currentSquaresFromSource = 1;
         }
     }
 
@@ -721,22 +715,19 @@ class Board
 
         // DEBUG cout << "passed en passant" << endl;
 
-        uint8_t rank = squareRank(square);
+        int rank = squareRank(square);
         char file = squareFile(square);
-        int currentSquaresFromSource = 1;
-        bool emptySquare = pieces[square] == Piece::NONE;
-
 
         for (int dir = 0; dir < 8; dir++)
         {
-            if (isForbiddenDirection(dir, square, rank, file)) continue;
+            int targetRank = rank + DIRECTIONS[dir][RANK];
+            char targetFile = file + DIRECTIONS[dir][FILE];
 
-            while (true)  //go in this direction
+            while (targetRank >= 0 && targetRank <= 7 && targetFile >= 'a' && targetFile <= 'h')
             {
-                int targetSquare = square + currentSquaresFromSource * directionsOffsets[dir];
-                if (pieces[targetSquare] == Piece::NONE)
-                    currentSquaresFromSource++;
-                else if (pieceColor(pieces[targetSquare]) == colorAttacking)
+                int targetSquare = targetRank * 8 + (targetFile - 97); // 'a' = 97, 'h' = 104
+
+                if (pieceColor(pieces[targetSquare]) == colorAttacking)
                 {
                     bool isDiagonalDirection = dir > 3;
                     PieceType pieceTypeHere = pieceToPieceType(pieces[targetSquare]);
@@ -751,19 +742,10 @@ class Board
                 else // friendly piece here
                     break;
 
-                char targetSquareFile = squareFile(targetSquare);
-                uint8_t targetSquareRank = squareRank(targetSquare);
-                if (directionWillHitFileH[dir] && targetSquareFile == 'h')
-                    break;
-                if (directionWillHitFileA[dir] && targetSquareFile == 'a')
-                    break;
-                if (directionWillHitRank7[dir] && targetSquareRank == 7)
-                    break;
-                if (directionWillHitRank0[dir] && targetSquareRank == 0)
-                    break;
+                targetRank += DIRECTIONS[dir][RANK];
+                targetFile +=  DIRECTIONS[dir][FILE];
             }
 
-            currentSquaresFromSource = 1;
         }
 
         // DEBUG cout << "not attacked by sliders" << endl;
