@@ -333,7 +333,7 @@ class Board
         bool capture = isCapture(move);
         pushState(move, pieces[to]);
         Color colorPlaying = color;
-        Color nextColor = colorPlaying == WHITE ? BLACK : WHITE;
+        Color nextColor = enemyColor();
 
         Piece piece = pieces[from];
         removePiece(from);

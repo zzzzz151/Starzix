@@ -13,7 +13,7 @@ const string POSITION4 = "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 
 const string POSITION4_MIRRORED = "r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1 ";
 const string POSITION5 = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8  ";
 
-template <typename T> void test(string testName, T got, T expected)
+template <typename T> inline void test(string testName, T got, T expected)
 {
     if (expected != got)
     {
@@ -29,18 +29,19 @@ template <typename T> void test(string testName, T got, T expected)
     if (expected != got) cout << "Expected: " << expected << endl << "Got: " << got << endl;
 }
 
-inline uint64_t perft(Board &board, int depth, bool capturesOnly = false)
+inline uint64_t perft(Board &board, int depth)
 {
     if (depth == 0) return 1;
 
-    MovesList moves = board.pseudolegalMoves(capturesOnly);        
+    MovesList moves = board.pseudolegalMoves();  
+
     uint64_t nodes = 0;
 
     for (int i = 0; i < moves.size(); i++) 
     {
         if (!board.makeMove(moves[i]))
             continue;
-        nodes += perft(board, depth - 1, capturesOnly);
+        nodes += perft(board, depth - 1);
         board.undoMove();
     }
 
@@ -67,10 +68,10 @@ inline void perftDivide(Board board, int depth)
     cout << "Total: " << totalNodes << endl;
 }
 
-inline void perftBench(Board &board, int depth, bool capturesOnly = false)
+inline void perftBench(Board &board, int depth)
 {
     chrono::steady_clock::time_point start =  chrono::steady_clock::now();
-    uint64_t nodes = perft(board, depth, capturesOnly);
+    uint64_t nodes = perft(board, depth);
     int millisecondsElapsed = (chrono::steady_clock::now() - start) / chrono::milliseconds(1);
     uint64_t nps = nodes / (millisecondsElapsed > 0 ? millisecondsElapsed : 1) * 1000;
     cout << "perft depth " << depth << " time " << millisecondsElapsed << " nodes " << nodes << " nps " << nps << " fen " << board.fen() << endl;
@@ -109,25 +110,23 @@ inline uint64_t perftCaptures(Board &board, int depth)
 }
 
 int main()
-{    
-    Board test = Board("8/8/8/4R2p/4k3/8/7K/B7 b - - 0 143");
-    cout << test.makeMove("e4d3") << endl;
-
+{   
     Board board = Board(START_FEN);
     Board board2 = Board("1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 w Qk f6 0 15");
     Board board3 = Board("1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 b Qk f6 0");
-
+    
     test("fen1", board.fen(), START_FEN);
+    
     test("fen2",  board2.fen(), (string)"1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 w Qk f6 0 15");
     test("fen3", board3.fen(), (string)"1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 b Qk f6 0 1");
-
+    
     bitset<64> got(board.occupancy());  
     bitset<64> expected(0xffff00000000ffffULL);  
     test("board.occupancy()", got, expected);
 
     test("pieceBitboard(KING) == 2", popcount(board.pieceBitboard(PieceType::KING)), 2);
     test("pieceBitboard(KING, WHITE) == 1", popcount(board.pieceBitboard(PieceType::KING, WHITE)), 1);
-
+    
     test("squareFile()", squareFile(33), 'b');
     test("squareFile()", squareFile(15), 'h');
 
@@ -139,7 +138,7 @@ int main()
     test("strToSquare()", strToSquare("b7"), (Square)49);
 
     test("sizeof(Move)", sizeof(Move), 2ULL); // 2 bytes
-
+    
     Move move = Move(49, 55, Move::NORMAL_FLAG);
     test("normal move.from", (int)(move.from()), 49);
     test("normal move.to", (int)move.to(), 55);
@@ -249,12 +248,12 @@ int main()
     test("perft(4) captures, pos2 kiwipete", perftCaptures(boardPos2, 4), 757163ULL);
     test("perft(5) captures, pos2 kiwipete", perftCaptures(boardPos2, 5), 35043416ULL);
 
+    cout << "Passed: " << passed << endl;
+    cout << "Failed: " << failed << endl;
+
     perftBench(board, 6);
     perftBench(boardPos2, 5);
-
-    cout << "Passed: " << passed << endl;
-    cout << "Failed: " << failed;
-
+    
     return 0;
 }
 

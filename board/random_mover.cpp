@@ -85,13 +85,17 @@ int main()
 
             Move move;
             for (int idx : indexes)
+            {
+                cerr << "Testing " << moves[idx].toUci() << ", ";
                 if (board.makeMove(moves[idx]))
                 {
+                    cerr << endl << moves[idx].toUci() << " is legal" << endl;
                     // this move is legal
                     move = moves[idx];
                     board.undoMove();
                     break;
                 }
+            }
             cerr << "besmov " << move.toUci() << endl;
             cout << "bestmove " << move.toUci() + "\n";
 
