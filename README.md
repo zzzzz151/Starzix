@@ -1,7 +1,5 @@
 # z5 - UCI C++ chess engine
 
-Currently ~3070 elo (tested against [amoeba](https://github.com/abulmo/amoeba) 3.4).
-
 # How to build
 
 ```g++ -O3 -std=c++17 src/main.cpp -o z5.exe```
@@ -48,8 +46,6 @@ Time management
 
 [Chess Programming Wiki](https://www.chessprogramming.org/)
 
-[Cutechess for testing](https://github.com/cutechess/cutechess)
+[Cutechess](https://github.com/cutechess/cutechess) for engine testing
 
-[Disservin's move gen (chess-library)](https://github.com/Disservin/chess-library)
-
-[MantaRay for C++ neural network inference](https://github.com/TheBlackPlague/MantaRay)
+[MantaRay](https://github.com/TheBlackPlague/MantaRay) for C++ neural network inference
