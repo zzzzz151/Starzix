@@ -565,7 +565,7 @@ class Board
         // diagonal left
         if (file != 'a')
         {
-            if (enPassantTargetSquare == SQUARE_DIAGONAL_LEFT)
+            if (enPassantTargetSquare != 0 && enPassantTargetSquare == SQUARE_DIAGONAL_LEFT)
                 moves.add(Move(square, SQUARE_DIAGONAL_LEFT, Move::EN_PASSANT_FLAG));
             else if (squareIsBackRank(SQUARE_DIAGONAL_LEFT) && pieceColor(pieces[SQUARE_DIAGONAL_LEFT]) == enemy)
                 addPromotions(square, SQUARE_DIAGONAL_LEFT, moves);
@@ -576,7 +576,7 @@ class Board
         // diagonal right
         if (file != 'h')
         {
-            if (enPassantTargetSquare == SQUARE_DIAGONAL_RIGHT)
+            if (enPassantTargetSquare != 0 && enPassantTargetSquare == SQUARE_DIAGONAL_RIGHT)
                 moves.add(Move(square, SQUARE_DIAGONAL_RIGHT, Move::EN_PASSANT_FLAG));
             else if (squareIsBackRank(SQUARE_DIAGONAL_RIGHT) && pieceColor(pieces[SQUARE_DIAGONAL_RIGHT]) == enemy)
                 addPromotions(square, SQUARE_DIAGONAL_RIGHT, moves);
@@ -681,7 +681,7 @@ class Board
 
             while (targetRank >= 0 && targetRank <= 7 && targetFile >= 'a' && targetFile <= 'h')
             {
-                int targetSquare = targetRank * 8 + (targetFile - 97); // 'a' = 97, 'h' = 104
+                int targetSquare = targetRank * 8 + targetFile - 'a';
 
                 Piece pieceHere = pieces[targetSquare];
                 if (pieceHere == Piece::NONE)
@@ -707,16 +707,18 @@ class Board
     {
          //idea: put a super piece in this square and see if its attacks intersect with an enemy piece
 
-        // DEBUG cout << "isSquareAttacked() called on square " << (int)square << ", colorAttacking " << (int)colorAttacking << endl;
+        // DEBUG printBoard();
+        // DEBUG cout << "isSquareAttacked() called on square " << squareToStr[square] << ", colorAttacking " << (int)colorAttacking << endl;
 
         // En passant
-        if (colorAttacking == color && enPassantTargetSquare == square)
+        if (colorAttacking == color && enPassantTargetSquare != 0 && enPassantTargetSquare == square)
             return true;
 
         // DEBUG cout << "passed en passant" << endl;
 
         int rank = squareRank(square);
         char file = squareFile(square);
+        Color colorDefending = oppColor(colorAttacking);
 
         for (int dir = 0; dir < 8; dir++)
         {
@@ -725,7 +727,7 @@ class Board
 
             while (targetRank >= 0 && targetRank <= 7 && targetFile >= 'a' && targetFile <= 'h')
             {
-                int targetSquare = targetRank * 8 + (targetFile - 97); // 'a' = 97, 'h' = 104
+                int targetSquare = targetRank * 8 + targetFile - 'a';
 
                 if (pieceColor(pieces[targetSquare]) == colorAttacking)
                 {
@@ -739,7 +741,7 @@ class Board
 
                     break;
                 }
-                else // friendly piece here
+                else if (pieceColor(pieces[targetSquare]) == colorDefending) // friendly piece here
                     break;
 
                 targetRank += DIRECTIONS[dir][RANK];
@@ -748,30 +750,33 @@ class Board
 
         }
 
-        // DEBUG cout << "not attacked by sliders" << endl;
-
-        uint64_t usBb = colorBitboard(colorAttacking);
-        Color enemy = oppColor(colorAttacking);
+        // DEBUGcout << "not attacked by sliders" << endl;
 
         uint64_t thisKnightMoves = knightMoves[square];
         if ((thisKnightMoves & piecesBitboards[(int)PieceType::KNIGHT][colorAttacking]) > 0) return true;
 
         // DEBUG cout << "not attacked by knights" << endl;
 
-        uint64_t thisKingMoves = kingMoves[square] & ~usBb;
-        Square enemyKingSquare = lsb(piecesBitboards[(int)PieceType::KING][colorAttacking]);
-        uint64_t enemyKingMoves = kingMoves[enemyKingSquare] & ~colorBitboard(colorAttacking); 
-        if ((thisKingMoves & enemyKingMoves) > 0) return true;
+        uint64_t thisKingMoves = kingMoves[square];
+        uint64_t attackingKingBb = piecesBitboards[(int)PieceType::KING][colorAttacking];
+        if ((thisKingMoves & attackingKingBb) > 0) 
+            return true;
 
-        // DEBUG cout << "not attacked by kings" << endl;
+        // DEBUG  cout << "not attacked by kings" << endl;
  
         const uint8_t SQUARE_DIAGONAL_LEFT = square + (colorAttacking == WHITE ? -9 : 7),
                       SQUARE_DIAGONAL_RIGHT = square + (colorAttacking == WHITE ? -7 : 9);
         Piece pawnAttacking = colorAttacking == WHITE ? Piece::WHITE_PAWN : Piece::BLACK_PAWN;
 
+        if ((colorDefending == WHITE && rank == 7) || (colorDefending == BLACK && rank == 0))
+            // in this case, colorDefending cant be attacked by an attacking pawn
+            goto afterPawns;
+
         if ((file != 'a' && pieces[SQUARE_DIAGONAL_LEFT] == pawnAttacking)
         || (file != 'h' && pieces[SQUARE_DIAGONAL_RIGHT] == pawnAttacking))
             return true;
+
+        afterPawns:
 
         // DEBUG cout << "not attacked by pawns" << endl;
         // DEBUG cout << "square not attacked" << endl;

@@ -74,11 +74,11 @@ int main()
             vector<int> indexes;
 
             // Fill vector with indexes from 0 to maxIndex
-            for (int i = 1; i <= maxIndex; ++i) 
+            for (int i = 0; i <= maxIndex; i++) 
                 indexes.push_back(i); 
 
             // Shuffle the vector
-            for (int i = 0; i < maxIndex; ++i) {
+            for (int i = 0; i <= maxIndex; i++) {
                 int randomIndex = rand() % maxIndex;
                 swap(indexes[i], indexes[randomIndex]);
             }
