@@ -46,6 +46,6 @@ Time management
 
 [Chess Programming Wiki](https://www.chessprogramming.org/)
 
-[Cutechess for testing](https://github.com/cutechess/cutechess)
+[Cutechess](https://github.com/cutechess/cutechess) for engine testing
 
-[MantaRay for C++ neural network inference](https://github.com/TheBlackPlague/MantaRay)
+[MantaRay](https://github.com/TheBlackPlague/MantaRay) for C++ neural network inference
