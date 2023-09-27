@@ -37,6 +37,9 @@ inline void position(vector<string> &words)
 
 int main()
 {
+    Board::initZobrist();
+    attacks::initAttacks();
+
     string received;
     getline(cin, received);
     cout << "id name random_mover\n";

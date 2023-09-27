@@ -4,12 +4,16 @@
 #include <sstream>
 #include <vector>
 #include "../src-test/board/board.hpp"
+#include "../src-test/board/attacks.hpp"
 #include "../src-test/see.hpp"
 using namespace std;
 
 int failed = 0, passed = 0;
 
 int main() {
+    Board::initZobrist();
+    attacks::initAttacks();
+
     // Open the file for reading
     std::ifstream inputFile("SEE.epd");
 
@@ -21,7 +25,7 @@ int main() {
 
     std::string line;
     while (std::getline(inputFile, line))
- {
+    {
         std::istringstream iss(line);
         std::vector<std::string> tokens;
 

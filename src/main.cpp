@@ -26,6 +26,8 @@ inline void initLmrTable()
 
 int main()
 {
+    Board::initZobrist();
+    attacks::initAttacks();
     initTT();
     initLmrTable();
     uciLoop();

@@ -9,54 +9,6 @@
 #include "types.hpp"
 using namespace std;
 
-uint64_t knightMoves[64], kingMoves[64];
-
-inline void initKnightMoves(Square square)
-{
-    uint64_t n = 1ULL << square;
-    uint64_t h1 = ((n >> 1ULL) & 0x7f7f7f7f7f7f7f7fULL) | ((n << 1ULL) & 0xfefefefefefefefeULL);
-    uint64_t h2 = ((n >> 2ULL) & 0x3f3f3f3f3f3f3f3fULL) | ((n << 2ULL) & 0xfcfcfcfcfcfcfcfcULL);
-    knightMoves[square] = (h1 << 16ULL) | (h1 >> 16ULL) | (h2 << 8ULL) | (h2 >> 8ULL);
-}
-
-inline void initKingMoves(Square square)
-{
-    uint64_t fileA = 0x8080808080808080;
-    uint64_t fileH = 0x0101010101010101;
-
-    uint64_t k = 1ULL << square;
-    k |= (k << 8ULL) | (k >> 8ULL);
-    k |= ((k & fileA) >> 1ULL) | ((k & fileH) << 1ULL);
-    kingMoves[square] = k ^ (1ULL << square);
-}
-
-inline uint64_t shiftRight(uint64_t bb) {
-	return (bb << 1ULL) & 0xfefefefefefefefeULL;
-}
-
-inline uint64_t shiftLeft(uint64_t bb) {
-	return (bb >> 1ULL) & 0x7f7f7f7f7f7f7f7fULL;
-}
-
-inline uint64_t shiftUp(uint64_t bb) { return bb << 8ULL; }
-
-inline uint64_t shiftDown(uint64_t bb) { return bb >> 8ULL; }
-
-inline void initMoves()
-{
-    uint64_t king = 1;
-
-    for (int square = 0; square < 64; square++)
-    {
-        initKnightMoves(square);
-        
-        uint64_t attacks = shiftLeft(king) | shiftRight(king) | king;
-        attacks = (attacks | shiftUp(attacks) | shiftDown(attacks)) ^ king;
-        kingMoves[square] = attacks;
-        king <<= 1ULL;
-    }
-}
-
 inline char squareFile(Square square)
 {
     int file = square & 7;
@@ -106,7 +58,9 @@ inline void printBitboard(uint64_t bb)
     {
         string x = str_bitset.substr(i, 8);
         reverse(x.begin(), x.end());
-        cout << x << endl;
+        for (int j = 0; j < x.length(); j++)
+            cout << string(1, x[j]) << " ";
+        cout << endl;
     }
 }
 
@@ -167,5 +121,17 @@ inline Color oppColor(Color color)
         return NULL_COLOR;
     return color == WHITE ? BLACK : WHITE;
 }
+
+inline uint64_t shiftRight(uint64_t bb) {
+	return (bb << 1ULL) & 0xfefefefefefefefeULL;
+}
+
+inline uint64_t shiftLeft(uint64_t bb) {
+	return (bb >> 1ULL) & 0x7f7f7f7f7f7f7f7fULL;
+}
+
+inline uint64_t shiftUp(uint64_t bb) { return bb << 8ULL; }
+
+inline uint64_t shiftDown(uint64_t bb) { return bb >> 8ULL; }
 
 #endif

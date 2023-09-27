@@ -83,8 +83,4 @@ unordered_map<Piece, char> pieceToChar = {
     {Piece::BLACK_KING, 'k'}
 };
 
-const int LEFT = 0, UP = 1, RIGHT = 2, DOWN = 3, UP_LEFT = 4, UP_RIGHT = 5, DOWN_RIGHT = 6, DOWN_LEFT = 7;
-constexpr static int DIRECTIONS[8][2] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}, {1, -1}, {1, 1}, {-1, 1}, {-1, -1}};
-const static int RANK_INDEX = 0, FILE_INDEX = 1;
-
 #endif

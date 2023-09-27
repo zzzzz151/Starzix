@@ -5,8 +5,8 @@
 
 **/*.exe
 
-src-test/
 src-test
+src-test/
 
 games.txt
 games.pgn

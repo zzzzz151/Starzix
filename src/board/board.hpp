@@ -10,6 +10,7 @@
 #include "builtin.hpp"
 #include "utils.hpp"
 #include "move.hpp"
+#include "attacks.hpp"
 #include "../nnue.hpp"
 using namespace std;
 
@@ -45,8 +46,6 @@ class Board
 {
     private:
 
-    inline static bool initialized = false;
-
     Piece pieces[64];
     uint64_t occupied, piecesBitboards[6][2];
 
@@ -65,20 +64,10 @@ class Board
     
     public:
 
-    inline static void init()
-    {
-        initZobrist();
-        initMoves();
-        initialized = true;
-    }
-
     Board() = default;
 
     inline Board(string fen)
     {
-        if (!initialized)
-            init();
-
         network.ResetAccumulator();
         network.RefreshAccumulator();
 
@@ -209,7 +198,7 @@ class Board
             str += "\n";
         }
 
-        cout << str;
+        // DEBUG cout << str;
     }
 
     inline Piece* piecesBySquare() { return pieces; }
@@ -280,6 +269,8 @@ class Board
         network.EfficientlyUpdateAccumulator<MantaRay::AccumulatorOperation::Deactivate>((int)pieceType, (int)color, square);
     }
 
+    public:
+
     inline static void initZobrist()
     {
         random_device rd;  // Create a random device to seed the random number generator
@@ -300,8 +291,6 @@ class Board
             zobristTable2[i] = randomNum;
         }
     }
-
-    public:
 
     inline uint64_t zobristHash()
     {
@@ -542,33 +531,107 @@ class Board
 
     inline MovesList pseudolegalMoves(bool capturesOnly = false)
     {
+        Color enemy = enemyColor();
         uint64_t usBb = us();
-        uint64_t usBb2 = usBb;
+        uint64_t themBb = capturesOnly ? them() : 0;
         MovesList moves;
 
-        while (usBb > 0)
-        {
-            Square square = poplsb(usBb);
-            uint64_t squareBit = (1ULL << square);
-            Piece piece = pieces[square];
-            PieceType pieceType = pieceToPieceType(piece);
+        uint64_t ourPawns = piecesBitboards[0][color],
+                 ourKnights = piecesBitboards[1][color],
+                 ourBishops = piecesBitboards[2][color],
+                 ourRooks = piecesBitboards[3][color],
+                 ourQueens = piecesBitboards[4][color],
+                 ourKing = piecesBitboards[5][color];
 
-            if (pieceType == PieceType::PAWN)
-                pawnPseudolegalMoves(square, moves, capturesOnly);
-            else if (pieceType == PieceType::KNIGHT)
-                knightPseudolegalMoves(square, usBb2, moves, capturesOnly);
-            else if (pieceType == PieceType::KING)
-                kingPseudolegalMoves(square, usBb2, moves, capturesOnly);
-            else
-                slidingPiecePseudolegalMoves(square, pieceType, moves, capturesOnly);
+        while (ourPawns > 0)
+        {
+            Square sq = poplsb(ourPawns);
+            pawnPseudolegalMoves(sq, enemy, moves, capturesOnly);
+        }
+
+        while (ourKnights > 0)
+        {
+            Square sq = poplsb(ourKnights);
+            uint64_t knightMoves = capturesOnly ? attacks::knightAttacks(sq) & themBb : attacks::knightAttacks(sq) & ~usBb;
+            while (knightMoves > 0)
+            {
+                Square targetSquare = poplsb(knightMoves);
+                moves.add(Move(sq, targetSquare, Move::NORMAL_FLAG));
+            }
+        }
+
+        Square kingSquare = poplsb(ourKing);
+        uint64_t kingMoves = capturesOnly ? attacks::kingAttacks(kingSquare) & themBb : attacks::kingAttacks(kingSquare) & ~usBb;
+        while (kingMoves > 0)
+        {
+            Square targetSquare = poplsb(kingMoves);
+            moves.add(Move(kingSquare, targetSquare, Move::NORMAL_FLAG));
+        }
+
+        // Castling
+        if (!capturesOnly && kingSquare == (color == WHITE ? 4 : 60) && !inCheck())
+        {
+            if (castlingRights[color][CASTLE_SHORT]
+            && pieces[kingSquare+1] == Piece::NONE
+            && pieces[kingSquare+2] == Piece::NONE
+            && pieces[kingSquare+3] == (color == WHITE ? Piece::WHITE_ROOK : Piece::BLACK_ROOK)
+            && !isSquareAttacked(kingSquare+1, enemy) 
+            && !isSquareAttacked(kingSquare+2, enemy))
+                moves.add(Move(kingSquare, kingSquare+2, Move::CASTLING_FLAG));
+
+            if (castlingRights[color][CASTLE_LONG]
+            && pieces[kingSquare-1] == Piece::NONE
+            && pieces[kingSquare-2] == Piece::NONE
+            && pieces[kingSquare-3] == Piece::NONE
+            && pieces[kingSquare-4] == (color == WHITE ? Piece::WHITE_ROOK : Piece::BLACK_ROOK)
+            && !isSquareAttacked(kingSquare-1, enemy) 
+            && !isSquareAttacked(kingSquare-2, enemy))
+                moves.add(Move(kingSquare, kingSquare-2, Move::CASTLING_FLAG));
+        }
+        
+        while (ourBishops > 0)
+        {
+            Square sq = poplsb(ourBishops);
+            uint64_t bishopAttacks = attacks::bishopAttacks(sq, occupied);
+            uint64_t bishopMoves = capturesOnly ? bishopAttacks & them()  : bishopAttacks & ~usBb;
+            while (bishopMoves > 0)
+            {
+                Square targetSquare = poplsb(bishopMoves);
+                moves.add(Move(sq, targetSquare, Move::NORMAL_FLAG));
+            }
+        }
+
+        while (ourRooks > 0)
+        {
+            Square sq = poplsb(ourRooks);
+            uint64_t rookAttacks = attacks::rookAttacks(sq, occupied);
+            uint64_t rookMoves = capturesOnly ? rookAttacks & them()  : rookAttacks & ~usBb;
+            while (rookMoves > 0)
+            {
+                Square targetSquare = poplsb(rookMoves);
+                moves.add(Move(sq, targetSquare, Move::NORMAL_FLAG));
+            }
+        }
+
+        while (ourQueens > 0)
+        {
+            Square sq = poplsb(ourQueens);
+            uint64_t queenAttacks = attacks::bishopAttacks(sq, occupied) | attacks::rookAttacks(sq, occupied);
+            uint64_t queenMoves = capturesOnly ? queenAttacks & them()  : queenAttacks & ~usBb;
+            while (queenMoves > 0)
+            {
+                Square targetSquare = poplsb(queenMoves);
+                moves.add(Move(sq, targetSquare, Move::NORMAL_FLAG));
+            }
         }
 
         return moves;
     }
 
-    inline void pawnPseudolegalMoves(Square square, MovesList &moves, bool capturesOnly = false)
+    private:
+
+    inline void pawnPseudolegalMoves(Square square, Color enemy, MovesList &moves, bool capturesOnly = false)
     {
-        Color enemy = enemyColor();
         Piece piece = pieces[square];
         uint8_t rank = squareRank(square);
         char file = squareFile(square);
@@ -620,8 +683,6 @@ class Board
 
     }
 
-    private:
-
     inline void addPromotions(Square square, Square targetSquare, MovesList &moves)
     {
         for (uint16_t promotionFlag : Move::PROMOTION_FLAGS)
@@ -630,164 +691,49 @@ class Board
 
     public:
 
-    inline void knightPseudolegalMoves(Square square, uint64_t usBb, MovesList &moves, bool capturesOnly = false)
-    {
-        uint64_t thisKnightMoves = knightMoves[square] & ~usBb;
-        Color enemy = enemyColor();
-
-        while (thisKnightMoves > 0)
-        {
-            Square targetSquare = poplsb(thisKnightMoves);
-            if (capturesOnly && pieceColor(pieces[targetSquare]) != enemy)
-                continue;
-            moves.add(Move(square, targetSquare, Move::NORMAL_FLAG));
-        }
-    }
-
-    inline void kingPseudolegalMoves(Square square, uint64_t usBb, MovesList &moves, bool capturesOnly = false)
-    {
-        uint64_t thisKingMoves = kingMoves[square] & ~usBb;
-        Color enemy = enemyColor();
-
-        while (thisKingMoves > 0)
-        {
-            Square targetSquare = poplsb(thisKingMoves);
-            if (capturesOnly && pieceColor(pieces[targetSquare]) != enemy)
-                continue;
-            moves.add(Move(square, targetSquare, Move::NORMAL_FLAG));
-        }
-
-        if (!capturesOnly && square == (color == WHITE ? 4 : 60) && !inCheck())
-        {
-            if (castlingRights[color][CASTLE_SHORT]
-            && pieces[square+1] == Piece::NONE
-            && pieces[square+2] == Piece::NONE
-            && pieces[square+3] == (color == WHITE ? Piece::WHITE_ROOK : Piece::BLACK_ROOK)
-            && !isSquareAttacked(square+1, enemy) 
-            && !isSquareAttacked(square+2, enemy))
-                moves.add(Move(square, square+2, Move::CASTLING_FLAG));
-
-            if (castlingRights[color][CASTLE_LONG]
-            && pieces[square-1] == Piece::NONE
-            && pieces[square-2] == Piece::NONE
-            && pieces[square-3] == Piece::NONE
-            && pieces[square-4] == (color == WHITE ? Piece::WHITE_ROOK : Piece::BLACK_ROOK)
-            && !isSquareAttacked(square-1, enemy) 
-            && !isSquareAttacked(square-2, enemy))
-                moves.add(Move(square, square-2, Move::CASTLING_FLAG));
-        }
-    }
-
-    inline void slidingPiecePseudolegalMoves(Square square, PieceType pieceType, MovesList &moves, bool capturesOnly = false)
-    {
-        int rank = squareRank(square);
-        char file = squareFile(square);
-        int startIndex = (pieceType == PieceType::BISHOP ? 4 : 0);
-        int endIndex = (pieceType == PieceType::ROOK ? 3 : 7);
-
-        for (int dir = startIndex; dir <= endIndex ; dir++)
-        {
-            int targetRank = rank + DIRECTIONS[dir][RANK_INDEX];
-            char targetFile = file + DIRECTIONS[dir][FILE_INDEX];
-
-            while (targetRank >= 0 && targetRank <= 7 && targetFile >= 'a' && targetFile <= 'h')
-            {
-                int targetSquare = targetRank * 8 + targetFile - 'a';
-
-                Piece pieceHere = pieces[targetSquare];
-                if (pieceHere == Piece::NONE)
-                { 
-                    if (!capturesOnly) 
-                        moves.add(Move(square, targetSquare, Move::NORMAL_FLAG));
-                }
-                else
-                {
-                    if (pieceColor(pieceHere) != color)
-                        // this is a capture
-                        moves.add(Move(square, targetSquare, Move::NORMAL_FLAG));
-                    break;
-                }
-
-                targetRank += DIRECTIONS[dir][RANK_INDEX];
-                targetFile +=  DIRECTIONS[dir][FILE_INDEX];
-            }
-        }
-    }
-
     inline bool isSquareAttacked(Square square, Color colorAttacking)
     {
          //idea: put a super piece in this square and see if its attacks intersect with an enemy piece
 
-        // DEBUG printBoard();
+        // printBoard();
         // DEBUG cout << "isSquareAttacked() called on square " << squareToStr[square] << ", colorAttacking " << (int)colorAttacking << endl;
 
-        // En passant
-        if (colorAttacking == color && enPassantTargetSquare != 0 && enPassantTargetSquare == square)
+        // Get the slider pieces of the attacker
+        uint64_t attackerBishops = piecesBitboards[(int)PieceType::BISHOP][colorAttacking],
+                 attackerRooks = piecesBitboards[(int)PieceType::ROOK][colorAttacking],
+                 attackerQueens =  piecesBitboards[(int)PieceType::QUEEN][colorAttacking];
+
+        uint64_t bishopAttacks = attacks::bishopAttacks(square, occupied);
+        if ((bishopAttacks & (attackerBishops | attackerQueens)) > 0)
             return true;
-
-        // DEBUG cout << "passed en passant" << endl;
-
-        int rank = squareRank(square);
-        char file = squareFile(square);
-        Color colorDefending = oppColor(colorAttacking);
-
-        for (int dir = 0; dir < 8; dir++)
-        {
-            int targetRank = rank + DIRECTIONS[dir][RANK_INDEX];
-            char targetFile = file + DIRECTIONS[dir][FILE_INDEX];
-
-            while (targetRank >= 0 && targetRank <= 7 && targetFile >= 'a' && targetFile <= 'h')
-            {
-                int targetSquare = targetRank * 8 + targetFile - 'a';
-
-                if (pieceColor(pieces[targetSquare]) == colorAttacking)
-                {
-                    bool isDiagonalDirection = dir > 3;
-                    PieceType pieceTypeHere = pieceToPieceType(pieces[targetSquare]);
-
-                    if (pieceTypeHere == PieceType::QUEEN 
-                    || (isDiagonalDirection && pieceTypeHere == PieceType::BISHOP)
-                    || (!isDiagonalDirection && pieceTypeHere == PieceType::ROOK)) 
-                        return true;
-
-                    break;
-                }
-                else if (pieceColor(pieces[targetSquare]) == colorDefending) // friendly piece here
-                    break;
-
-                targetRank += DIRECTIONS[dir][RANK_INDEX];
-                targetFile +=  DIRECTIONS[dir][FILE_INDEX];
-            }
-
-        }
-
-        // DEBUGcout << "not attacked by sliders" << endl;
-
-        uint64_t thisKnightMoves = knightMoves[square];
-        if ((thisKnightMoves & piecesBitboards[(int)PieceType::KNIGHT][colorAttacking]) > 0) return true;
-
-        // DEBUG cout << "not attacked by knights" << endl;
-
-        uint64_t thisKingMoves = kingMoves[square];
-        uint64_t attackingKingBb = piecesBitboards[(int)PieceType::KING][colorAttacking];
-        if ((thisKingMoves & attackingKingBb) > 0) 
-            return true;
-
-        // DEBUG  cout << "not attacked by kings" << endl;
  
-        const int SQUARE_DIAGONAL_LEFT = square + (colorAttacking == WHITE ? -9 : 7),
-                  SQUARE_DIAGONAL_RIGHT = square + (colorAttacking == WHITE ? -7 : 9);
-        Piece pawnAttacking = colorAttacking == WHITE ? Piece::WHITE_PAWN : Piece::BLACK_PAWN;
+        // DEBUG cout << "not attacked by bishops" << endl;
 
-        if ((colorDefending == WHITE && rank == 7) || (colorDefending == BLACK && rank == 0))
-            // in this case, colorDefending cant be attacked by an attacking pawn
-            goto afterPawns;
-
-        if ((file != 'a' && pieces[SQUARE_DIAGONAL_LEFT] == pawnAttacking)
-        || (file != 'h' && pieces[SQUARE_DIAGONAL_RIGHT] == pawnAttacking))
+        uint64_t rookAttacks = attacks::rookAttacks(square, occupied);
+        if ((rookAttacks & (attackerRooks | attackerQueens)) > 0)
             return true;
 
-        afterPawns:
+        // DEBUG cout << "not attacked by rooks" << endl;
+
+        uint64_t knightAttacks = attacks::knightAttacks(square);
+        if ((knightAttacks & (piecesBitboards[(int)PieceType::KNIGHT][colorAttacking])) > 0) 
+            return true;
+
+         // DEBUG cout << "not attacked by knights" << endl;
+
+        uint64_t kingAttacks = attacks::kingAttacks(square);
+        if ((kingAttacks & piecesBitboards[(int)PieceType::KING][colorAttacking]) > 0) 
+            return true;
+
+        // DEBUG cout << "not attacked by kings" << endl;
+
+        uint64_t pawnAttacks = attacks::pawnAttacks(square, oppColor(colorAttacking));
+        if ((pawnAttacks & piecesBitboards[(int)PieceType::PAWN][colorAttacking]) > 0)
+            return true;
+
+        // En passant
+        if (enPassantTargetSquare != 0 && enPassantTargetSquare == square && colorAttacking == color)
+            return true;
 
         // DEBUG cout << "not attacked by pawns" << endl;
         // DEBUG cout << "square not attacked" << endl;

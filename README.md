@@ -10,6 +10,10 @@ Hash (int, default 64) - transposition table size in MB from 1 to 512
 
 # Features
 
+Bitboards
+
+Pseudolegal move generation (magic bitboards for sliders, lookup tables for knight and king)
+
 NNUE evaluation (768->128x2->1)
 
 Negamax with alpha beta pruning and PVS

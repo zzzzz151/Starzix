@@ -55,23 +55,21 @@ inline bool SEE(Board &board, Move &move, int threshold = 0)
     if (score >= 0)
         return true;
 
-    int from = (int)move.from();
-    int to = (int)move.to();
+    Square from = move.from();
+    Square square = move.to();
 
-    uint64_t occupancy = board.occupancy() ^ (1ULL << from) ^ (1ULL << to);
+    uint64_t occupancy = board.occupancy() ^ (1ULL << from) ^ (1ULL << square);
     uint64_t queens = board.pieceBitboard(PieceType::QUEEN);
     uint64_t bishops = queens | board.pieceBitboard(PieceType::BISHOP);
     uint64_t rooks = queens | board.pieceBitboard(PieceType::ROOK);
 
-    Square square = move.to();
-
     uint64_t attackers = 0;
-    attackers |= rooks & rookAttacks(square, occupancy);
-    attackers |= bishops & bishopAttacks(square, occupancy);
-    attackers |= board.pieceBitboard(PieceType::PAWN, BLACK) & pawnAttacks(square, WHITE);
-    attackers |= board.pieceBitboard(PieceType::PAWN, WHITE) & pawnAttacks(square, BLACK);
-    attackers |= board.pieceBitboard(PieceType::KNIGHT) & knightMoves[square];
-    attackers |= board.pieceBitboard(PieceType::KING) & kingMoves[square];
+    attackers |= rooks & attacks::rookAttacks(square, occupancy);
+    attackers |= bishops & attacks::bishopAttacks(square, occupancy);
+    attackers |= board.pieceBitboard(PieceType::PAWN, BLACK) & attacks::pawnAttacks(square, WHITE);
+    attackers |= board.pieceBitboard(PieceType::PAWN, WHITE) & attacks::pawnAttacks(square, BLACK);
+    attackers |= board.pieceBitboard(PieceType::KNIGHT) & attacks::knightAttacks(square);
+    attackers |= board.pieceBitboard(PieceType::KING) & attacks::kingAttacks(square);
 
     Color us = board.enemyColor();
     while (true)
@@ -83,10 +81,10 @@ inline bool SEE(Board &board, Move &move, int threshold = 0)
         next = popLeastValuable(board, occupancy, ourAttackers, us);
 
         if (next == PieceType::PAWN || next == PieceType::BISHOP || next == PieceType::QUEEN)
-            attackers |= bishopAttacks(square, occupancy) & bishops;
+            attackers |= attacks::bishopAttacks(square, occupancy) & bishops;
 
         if (next == PieceType::ROOK || next == PieceType::QUEEN)
-            attackers |= rookAttacks(square, occupancy) & rooks;
+            attackers |= attacks::rookAttacks(square, occupancy) & rooks;
 
         attackers &= occupancy;
         score = -score - 1 - SEE_PIECE_VALUES[(int)next];
