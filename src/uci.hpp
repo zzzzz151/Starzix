@@ -3,11 +3,12 @@
 
 // clang-format-off
 #include <cstring> // for memset()
+#include <chrono>
 #include "board/board.hpp"
-#include "main.cpp"
-inline void initTT();
 #include "nnue.hpp"
 #include "search.hpp"
+#include "main.cpp"
+inline void initTT();
 using namespace std;
 
 inline void setoption(vector<string> &words) // e.g. "setoption name Hash value 32"
@@ -122,7 +123,7 @@ inline void uciLoop()
         else if (words[0] == "go")
             go(words);
         else if (words[0] == "eval")
-            cout << "eval " << network.Evaluate((int)board.colorToMove()) << " cp" << endl;
+            cout << "eval " << nnue::evaluate(board.colorToMove()) << " cp" << endl;
     }
 }
 

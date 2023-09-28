@@ -13,6 +13,7 @@ int failed = 0, passed = 0;
 int main() {
     Board::initZobrist();
     attacks::initAttacks();
+    nnue::loadNetFromFile();
 
     // Open the file for reading
     std::ifstream inputFile("SEE.epd");
@@ -44,7 +45,10 @@ int main() {
         bool expected = gain >= 0;
 
         Board board = Board(fen);
-        Move move = Move::fromUci(uciMove, board.piecesBySquare());
+        Piece pieces[64];
+        board.getPieces(pieces);
+        Move move = Move::fromUci(uciMove, pieces);
+
         bool res = SEE(board, move);
 
         if (res == expected)

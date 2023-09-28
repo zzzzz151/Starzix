@@ -4,6 +4,8 @@
 // clang-format off
 #include <algorithm>
 #include <iostream>
+#include <cstring>
+#include "board/move.hpp"
 #include "search.hpp"
 using namespace std;
 

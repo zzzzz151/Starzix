@@ -28,6 +28,7 @@ int main()
 {
     Board::initZobrist();
     attacks::initAttacks();
+    nnue::loadNetFromFile();
     initTT();
     initLmrTable();
     uciLoop();

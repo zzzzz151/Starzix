@@ -39,6 +39,7 @@ int main()
 {
     Board::initZobrist();
     attacks::initAttacks();
+    nnue::loadNetFromFile();
 
     string received;
     getline(cin, received);

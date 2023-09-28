@@ -6,24 +6,13 @@
 #include <vector>
 #include <iostream>
 #include <algorithm>
+#include <bitset>
 #include "types.hpp"
 using namespace std;
 
-inline char squareFile(Square square)
+inline uint8_t squareFile(Square square)
 {
-    int file = square & 7;
-    switch (file)
-    {
-        case 0: return 'a';
-        case 1: return 'b';
-        case 2: return 'c';
-        case 3: return 'd';
-        case 4: return 'e';
-        case 5: return 'f';
-        case 6: return 'g';
-        case 7: return 'h';
-        default: return 'z';
-    }
+    return square & 7;
 }
 
 inline uint8_t squareRank(Square square) { return square >> 3; }
@@ -97,17 +86,10 @@ inline Square strToSquare(string strSquare)
     return (strSquare[0] - 'a') + (strSquare[1] - '1') * 8;
 }
 
-
 inline bool squareIsBackRank(Square square)
 {
     uint8_t rank = squareRank(square);
     return rank == 0 || rank == 7;
-}
-
-inline bool isEdgeSquare(Square square)
-{
-    char file = squareFile(square);
-    return file == 'a' || file == 'h' || squareIsBackRank(square);
 }
 
 inline PieceType pieceTypeAt(Square sq, Piece* boardPieces)

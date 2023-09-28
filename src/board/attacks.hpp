@@ -244,12 +244,12 @@ namespace attacks
         if ((color == WHITE && rank >= 6) || (color == BLACK && rank <= 1))
             return 0ULL;
 
-        char file = squareFile(square);
+        uint8_t file = squareFile(square);
 
-        if (file == 'a')
+        if (file == 0)
             return 1ULL << SQUARE_DIAGONAL_RIGHT;
 
-        if (file == 'h')
+        if (file == 7)
             return 1ULL << SQUARE_DIAGONAL_LEFT;
 
         return (1ULL << SQUARE_DIAGONAL_LEFT) | (1ULL << SQUARE_DIAGONAL_RIGHT);

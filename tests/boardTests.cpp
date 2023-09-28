@@ -4,7 +4,6 @@
 #include <string>
 #include <chrono>
 #include "../src-test/board/board.hpp"
-#include "../src-test/board/attacks.hpp"
 using namespace std;
 
 int failed = 0, passed = 0;
@@ -34,7 +33,7 @@ inline uint64_t perft(Board &board, int depth)
 {
     if (depth == 0) return 1;
 
-    MovesList moves = board.pseudolegalMoves();  
+    MovesList moves = board.pseudolegalMoves();
 
     uint64_t nodes = 0;
 
@@ -114,13 +113,13 @@ int main()
 {   
     Board::initZobrist();
     attacks::initAttacks();
+    nnue::loadNetFromFile();
 
     Board board = Board(START_FEN);
     Board board2 = Board("1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 w Qk f6 0 15");
     Board board3 = Board("1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 b Qk f6 0");
     
     test("fen1", board.fen(), START_FEN);
-    
     test("fen2",  board2.fen(), (string)"1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 w Qk f6 0 15");
     test("fen3", board3.fen(), (string)"1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 b Qk f6 0 1");
     
@@ -131,10 +130,8 @@ int main()
     test("pieceBitboard(KING) == 2", popcount(board.pieceBitboard(PieceType::KING)), 2);
     test("pieceBitboard(KING, WHITE) == 1", popcount(board.pieceBitboard(PieceType::KING, WHITE)), 1);
     
-    test("squareFile()", squareFile(33), 'b');
-    test("squareFile()", squareFile(15), 'h');
-
-    test("isEdgeSquare()", isEdgeSquare(19), false);
+    test("squareFile()", (int)squareFile(33), 1);
+    test("squareFile()", (int)squareFile(15), 7);
 
     test("popcount()", popcount((uint64_t)5), 2); // 5 = 101
     test("lsb()", 1ULL << lsb((uint64_t)12), (uint64_t)4); // 12 = 1100
@@ -153,8 +150,8 @@ int main()
     test("move.flag=castling", move.typeFlag(), move.CASTLING_FLAG);
 
     board = Board("rnb1kbnr/1P1pqppp/4p3/2p5/8/8/P1PPPPPP/RNBQKBNR w KQkq - 1 5");
-    move = Move::fromUci("b7c8b", board.piecesBySquare());
-    test("Move::fromUci() == move.toUci()", move.toUci(), (string)"b7c8b");
+    move = Move("b7", "c8", Move::BISHOP_PROMOTION_FLAG); // b7c8b
+    test("move.toUci()", move.toUci(), (string)"b7c8b");
     test("move.BISHOP_PROMOTION_FLAG", (int)move.typeFlag(), (int)move.BISHOP_PROMOTION_FLAG);
     test("move.promotionPieceType() == bishop", (int)move.promotionPieceType(), (int)PieceType::BISHOP);
 

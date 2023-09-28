@@ -18,25 +18,25 @@ struct Move
     public:
 
     const static uint16_t NULL_FLAG = 0x0000,
-                          NORMAL_FLAG = 0x0001,
-                          CASTLING_FLAG = 0x0002,
-                          EN_PASSANT_FLAG = 0x0003,
-                          KNIGHT_PROMOTION_FLAG = 0x0004,
-                          BISHOP_PROMOTION_FLAG = 0x0005,
-                          ROOK_PROMOTION_FLAG = 0x0006,
-                          QUEEN_PROMOTION_FLAG = 0x0007;
+                          NORMAL_FLAG = 0x0009,
+                          CASTLING_FLAG = 0x0008,
+                          EN_PASSANT_FLAG = 0x0007,
+                          KNIGHT_PROMOTION_FLAG = 0x0001,
+                          BISHOP_PROMOTION_FLAG = 0x0002,
+                          ROOK_PROMOTION_FLAG = 0x0003,
+                          QUEEN_PROMOTION_FLAG = 0x0004;
 
     constexpr static uint16_t PROMOTION_FLAGS[4] = {QUEEN_PROMOTION_FLAG, KNIGHT_PROMOTION_FLAG, BISHOP_PROMOTION_FLAG, ROOK_PROMOTION_FLAG};
 
-    Move() = default;
+    inline Move() = default;
 
     // Custom == operator
-    bool operator==(const Move& other) const {
+    inline bool operator==(const Move& other) const {
         return moveEncoded == other.moveEncoded;
     }
 
     // Custom != operator
-    bool operator!=(const Move& other) const {
+    inline bool operator!=(const Move& other) const {
         return moveEncoded != other.moveEncoded;
     }
 
@@ -95,21 +95,25 @@ struct Move
     inline PieceType promotionPieceType()
     {
         uint16_t flag = typeFlag();
-        if (flag == QUEEN_PROMOTION_FLAG) return PieceType::QUEEN;
-        if (flag == KNIGHT_PROMOTION_FLAG) return PieceType::KNIGHT;
-        if (flag == BISHOP_PROMOTION_FLAG) return PieceType::BISHOP;
-        if (flag == ROOK_PROMOTION_FLAG) return PieceType::ROOK;
-        return PieceType::NONE;
+        if (flag < 1 || flag > 4)
+            return PieceType::NONE;
+        return (PieceType)flag;
     }
 
     inline string toUci()
     {
         string str = squareToStr[from()] + squareToStr[to()];
         uint16_t myTypeFlag = typeFlag();
-        if (myTypeFlag == QUEEN_PROMOTION_FLAG) str += "q";
-        else if (myTypeFlag == KNIGHT_PROMOTION_FLAG) str += "n";
-        else if (myTypeFlag == BISHOP_PROMOTION_FLAG) str += "b";
-        else if (myTypeFlag == ROOK_PROMOTION_FLAG) str += "r";
+
+        if (myTypeFlag == QUEEN_PROMOTION_FLAG) 
+            str += "q";
+        else if (myTypeFlag == KNIGHT_PROMOTION_FLAG) 
+            str += "n";
+        else if (myTypeFlag == BISHOP_PROMOTION_FLAG) 
+            str += "b";
+        else if (myTypeFlag == ROOK_PROMOTION_FLAG) 
+            str += "r";
+
         return str;
     }
     
@@ -123,6 +127,8 @@ struct MovesList
     uint8_t numMoves = 0;
 
     public:
+
+    inline MovesList() = default;
 
     inline void add(Move move) { 
         assert(numMoves < 255);

@@ -84,7 +84,7 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
     // Quiescence saarch: search capture moves until a 'quiet' position is reached
 
     int originalAlpha = alpha;
-    int eval = network.Evaluate((int)board.colorToMove());
+    int eval = nnue::evaluate(board.colorToMove());
     if (eval >= beta) 
         return eval;
     if (alpha < eval) 
@@ -220,7 +220,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
     if (depth <= 0) return qSearch(alpha, beta, plyFromRoot);
 
     bool pvNode = beta - alpha > 1 || plyFromRoot == 0;
-    int eval = network.Evaluate((int)board.colorToMove());
+    int eval = nnue::evaluate(board.colorToMove());
 
     if (!pvNode && !inCheck)
     {

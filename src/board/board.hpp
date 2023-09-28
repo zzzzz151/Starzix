@@ -68,8 +68,7 @@ class Board
 
     inline Board(string fen)
     {
-        network.ResetAccumulator();
-        network.RefreshAccumulator();
+        nnue::reset();
 
         states = {};
         nullMoveEnPassantSquares = {};
@@ -201,7 +200,9 @@ class Board
         // DEBUG cout << str;
     }
 
-    inline Piece* piecesBySquare() { return pieces; }
+    inline void getPieces(Piece* dst) { 
+        copy(begin(pieces), end(pieces), dst);
+    }
 
     inline Color colorToMove() { return color; }
 
@@ -222,6 +223,15 @@ class Board
         if (argColor == NULL_COLOR)
             return piecesBitboards[(uint8_t)pieceType][WHITE] | piecesBitboards[(uint8_t)pieceType][BLACK];
         return piecesBitboards[(uint8_t)pieceType][argColor];
+    }
+
+    inline void getPiecesBitboards(uint64_t dst[6][2])
+    {
+        for (int pt = 0; pt <= 5; pt++)
+        {
+            dst[pt][WHITE] = piecesBitboards[pt][WHITE];
+            dst[pt][BLACK] = piecesBitboards[pt][BLACK];
+        }
     }
 
     inline uint64_t colorBitboard(Color argColor)
@@ -250,7 +260,7 @@ class Board
         occupied |= squareBit;
         piecesBitboards[(uint8_t)pieceType][color] |= squareBit;
 
-        network.EfficientlyUpdateAccumulator<MantaRay::AccumulatorOperation::Activate>((int)pieceType, (int)color, square);
+        nnue::currentAccumulator->activate(color, pieceType, square);
     }
 
     inline void removePiece(Square square)
@@ -266,7 +276,7 @@ class Board
         occupied ^= squareBit;
         piecesBitboards[(uint8_t)pieceType][color] ^= squareBit;
 
-        network.EfficientlyUpdateAccumulator<MantaRay::AccumulatorOperation::Deactivate>((int)pieceType, (int)color, square);
+        nnue::currentAccumulator->deactivate(color, pieceType, square);
     }
 
     public:
@@ -302,8 +312,9 @@ class Board
                                 + 8 * castlingRights[BLACK][CASTLE_LONG];
         hash ^= castlingHash;
 
+
         if (enPassantTargetSquare != 0)
-            hash ^= zobristTable2[2] / (uint64_t)(squareFile(enPassantTargetSquare) * squareFile(enPassantTargetSquare));
+            hash ^= zobristTable2[9-squareFile(enPassantTargetSquare)];
 
         for (int sq = 0; sq < 64; sq++)
         {
@@ -408,15 +419,15 @@ class Board
             bool pawnTwoUp = (rankFrom == 1 && rankTo == 3) || (rankFrom == 6 && rankTo == 4);
             if (pawnTwoUp)
             {
-                char file = squareFile(from);
+                uint8_t file = squareFile(from);
 
                 // we already switched color
                 Square possibleEnPassantTargetSquare = colorPlaying == WHITE ? to-8 : to+8;
                 Piece enemyPawnPiece =  colorPlaying == WHITE ? Piece::BLACK_PAWN : Piece::WHITE_PAWN;
 
-                if (file != 'a' && pieces[to-1] == enemyPawnPiece)
+                if (file != 0 && pieces[to-1] == enemyPawnPiece)
                     enPassantTargetSquare = possibleEnPassantTargetSquare;
-                else if (file != 'h' && pieces[to+1] == enemyPawnPiece)
+                else if (file != 7 && pieces[to+1] == enemyPawnPiece)
                     enPassantTargetSquare = possibleEnPassantTargetSquare;
             }
         }
@@ -428,7 +439,36 @@ class Board
 
     inline bool makeMove(string uci)
     {
-        return makeMove(Move::fromUci(uci, piecesBySquare()));
+        Square from = strToSquare(uci.substr(0,2));
+        Square to = strToSquare(uci.substr(2,4));
+
+        if (uci.size() == 5) // promotion
+        {
+            char promotionLowerCase = uci.back(); // last char of string
+            uint16_t typeFlag = Move::QUEEN_PROMOTION_FLAG;
+
+            if (promotionLowerCase == 'n') 
+                typeFlag = Move::KNIGHT_PROMOTION_FLAG;
+            else if (promotionLowerCase == 'b') 
+                typeFlag = Move::BISHOP_PROMOTION_FLAG;
+            else if (promotionLowerCase == 'r') 
+                typeFlag = Move::ROOK_PROMOTION_FLAG;
+
+            return makeMove(Move(from, to, typeFlag));
+        }
+
+        PieceType pieceType = pieceToPieceType(pieces[from]);
+        if (pieceType == PieceType::PAWN && enPassantTargetSquare != 0 && enPassantTargetSquare == to)
+            return makeMove(Move(from, to, Move::EN_PASSANT_FLAG));
+
+        if (pieceType == PieceType::KING)
+        {
+            int bitboardSquaresMoved = (int)to - (int)from;
+            if (bitboardSquaresMoved == 2 || bitboardSquaresMoved == -2)
+                return makeMove(Move(from, to, Move::CASTLING_FLAG));
+        }
+
+        return makeMove(Move(from, to, Move::NORMAL_FLAG));
     }
 
     inline void undoMove()
@@ -634,14 +674,14 @@ class Board
     {
         Piece piece = pieces[square];
         uint8_t rank = squareRank(square);
-        char file = squareFile(square);
+        uint8_t file = squareFile(square);
         const int SQUARE_ONE_UP = square + (color == WHITE ? 8 : -8),
                   SQUARE_TWO_UP = square + (color == WHITE ? 16 : -16),
                   SQUARE_DIAGONAL_LEFT = square + (color == WHITE ? 7 : -9),
                   SQUARE_DIAGONAL_RIGHT = square + (color == WHITE ? 9 : -7);
 
         // diagonal left
-        if (file != 'a')
+        if (file != 0)
         {
             if (enPassantTargetSquare != 0 && enPassantTargetSquare == SQUARE_DIAGONAL_LEFT)
                 moves.add(Move(square, SQUARE_DIAGONAL_LEFT, Move::EN_PASSANT_FLAG));
@@ -652,7 +692,7 @@ class Board
         }
 
         // diagonal right
-        if (file != 'h')
+        if (file != 7)
         {
             if (enPassantTargetSquare != 0 && enPassantTargetSquare == SQUARE_DIAGONAL_RIGHT)
                 moves.add(Move(square, SQUARE_DIAGONAL_RIGHT, Move::EN_PASSANT_FLAG));
