@@ -70,8 +70,10 @@ class Board
     {
         nnue::reset();
 
-        states = {};
-        nullMoveEnPassantSquares = {};
+        states.clear();
+        states.reserve(256);
+        nullMoveEnPassantSquares.clear();
+        nullMoveEnPassantSquares.reserve(256);
 
         fen = trim(fen);
         vector<string> fenSplit = splitString(fen, ' ');
