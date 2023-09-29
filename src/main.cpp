@@ -2,8 +2,8 @@
 #define MAIN_CPP
 
 // clang-format off
-#include "search.hpp"
 #include "uci.hpp"
+#include "search.hpp"
 
 inline void initTT()
 {
@@ -31,7 +31,7 @@ int main()
     nnue::loadNetFromFile();
     initTT();
     initLmrTable();
-    uciLoop();
+    uci::uciLoop();
     return 0;
 }
 

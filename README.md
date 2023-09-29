@@ -1,8 +1,8 @@
-# z5 - UCI C++ chess engine
+# z5 - C++ chess engine
 
 # How to build
 
-```g++ -O3 -std=c++17 src/main.cpp -o z5.exe```
+```g++ -O3 -march=native -std=c++17 src/main.cpp -o z5.exe```
 
 # UCI options
 

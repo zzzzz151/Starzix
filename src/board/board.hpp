@@ -113,7 +113,7 @@ class Board
                 currentFile += charToInt(thisChar);
             else
             {
-                placePiece(charToPiece[thisChar], currentRank * 8 + currentFile);
+                placePiece(charToPiece[thisChar], currentRank * 8 + currentFile, true);
                 currentFile++;
             }
         }
@@ -248,7 +248,7 @@ class Board
 
     private:
 
-    inline void placePiece(Piece piece, Square square)
+    inline void placePiece(Piece piece, Square square, bool updateNnue)
     {
         if (piece == Piece::NONE) return;
         pieces[square] = piece;
@@ -260,10 +260,11 @@ class Board
         occupied |= squareBit;
         piecesBitboards[(uint8_t)pieceType][color] |= squareBit;
 
-        nnue::currentAccumulator->activate(color, pieceType, square);
+        if (updateNnue)
+            nnue::currentAccumulator->activate(color, pieceType, square);
     }
 
-    inline void removePiece(Square square)
+    inline void removePiece(Square square, bool updateNnue)
     {
         if (pieces[square] == Piece::NONE) return;
 
@@ -276,7 +277,8 @@ class Board
         occupied ^= squareBit;
         piecesBitboards[(uint8_t)pieceType][color] ^= squareBit;
 
-        nnue::currentAccumulator->deactivate(color, pieceType, square);
+        if (updateNnue)
+            nnue::currentAccumulator->deactivate(color, pieceType, square);
     }
 
     public:
@@ -340,6 +342,7 @@ class Board
 
     inline bool makeMove(Move move)
     {
+        nnue::push();
         Square from = move.from();
         Square to = move.to();
         auto typeFlag = move.typeFlag();
@@ -349,30 +352,30 @@ class Board
         Color nextColor = enemyColor();
 
         Piece piece = pieces[from];
-        removePiece(from);
-        removePiece(to);
+        removePiece(from, true);
+        removePiece(to, true);
 
         PieceType promotionPieceType = move.promotionPieceType();
         if (promotionPieceType != PieceType::NONE)
         {
-            placePiece(makePiece(promotionPieceType, colorPlaying), to);
+            placePiece(makePiece(promotionPieceType, colorPlaying), to, true);
             goto piecesProcessed;
         }
 
-        placePiece(piece, to);
+        placePiece(piece, to, true);
 
         if (typeFlag == move.CASTLING_FLAG)
         {
             Piece rook = makePiece(PieceType::ROOK, colorPlaying);
             bool isShortCastle = to > from;
-            removePiece(isShortCastle ? to+1 : to-2); 
-            placePiece(rook, isShortCastle ? to-1 : to+1);
+            removePiece(isShortCastle ? to+1 : to-2, true); 
+            placePiece(rook, isShortCastle ? to-1 : to+1, true);
 
         }
         else if (typeFlag == move.EN_PASSANT_FLAG)
         {
             Square capturedPawnSquare = color == WHITE ? to - 8 : to + 8;
-            removePiece(capturedPawnSquare);
+            removePiece(capturedPawnSquare, true);
         }
 
         piecesProcessed:
@@ -473,6 +476,7 @@ class Board
 
     inline void undoMove()
     {
+        nnue::pull();
         color = enemyColor();
         Move move = states[states.size()-1].move;
         Square from = move.from();
@@ -481,52 +485,52 @@ class Board
 
         Piece capturedPiece = states[states.size()-1].capturedPiece;
         Piece piece = pieces[to];
-        removePiece(to);
+        removePiece(to, false);
 
         if (typeFlag == move.CASTLING_FLAG)
         {
             // Replace king
             if (color == WHITE) 
-                placePiece(Piece::WHITE_KING, 4);
+                placePiece(Piece::WHITE_KING, 4, false);
             else 
-                placePiece(Piece::BLACK_KING, 60);
+                placePiece(Piece::BLACK_KING, 60, false);
 
             // Replace rook
             if (to == 6)
             { 
-                removePiece(5); 
-                placePiece(Piece::WHITE_ROOK, 7);
+                removePiece(5, false); 
+                placePiece(Piece::WHITE_ROOK, 7, false);
             }
             else if (to == 2) 
             {
-                removePiece(3);
-                placePiece(Piece::WHITE_ROOK, 0);
+                removePiece(3, false);
+                placePiece(Piece::WHITE_ROOK, 0, false);
             }
             else if (to == 62) { 
-                removePiece(61);
-                placePiece(Piece::BLACK_ROOK, 63);
+                removePiece(61, false);
+                placePiece(Piece::BLACK_ROOK, 63, false);
             }
             else if (to == 58) 
             {
-                removePiece(59);
-                placePiece(Piece::BLACK_ROOK, 56);
+                removePiece(59, false);
+                placePiece(Piece::BLACK_ROOK, 56, false);
             }
         }
         else if (typeFlag == move.EN_PASSANT_FLAG)
         {
-            placePiece(color == WHITE ? Piece::WHITE_PAWN : Piece::BLACK_PAWN, from);
+            placePiece(color == WHITE ? Piece::WHITE_PAWN : Piece::BLACK_PAWN, from, false);
             Square capturedPawnSquare = color == WHITE ? to - 8 : to + 8;
-            placePiece(color == WHITE ? Piece::BLACK_PAWN : Piece::WHITE_PAWN, capturedPawnSquare);
+            placePiece(color == WHITE ? Piece::BLACK_PAWN : Piece::WHITE_PAWN, capturedPawnSquare, false);
         }
         else if (move.promotionPieceType() != PieceType::NONE)
         {
-            placePiece(color == WHITE ? Piece::WHITE_PAWN : Piece::BLACK_PAWN, from);
-            placePiece(capturedPiece, to); // promotion + capture, so replace the captured piece
+            placePiece(color == WHITE ? Piece::WHITE_PAWN : Piece::BLACK_PAWN, from, false);
+            placePiece(capturedPiece, to, false); // promotion + capture, so replace the captured piece
         }
         else
         {
-            placePiece(piece, from);
-            placePiece(capturedPiece, to);
+            placePiece(piece, from, false);
+            placePiece(capturedPiece, to, false);
         }
 
         if (color == BLACK) 

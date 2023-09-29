@@ -6,8 +6,12 @@
 #include "time_management.hpp"
 #include "nnue.hpp"
 #include "see.hpp"
-inline void info(int depth, int score); // from uci.hpp
 using namespace std;
+
+namespace uci
+{
+    inline void info(int depth, int score); 
+}
 
 // ----- Tunable params ------
 
@@ -15,7 +19,7 @@ const uint8_t MAX_DEPTH = 100;
 
 int TT_SIZE_MB = 64; // default (and current) TT size in MB
 
-extern const int PIECE_VALUES[7] = {100, 302, 320, 500, 900, 15000, 0};
+const int PIECE_VALUES[7] = {100, 302, 320, 500, 900, 15000, 0};
 
 const uint8_t ASPIRATION_MIN_DEPTH = 6,
               ASPIRATION_INITIAL_DELTA = 25;
@@ -75,6 +79,7 @@ vector<TTEntry> TT;
 
 // ----- End global vars -----
 
+#include "uci.hpp"
 #include "move_scoring.hpp"
 
 inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp = false);
@@ -375,6 +380,14 @@ inline int aspiration(int maxDepth, int score)
 
 inline Move iterativeDeepening()
 {
+    // clear killers
+    int numRows = sizeof(killerMoves) / sizeof(killerMoves[0]);
+    for (int i = 0; i < numRows; i++)
+    {
+        killerMoves[i][0] = NULL_MOVE;
+        killerMoves[i][1] = NULL_MOVE;
+    }
+
     // clear history moves
     memset(&historyMoves[0][0][0], 0, sizeof(historyMoves));
 
@@ -395,11 +408,11 @@ inline Move iterativeDeepening()
         if (checkIsTimeUp())
         {
             bestMoveRoot = moveBefore;
-            info(iterationDepth, scoreBefore);
+            uci::info(iterationDepth, scoreBefore);
             break;
         }
 
-        info(iterationDepth, score);
+        uci::info(iterationDepth, score);
         iterationDepth++;
     }
 
