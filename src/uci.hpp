@@ -77,7 +77,7 @@ namespace uci
         uint64_t nps = nodes / (millisecondsElapsed > 0 ? millisecondsElapsed : 1) * 1000;
 
         cout << "info depth " << depth
-            << " seldepth " << maxPlyReached + 1
+            << " seldepth " << maxPlyReached
             << " time " << round(millisecondsElapsed)
             << " nodes " << nodes
             << " nps " << nps

@@ -1,5 +1,7 @@
 # z5 - C++ chess engine
 
+Currently ~3100 elo (tested against [amoeba](https://github.com/abulmo/amoeba) 3.4).
+
 # How to build
 
 ```g++ -O3 -march=native -std=c++17 src/main.cpp -o z5.exe```
