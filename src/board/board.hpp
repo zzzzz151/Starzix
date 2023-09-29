@@ -340,16 +340,34 @@ class Board
         return false;
     }
 
+    inline bool isDraw()
+    {
+        if (pliesSincePawnMoveOrCapture >= 100)
+            return true;
+
+        // K vs K
+        int numPieces = popcount(occupied);
+        if (numPieces == 2)
+            return true;
+
+        // KBK KNK
+        if (numPieces == 3 && (pieceBitboard(PieceType::KNIGHT) > 0 || pieceBitboard(PieceType::BISHOP) > 0))
+            return true;
+
+        return false;
+    }
+
     inline bool makeMove(Move move)
     {
-        nnue::push();
         Square from = move.from();
         Square to = move.to();
         auto typeFlag = move.typeFlag();
         bool capture = isCapture(move);
-        pushState(move, pieces[to]);
         Color colorPlaying = color;
         Color nextColor = enemyColor();
+
+        nnue::push();
+        pushState(move, pieces[to]);
 
         Piece piece = pieces[from];
         removePiece(from, true);

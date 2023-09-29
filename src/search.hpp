@@ -69,7 +69,7 @@ const char INVALID = 0, EXACT = 1, LOWER_BOUND = 2, UPPER_BOUND = 3;
 struct TTEntry
 {
     uint64_t key = 0;
-    int score = 0;
+    int score = NEG_INFINITY;
     Move bestMove = NULL_MOVE;
     uint8_t depth = 0;
     char type = INVALID;
@@ -83,6 +83,24 @@ vector<TTEntry> TT;
 #include "move_scoring.hpp"
 
 inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp = false);
+
+inline void storeInTT(TTEntry *ttEntry, uint64_t key, uint8_t depth, Move &bestMove, int bestScore, int plyFromRoot, int originalAlpha, int beta)
+{
+    ttEntry->key = key;
+    ttEntry->depth = depth;
+    ttEntry->bestMove = bestMove;
+
+    ttEntry->score = bestScore;
+    if (abs(bestScore) >= MIN_MATE_SCORE) 
+        ttEntry->score += bestScore < 0 ? -plyFromRoot : plyFromRoot;
+
+    if (bestScore <= originalAlpha) 
+        ttEntry->type = UPPER_BOUND;
+    else if (bestScore >= beta) 
+        ttEntry->type = LOWER_BOUND;
+    else 
+        ttEntry->type = EXACT;
+}
 
 inline int qSearch(int alpha, int beta, int plyFromRoot)
 {
@@ -138,24 +156,7 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
     }
 
     if (ttEntry->depth <= 0)
-    {
-        // save in TT
-
-        ttEntry->key = boardKey;
-        ttEntry->depth = 0;
-        ttEntry->score = bestScore;
-        ttEntry->bestMove = NULL_MOVE;
-
-        if (abs(bestScore) >= MIN_MATE_SCORE) 
-            ttEntry->score += bestScore < 0 ? -plyFromRoot : plyFromRoot;
-
-        if (bestScore <= originalAlpha) 
-            ttEntry->type = UPPER_BOUND;
-        else if (bestScore >= beta) 
-            ttEntry->type = LOWER_BOUND;
-        else 
-            ttEntry->type = EXACT;
-    }
+        storeInTT(ttEntry, boardKey, 0, NULL_MOVE, bestScore, plyFromRoot, originalAlpha, beta);
 
     return bestScore;
 }
@@ -194,10 +195,10 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
     if (plyFromRoot > maxPlyReached) 
         maxPlyReached = plyFromRoot;
 
-    if (plyFromRoot > 0 && board.isRepetition()) 
+    if (checkIsTimeUp())
         return 0;
 
-    if (checkIsTimeUp()) 
+    if (plyFromRoot > 0 && (board.isDraw() || board.isRepetition()))
         return 0;
 
     bool inCheck = board.inCheck();
@@ -279,13 +280,15 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
 
         legalMovesPlayed++;
         nodes++;
+        Square targetSquare = move.to();
 
         // 7th-rank-pawn extension
-        uint8_t rank = squareRank(move.to());
-        int extension = board.pieceTypeAt(move.to()) == PieceType::PAWN && (rank == 2 || rank == 7);
+        uint8_t rank = squareRank(targetSquare);
+        int extension = board.pieceTypeAt(targetSquare) == PieceType::PAWN && (rank == 2 || rank == 7);
 
-        int score = legalMovesPlayed == 1 ? -search(depth - 1 + extension, -beta, -alpha, plyFromRoot + 1) 
-                                          : pvs(depth + extension, alpha, beta, plyFromRoot, move, scores[i], lmr, inCheck, pvNode);
+        int score = legalMovesPlayed == 1 
+                    ? -search(depth - 1 + extension, -beta, -alpha, plyFromRoot + 1) 
+                    : pvs(depth + extension, alpha, beta, plyFromRoot, move, scores[i], lmr, inCheck, pvNode);
 
         board.undoMove();
         if (checkIsTimeUp()) return 0;
@@ -315,8 +318,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
             counterMove = move;
             int stm = (int)board.colorToMove();
             int pieceType = (int)board.pieceTypeAt(move.from());
-            int squareTo = (int)move.to();
-            historyMoves[stm][pieceType][squareTo] += depth * depth;
+            historyMoves[stm][pieceType][targetSquare] += depth * depth;
         }
 
         break; // Beta cutoff
@@ -325,22 +327,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
     if (legalMovesPlayed == 0) 
         return inCheck ? NEG_INFINITY + plyFromRoot : 0; // checkmate/draw
 
-    // Save in TT
-
-    ttEntry->key = boardKey;
-    ttEntry->depth = depth;
-    ttEntry->bestMove = bestMove;
-    ttEntry->score = bestScore;
-
-    if (abs(bestScore) >= MIN_MATE_SCORE) 
-        ttEntry->score += bestScore < 0 ? -plyFromRoot : plyFromRoot;
-
-    if (bestScore <= originalAlpha) 
-        ttEntry->type = UPPER_BOUND;
-    else if (bestScore >= beta) 
-        ttEntry->type = LOWER_BOUND;
-    else 
-        ttEntry->type = EXACT;
+    storeInTT(ttEntry, boardKey, depth, bestMove, bestScore, plyFromRoot, originalAlpha, beta);    
 
     return bestScore;
 }
@@ -381,8 +368,7 @@ inline int aspiration(int maxDepth, int score)
 inline Move iterativeDeepening()
 {
     // clear killers
-    int numRows = sizeof(killerMoves) / sizeof(killerMoves[0]);
-    for (int i = 0; i < numRows; i++)
+    for (int i = 0; i < MAX_DEPTH * 2; i++)
     {
         killerMoves[i][0] = NULL_MOVE;
         killerMoves[i][1] = NULL_MOVE;
@@ -402,8 +388,9 @@ inline Move iterativeDeepening()
         int scoreBefore = score;
         Move moveBefore = bestMoveRoot;
 
-        score = iterationDepth >= ASPIRATION_MIN_DEPTH ? aspiration(iterationDepth, score) 
-                                                       : search(iterationDepth, NEG_INFINITY, POS_INFINITY, 0);
+        score = iterationDepth >= ASPIRATION_MIN_DEPTH 
+                ? aspiration(iterationDepth, score) 
+                : search(iterationDepth, NEG_INFINITY, POS_INFINITY, 0);
 
         if (checkIsTimeUp())
         {
