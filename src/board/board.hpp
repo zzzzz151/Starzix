@@ -64,6 +64,8 @@ class Board
                            zobristColorToMove,
                            zobristCastlingRights[2][2],
                            zobristEnPassantFiles[8];
+
+    Move lastMovePlayed;
     
     public:
 
@@ -495,6 +497,7 @@ class Board
 
         color = nextColor;
         zobristKey ^= zobristColorToMove;
+        lastMovePlayed = move;
         return true; // move is legal
 
     }
@@ -596,6 +599,7 @@ class Board
             currentMoveCounter--;
 
         pullState();
+        lastMovePlayed = states.size() > 0 ? states.back().move : NULL_MOVE;
 
     }
 
@@ -868,6 +872,8 @@ class Board
             zobristKey ^= zobristEnPassantFiles[squareFile(enPassantTargetSquare)];
         nullMoveEnPassantSquares.push_back(enPassantTargetSquare); // append
         enPassantTargetSquare = 0;
+
+        lastMovePlayed = NULL_MOVE;
     }
 
     inline void undoNullMove()
@@ -883,6 +889,8 @@ class Board
         if (enPassantTargetSquare != 0)
             zobristKey ^= zobristEnPassantFiles[squareFile(enPassantTargetSquare)];
         nullMoveEnPassantSquares.pop_back(); // remove last element
+
+        lastMovePlayed = states.size() > 0 ? states.back().move : NULL_MOVE;
     }
 
     inline bool hasAtLeast1Piece(Color argColor = NULL_COLOR)
@@ -897,6 +905,8 @@ class Board
 
         return false;
     }
+
+    inline Move lastMove() { return lastMovePlayed; }
     
 };
 

@@ -55,13 +55,13 @@ const double LMR_BASE = 1,
 // ----- Global vars -----
 
 const int POS_INFINITY = 9999999, NEG_INFINITY = -POS_INFINITY, MIN_MATE_SCORE = POS_INFINITY - 512;
-Move NULL_MOVE;
 Board board;
 Move bestMoveRoot;
 uint64_t nodes;
 int maxPlyReached;
 Move killerMoves[MAX_DEPTH*2][2]; // ply, move
 int historyMoves[2][6][64];       // color, pieceType, squareTo
+Move counterMoves[2][1ULL << 16]; // color, moveEncoded
 int lmrTable[MAX_DEPTH + 2][218]; // depth, move (lmrTable initialized in main.cpp)
 Move counterMove;
 
@@ -315,9 +315,10 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
         }
         if (isQuietMove)
         {
-            counterMove = move;
+            
             int stm = (int)board.colorToMove();
             int pieceType = (int)board.pieceTypeAt(move.from());
+            counterMoves[(int)board.enemyColor()][board.lastMove().move()] = move;
             historyMoves[stm][pieceType][targetSquare] += depth * depth;
         }
 
@@ -377,8 +378,10 @@ inline Move iterativeDeepening()
     // clear history moves
     memset(&historyMoves[0][0][0], 0, sizeof(historyMoves));
 
+    // clear countermoves
+    memset(&counterMoves[0][0], 0, sizeof(counterMoves));
+
     bestMoveRoot = NULL_MOVE;
-    counterMove = NULL_MOVE;
     nodes = 0;
     int iterationDepth = 1, score = 0;
 

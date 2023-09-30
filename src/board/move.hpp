@@ -86,6 +86,8 @@ struct Move
         return Move(from, to, NORMAL_FLAG);
     }
 
+    inline uint16_t move() { return moveEncoded; }
+
     inline Square from() { return (moveEncoded >> 10) & 0b111111; }
 
     inline Square to() { return (moveEncoded >> 4) & 0b111111; }
@@ -118,6 +120,8 @@ struct Move
     }
     
 };
+
+Move NULL_MOVE = Move();
 
 struct MovesList
 {
