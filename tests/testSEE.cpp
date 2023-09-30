@@ -16,7 +16,7 @@ int main() {
     nnue::loadNetFromFile();
 
     // Open the file for reading
-    std::ifstream inputFile("SEE.epd");
+    std::ifstream inputFile("tests/SEE.epd");
 
     // Check if the file is open
     if (!inputFile.is_open()) {

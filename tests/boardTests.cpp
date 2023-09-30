@@ -29,6 +29,22 @@ template <typename T> inline void test(string testName, T got, T expected)
     if (expected != got) cout << "Expected: " << expected << endl << "Got: " << got << endl;
 }
 
+template <typename T> inline void testNotEquals(string testName, T got, T expected)
+{
+    if (expected == got)
+    {
+        cout << "[FAILED]";
+        failed++;
+    }
+    else 
+    {
+        cout << "[PASSED]";
+        passed++;
+    }
+    cout << " Test: " << testName << endl;
+    if (expected == got) cout << "Expected equal but theyre different! Expected: " << expected << endl;
+}
+
 inline uint64_t perft(Board &board, int depth)
 {
     if (depth == 0) return 1;
@@ -216,6 +232,34 @@ int main()
         board.undoMove();
     test("fen is what we expect after 6x undoMove()", board.fen(), (string)"rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/p1P2P2/RNBQK2R b KQkq - 5 9");
     test("zobristHash is same after making and undoing moves", board.zobristHash(), zobristHashBefore);
+
+    board = Board("r3k2r/pppppppp/8/2P1P2P/8/8/8/R3K2R b KQkq - 0 1");
+    uint64_t zobHash = board.zobristHash();
+    board.makeMove("a8b8"); // black rook moves
+    uint64_t zobHash2 = board.zobristHash();
+    testNotEquals("Zobrist hash not equals after losing castle right", zobHash2, zobHash);
+    board.undoMove();
+    uint64_t zobHash3 = board.zobristHash();
+    testNotEquals("Zobrist hash not equals after undoing move", zobHash3, zobHash2);
+    test("Zobrist hash equals after undoing move to before undoing the move", zobHash3, zobHash);
+
+    board = Board("r3k2r/pppppppp/8/2P1P2P/8/8/8/R3K2R b KQkq - 0 1");
+    board.makeMove("b7b5"); // creates enpassant target square b6
+    zobHash2 = board.zobristHash();
+    testNotEquals("Zobrist hash not equals after creating enpassant sq", zobHash2, zobHash);
+    board.undoMove();
+    test("Zobrist hash equals after undoing move", board.zobristHash(), zobHash);
+
+    board = Board("r3k2r/pppppppp/8/2P1P2P/8/8/8/R3K2R b KQkq - 0 1");
+    board.makeMove("a8b8");
+    board.makeMove("e1e2");
+    board.makeMove("d7d5");
+    test("Zobrist hash equals (making 3 moves vs from fen)", board.zobristHash(), Board("1r2k2r/ppp1pppp/8/2PpP2P/8/8/4K3/R6R w k d6 0 3").zobristHash());
+
+    board = Board("rnb1kbnr/pppp1ppp/8/4p1q1/3P4/1P6/P1P1PPPP/RNBQKBNR w KQkq - 1 3");
+    zobHash = board.zobristHash();
+    board.makeMove("e1d2"); // illegal
+    test("Zobrist hash equals after illegal move", zobHash, board.zobristHash());
 
     board = Board(START_FEN);
     Board boardPos2 = Board(POSITION2_KIWIPETE);

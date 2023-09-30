@@ -1,6 +1,6 @@
 # z5 - C++ chess engine
 
-Currently ~3100 elo (tested against [amoeba](https://github.com/abulmo/amoeba) 3.4).
+Currently ~3150 elo (tested against [amoeba](https://github.com/abulmo/amoeba) 3.4).
 
 # How to build
 
@@ -18,7 +18,7 @@ Pseudolegal move generation (magic bitboards for sliders, lookup tables for knig
 
 NNUE evaluation (768->128x2->1)
 
-Negamax with alpha beta pruning and PVS
+Negamax with alpha beta pruning and principal variation search
 
 Iterative deepening
 
