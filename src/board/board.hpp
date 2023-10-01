@@ -96,6 +96,8 @@ class Board
 
         pliesSincePawnMoveOrCapture = fenSplit.size() >= 5 ? stoi(fenSplit[4]) : 0;
         currentMoveCounter = fenSplit.size() >= 6 ? stoi(fenSplit[5]) : 1;
+
+        lastMovePlayed = NULL_MOVE;
     }
 
     private:
