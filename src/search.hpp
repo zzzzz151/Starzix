@@ -126,7 +126,7 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
 
     MovesList moves = board.pseudolegalMoves(true);
 
-    int scores[255];
+    int scores[256];
     scoreMoves(moves, scores, boardKey, *ttEntry, plyFromRoot);
 
     int bestScore = eval;
@@ -246,11 +246,12 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
         }
     }
 
-    int scores[255];
+    int scores[256];
     scoreMoves(moves, scores, boardKey, *ttEntry, plyFromRoot);
     int bestScore = NEG_INFINITY;
     Move bestMove;
-    uint8_t legalMovesPlayed = 0;
+    int legalMovesPlayed = 0;
+    int* failLowQuiets[256], numFailLowQuiets = 0;
 
     for (int i = 0; i < moves.size(); i++)
     {
@@ -293,6 +294,11 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
         board.undoMove();
         if (checkIsTimeUp()) return 0;
 
+        bool isQuietMove = !board.isCapture(move) && move.promotionPieceType() == PieceType::NONE;
+        int stm = (int)board.colorToMove();
+        int pieceType = (int)board.pieceTypeAt(move.from());
+        failLowQuiets[numFailLowQuiets++] = &(historyMoves[stm][pieceType][targetSquare]);
+
         if (score <= bestScore) continue;
         bestScore = score;
         bestMove = move;
@@ -307,7 +313,6 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
 
         // Beta cutoff
 
-        bool isQuietMove = !board.isCapture(move) && move.promotionPieceType() == PieceType::NONE;
         if (isQuietMove && move != killerMoves[plyFromRoot][0])
         {
             killerMoves[plyFromRoot][1] = killerMoves[plyFromRoot][0];
@@ -315,11 +320,12 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
         }
         if (isQuietMove)
         {
-            
-            int stm = (int)board.colorToMove();
-            int pieceType = (int)board.pieceTypeAt(move.from());
             counterMoves[(int)board.enemyColor()][board.lastMove().move()] = move;
             historyMoves[stm][pieceType][targetSquare] += depth * depth;
+
+            // Penalize quiets that failed low
+            for (int i = 0; i < numFailLowQuiets - 1; i++)
+                *failLowQuiets[i] -= depth * depth;
         }
 
         break; // Beta cutoff
