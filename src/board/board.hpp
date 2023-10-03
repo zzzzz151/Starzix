@@ -703,7 +703,7 @@ class Board
         {
             Square sq = poplsb(ourBishops);
             uint64_t bishopAttacks = attacks::bishopAttacks(sq, occupied);
-            uint64_t bishopMoves = capturesOnly ? bishopAttacks & them()  : bishopAttacks & ~usBb;
+            uint64_t bishopMoves = capturesOnly ? bishopAttacks & themBb  : bishopAttacks & ~usBb;
             while (bishopMoves > 0)
             {
                 Square targetSquare = poplsb(bishopMoves);
@@ -715,7 +715,7 @@ class Board
         {
             Square sq = poplsb(ourRooks);
             uint64_t rookAttacks = attacks::rookAttacks(sq, occupied);
-            uint64_t rookMoves = capturesOnly ? rookAttacks & them()  : rookAttacks & ~usBb;
+            uint64_t rookMoves = capturesOnly ? rookAttacks & themBb  : rookAttacks & ~usBb;
             while (rookMoves > 0)
             {
                 Square targetSquare = poplsb(rookMoves);
@@ -727,7 +727,7 @@ class Board
         {
             Square sq = poplsb(ourQueens);
             uint64_t queenAttacks = attacks::bishopAttacks(sq, occupied) | attacks::rookAttacks(sq, occupied);
-            uint64_t queenMoves = capturesOnly ? queenAttacks & them()  : queenAttacks & ~usBb;
+            uint64_t queenMoves = capturesOnly ? queenAttacks & themBb  : queenAttacks & ~usBb;
             while (queenMoves > 0)
             {
                 Square targetSquare = poplsb(queenMoves);
