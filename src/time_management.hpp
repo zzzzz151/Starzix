@@ -34,8 +34,8 @@ inline void setupTime(vector<string> &words, Color color)
     }
 
     if (isMoveTime || movesToGo == 1)
-        // save 5ms for shenanigans
-        millisecondsForThisTurn = milliseconds - min(5, milliseconds / 2); 
+        // save 10ms for shenanigans
+        millisecondsForThisTurn = milliseconds - min(10, milliseconds / 2); 
     else if (movesToGo != -1)
     	millisecondsForThisTurn = milliseconds / movesToGo;
     else
