@@ -16,8 +16,6 @@ inline void setupTime(vector<string> &words, Color color)
     int milliseconds = -1, movesToGo = -1, increment = 0;
     bool isMoveTime = false;
 
-    // With movestogo or movetime, save 5ms for shenanigans
-
     for (int i = 0; i < words.size(); i++)
     {
         if ((words[i] == "wtime" && color == WHITE) || (words[i] == "btime" && color == BLACK))
@@ -34,7 +32,7 @@ inline void setupTime(vector<string> &words, Color color)
     }
 
     if (isMoveTime || movesToGo == 1)
-        // save 10ms for shenanigans
+        // save 10ms for overhead
         millisecondsForThisTurn = milliseconds - min(10, milliseconds / 2); 
     else if (movesToGo != -1)
     	millisecondsForThisTurn = milliseconds / movesToGo;

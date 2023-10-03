@@ -150,7 +150,7 @@ namespace nnue
             sum += crelu(them[i]) * nn.outputWeights[HIDDEN_LAYER_SIZE + i];
         }
 
-        return sum * 400.0 / Q;
+        return sum * 400 / Q;
     }
 
 }

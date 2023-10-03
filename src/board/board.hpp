@@ -335,7 +335,9 @@ class Board
         random_device rd;  // Create a random device to seed the random number generator
         mt19937_64 gen(rd());  // Create a 64-bit Mersenne Twister random number generator
         uniform_int_distribution<uint64_t> distribution;
-        uint64_t randomNum;
+        
+        uint64_t randomNum = distribution(gen);
+        zobristColorToMove = randomNum;
 
         for (int sq = 0; sq < 64; sq++)
             for (int pt = 0; pt < 12; pt++)
@@ -343,9 +345,7 @@ class Board
                 randomNum = distribution(gen);
                 zobristTable[sq][pt] = randomNum;
             }
-
-        randomNum = distribution(gen);
-        zobristColorToMove = distribution(gen);
+            
 
         for (int color = 0; color <= 1; color++)
             for (int castlingDir = 0; castlingDir <= 1; castlingDir++)
