@@ -127,7 +127,7 @@ struct MovesList
 {
     private:
 
-    Move moves[255];
+    Move moves[256];
     uint8_t numMoves = 0;
 
     public:
