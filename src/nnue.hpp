@@ -2,42 +2,46 @@
 #define NNUE_HPP
 
 #include <iostream>
-#include <fstream>
+#include <cstdio>
 #include <array>
 #include <cstdint>
 #include <vector>
 #include <cassert>
 #include "board/types.hpp"
 #include "board/builtin.hpp"
-using namespace std;
 
 // clang-format off
 namespace nnue
 {
-    const string NET_FILE = "net_128_500M_0wdl.nnue";
+    const char* NET_FILE = "net_128_500M_0wdl.nnue";
     const uint16_t HIDDEN_LAYER_SIZE = 128;
     const int32_t Q = 255 * 64;
 
     struct alignas(64) NN {
         array<int16_t, 768 * HIDDEN_LAYER_SIZE> featureWeights;
         array<int16_t, HIDDEN_LAYER_SIZE> featureBiases;
-        array<int8_t , HIDDEN_LAYER_SIZE* 2> outputWeights;
+        array<int8_t , HIDDEN_LAYER_SIZE * 2> outputWeights;
         int16_t outputBias;
     };
 
     NN nn;
 
     inline void loadNetFromFile()
-    {
-        ifstream file(NET_FILE, ios::binary);
-
-        if (!file.is_open()) {
+    {        
+        FILE* file = fopen(NET_FILE, "rb");
+        if (file) {
+            // Read binary data into the struct
+            fread(nn.featureWeights.data(), sizeof(int16_t), nn.featureWeights.size(), file);
+            fread(nn.featureBiases.data(), sizeof(int16_t), nn.featureBiases.size(), file);
+            fread(nn.outputWeights.data(), sizeof(int8_t), nn.outputWeights.size(), file);
+            fread(&nn.outputBias, sizeof(int16_t), 1, file);
+            fclose(file); 
+        } 
+        else 
+        {
             cout << "Error opening net file " << NET_FILE << endl;
             exit(0);
         }
-
-        file.read(reinterpret_cast<char*>(&nn), sizeof(NN));
-        file.close();
     }
 
     struct Accumulator
