@@ -204,6 +204,8 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
     bool inCheck = board.inCheck();
     if (inCheck) depth++; // Check extension
 
+    if (depth <= 0) return qSearch(alpha, beta, plyFromRoot);
+
     int originalAlpha = alpha;
     uint64_t boardKey = board.zobristHash();
 
@@ -220,10 +222,6 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
     // IIR (Internal iterative reduction)
     if (ttEntry->key != boardKey && depth >= IIR_MIN_DEPTH && !inCheck)
         depth--;
-
-    MovesList moves = board.pseudolegalMoves();
-
-    if (depth <= 0) return qSearch(alpha, beta, plyFromRoot);
 
     bool pvNode = beta - alpha > 1 || plyFromRoot == 0;
     int eval = nnue::evaluate(board.colorToMove());
@@ -246,6 +244,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
         }
     }
 
+    MovesList moves = board.pseudolegalMoves();
     int scores[256];
     scoreMoves(moves, scores, boardKey, *ttEntry, plyFromRoot);
     int bestScore = NEG_INFINITY;
