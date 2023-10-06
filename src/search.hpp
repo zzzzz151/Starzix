@@ -233,7 +233,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
             return eval;
 
         // NMP (Null move pruning)
-        if (depth >= NMP_MIN_DEPTH && !skipNmp && eval >= beta && board.hasAtLeast1Piece())
+        if (depth >= NMP_MIN_DEPTH && !skipNmp && eval >= beta && board.hasNonPawnMaterial(board.colorToMove()))
         {
             board.makeNullMove();
             int score = -search(depth - NMP_BASE_REDUCTION - depth / NMP_REDUCTION_DIVISOR, -beta, -alpha, plyFromRoot + 1, true);
@@ -282,13 +282,9 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp)
         nodes++;
         Square targetSquare = move.to();
 
-        // 7th-rank-pawn extension
-        uint8_t rank = squareRank(targetSquare);
-        int extension = board.pieceTypeAt(targetSquare) == PieceType::PAWN && (rank == 2 || rank == 7);
-
         int score = legalMovesPlayed == 1 
-                    ? -search(depth - 1 + extension, -beta, -alpha, plyFromRoot + 1) 
-                    : pvs(depth + extension, alpha, beta, plyFromRoot, move, scores[i], lmr, inCheck, pvNode);
+                    ? -search(depth - 1, -beta, -alpha, plyFromRoot + 1) 
+                    : pvs(depth, alpha, beta, plyFromRoot, move, scores[i], lmr, inCheck, pvNode);
 
         board.undoMove();
         if (checkIsTimeUp()) return 0;
@@ -373,18 +369,10 @@ inline int aspiration(int maxDepth, int score)
 
 inline Move iterativeDeepening()
 {
-    // clear killers
-    for (int i = 0; i < MAX_DEPTH * 2; i++)
-    {
-        killerMoves[i][0] = NULL_MOVE;
-        killerMoves[i][1] = NULL_MOVE;
-    }
-
-    // clear history moves
-    memset(&historyMoves[0][0][0], 0, sizeof(historyMoves));
-
-    // clear countermoves
-    memset(&counterMoves[0][0], 0, sizeof(counterMoves));
+    // clear killers, countermoves and history moves
+    memset(&(killerMoves[0][0]), 0, sizeof(killerMoves));
+    memset(&(counterMoves[0][0]), 0, sizeof(counterMoves));
+    memset(&(historyMoves[0][0][0]), 0, sizeof(historyMoves));
 
     bestMoveRoot = NULL_MOVE;
     nodes = 0;

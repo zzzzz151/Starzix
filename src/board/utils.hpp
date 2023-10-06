@@ -10,10 +10,7 @@
 #include "types.hpp"
 using namespace std;
 
-inline uint8_t squareFile(Square square)
-{
-    return square & 7;
-}
+inline uint8_t squareFile(Square square) { return square & 7; }
 
 inline uint8_t squareRank(Square square) { return square >> 3; }
 

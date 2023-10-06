@@ -100,14 +100,14 @@ inline uint8_t poplsb(uint64_t &mask)
     return uint8_t(s);
 }
 
-uint64_t pdep(uint64_t val, uint64_t mask) {
-  uint64_t res = 0;
-  for (uint64_t bb = 1; mask; bb += bb) {
-    if (val & bb)
-        res |= mask & -mask;
-    mask &= mask - 1;
-  }
-  return res;
+inline uint64_t pdep(uint64_t val, uint64_t mask) {
+    uint64_t res = 0;
+    for (uint64_t bb = 1; mask; bb += bb) {
+        if (val & bb)
+            res |= mask & -mask;
+        mask &= mask - 1;
+    }
+    return res;
 }
 
 #endif

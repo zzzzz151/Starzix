@@ -13,6 +13,7 @@ const int HASH_MOVE_SCORE = INT_MAX,
           GOOD_CAPTURE_SCORE = 1'500'000'000,
           PROMOTION_SCORE = 1'000'000'000,
           KILLER_SCORE = 500'000'000,
+          COUNTERMOVE_SCORE = 250'000'000,
           HISTORY_SCORE = 0, // non-killer quiets
           BAD_CAPTURE_SCORE = -500'000'000;
 
@@ -39,7 +40,7 @@ inline void scoreMoves(MovesList &moves, int *scores, uint64_t boardKey, TTEntry
         else if (killerMoves[plyFromRoot][1] == move)
             scores[i] = KILLER_SCORE;
         else if (move == counterMoves[board.enemyColor()][board.lastMove().move()])
-            scores[i] = KILLER_SCORE - 1;
+            scores[i] = COUNTERMOVE_SCORE;
         else
         {
             int stm = (int)board.colorToMove();

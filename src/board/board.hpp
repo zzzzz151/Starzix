@@ -237,7 +237,7 @@ class Board
             str += "\n";
         }
 
-        // DEBUG cout << str;
+        cout << str;
     }
 
     inline void getPieces(Piece* dst) { 
@@ -345,7 +345,6 @@ class Board
                 randomNum = distribution(gen);
                 zobristTable[sq][pt] = randomNum;
             }
-            
 
         for (int color = 0; color <= 1; color++)
             for (int castlingDir = 0; castlingDir <= 1; castlingDir++)
@@ -365,9 +364,9 @@ class Board
 
     inline bool isRepetition()
     {
-        if (states.size() <= 1) return false;
+        if (states.size() <= 2) return false;
 
-        for (int i = states.size()-2; i >= 0 && i >= states.size() - pliesSincePawnMoveOrCapture - 1; i -= 2)
+        for (int i = (int)states.size() - 2; i >= 0 && i >= (int)states.size() - (int)pliesSincePawnMoveOrCapture - 1; i -= 2)
             if (states[i].zobristKey == zobristKey)
                 return true;
 
@@ -499,7 +498,6 @@ class Board
 
         color = nextColor;
         zobristKey ^= zobristColorToMove;
-        lastMovePlayed = move;
         return true; // move is legal
 
     }
@@ -601,7 +599,6 @@ class Board
             currentMoveCounter--;
 
         pullState();
-        lastMovePlayed = states.size() > 0 ? states.back().move : NULL_MOVE;
 
     }
 
@@ -620,6 +617,7 @@ class Board
     {
         BoardInfo state = BoardInfo(zobristKey, castlingRights, enPassantTargetSquare, pliesSincePawnMoveOrCapture, capturedPiece, move);
         states.push_back(state); // append
+        lastMovePlayed = move;
     }
 
     inline void pullState()
@@ -635,6 +633,8 @@ class Board
         zobristKey = state.zobristKey;
         enPassantTargetSquare = state.enPassantTargetSquare;
         pliesSincePawnMoveOrCapture = state.pliesSincePawnMoveOrCapture;
+
+        lastMovePlayed = states.size() > 0 ? states.back().move : NULL_MOVE;
     }
 
     public:
@@ -895,15 +895,19 @@ class Board
         lastMovePlayed = states.size() > 0 ? states.back().move : NULL_MOVE;
     }
 
-    inline bool hasAtLeast1Piece(Color argColor = NULL_COLOR)
+    inline bool hasNonPawnMaterial(Color argColor = NULL_COLOR)
     {
-        if (argColor == NULL_COLOR) 
-            argColor = color;
-
         // p, n, b, r, q, k
         for (int pt = 1; pt <= 4; pt++)
-            if (piecesBitboards[pt][argColor] > 0)
+        {
+            if (argColor == NULL_COLOR)
+            {
+                if (piecesBitboards[pt][WHITE] > 0 || piecesBitboards[pt][BLACK] > 0)
+                    return true;
+            }
+            else if (piecesBitboards[pt][argColor] > 0)
                 return true;
+        }
 
         return false;
     }
