@@ -17,11 +17,6 @@ namespace uci
         }
     }
 
-    inline void ucinewgame()
-    {
-        clearTT();
-    }
-
     inline void position(vector<string> &words)
     {
         int movesTokenIndex = -1;
@@ -55,6 +50,9 @@ namespace uci
 
     inline void info(int depth, int score)
     {
+        double millisecondsElapsed = (chrono::steady_clock::now() - start) / chrono::milliseconds(1);
+        uint64_t nps = nodes / (millisecondsElapsed > 0 ? millisecondsElapsed : 1) * 1000;
+
         bool isMate = abs(score) >= MIN_MATE_SCORE;
         int movesToMate = 0;
         if (isMate)
@@ -63,9 +61,6 @@ namespace uci
             movesToMate = round(pliesToMate / 2.0);
             if (score < 0) movesToMate *= -1; // we are getting mated
         }
-
-        double millisecondsElapsed = (chrono::steady_clock::now() - start) / chrono::milliseconds(1);
-        uint64_t nps = nodes / (millisecondsElapsed > 0 ? millisecondsElapsed : 1) * 1000;
 
         cout << "info depth " << depth
             << " seldepth " << maxPlyReached
@@ -100,7 +95,7 @@ namespace uci
             else if (words[0] == "setoption") // e.g. "setoption name Hash value 32"
                 setoption(words);
             else if (received == "ucinewgame")
-                ucinewgame();
+                clearTT();
             else if (received == "isready")
                 cout << "readyok\n";
             else if (words[0] == "position")

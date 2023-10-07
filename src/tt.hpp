@@ -7,7 +7,7 @@ int TT_SIZE_MB = 64; // default and current
 const uint8_t INVALID = 0, EXACT = 1, LOWER_BOUND = 2, UPPER_BOUND = 3;
 struct TTEntry
 {
-    uint64_t key = 0;
+    uint64_t zobristHash = 0;
     int score = 0;
     Move bestMove = NULL_MOVE;
     uint8_t depth = 0;
@@ -20,7 +20,7 @@ inline void initTT()
     int numEntries = (TT_SIZE_MB * 1024 * 1024) / sizeof(TTEntry);
     tt.clear();
     tt.resize(numEntries);
-    cout << "TT size = " << TT_SIZE_MB << "MB => " << numEntries << " entries" << endl;
+    //cout << "TT size = " << TT_SIZE_MB << "MB => " << numEntries << " entries" << endl;
 }
 
 inline void clearTT()
@@ -28,9 +28,9 @@ inline void clearTT()
     memset(tt.data(), 0, sizeof(TTEntry) * tt.size());
 }
 
-inline void storeInTT(TTEntry *ttEntry, uint64_t key, uint8_t depth, Move &bestMove, int bestScore, int plyFromRoot, int originalAlpha, int beta)
+inline void storeInTT(TTEntry *ttEntry, uint8_t depth, Move &bestMove, int bestScore, int plyFromRoot, int originalAlpha, int beta)
 {
-    ttEntry->key = key;
+    ttEntry->zobristHash = board.zobristHash();
     ttEntry->depth = depth;
     ttEntry->bestMove = bestMove;
 

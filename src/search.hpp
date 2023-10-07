@@ -49,7 +49,7 @@ int maxPlyReached;
 Move killerMoves[MAX_DEPTH*2][2]; // ply, move
 int history[2][6][64];            // color, pieceType, targetSquare
 Move counterMoves[2][1ULL << 16]; // color, moveEncoded
-int lmrTable[MAX_DEPTH + 2][218]; // depth, move
+int lmrTable[MAX_DEPTH * 2][256]; // depth, move
 
 // ----- End global vars -----
 
@@ -86,10 +86,9 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
     if (alpha < eval) 
         alpha = eval;
 
-    uint64_t boardKey = board.zobristHash();
     // probe TT
-    TTEntry *ttEntry = &(tt[boardKey % tt.size()]);
-    if (plyFromRoot > 0 && ttEntry->key == boardKey)
+    TTEntry *ttEntry = &(tt[board.zobristHash() % tt.size()]);
+    if (plyFromRoot > 0 && board.zobristHash() == ttEntry->zobristHash)
         if (ttEntry->type == EXACT || (ttEntry->type == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->type == UPPER_BOUND && ttEntry->score <= alpha))
         {
             int ret = ttEntry->score;
@@ -100,7 +99,7 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
     MovesList moves = board.pseudolegalMoves(true);
 
     int scores[256];
-    scoreMoves(moves, scores, boardKey, *ttEntry, plyFromRoot);
+    scoreMoves(moves, scores, *ttEntry, plyFromRoot);
 
     int bestScore = eval;
     for (int i = 0; i < moves.size(); i++)
@@ -129,7 +128,7 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
     }
 
     if (ttEntry->depth <= 0)
-        storeInTT(ttEntry, boardKey, 0, NULL_MOVE, bestScore, plyFromRoot, originalAlpha, beta);
+        storeInTT(ttEntry, 0, NULL_MOVE, bestScore, plyFromRoot, originalAlpha, beta);
 
     return bestScore;
 }
@@ -150,12 +149,9 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
 
     if (depth <= 0) return qSearch(alpha, beta, plyFromRoot);
 
-    int originalAlpha = alpha;
-    uint64_t boardKey = board.zobristHash();
-
     // Probe TT
-    TTEntry *ttEntry = &(tt[boardKey % tt.size()]);
-    if (plyFromRoot > 0 && ttEntry->key == boardKey && ttEntry->depth >= depth)
+    TTEntry *ttEntry = &(tt[board.zobristHash() % tt.size()]);
+    if (plyFromRoot > 0 && ttEntry->zobristHash == board.zobristHash() && ttEntry->depth >= depth)
         if (ttEntry->type == EXACT || (ttEntry->type == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->type == UPPER_BOUND && ttEntry->score <= alpha))
         {
             int ret = ttEntry->score;
@@ -164,7 +160,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
         }
 
     // IIR (Internal iterative reduction)
-    if (ttEntry->key != boardKey && depth >= IIR_MIN_DEPTH && !inCheck)
+    if (ttEntry->zobristHash != board.zobristHash() && depth >= IIR_MIN_DEPTH && !inCheck)
         depth--;
 
     bool pvNode = beta - alpha > 1 || plyFromRoot == 0;
@@ -190,12 +186,13 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
 
     MovesList moves = board.pseudolegalMoves();
     int scores[256];
-    scoreMoves(moves, scores, boardKey, *ttEntry, plyFromRoot);
+    scoreMoves(moves, scores, *ttEntry, plyFromRoot);
     int bestScore = NEG_INFINITY;
     Move bestMove;
     int legalMovesPlayed = 0;
     int stm = board.colorToMove();
     int* pointersFailLowQuietsHistory[256], numFailLowQuiets = 0;
+    int originalAlpha = alpha;
 
     for (int i = 0; i < moves.size(); i++)
     {
@@ -299,7 +296,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
     if (legalMovesPlayed == 0) 
         return inCheck ? NEG_INFINITY + plyFromRoot : 0; // checkmate/draw
 
-    storeInTT(ttEntry, boardKey, depth, bestMove, bestScore, plyFromRoot, originalAlpha, beta);    
+    storeInTT(ttEntry, depth, bestMove, bestScore, plyFromRoot, originalAlpha, beta);    
 
     return bestScore;
 }

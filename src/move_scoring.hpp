@@ -10,13 +10,13 @@ const int HASH_MOVE_SCORE = INT_MAX,
           HISTORY_SCORE = 0, // non-killer quiets
           BAD_CAPTURE_SCORE = -500'000'000;
 
-inline void scoreMoves(MovesList &moves, int *scores, uint64_t boardKey, TTEntry &ttEntry, int plyFromRoot)
+inline void scoreMoves(MovesList &moves, int *scores, TTEntry &ttEntry, int plyFromRoot)
 {
     for (int i = 0; i < moves.size(); i++)
     {
         Move move = moves[i];
 
-        if (ttEntry.key == boardKey && move == ttEntry.bestMove)
+        if (board.zobristHash() == ttEntry.zobristHash && move == ttEntry.bestMove)
             scores[i] = HASH_MOVE_SCORE;
         else if (board.isCapture(move))
         {
