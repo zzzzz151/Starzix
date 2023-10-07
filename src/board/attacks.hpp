@@ -1,5 +1,4 @@
-#ifndef ATTACKS_HPP
-#define ATTACKS_HPP
+#pragma once
 
 // clang-format off
 #include "builtin.hpp"
@@ -295,4 +294,3 @@ namespace attacks
 
 }
 
-#endif

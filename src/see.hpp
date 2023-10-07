@@ -1,10 +1,7 @@
 
-#ifndef SEE_HPP
-#define SEE_HPP
+#pragma once
 
 // clang-format off
-#include "board/board.hpp"
-#include "board/attacks.hpp"
 
 const int SEE_PIECE_VALUES[7] = {100, 300, 300, 500, 900, 0, 0};
 const int PAWN_INDEX = 0;
@@ -102,4 +99,3 @@ inline bool SEE(Board &board, Move &move, int threshold = 0)
     return board.colorToMove() != us;
 }
 
-#endif

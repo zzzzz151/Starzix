@@ -1,5 +1,4 @@
-#ifndef BOARD_HPP
-#define BOARD_HPP
+#pragma once
 
 // clang-format off
 #include <cstdint>
@@ -916,4 +915,3 @@ class Board
     
 };
 
-#endif

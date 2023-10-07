@@ -1,5 +1,4 @@
-#ifndef MOVE_HPP
-#define MOVE_HPP
+#pragma once
 
 // clang-format off
 #include <cassert>
@@ -155,4 +154,3 @@ struct MovesList
     }
 };
 
-#endif

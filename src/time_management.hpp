@@ -1,9 +1,6 @@
-#ifndef TIME_MANAGEMENT_HPP
-#define TIME_MANAGEMENT_HPP
+#pragma once
 
 // clang-format off
-#include <chrono>
-using namespace std;
 
 chrono::steady_clock::time_point start;
 int millisecondsForThisTurn;
@@ -55,4 +52,3 @@ inline int millisecondsLeftForThisTurn()
     return millisecondsForThisTurn - millisecondsElapsed;
 }
 
-#endif

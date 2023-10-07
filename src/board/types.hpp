@@ -1,5 +1,4 @@
-#ifndef TYPES_HPP
-#define TYPES_HPP
+#pragma once
 
 // clang-format off
 #include <cstdint>
@@ -83,4 +82,3 @@ unordered_map<Piece, char> pieceToChar = {
     {Piece::BLACK_KING, 'k'}
 };
 
-#endif

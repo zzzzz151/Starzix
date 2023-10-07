@@ -1,13 +1,6 @@
-#ifndef MOVE_SCORING_HPP
-#define MOVE_SCORING_HPP
+#pragma once
 
 // clang-format off
-#include <algorithm>
-#include <iostream>
-#include <cstring>
-#include "board/move.hpp"
-#include "search.hpp"
-using namespace std;
 
 const int HASH_MOVE_SCORE = INT_MAX,
           GOOD_CAPTURE_SCORE = 1'500'000'000,
@@ -45,8 +38,8 @@ inline void scoreMoves(MovesList &moves, int *scores, uint64_t boardKey, TTEntry
         {
             int stm = (int)board.colorToMove();
             int pieceType = (int)board.pieceTypeAt(move.from());
-            int squareTo = (int)move.to();
-            scores[i] = HISTORY_SCORE + historyMoves[stm][pieceType][squareTo];
+            int targetSqiare = (int)move.to();
+            scores[i] = HISTORY_SCORE + history[stm][pieceType][targetSqiare];
         }
     }
 }
@@ -63,4 +56,3 @@ inline Move incrementalSort(MovesList &moves, int *scores, int i)
     return moves[i];
 }
 
-#endif

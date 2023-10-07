@@ -1,14 +1,4 @@
-#ifndef NNUE_HPP
-#define NNUE_HPP
-
-#include <iostream>
-#include <cstdio>
-#include <array>
-#include <cstdint>
-#include <vector>
-#include <cassert>
-#include "board/types.hpp"
-#include "board/builtin.hpp"
+#pragma once
 
 // clang-format off
 namespace nnue
@@ -159,4 +149,3 @@ namespace nnue
 
 }
 
-#endif

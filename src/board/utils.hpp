@@ -1,5 +1,4 @@
-#ifndef UTILS_HPP
-#define UTILS_HPP
+#pragma once
 
 #include <sstream>
 #include <string>
@@ -113,4 +112,3 @@ inline uint64_t shiftUp(uint64_t bb) { return bb << 8ULL; }
 
 inline uint64_t shiftDown(uint64_t bb) { return bb >> 8ULL; }
 
-#endif

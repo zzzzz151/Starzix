@@ -1,14 +1,6 @@
-#ifndef UCI_HPP
-#define UCI_HPP
+#pragma once
 
 // clang-format-off
-#include <cstring> // for memset()
-#include <chrono>
-#include "board/board.hpp"
-#include "nnue.hpp"
-#include "search.hpp"
-inline void initTT();
-using namespace std;
 
 namespace uci
 {
@@ -27,8 +19,7 @@ namespace uci
 
     inline void ucinewgame()
     {
-        // clear TT
-        memset(TT.data(), 0, sizeof(TTEntry) * TT.size());
+        clearTT();
     }
 
     inline void position(vector<string> &words)
@@ -123,4 +114,4 @@ namespace uci
 
 }
 
-#endif
+

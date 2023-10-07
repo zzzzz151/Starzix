@@ -1,5 +1,4 @@
-#ifndef BUILTIN_HPP
-#define BUILTIN_HPP
+#pragma once
 
 #include <cassert>
 
@@ -109,5 +108,3 @@ inline uint64_t pdep(uint64_t val, uint64_t mask) {
     }
     return res;
 }
-
-#endif
