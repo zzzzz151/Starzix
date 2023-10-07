@@ -10,13 +10,13 @@ Estimated ~3200 elo (tested against [4ku](https://github.com/kz04px/4ku) 3.0, [a
 
 **Options**
 
-Hash (int, default 64, 1 to 512) - transposition table size in MB
+- Hash (int, default 64, 1 to 512) - transposition table size in MB
 
 **Extra commands**
 
-perft \<depth\> - runs a perft from current position
+- perft \<depth\> - runs a perft from current position
 
-eval - current position's evaluation from perspective of side to move
+- eval - displays current position's evaluation from perspective of side to move
 
 # Features
 
