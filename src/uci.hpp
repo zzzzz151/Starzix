@@ -2,6 +2,8 @@
 
 // clang-format-off
 
+#include "board/perft.hpp"
+
 namespace uci
 {
 
@@ -102,6 +104,11 @@ namespace uci
                 position(words);
             else if (words[0] == "go")
                 go(words);
+            else if (words[0] == "perft")
+            {
+                int depth = stoi(words[1]);
+                perftBench(board, depth);
+            }
             else if (words[0] == "eval")
                 cout << "eval " << nnue::evaluate(board.colorToMove()) << " cp" << endl;
         }

@@ -6,9 +6,17 @@ Estimated ~3200 elo (tested against [4ku](https://github.com/kz04px/4ku) 3.0, [a
 
 ```g++ -O3 -march=native -std=c++17 src/main.cpp -o z5.exe```
 
-# UCI options
+# UCI
 
-Hash (int, default 64) - transposition table size in MB from 1 to 512
+**Options**
+
+Hash (int, default 64, 1 to 512) - transposition table size in MB
+
+**Extra commands**
+
+perft \<depth\> - runs a perft from current position
+
+eval - current position's evaluation from perspective of side to move
 
 # Features
 

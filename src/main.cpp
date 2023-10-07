@@ -17,6 +17,7 @@ int main()
     nnue::loadNetFromFile();
     initTT();
     initLmrTable();
+    board = Board(START_FEN);
     uci::uciLoop();
     return 0;
 }
