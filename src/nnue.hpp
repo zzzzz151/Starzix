@@ -3,8 +3,8 @@
 // clang-format off
 namespace nnue
 {
-    const char* NET_FILE = "net_128_500M_0wdl.nnue";
-    const uint16_t HIDDEN_LAYER_SIZE = 128;
+    const char* NET_FILE = "net_384_1B_25wdl.nnue";
+    const uint16_t HIDDEN_LAYER_SIZE = 384;
     const int32_t Q = 255 * 64;
 
     struct alignas(64) NN {

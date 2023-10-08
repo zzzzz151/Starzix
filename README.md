@@ -24,7 +24,7 @@ Bitboards
 
 Pseudolegal move generation (magic bitboards for sliders, lookup tables for knight and king)
 
-NNUE evaluation (768->128x2->1)
+NNUE evaluation (768->384x2->1)
 
 Negamax with alpha beta pruning and principal variation search
 
