@@ -1,6 +1,6 @@
 # z5 - C++ chess engine
 
-Estimated ~3200 elo (tested against [4ku](https://github.com/kz04px/4ku) 3.0, [amoeba](https://github.com/abulmo/amoeba) 3.4 and [StockNemo](https://github.com/TheBlackPlague/StockNemo) 5.7.0.0).
+Estimated ~3300 elo (tested against [4ku](https://github.com/kz04px/4ku) 3.0, [amoeba](https://github.com/abulmo/amoeba) 3.4 and [StockNemo](https://github.com/TheBlackPlague/StockNemo) 5.7.0.0).
 
 # How to build
 
