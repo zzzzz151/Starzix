@@ -11,14 +11,26 @@ namespace attacks
     {
         // private stuff
 
-        uint64_t knightAttacks[64], kingAttacks[64];
+        uint64_t pawnAttacks[2][64], knightAttacks[64], kingAttacks[64];
 
-        inline void initKnightAttacks(Square square)
+        inline uint64_t pawnAttacksSlow(Square square, Color color)
         {
-            uint64_t n = 1ULL << square;
-            uint64_t h1 = ((n >> 1ULL) & 0x7f7f7f7f7f7f7f7fULL) | ((n << 1ULL) & 0xfefefefefefefefeULL);
-            uint64_t h2 = ((n >> 2ULL) & 0x3f3f3f3f3f3f3f3fULL) | ((n << 2ULL) & 0xfcfcfcfcfcfcfcfcULL);
-            knightAttacks[square] = (h1 << 16ULL) | (h1 >> 16ULL) | (h2 << 8ULL) | (h2 >> 8ULL);
+            const int SQUARE_DIAGONAL_LEFT = square + (color == WHITE ? 7 : -9),
+                    SQUARE_DIAGONAL_RIGHT = square + (color == WHITE ? 9 : -7);
+
+            uint8_t rank = squareRank(square);
+            if ((color == WHITE && rank >= 6) || (color == BLACK && rank <= 1))
+                return 0ULL;
+
+            uint8_t file = squareFile(square);
+
+            if (file == 0)
+                return 1ULL << SQUARE_DIAGONAL_RIGHT;
+
+            if (file == 7)
+                return 1ULL << SQUARE_DIAGONAL_LEFT;
+
+            return (1ULL << SQUARE_DIAGONAL_LEFT) | (1ULL << SQUARE_DIAGONAL_RIGHT);
         }
 
         inline uint64_t bishopAttacksSlow(Square sq, uint64_t occupied, bool excludeLastSquare = false)
@@ -190,12 +202,21 @@ namespace attacks
     {
         using namespace internal;
 
-        // Init king and knight attacks
+        // Init pawn, king and knight attacks
         uint64_t king = 1;
         for (int square = 0; square < 64; square++)
         {
-            initKnightAttacks(square);
+            // Pawn
+            pawnAttacks[WHITE][square] = pawnAttacksSlow(square, WHITE);
+            pawnAttacks[BLACK][square] = pawnAttacksSlow(square, BLACK);
 
+            // Knight
+            uint64_t n = 1ULL << square;
+            uint64_t h1 = ((n >> 1ULL) & 0x7f7f7f7f7f7f7f7fULL) | ((n << 1ULL) & 0xfefefefefefefefeULL);
+            uint64_t h2 = ((n >> 2ULL) & 0x3f3f3f3f3f3f3f3fULL) | ((n << 2ULL) & 0xfcfcfcfcfcfcfcfcULL);
+            knightAttacks[square] = (h1 << 16ULL) | (h1 >> 16ULL) | (h2 << 8ULL) | (h2 >> 8ULL);
+
+            // King
             uint64_t attacks = shiftLeft(king) | shiftRight(king) | king;
             attacks = (attacks | shiftUp(attacks) | shiftDown(attacks)) ^ king;
             internal::kingAttacks[square] = attacks;
@@ -236,22 +257,7 @@ namespace attacks
 
     inline uint64_t pawnAttacks(Square square, Color color)
     {
-        const int SQUARE_DIAGONAL_LEFT = square + (color == WHITE ? 7 : -9),
-                  SQUARE_DIAGONAL_RIGHT = square + (color == WHITE ? 9 : -7);
-
-        uint8_t rank = squareRank(square);
-        if ((color == WHITE && rank >= 6) || (color == BLACK && rank <= 1))
-            return 0ULL;
-
-        uint8_t file = squareFile(square);
-
-        if (file == 0)
-            return 1ULL << SQUARE_DIAGONAL_RIGHT;
-
-        if (file == 7)
-            return 1ULL << SQUARE_DIAGONAL_LEFT;
-
-        return (1ULL << SQUARE_DIAGONAL_LEFT) | (1ULL << SQUARE_DIAGONAL_RIGHT);
+        return internal::pawnAttacks[color][square];
     }
 
     inline uint64_t knightAttacks(Square square) 

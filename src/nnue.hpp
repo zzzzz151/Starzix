@@ -1,6 +1,8 @@
 #pragma once
 
 // clang-format off
+#include <array>
+
 namespace nnue
 {
     const char* NET_FILE = "net_384_1B_25wdl.nnue";

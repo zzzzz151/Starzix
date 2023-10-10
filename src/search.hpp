@@ -199,6 +199,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
         Move move = incrementalSort(moves, scores, i);
         bool historyMoveOrLosing = scores[i] < KILLER_SCORE;
         int lmr = lmrTable[depth][legalMovesPlayed];
+        bool isQuietMove = !board.isCapture(move) && move.promotionPieceType() == PieceType::NONE;
 
         // Moves loop pruning
         if (plyFromRoot > 0 && historyMoveOrLosing && bestScore > -MIN_MATE_SCORE)
@@ -212,23 +213,22 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
                 break;
 
             // SEE pruning
-            bool isNoisy = board.isCapture(move) || move.promotionPieceType() != PieceType::NONE;
-            if (depth <= SEE_PRUNING_MAX_DEPTH && !SEE(board, move, depth * (isNoisy ? SEE_PRUNING_NOISY_THRESHOLD : SEE_PRUNING_QUIET_THRESHOLD)))
+            int threshold = depth * (isQuietMove ? SEE_PRUNING_QUIET_THRESHOLD : SEE_PRUNING_NOISY_THRESHOLD);
+            if (depth <= SEE_PRUNING_MAX_DEPTH && !SEE(board, move, threshold))
                 continue;
         }
-
-        Square targetSquare = move.to();
-        int pieceType = (int)board.pieceTypeAt(move.from());
-        bool isQuietMove = !board.isCapture(move) && move.promotionPieceType() == PieceType::NONE;
-        int *pointerMoveHistory = &(history[stm][pieceType][targetSquare]);
 
         if (!board.makeMove(move))
             continue; // illegal move
 
         legalMovesPlayed++;
         nodes++;
+        Square targetSquare = move.to();
+        int pieceType = move.promotionPieceType() != PieceType::NONE ? (int)PieceType::PAWN : (int)board.pieceTypeAt(targetSquare);
+        int *pointerMoveHistory = &(history[stm][pieceType][targetSquare]);
 
         int score = 0;
+        // PVS (Principal variation search)
         if (legalMovesPlayed == 1)
             score = -search(depth - 1, -beta, -alpha, plyFromRoot + 1);
         else
@@ -249,7 +249,6 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
             else
                 lmr = 0;
 
-            // PVS (Principal variation search)
             score = -search(depth - 1 - lmr, -alpha - 1, -alpha, plyFromRoot + 1);
             if (score > alpha && (score < beta || lmr > 0))
                 score = -search(depth - 1, -beta, -alpha, plyFromRoot + 1);

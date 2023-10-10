@@ -2,7 +2,6 @@
 
 #include <cstring> // for memset()
 #include <chrono>
-#include <array>
 
 #include "board/board.hpp"
 #include "search.hpp"
