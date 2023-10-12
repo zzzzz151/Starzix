@@ -202,14 +202,14 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
         bool isQuietMove = !board.isCapture(move) && move.promotionPieceType() == PieceType::NONE;
 
         // Moves loop pruning
-        if (plyFromRoot > 0 && historyMoveOrLosing && bestScore > -MIN_MATE_SCORE)
+        if (historyMoveOrLosing && bestScore > -MIN_MATE_SCORE)
         {
             // LMP (Late move pruning)
-            if (!inCheck && !pvNode && depth <= LMP_MAX_DEPTH && legalMovesPlayed >= LMP_MIN_MOVES_BASE + depth * depth * 2)
+            if (depth <= LMP_MAX_DEPTH && legalMovesPlayed >= LMP_MIN_MOVES_BASE + depth * depth * 2)
                 break;
 
             // FP (Futility pruning)
-            if (!inCheck && depth <= FP_MAX_DEPTH && alpha < MIN_MATE_SCORE && eval + FP_BASE + max(depth - lmr, 0) * FP_MULTIPLIER <= alpha)
+            if (depth <= FP_MAX_DEPTH && alpha < MIN_MATE_SCORE && eval + FP_BASE + max(depth - lmr, 0) * FP_MULTIPLIER <= alpha)
                 break;
 
             // SEE pruning
