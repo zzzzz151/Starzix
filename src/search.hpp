@@ -43,7 +43,8 @@ const int LMR_HISTORY_DIVISOR = 1024;
 
 const int POS_INFINITY = 9999999, NEG_INFINITY = -POS_INFINITY, MIN_MATE_SCORE = POS_INFINITY - 512;
 Board board;
-Move bestMoveRoot;
+Move pvLines[MAX_DEPTH*2][MAX_DEPTH*2];
+int pvLengths[MAX_DEPTH*2];
 uint64_t nodes;
 int maxPlyReached;
 Move killerMoves[MAX_DEPTH*2][2]; // ply, move
@@ -140,6 +141,8 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
 
     if (checkIsTimeUp())
         return 0;
+
+    pvLengths[plyFromRoot] = 0;
 
     if (plyFromRoot > 0 && (board.isDraw() || board.isRepetition()))
         return 0;
@@ -260,17 +263,28 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
         if (isQuietMove)
             pointersFailLowQuietsHistory[numFailLowQuiets++] = pointerMoveHistory;
 
-        if (score <= bestScore) continue;
-        bestScore = score;
+        if (score > bestScore)
+            bestScore = score;
+
+        if (score <= alpha)
+            continue;
+
+        alpha = score;
         bestMove = move;
 
-        if (bestScore > alpha) 
+        if (pvNode)
         {
-            alpha = bestScore;
-            if (plyFromRoot == 0) bestMoveRoot = move;
+            // Update pv line
+            plyFromRoot++;
+            int subPvLineLength = pvLengths[plyFromRoot];
+            pvLengths[plyFromRoot - 1] = 1 + subPvLineLength;
+            pvLines[plyFromRoot - 1][0] = move;
+            memcpy(&(pvLines[plyFromRoot - 1][1]), pvLines[plyFromRoot], subPvLineLength * sizeof(Move)); // dst, src, size
+            plyFromRoot--;
         }
 
-        if (alpha < beta) continue;
+        if (score < beta) 
+            continue;
 
         // Beta cutoff
 
@@ -333,14 +347,15 @@ inline int aspiration(int maxDepth, int score)
     return score;
 }
 
-inline Move iterativeDeepening()
+inline void iterativeDeepening()
 {
-    // clear killers, countermoves and history
+    // clear pv's, killers, countermoves and history
+    memset(&(pvLines[0][0]), 0, sizeof(pvLines));
+    memset(&(pvLengths[0]), 0, sizeof(pvLengths));
     memset(&(killerMoves[0][0]), 0, sizeof(killerMoves));
     memset(&(counterMoves[0][0]), 0, sizeof(counterMoves));
     memset(&(history[0][0][0]), 0, sizeof(history));
 
-    bestMoveRoot = NULL_MOVE;
     nodes = 0;
     int iterationDepth = 1, score = 0;
 
@@ -348,7 +363,6 @@ inline Move iterativeDeepening()
     {
         maxPlyReached = -1;
         int scoreBefore = score;
-        Move moveBefore = bestMoveRoot;
 
         score = iterationDepth >= ASPIRATION_MIN_DEPTH 
                 ? aspiration(iterationDepth, score) 
@@ -356,7 +370,6 @@ inline Move iterativeDeepening()
 
         if (checkIsTimeUp())
         {
-            bestMoveRoot = moveBefore;
             uci::info(iterationDepth, scoreBefore);
             break;
         }
@@ -364,7 +377,5 @@ inline Move iterativeDeepening()
         uci::info(iterationDepth, score);
         iterationDepth++;
     }
-
-    return bestMoveRoot;
 }
 

@@ -6,7 +6,7 @@ Estimated ~3300 elo (tested against [4ku](https://github.com/kz04px/4ku) 3.0, [a
 
 ```g++ -O3 -march=native -std=c++17 src/main.cpp -o z5.exe```
 
-# UCI
+# UCI (Universal Chess Interface)
 
 **Options**
 

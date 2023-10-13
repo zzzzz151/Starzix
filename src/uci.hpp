@@ -46,8 +46,8 @@ namespace uci
     inline void go(vector<string> &words)
     {
         setupTime(words, board.colorToMove());
-        Move bestMove = iterativeDeepening();
-        cout << "bestmove " + bestMove.toUci() + "\n";
+        iterativeDeepening();
+        cout << "bestmove " + pvLines[0][0].toUci() + "\n";
     }
 
     inline void info(int depth, int score)
@@ -55,6 +55,7 @@ namespace uci
         double millisecondsElapsed = (chrono::steady_clock::now() - start) / chrono::milliseconds(1);
         uint64_t nps = nodes / (millisecondsElapsed > 0 ? millisecondsElapsed : 1) * 1000;
 
+        // "score cp <score>" or "score mate <moves>" ?
         bool isMate = abs(score) >= MIN_MATE_SCORE;
         int movesToMate = 0;
         if (isMate)
@@ -64,13 +65,18 @@ namespace uci
             if (score < 0) movesToMate *= -1; // we are getting mated
         }
 
+        // Collect PV
+        string strPv = pvLines[0][0].toUci();
+        for (int i = 1; i < pvLengths[0]; i++)
+            strPv += " " + pvLines[0][i].toUci();
+
         cout << "info depth " << depth
             << " seldepth " << maxPlyReached
             << " time " << round(millisecondsElapsed)
             << " nodes " << nodes
             << " nps " << nps
             << (isMate ? " score mate " : " score cp ") << (isMate ? movesToMate : score)
-            << " pv " << bestMoveRoot.toUci()
+            << " pv " << strPv
             << endl;
     }
 
