@@ -369,10 +369,7 @@ inline void iterativeDeepening()
                 : search(iterationDepth, NEG_INFINITY, POS_INFINITY, 0);
 
         if (checkIsTimeUp())
-        {
-            uci::info(iterationDepth, scoreBefore);
             break;
-        }
 
         uci::info(iterationDepth, score);
         iterationDepth++;
