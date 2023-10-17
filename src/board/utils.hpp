@@ -112,3 +112,17 @@ inline uint64_t shiftUp(uint64_t bb) { return bb << 8ULL; }
 
 inline uint64_t shiftDown(uint64_t bb) { return bb >> 8ULL; }
 
+template <typename T>
+inline bool lastElementsAreEqual(vector<T> &moves, int numElements) {
+    if (numElements > moves.size()) 
+        return false;
+
+    T lastElement = moves[moves.size() - 1];
+
+    // Compare last numElements to lastElement
+    for (int i = 2; i <= numElements; i++) 
+        if (moves[moves.size() - i] != lastElement) 
+            return false;
+
+    return true;
+}

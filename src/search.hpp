@@ -80,7 +80,6 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
 {
     // Quiescence saarch: search capture moves until a 'quiet' position is reached
 
-    int originalAlpha = alpha;
     int eval = nnue::evaluate(board.colorToMove());
     if (eval >= beta) 
         return eval;
@@ -101,14 +100,17 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
 
     int scores[256];
     scoreMoves(moves, scores, *ttEntry, plyFromRoot);
-
     int bestScore = eval;
+    Move bestMove = NULL_MOVE;
+    int originalAlpha = alpha;
+
     for (int i = 0; i < moves.size(); i++)
     {
         Move capture = incrementalSort(moves, scores, i);
 
         // SEE pruning (skip bad captures)
-        if (!SEE(board, capture)) continue;
+        if (!SEE(board, capture)) 
+            continue;
 
         if (!board.makeMove(capture))
             continue; // illegal move
@@ -117,19 +119,25 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
         int score = -qSearch(-beta, -alpha, plyFromRoot + 1);
         board.undoMove();
 
-        if (score > bestScore) 
-            bestScore = score;
-        else 
+        if (score <= bestScore)
             continue;
 
+        bestScore = score;
+
         if (score >= beta) 
-            return score;
+        {
+            bestMove = capture;
+            break;
+        }
         if (score > alpha) 
+        {
             alpha = score;
+            bestMove = capture;
+        }
     }
 
     if (ttEntry->depth <= 0)
-        storeInTT(ttEntry, 0, NULL_MOVE, bestScore, plyFromRoot, originalAlpha, beta);
+        storeInTT(ttEntry, 0, bestMove, bestScore, plyFromRoot, originalAlpha, beta);
 
     return bestScore;
 }
@@ -139,7 +147,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
     if (plyFromRoot > maxPlyReached) 
         maxPlyReached = plyFromRoot;
 
-    if (checkIsTimeUp())
+    if (isHardTimeUp())
         return 0;
 
     pvLengths[plyFromRoot] = 0;
@@ -258,7 +266,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
         }
 
         board.undoMove();
-        if (checkIsTimeUp()) return 0;
+        if (isHardTimeUp()) return 0;
 
         if (isQuietMove)
             pointersFailLowQuietsHistory[numFailLowQuiets++] = pointerMoveHistory;
@@ -325,7 +333,7 @@ inline int aspiration(int maxDepth, int score)
     {
         score = search(depth, alpha, beta, 0);
 
-        if (checkIsTimeUp()) return 0;
+        if (isHardTimeUp()) return 0;
 
         if (score >= beta)
         {
@@ -349,7 +357,7 @@ inline int aspiration(int maxDepth, int score)
 
 inline void iterativeDeepening()
 {
-    // clear pv's, killers, countermoves and history
+    // clear pv lines, killers, countermoves and history
     memset(&(pvLines[0][0]), 0, sizeof(pvLines));
     memset(&(pvLengths[0]), 0, sizeof(pvLengths));
     memset(&(killerMoves[0][0]), 0, sizeof(killerMoves));
@@ -362,17 +370,19 @@ inline void iterativeDeepening()
     while (iterationDepth <= MAX_DEPTH)
     {
         maxPlyReached = -1;
-        int scoreBefore = score;
 
         score = iterationDepth >= ASPIRATION_MIN_DEPTH 
                 ? aspiration(iterationDepth, score) 
                 : search(iterationDepth, NEG_INFINITY, POS_INFINITY, 0);
 
-        if (checkIsTimeUp())
+        if (pvLines[0][0] != NULL_MOVE && isHardTimeUp())
             break;
 
         uci::info(iterationDepth, score);
         iterationDepth++;
+
+        if (pvLines[0][0] != NULL_MOVE && isSoftTimeUp())
+            break;
     }
 }
 

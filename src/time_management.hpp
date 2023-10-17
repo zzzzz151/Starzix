@@ -3,15 +3,15 @@
 // clang-format off
 
 chrono::steady_clock::time_point start;
-int millisecondsForThisTurn;
-bool isTimeUp = false;
+bool isMoveTime = false;
+int softMillisecondsForThisTurn, hardMillisecondsForThisTurn;
+bool hardTimeUp = false;
 
 inline void setupTime(vector<string> &words, Color color)
 {
     start = chrono::steady_clock::now();
-    isTimeUp = false;
+    isMoveTime = hardTimeUp = false;
     int milliseconds = -1, movesToGo = -1, increment = 0;
-    bool isMoveTime = false;
 
     for (int i = 0; i < words.size(); i++)
     {
@@ -28,27 +28,41 @@ inline void setupTime(vector<string> &words, Color color)
         }
     }
 
-    if (isMoveTime || movesToGo == 1)
-        // save 10ms for overhead
-        millisecondsForThisTurn = milliseconds - min(10, milliseconds / 2); 
+    if (isMoveTime)
+    {
+        softMillisecondsForThisTurn = hardMillisecondsForThisTurn = milliseconds - min(10, milliseconds / 2); 
+    }
     else if (movesToGo != -1)
-    	millisecondsForThisTurn = milliseconds / movesToGo;
+    {
+        hardMillisecondsForThisTurn = movesToGo == 1 ? milliseconds - min(10, milliseconds / 2) : milliseconds / 2;
+        softMillisecondsForThisTurn = min(0.5 * milliseconds / movesToGo, (double)hardMillisecondsForThisTurn);
+    }
+    else if (milliseconds != -1)
+    {
+        // "go wtime 10000 btime 10000 winc 100 binc 100"
+        hardMillisecondsForThisTurn = milliseconds / 4;
+        softMillisecondsForThisTurn = milliseconds / 30;
+    }
     else
-        // if invalid, use 1 min by default, else it's "go wtime 10000 btime 10000 winc 100 binc 100"
-        millisecondsForThisTurn = milliseconds == -1 ? 60000 : round(milliseconds / 15.0);
-
+    {
+        // if invalid 'go' command received, default to 1 minute (this should never happen)
+        isMoveTime = true;
+        softMillisecondsForThisTurn = hardMillisecondsForThisTurn = 60000;
+    }
 }
 
-inline bool checkIsTimeUp()
+inline bool isHardTimeUp()
 {
-    if (isTimeUp) return true;
-    isTimeUp = (chrono::steady_clock::now() - start) / chrono::milliseconds(1) >= millisecondsForThisTurn;
-    return isTimeUp;
+    if (hardTimeUp) 
+        return true;
+    hardTimeUp = (chrono::steady_clock::now() - start) / chrono::milliseconds(1) >= hardMillisecondsForThisTurn;
+    return hardTimeUp;
 }
 
-inline int millisecondsLeftForThisTurn()
+inline bool isSoftTimeUp()
 {
-    int millisecondsElapsed = (chrono::steady_clock::now() - start) / chrono::milliseconds(1);
-    return millisecondsForThisTurn - millisecondsElapsed;
+    if (isMoveTime) 
+        return isHardTimeUp();
+    return (chrono::steady_clock::now() - start) / chrono::milliseconds(1) >= softMillisecondsForThisTurn;
 }
 

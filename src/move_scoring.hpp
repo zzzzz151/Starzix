@@ -27,7 +27,7 @@ inline void scoreMoves(MovesList &moves, int *scores, TTEntry &ttEntry, int plyF
             scores[i] = moveScore;
         }
         else if (move.promotionPieceType() != PieceType::NONE)
-            scores[i] = PROMOTION_SCORE;
+            scores[i] = PROMOTION_SCORE + move.typeFlag();
         else if (killerMoves[plyFromRoot][0] == move)
             scores[i] = KILLER_SCORE + 1;
         else if (killerMoves[plyFromRoot][1] == move)
