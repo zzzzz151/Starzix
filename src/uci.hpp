@@ -84,9 +84,9 @@ namespace uci
     {
         string received;
         getline(cin, received);
-        cout << "id name z5\n";
+        cout << "id name z5 2.0\n";
         cout << "id author zzzzz\n";
-        cout << "option name Hash type spin default " << TT_SIZE_MB << " min 1 max 512\n";
+        cout << "option name Hash type spin default " << TT_SIZE_MB << " min 1 max 1024\n";
         cout << "uciok\n";
 
         while (true)

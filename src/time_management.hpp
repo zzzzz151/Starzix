@@ -23,8 +23,8 @@ inline void setupTime(vector<string> &words, Color color)
             movesToGo = stoi(words[i + 1]);
         else if (words[i] == "movetime")
         {
-            milliseconds = stoi(words[i + 1]);
             isMoveTime = true;
+            milliseconds = stoi(words[i + 1]);
         }
     }
 
@@ -34,7 +34,7 @@ inline void setupTime(vector<string> &words, Color color)
     }
     else if (movesToGo != -1)
     {
-        hardMillisecondsForThisTurn = movesToGo == 1 ? milliseconds - min(10, milliseconds / 2) : milliseconds / 2;
+        hardMillisecondsForThisTurn = movesToGo == 1 ? milliseconds - min(10, milliseconds / 2) : milliseconds * 0.75;
         softMillisecondsForThisTurn = min(0.5 * milliseconds / movesToGo, (double)hardMillisecondsForThisTurn);
     }
     else if (milliseconds != -1)
@@ -66,7 +66,7 @@ inline bool isSoftTimeUp()
 
     Move bestMove = pvLines[0][0];
     double bestMoveFraction = (double)movesNodes[bestMove.from()][bestMove.to()] / (double)nodes;
-    double softTimeScale = (1.25 - bestMoveFraction) * 1.5;
+    double softTimeScale = (1.25 - bestMoveFraction) * 1.75;
     return (chrono::steady_clock::now() - start) / chrono::milliseconds(1) >= softMillisecondsForThisTurn * softTimeScale;
 }
 

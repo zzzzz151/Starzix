@@ -1,7 +1,5 @@
 # z5 - C++ chess engine
 
-Estimated ~3300 elo (tested against [4ku](https://github.com/kz04px/4ku) 3.0, [amoeba](https://github.com/abulmo/amoeba) 3.4 and [StockNemo](https://github.com/TheBlackPlague/StockNemo) 5.7.0.0).
-
 # How to build
 
 ```g++ -O3 -march=native -std=c++17 src/main.cpp -o z5.exe```
@@ -10,7 +8,7 @@ Estimated ~3300 elo (tested against [4ku](https://github.com/kz04px/4ku) 3.0, [a
 
 **Options**
 
-- Hash (int, default 64, 1 to 512) - transposition table size in MB
+- Hash (int, default 64, 1 to 1024) - transposition table size in MB
 
 **Extra commands**
 
