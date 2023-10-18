@@ -2,7 +2,7 @@
 
 # How to build
 
-```g++ -O3 -march=native -std=c++17 src/main.cpp -o z5.exe```
+```clang++ -O3 -march=native -std=c++20 main.cpp -o z5.exe```
 
 # UCI (Universal Chess Interface)
 
@@ -52,7 +52,7 @@ Late move pruning
 
 SEE depth-based pruning
 
-Time management
+Time management (any time control, soft and hard limits)
 
 # Credits
 
