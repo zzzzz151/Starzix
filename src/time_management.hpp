@@ -4,7 +4,7 @@
 
 chrono::steady_clock::time_point start;
 bool isMoveTime = false;
-int softMillisecondsForThisTurn, hardMillisecondsForThisTurn;
+int hardMillisecondsForThisTurn, softMillisecondsForThisTurn;
 bool hardTimeUp = false;
 
 inline void setupTime(vector<string> &words, Color color)
@@ -45,9 +45,9 @@ inline void setupTime(vector<string> &words, Color color)
     }
     else
     {
-        // if invalid 'go' command received, default to 1 minute (this should never happen)
+        // received just 'go' or 'go infinite'
         isMoveTime = true;
-        softMillisecondsForThisTurn = hardMillisecondsForThisTurn = 60000;
+        softMillisecondsForThisTurn = hardMillisecondsForThisTurn = INT_MAX;
     }
 }
 
@@ -63,6 +63,11 @@ inline bool isSoftTimeUp()
 {
     if (isMoveTime) 
         return isHardTimeUp();
-    return (chrono::steady_clock::now() - start) / chrono::milliseconds(1) >= softMillisecondsForThisTurn;
+
+    Move bestMove = pvLines[0][0];
+    double bestMoveFraction = (double)movesNodes[bestMove.from()][bestMove.to()] / (double)nodes;
+    double softTimeScale = (1.25 - bestMoveFraction) * 1.5;
+    return (chrono::steady_clock::now() - start) / chrono::milliseconds(1) >= softMillisecondsForThisTurn * softTimeScale;
 }
+
 

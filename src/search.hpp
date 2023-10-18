@@ -46,6 +46,7 @@ Board board;
 Move pvLines[MAX_DEPTH*2][MAX_DEPTH*2];
 int pvLengths[MAX_DEPTH*2];
 uint64_t nodes;
+uint64_t movesNodes[64][64]; // from, to
 int maxPlyReached;
 Move killerMoves[MAX_DEPTH*2][2]; // ply, move
 int history[2][6][64];            // color, pieceType, targetSquare
@@ -153,12 +154,13 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
     pvLengths[plyFromRoot] = 0;
 
     if (plyFromRoot > 0 && (board.isDraw() || board.isRepetition()))
-        return 0;
+        return -1 + (nodes % 3);
 
     bool inCheck = board.inCheck();
     if (inCheck) depth++; // Check extension
 
-    if (depth <= 0) return qSearch(alpha, beta, plyFromRoot);
+    if (depth <= 0) 
+        return qSearch(alpha, beta, plyFromRoot);
 
     // Probe TT
     TTEntry *ttEntry = &(tt[board.zobristHash() % tt.size()]);
@@ -232,8 +234,9 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
         if (!board.makeMove(move))
             continue; // illegal move
 
-        legalMovesPlayed++;
+        uint64_t prevNodes = nodes;
         nodes++;
+        legalMovesPlayed++;
         Square targetSquare = move.to();
         int pieceType = move.promotionPieceType() != PieceType::NONE ? (int)PieceType::PAWN : (int)board.pieceTypeAt(targetSquare);
         int *pointerMoveHistory = &(history[stm][pieceType][targetSquare]);
@@ -267,6 +270,9 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
 
         board.undoMove();
         if (isHardTimeUp()) return 0;
+
+        if (plyFromRoot == 0)
+            movesNodes[move.from()][targetSquare] += nodes - prevNodes;
 
         if (isQuietMove)
             pointersFailLowQuietsHistory[numFailLowQuiets++] = pointerMoveHistory;
@@ -357,16 +363,16 @@ inline int aspiration(int maxDepth, int score)
 
 inline void iterativeDeepening()
 {
-    // clear pv lines, killers, countermoves and history
+    // clear stuff
+    nodes = 0;
+    memset(&(movesNodes[0][0]), 0, sizeof(movesNodes));
     memset(&(pvLines[0][0]), 0, sizeof(pvLines));
     memset(&(pvLengths[0]), 0, sizeof(pvLengths));
     memset(&(killerMoves[0][0]), 0, sizeof(killerMoves));
     memset(&(counterMoves[0][0]), 0, sizeof(counterMoves));
     memset(&(history[0][0][0]), 0, sizeof(history));
 
-    nodes = 0;
     int iterationDepth = 1, score = 0;
-
     while (iterationDepth <= MAX_DEPTH)
     {
         maxPlyReached = -1;
@@ -383,6 +389,7 @@ inline void iterativeDeepening()
 
         if (pvLines[0][0] != NULL_MOVE && isSoftTimeUp())
             break;
+
     }
 }
 
