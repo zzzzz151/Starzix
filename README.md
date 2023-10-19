@@ -12,7 +12,7 @@
 
 **Extra commands**
 
-- perft \<depth\> - runs a perft from current position
+- perft \<depth\> - runs perft from current position
 
 - eval - displays current position's evaluation from perspective of side to move
 
@@ -32,7 +32,7 @@ Transposition table
 
 Quiescence search with SEE pruning
 
-Move ordering (hash move > good captures by SEE + MVVLVA > promotions > killer moves > countermove > history heuristic > bad captures)
+Move ordering (hash move > good captures by SEE + MVVLVA > promotions > killer moves > countermove > quiet moves by history > bad captures)
 
 Aspiration windows
 

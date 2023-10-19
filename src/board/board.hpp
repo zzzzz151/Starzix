@@ -65,8 +65,10 @@ class Board
                            zobristEnPassantFiles[8];
 
     Move lastMovePlayed;
-    
+
     public:
+
+    bool perft = false; // In perft, dont update zobrist hash nor nnue accumulator
 
     Board() = default;
 
@@ -403,30 +405,30 @@ class Board
         pushState(move, pieces[to]);
 
         Piece piece = pieces[from];
-        removePiece(from, true);
-        removePiece(to, true);
+        removePiece(from, !perft);
+        removePiece(to, !perft);
 
         PieceType promotionPieceType = move.promotionPieceType();
         if (promotionPieceType != PieceType::NONE)
         {
-            placePiece(makePiece(promotionPieceType, colorPlaying), to, true);
+            placePiece(makePiece(promotionPieceType, colorPlaying), to, !perft);
             goto piecesProcessed;
         }
 
-        placePiece(piece, to, true);
+        placePiece(piece, to, !perft);
 
         if (typeFlag == move.CASTLING_FLAG)
         {
             Piece rook = makePiece(PieceType::ROOK, colorPlaying);
             bool isShortCastle = to > from;
-            removePiece(isShortCastle ? to+1 : to-2, true); 
-            placePiece(rook, isShortCastle ? to-1 : to+1, true);
+            removePiece(isShortCastle ? to+1 : to-2, !perft); 
+            placePiece(rook, isShortCastle ? to-1 : to+1, !perft);
 
         }
         else if (typeFlag == move.EN_PASSANT_FLAG)
         {
             Square capturedPawnSquare = color == WHITE ? to - 8 : to + 8;
-            removePiece(capturedPawnSquare, true);
+            removePiece(capturedPawnSquare, !perft);
         }
 
         piecesProcessed:

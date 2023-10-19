@@ -46,7 +46,7 @@ int main()
 {   
     Board::initZobrist();
     attacks::initAttacks();
-    nnue::loadNetFromFile();
+    //nnue::loadNetFromFile();
 
     Board board = Board(START_FEN);
     Board board2 = Board("1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 w Qk f6 0 15");
@@ -184,6 +184,12 @@ int main()
     Board boardPos4 = Board(POSITION4);
     Board boardPos4Mirrored = Board(POSITION4_MIRRORED);
     Board boardPos5 = Board(POSITION5);
+    board.perft = true;
+    boardPos2.perft = true;
+    boardPos3.perft = true;
+    boardPos4.perft = true;
+    boardPos4Mirrored.perft = true;
+    boardPos5.perft = true;
 
     test("perft(1) position 2 kiwipete", perft(boardPos2, 1), 48ULL);
     test("perft(1) position 3", perft(boardPos3, 1), 14ULL);
@@ -217,9 +223,6 @@ int main()
 
     cout << "Passed: " << passed << endl;
     cout << "Failed: " << failed << endl;
-    
-    perftBench(board, 6);
-    perftBench(boardPos2, 5);
     
     return 0;
 }
