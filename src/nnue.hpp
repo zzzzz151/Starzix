@@ -1,6 +1,8 @@
 #pragma once
 
 // clang-format off
+
+#include <stdio.h>
 #include <array>
 
 namespace nnue
@@ -20,14 +22,16 @@ namespace nnue
 
     inline void loadNetFromFile()
     {        
-        FILE* file = fopen(NET_FILE, "rb");
-        if (file) {
+        FILE *netFile;
+        errno_t error = fopen_s(&netFile, NET_FILE, "rb");
+
+        if (error == 0) {
             // Read binary data into the struct
-            fread(nn.featureWeights.data(), sizeof(int16_t), nn.featureWeights.size(), file);
-            fread(nn.featureBiases.data(), sizeof(int16_t), nn.featureBiases.size(), file);
-            fread(nn.outputWeights.data(), sizeof(int8_t), nn.outputWeights.size(), file);
-            fread(&nn.outputBias, sizeof(int16_t), 1, file);
-            fclose(file); 
+            fread(nn.featureWeights.data(), sizeof(int16_t), nn.featureWeights.size(), netFile);
+            fread(nn.featureBiases.data(), sizeof(int16_t), nn.featureBiases.size(), netFile);
+            fread(nn.outputWeights.data(), sizeof(int8_t), nn.outputWeights.size(), netFile);
+            fread(&nn.outputBias, sizeof(int16_t), 1, netFile);
+            fclose(netFile); 
         } 
         else 
         {

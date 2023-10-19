@@ -79,19 +79,6 @@ inline uint8_t msb(uint64_t b)
 
 #endif
 
-inline int popcount(uint64_t mask)
-{
-#if defined(_MSC_VER) || defined(__INTEL_COMPILER)
-
-    return (uint8_t)_mm_popcnt_uint64_t(mask);
-
-#else // Assumed gcc or compatible compiler
-
-    return __builtin_popcountll(mask);
-
-#endif
-}
-
 inline uint8_t poplsb(uint64_t &mask)
 {
     uint8_t s = lsb(mask);
