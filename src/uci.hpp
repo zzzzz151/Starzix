@@ -45,7 +45,7 @@ namespace uci
 
     inline void go(vector<string> &words)
     {
-        setupTime(words, board.colorToMove());
+        setupTime(words, board.sideToMove());
         iterativeDeepening();
         cout << "bestmove " + pvLines[0][0].toUci() + "\n";
     }
@@ -116,7 +116,7 @@ namespace uci
                 perftBench(board, depth);
             }
             else if (words[0] == "eval")
-                cout << "eval " << nnue::evaluate(board.colorToMove()) << " cp" << endl;
+                cout << "eval " << nnue::evaluate(board.sideToMove()) << " cp" << endl;
         }
     }
 

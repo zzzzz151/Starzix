@@ -16,7 +16,7 @@ inline void scoreMoves(MovesList &moves, int *scores, TTEntry &ttEntry, int plyF
     {
         Move move = moves[i];
 
-        if (board.zobristHash() == ttEntry.zobristHash && move == ttEntry.bestMove)
+        if (board.getZobristHash() == ttEntry.zobristHash && move == ttEntry.bestMove)
             scores[i] = HASH_MOVE_SCORE;
         else if (board.isCapture(move))
         {
@@ -32,11 +32,11 @@ inline void scoreMoves(MovesList &moves, int *scores, TTEntry &ttEntry, int plyF
             scores[i] = KILLER_SCORE + 1;
         else if (killerMoves[plyFromRoot][1] == move)
             scores[i] = KILLER_SCORE;
-        else if (move == counterMoves[board.enemyColor()][board.lastMove().move()])
+        else if (move == counterMoves[board.oppSide()][board.getLastMove().move()])
             scores[i] = COUNTERMOVE_SCORE;
         else
         {
-            int stm = (int)board.colorToMove();
+            int stm = (int)board.sideToMove();
             int pieceType = (int)board.pieceTypeAt(move.from());
             int targetSqiare = (int)move.to();
             scores[i] = HISTORY_SCORE + history[stm][pieceType][targetSqiare];

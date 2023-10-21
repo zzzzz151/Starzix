@@ -17,25 +17,24 @@ struct Move
     public:
 
     const static uint16_t NULL_FLAG = 0x0000,
-                          NORMAL_FLAG = 0x0009,
-                          CASTLING_FLAG = 0x0008,
+                          NORMAL_FLAG = 0x0005,
+                          CASTLING_FLAG = 0x0006,
                           EN_PASSANT_FLAG = 0x0007,
+                          PAWN_TWO_UP_FLAG = 0x0008,
                           KNIGHT_PROMOTION_FLAG = 0x0001,
                           BISHOP_PROMOTION_FLAG = 0x0002,
                           ROOK_PROMOTION_FLAG = 0x0003,
                           QUEEN_PROMOTION_FLAG = 0x0004;
 
-    constexpr static uint16_t PROMOTION_FLAGS[4] = {QUEEN_PROMOTION_FLAG, KNIGHT_PROMOTION_FLAG, BISHOP_PROMOTION_FLAG, ROOK_PROMOTION_FLAG};
-
     inline Move() = default;
 
     // Custom == operator
-    inline bool operator==(const Move& other) const {
+    inline bool operator==(const Move &other) const {
         return moveEncoded == other.moveEncoded;
     }
 
     // Custom != operator
-    inline bool operator!=(const Move& other) const {
+    inline bool operator!=(const Move &other) const {
         return moveEncoded != other.moveEncoded;
     }
 
@@ -51,7 +50,23 @@ struct Move
 
     inline Move(string from, string to, uint16_t typeFlag) : Move(strToSquare(from), strToSquare(to), typeFlag) {}
 
-    static inline Move fromUci(string uci, Piece* boardPieces)
+    inline uint16_t move() { return moveEncoded; }
+
+    inline Square from() { return (moveEncoded >> 10) & 0b111111; }
+
+    inline Square to() { return (moveEncoded >> 4) & 0b111111; }
+
+    inline uint16_t typeFlag() { return moveEncoded & 0x000F; }
+
+    inline PieceType promotionPieceType()
+    {
+        uint16_t flag = typeFlag();
+        if (flag < 1 || flag > 4)
+            return PieceType::NONE;
+        return (PieceType)flag;
+    }
+
+    static inline Move fromUci(string uci, array<Piece, 64> pieces)
     {
         Square from = strToSquare(uci.substr(0,2));
         Square to = strToSquare(uci.substr(2,4));
@@ -70,35 +85,21 @@ struct Move
 
             return Move(from, to, typeFlag);
         }
-
-        PieceType pieceType = pieceTypeAt(from, boardPieces);
-        if (pieceType == PieceType::PAWN && boardPieces[to] == Piece::NONE && squareFile(from) != squareFile(to))
-            return Move(from, to, EN_PASSANT_FLAG);
-
-        if (pieceType == PieceType::KING)
+        else if (pieceToPieceType(pieces[from]) == PieceType::KING)
         {
-            int bitboardSquaresMoved = (int)to - (int)from;
-            if (bitboardSquaresMoved == 2 || bitboardSquaresMoved == -2)
-                return Move(from, to, CASTLING_FLAG);
+            if (abs((int)to - (int)from) == 2)
+                return Move(from, to, Move::CASTLING_FLAG);
+        }
+        else if (pieceToPieceType(pieces[from]) == PieceType::PAWN)
+        { 
+            int bitboardSquaresTraveled = abs((int)to - (int)from);
+            if (bitboardSquaresTraveled == 16)
+                return Move(from, to, PAWN_TWO_UP_FLAG);
+            if (bitboardSquaresTraveled != 8 && pieces[to] == Piece::NONE)
+                return Move(from, to, EN_PASSANT_FLAG);
         }
 
         return Move(from, to, NORMAL_FLAG);
-    }
-
-    inline uint16_t move() { return moveEncoded; }
-
-    inline Square from() { return (moveEncoded >> 10) & 0b111111; }
-
-    inline Square to() { return (moveEncoded >> 4) & 0b111111; }
-
-    inline uint16_t typeFlag() { return moveEncoded & 0x000F; }
-
-    inline PieceType promotionPieceType()
-    {
-        uint16_t flag = typeFlag();
-        if (flag < 1 || flag > 4)
-            return PieceType::NONE;
-        return (PieceType)flag;
     }
 
     inline string toUci()

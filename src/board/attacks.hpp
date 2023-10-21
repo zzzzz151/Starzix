@@ -19,7 +19,7 @@ namespace attacks
                     SQUARE_DIAGONAL_RIGHT = square + (color == WHITE ? 9 : -7);
 
             uint8_t rank = squareRank(square);
-            if ((color == WHITE && rank >= 6) || (color == BLACK && rank <= 1))
+            if ((color == WHITE && rank == 7) || (color == BLACK && rank == 0))
                 return 0ULL;
 
             uint8_t file = squareFile(square);

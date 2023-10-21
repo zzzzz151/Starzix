@@ -5,7 +5,8 @@
 
 inline uint64_t perft(Board &board, int depth)
 {
-    if (depth == 0) return 1;
+    if (depth == 0) 
+        return 1;
 
     MovesList moves = board.pseudolegalMoves();
     uint64_t nodes = 0;
@@ -46,7 +47,8 @@ inline void perftDivide(Board &board, int depth)
     uint64_t totalNodes = 0;
     for (int i = 0; i < moves.size(); i++) 
     {
-        if (!board.makeMove(moves[i])) continue;
+        if (!board.makeMove(moves[i])) 
+            continue;
         uint64_t nodes = perft(board, depth - 1);
         cout << moves[i].toUci() << ": " << nodes << endl;
         totalNodes += nodes;
@@ -58,7 +60,8 @@ inline void perftDivide(Board &board, int depth)
 
 inline uint64_t perftCaptures(Board &board, int depth)
 {
-    if (depth == 0) return 0;
+    if (depth == 0) 
+        return 0;
 
     uint64_t legalCaptures = 0;
     if (depth == 1)

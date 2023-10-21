@@ -47,7 +47,7 @@ int main()
     Board::initZobrist();
     attacks::initAttacks();
     //nnue::loadNetFromFile();
-
+    
     Board board = Board(START_FEN);
     Board board2 = Board("1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 w Qk f6 0 15");
     Board board3 = Board("1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 b Qk f6 0");
@@ -60,8 +60,8 @@ int main()
     bitset<64> expected(0xffff00000000ffffULL);  
     test("board.occupancy()", got, expected);
 
-    test("pieceBitboard(KING) == 2", popcount(board.pieceBitboard(PieceType::KING)), 2);
-    test("pieceBitboard(KING, WHITE) == 1", popcount(board.pieceBitboard(PieceType::KING, WHITE)), 1);
+    test("getBitboard(KING) == 2", popcount(board.getBitboard(PieceType::KING)), 2);
+    test("getBitboard(KING, WHITE) == 1", popcount(board.getBitboard(PieceType::KING, WHITE)), 1);
     
     test("squareFile()", (int)squareFile(33), 1);
     test("squareFile()", (int)squareFile(15), 7);
@@ -89,13 +89,14 @@ int main()
     test("move.promotionPieceType() == bishop", (int)move.promotionPieceType(), (int)PieceType::BISHOP);
 
     board = Board("rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/2P2P2/RqBQ1RK1 b kq - 1 10");
+    test("move has PAWN_TWO_UP_FLAG flag", Move::fromUci("g7g5", board.getPieces()).typeFlag(), Move::PAWN_TWO_UP_FLAG);
     board.makeMove("g7g5");
     test("makeMove() creates en passant", board.fen(), (string)"rnbqkb1r/4pp1p/1p1p1n2/2p3pP/2BP2P1/4PN2/2P2P2/RqBQ1RK1 w kq g6 0 11");
 
     board = Board("rnbqkbnr/pppppp1p/8/8/1P4pP/3P4/P1P1PPP1/RNBQKBNR b KQkq h3 0 3");
     board.makeMove("g4h3");
-    test("makeMove() creates en passant v2", board.fen(), (string)"rnbqkbnr/pppppp1p/8/8/1P6/3P3p/P1P1PPP1/RNBQKBNR w KQkq - 0 4");
-
+    test("fen is correct after taking en passant", board.fen(), (string)"rnbqkbnr/pppppp1p/8/8/1P6/3P3p/P1P1PPP1/RNBQKBNR w KQkq - 0 4");
+    
     board = Board(START_FEN);
     test("isRepetition()", board.isRepetition(), false);
     board.makeMove("e2e4");
@@ -114,14 +115,14 @@ int main()
     test("isRepetition()", board.isRepetition(), false);
 
     board = Board(POSITION2_KIWIPETE); 
-    test("isSquareAttacked() #1 (empty sq attacked by us)", board.isSquareAttacked("e3", board.colorToMove()), true);
-    test("isSquareAttacked() #2 (empty sq not attacked by us)", board.isSquareAttacked("a5", board.colorToMove()), false);
-    test("isSquareAttacked() #3 (empty sq attacked by enemy)", board.isSquareAttacked("d6", board.enemyColor()), true);
-    test("isSquareAttacked() #4 (empty sq not attacked by enemy)", board.isSquareAttacked("b3", board.enemyColor()), false);
-    test("isSquareAttacked() #5 (we can capture enemy in this square)", board.isSquareAttacked("d7", board.colorToMove()), true);
-    test("isSquareAttacked() #6 (we cannot capture enemy in this square)", board.isSquareAttacked("b4", board.colorToMove()), false);
-    test("isSquareAttacked() #7 (enemy can capture us in this square)", board.isSquareAttacked("e2", board.enemyColor()), true);
-    test("isSquareAttacked() #8 (enemy cannot capture us in this square)", board.isSquareAttacked("h2", board.enemyColor()), false);
+    test("isSquareAttacked() #1 (empty sq attacked by us)", board.isSquareAttacked("e3", board.sideToMove()), true);
+    test("isSquareAttacked() #2 (empty sq not attacked by us)", board.isSquareAttacked("a5", board.sideToMove()), false);
+    test("isSquareAttacked() #3 (empty sq attacked by enemy)", board.isSquareAttacked("d6", board.oppSide()), true);
+    test("isSquareAttacked() #4 (empty sq not attacked by enemy)", board.isSquareAttacked("b3", board.oppSide()), false);
+    test("isSquareAttacked() #5 (we can capture enemy in this square)", board.isSquareAttacked("d7", board.sideToMove()), true);
+    test("isSquareAttacked() #6 (we cannot capture enemy in this square)", board.isSquareAttacked("b4", board.sideToMove()), false);
+    test("isSquareAttacked() #7 (enemy can capture us in this square)", board.isSquareAttacked("e2", board.oppSide()), true);
+    test("isSquareAttacked() #8 (enemy cannot capture us in this square)", board.isSquareAttacked("h2", board.oppSide()), false);
 
     board = Board("rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/p1P2P2/RNBQK2R b KQkq - 5 9");
     test("inCheck() returns false", board.inCheck(), false);
@@ -133,50 +134,48 @@ int main()
     test("undoNullMove() fen", board.fen(), (string)"1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 w Qk f6 0 15");
 
     board = Board("rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/p1P2P2/RNBQK2R b KQkq - 5 9");
-    uint64_t zobristHashBefore = board.zobristHash();
-    string myMoves[6] = { "a2b1q", // black promotes to queen
-                          "e1g1", // white castles short
-                          "g7g5", // black allows enpassant
-                          "h5g6", // white takes on passant
-                          "f6g4", // black captures white pawn with black knight
-                          "a1a2" }; // white moves rook up (test 50move counter)
-    for (string myMove : myMoves)
-        board.makeMove(myMove);
+    uint64_t zobristHashBefore = board.getZobristHash();
+    board.makeMove("a2b1q");  // black promotes to queen | rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/2P2P2/RqBQK2R w KQkq - 0 10
+    board.makeMove("e1g1"); // white castles short | rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/2P2P2/RqBQ1RK1 b kq - 1 10
+    board.makeMove("g7g5"); // black allows enpassant | rnbqkb1r/4pp1p/1p1p1n2/2p3pP/2BP2P1/4PN2/2P2P2/RqBQ1RK1 w kq g6 0 11
+    board.makeMove("h5g6"); // white takes on passant | rnbqkb1r/4pp1p/1p1p1nP1/2p5/2BP2P1/4PN2/2P2P2/RqBQ1RK1 b kq - 0 11
+    board.makeMove("f6g4");  // black captures white pawn with black knight | rnbqkb1r/4pp1p/1p1p2P1/2p5/2BP2n1/4PN2/2P2P2/RqBQ1RK1 w kq - 0 12
+    board.makeMove("a1a2"); // white moves rook up (test 50move counter) | rnbqkb1r/4pp1p/1p1p2P1/2p5/2BP2n1/4PN2/R1P2P2/1qBQ1RK1 b kq - 1 12
     test("fen is what we expect after 6x makeMove()", board.fen(), (string)"rnbqkb1r/4pp1p/1p1p2P1/2p5/2BP2n1/4PN2/R1P2P2/1qBQ1RK1 b kq - 1 12");
-    test("zobristHash is what we expect after making moves", board.zobristHash(), Board("rnbqkb1r/4pp1p/1p1p2P1/2p5/2BP2n1/4PN2/R1P2P2/1qBQ1RK1 b kq - 1 12").zobristHash());
+    test("zobristHash is what we expect after making moves", board.getZobristHash(), Board("rnbqkb1r/4pp1p/1p1p2P1/2p5/2BP2n1/4PN2/R1P2P2/1qBQ1RK1 b kq - 1 12").getZobristHash());
 
     for (int i = 5; i >= 0; i--)
         board.undoMove();
     test("fen is what we expect after 6x undoMove()", board.fen(), (string)"rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/p1P2P2/RNBQK2R b KQkq - 5 9");
-    test("zobristHash is same after making and undoing moves", board.zobristHash(), zobristHashBefore);
+    test("zobristHash is same after making and undoing moves", board.getZobristHash(), zobristHashBefore);
 
     board = Board("r3k2r/pppppppp/8/2P1P2P/8/8/8/R3K2R b KQkq - 0 1");
-    uint64_t zobHash = board.zobristHash();
+    uint64_t zobHash = board.getZobristHash();
     board.makeMove("a8b8"); // black rook moves
-    uint64_t zobHash2 = board.zobristHash();
+    uint64_t zobHash2 = board.getZobristHash();
     testNotEquals("Zobrist hash not equals after losing castle right", zobHash2, zobHash);
     board.undoMove();
-    uint64_t zobHash3 = board.zobristHash();
+    uint64_t zobHash3 = board.getZobristHash();
     testNotEquals("Zobrist hash not equals after undoing move", zobHash3, zobHash2);
     test("Zobrist hash equals after undoing move to before undoing the move", zobHash3, zobHash);
 
     board = Board("r3k2r/pppppppp/8/2P1P2P/8/8/8/R3K2R b KQkq - 0 1");
     board.makeMove("b7b5"); // creates enpassant target square b6
-    zobHash2 = board.zobristHash();
+    zobHash2 = board.getZobristHash();
     testNotEquals("Zobrist hash not equals after creating enpassant sq", zobHash2, zobHash);
     board.undoMove();
-    test("Zobrist hash equals after undoing move", board.zobristHash(), zobHash);
+    test("Zobrist hash equals after undoing move", board.getZobristHash(), zobHash);
 
     board = Board("r3k2r/pppppppp/8/2P1P2P/8/8/8/R3K2R b KQkq - 0 1");
     board.makeMove("a8b8");
     board.makeMove("e1e2");
     board.makeMove("d7d5");
-    test("Zobrist hash equals (making 3 moves vs from fen)", board.zobristHash(), Board("1r2k2r/ppp1pppp/8/2PpP2P/8/8/4K3/R6R w k d6 0 3").zobristHash());
+    test("Zobrist hash equals (making 3 moves vs from fen)", board.getZobristHash(), Board("1r2k2r/ppp1pppp/8/2PpP2P/8/8/4K3/R6R w k d6 0 3").getZobristHash());
 
     board = Board("rnb1kbnr/pppp1ppp/8/4p1q1/3P4/1P6/P1P1PPPP/RNBQKBNR w KQkq - 1 3");
-    zobHash = board.zobristHash();
+    zobHash = board.getZobristHash();
     board.makeMove("e1d2"); // illegal
-    test("Zobrist hash equals after illegal move", zobHash, board.zobristHash());
+    test("Zobrist hash equals after illegal move", zobHash, board.getZobristHash());
 
     board = Board(START_FEN);
     Board boardPos2 = Board(POSITION2_KIWIPETE);
@@ -190,7 +189,7 @@ int main()
     boardPos4.perft = true;
     boardPos4Mirrored.perft = true;
     boardPos5.perft = true;
-
+    
     test("perft(1) position 2 kiwipete", perft(boardPos2, 1), 48ULL);
     test("perft(1) position 3", perft(boardPos3, 1), 14ULL);
     test("perft(1) position 4", perft(boardPos4, 1), 6ULL);

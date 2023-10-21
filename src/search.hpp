@@ -68,11 +68,8 @@ namespace uci
 
 inline void initLmrTable()
 {
-    int numRows = sizeof(lmrTable) / sizeof(lmrTable[0]);
-    int numCols = sizeof(lmrTable[0]) / sizeof(lmrTable[0][0]); 
-
-    for (int depth = 0; depth < numRows; depth++)
-        for (int move = 0; move < numCols; move++)
+    for (int depth = 0; depth < MAX_DEPTH * 2; depth++)
+        for (int move = 0; move < 256; move++)
             // log(x) is ln(x)
             lmrTable[depth][move] = depth == 0 || move == 0 ? 0 : round(LMR_BASE + log(depth) * log(move) / LMR_DIVISOR);
 }
@@ -81,15 +78,15 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
 {
     // Quiescence saarch: search capture moves until a 'quiet' position is reached
 
-    int eval = nnue::evaluate(board.colorToMove());
+    int eval = nnue::evaluate(board.sideToMove());
     if (eval >= beta) 
         return eval;
     if (alpha < eval) 
         alpha = eval;
 
     // probe TT
-    TTEntry *ttEntry = &(tt[board.zobristHash() % tt.size()]);
-    if (plyFromRoot > 0 && board.zobristHash() == ttEntry->zobristHash)
+    TTEntry *ttEntry = &(tt[board.getZobristHash() % tt.size()]);
+    if (plyFromRoot > 0 && board.getZobristHash() == ttEntry->zobristHash)
         if (ttEntry->type == EXACT || (ttEntry->type == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->type == UPPER_BOUND && ttEntry->score <= alpha))
         {
             int ret = ttEntry->score;
@@ -163,8 +160,8 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
         return qSearch(alpha, beta, plyFromRoot);
 
     // Probe TT
-    TTEntry *ttEntry = &(tt[board.zobristHash() % tt.size()]);
-    if (plyFromRoot > 0 && ttEntry->zobristHash == board.zobristHash() && ttEntry->depth >= depth)
+    TTEntry *ttEntry = &(tt[board.getZobristHash() % tt.size()]);
+    if (plyFromRoot > 0 && ttEntry->zobristHash == board.getZobristHash() && ttEntry->depth >= depth)
         if (ttEntry->type == EXACT || (ttEntry->type == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->type == UPPER_BOUND && ttEntry->score <= alpha))
         {
             int ret = ttEntry->score;
@@ -173,11 +170,11 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
         }
 
     // IIR (Internal iterative reduction)
-    if (ttEntry->zobristHash != board.zobristHash() && depth >= IIR_MIN_DEPTH && !inCheck)
+    if (ttEntry->zobristHash != board.getZobristHash() && depth >= IIR_MIN_DEPTH && !inCheck)
         depth--;
 
     bool pvNode = beta - alpha > 1 || plyFromRoot == 0;
-    int eval = nnue::evaluate(board.colorToMove());
+    int eval = nnue::evaluate(board.sideToMove());
 
     if (!pvNode && !inCheck)
     {
@@ -186,7 +183,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
             return eval;
 
         // NMP (Null move pruning)
-        if (depth >= NMP_MIN_DEPTH && !skipNmp && eval >= beta && board.hasNonPawnMaterial(board.colorToMove()))
+        if (depth >= NMP_MIN_DEPTH && !skipNmp && eval >= beta && board.hasNonPawnMaterial(board.sideToMove()))
         {
             board.makeNullMove();
             int score = -search(depth - NMP_BASE_REDUCTION - depth / NMP_REDUCTION_DIVISOR, -beta, -alpha, plyFromRoot + 1, true);
@@ -203,7 +200,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
     int bestScore = NEG_INFINITY;
     Move bestMove;
     int legalMovesPlayed = 0;
-    int stm = board.colorToMove();
+    int stm = board.sideToMove();
     int* pointersFailLowQuietsHistory[256], numFailLowQuiets = 0;
     int originalAlpha = alpha;
 
@@ -309,7 +306,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
         }
         if (isQuietMove)
         {
-            counterMoves[(int)board.enemyColor()][board.lastMove().move()] = move;
+            counterMoves[(int)board.oppSide()][board.getLastMove().move()] = move;
             *pointerMoveHistory += depth * depth;
 
             // Penalize quiets that failed low (this one failed high so dont penalize it)

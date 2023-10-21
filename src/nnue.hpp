@@ -61,13 +61,13 @@ namespace nnue
                     while (bb > 0)
                     {
                         Square sq = poplsb(bb);
-                        activate(color, (PieceType)pt, sq);
+                        activate(color, sq, (PieceType)pt);
                     }
                 }
             }
         }
 
-        inline void activate(Color color, PieceType pieceType, Square sq)
+        inline void activate(Color color, Square sq, PieceType pieceType)
         {
             int whiteIdx = color * 384 + (int)pieceType * 64 + sq;
             int blackIdx = !color * 384 + (int)pieceType * 64 + (sq ^ 56);
@@ -81,7 +81,7 @@ namespace nnue
             }
         }   
 
-        inline void deactivate(Color color, PieceType pieceType, Square sq)
+        inline void deactivate(Color color, Square sq, PieceType pieceType)
         {
             int whiteIdx = color * 384 + (int)pieceType * 64 + sq;
             int blackIdx = !color * 384 + (int)pieceType * 64 + (sq ^ 56);

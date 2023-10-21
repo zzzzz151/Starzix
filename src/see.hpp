@@ -6,14 +6,14 @@
 const int SEE_PIECE_VALUES[7] = {100, 300, 300, 500, 900, 0, 0};
 const int PAWN_INDEX = 0;
 
-inline int gain(Board &board, Move &move)
+inline int gain(Board &board, Move move)
 {
-    auto moveType = move.typeFlag();
+    auto moveFlag = move.typeFlag();
 
-    if (moveType == move.CASTLING_FLAG)
+    if (moveFlag == Move::CASTLING_FLAG)
         return 0;
 
-    if (moveType == move.EN_PASSANT_FLAG)
+    if (moveFlag == Move::EN_PASSANT_FLAG)
         return SEE_PIECE_VALUES[PAWN_INDEX];
 
     int score = SEE_PIECE_VALUES[(int)board.pieceTypeAt(move.to())];
@@ -29,7 +29,7 @@ inline PieceType popLeastValuable(Board &board, uint64_t &occ, uint64_t attacker
 {
     for (int pt = 0; pt <= 5; pt++)
     {
-        uint64_t bb = attackers & board.pieceBitboard((PieceType)pt, color);
+        uint64_t bb = attackers & board.getBitboard((PieceType)pt, color);
         if (bb > 0)
         {
             occ ^= (1ULL << lsb(bb));
@@ -40,7 +40,7 @@ inline PieceType popLeastValuable(Board &board, uint64_t &occ, uint64_t attacker
     return PieceType::NONE;
 }
 
-inline bool SEE(Board &board, Move &move, int threshold = 0)
+inline bool SEE(Board &board, Move move, int threshold = 0)
 {
     int score = gain(board, move) - threshold;
     if (score < 0)
@@ -56,22 +56,22 @@ inline bool SEE(Board &board, Move &move, int threshold = 0)
     Square square = move.to();
 
     uint64_t occupancy = board.occupancy() ^ (1ULL << from) ^ (1ULL << square);
-    uint64_t queens = board.pieceBitboard(PieceType::QUEEN);
-    uint64_t bishops = queens | board.pieceBitboard(PieceType::BISHOP);
-    uint64_t rooks = queens | board.pieceBitboard(PieceType::ROOK);
+    uint64_t queens = board.getBitboard(PieceType::QUEEN);
+    uint64_t bishops = queens | board.getBitboard(PieceType::BISHOP);
+    uint64_t rooks = queens | board.getBitboard(PieceType::ROOK);
 
     uint64_t attackers = 0;
     attackers |= rooks & attacks::rookAttacks(square, occupancy);
     attackers |= bishops & attacks::bishopAttacks(square, occupancy);
-    attackers |= board.pieceBitboard(PieceType::PAWN, BLACK) & attacks::pawnAttacks(square, WHITE);
-    attackers |= board.pieceBitboard(PieceType::PAWN, WHITE) & attacks::pawnAttacks(square, BLACK);
-    attackers |= board.pieceBitboard(PieceType::KNIGHT) & attacks::knightAttacks(square);
-    attackers |= board.pieceBitboard(PieceType::KING) & attacks::kingAttacks(square);
+    attackers |= board.getBitboard(PieceType::PAWN, BLACK) & attacks::pawnAttacks(square, WHITE);
+    attackers |= board.getBitboard(PieceType::PAWN, WHITE) & attacks::pawnAttacks(square, BLACK);
+    attackers |= board.getBitboard(PieceType::KNIGHT) & attacks::knightAttacks(square);
+    attackers |= board.getBitboard(PieceType::KING) & attacks::kingAttacks(square);
 
-    Color us = board.enemyColor();
+    Color us = board.oppSide();
     while (true)
     {
-        uint64_t ourAttackers = attackers & board.colorBitboard(us);
+        uint64_t ourAttackers = attackers & board.getBitboard(us);
         if (ourAttackers == 0)
             break;
 
@@ -90,12 +90,12 @@ inline bool SEE(Board &board, Move &move, int threshold = 0)
         if (score >= 0)
         {
             // if our only attacker is our king, but the opponent still has defenders
-            if (next == PieceType::KING && (attackers & board.colorBitboard(us)) > 0)
+            if (next == PieceType::KING && (attackers & board.getBitboard(us)) > 0)
                 us = oppColor(us);
             break;
         }
     }
 
-    return board.colorToMove() != us;
+    return board.sideToMove() != us;
 }
 

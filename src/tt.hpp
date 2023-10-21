@@ -30,7 +30,7 @@ inline void clearTT()
 
 inline void storeInTT(TTEntry *ttEntry, uint8_t depth, Move &bestMove, int bestScore, int plyFromRoot, int originalAlpha, int beta)
 {
-    ttEntry->zobristHash = board.zobristHash();
+    ttEntry->zobristHash = board.getZobristHash();
     ttEntry->depth = depth;
     ttEntry->bestMove = bestMove;
 
