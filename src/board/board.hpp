@@ -347,12 +347,12 @@ class Board
 
     private:
 
-    inline void disableCastlingRight(int castlingRight)
+    inline void disableCastlingRight(Color color, int castlingRight)
     {
-        if (castlingRights[colorToMove][castlingRight])
+        if (castlingRights[color][castlingRight])
         {
-            castlingRights[colorToMove][castlingRight] = false;
-            zobristHash ^= zobristCastlingRights[colorToMove][castlingRight];
+            castlingRights[color][castlingRight] = false;
+            zobristHash ^= zobristCastlingRights[color][castlingRight];
         }
     }
 
@@ -427,13 +427,17 @@ class Board
         // Update castling rights
         if (pieceType == PieceType::KING)
         {
-            disableCastlingRight(CASTLE_SHORT);
-            disableCastlingRight(CASTLE_LONG);
+            disableCastlingRight(colorToMove, CASTLE_SHORT);
+            disableCastlingRight(colorToMove, CASTLE_LONG);
         }
-        else if (from == 7 || from == 63)
-            disableCastlingRight(CASTLE_SHORT);
-        else if (from == 0 || from == 56)
-            disableCastlingRight(CASTLE_LONG);
+        if (pieces[0] != Piece::WHITE_ROOK)
+            disableCastlingRight(WHITE, CASTLE_LONG);
+        if (pieces[7] != Piece::WHITE_ROOK)
+            disableCastlingRight(WHITE, CASTLE_SHORT);
+        if (pieces[56] != Piece::BLACK_ROOK)
+            disableCastlingRight(BLACK, CASTLE_LONG);
+        if (pieces[63] != Piece::BLACK_ROOK)
+            disableCastlingRight(BLACK, CASTLE_SHORT);
 
         if (pieceType == PieceType::PAWN || capturedPiece != Piece::NONE)
             pliesSincePawnMoveOrCapture = 0;
@@ -658,12 +662,13 @@ class Board
         }
 
         // Castling
-        if (!capturesOnly && kingSquare == (colorToMove == WHITE ? 4 : 60) && !inCheck())
+        int inCheck = -1;
+        if (!capturesOnly)
         {
             if (castlingRights[colorToMove][CASTLE_SHORT]
             && pieces[kingSquare+1] == Piece::NONE
             && pieces[kingSquare+2] == Piece::NONE
-            && pieces[kingSquare+3] == (colorToMove == WHITE ? Piece::WHITE_ROOK : Piece::BLACK_ROOK)
+            && !(inCheck = this->inCheck())
             && !isSquareAttacked(kingSquare+1, enemyColor) 
             && !isSquareAttacked(kingSquare+2, enemyColor))
                 moves.add(Move(kingSquare, kingSquare + 2, Move::CASTLING_FLAG));
@@ -672,7 +677,7 @@ class Board
             && pieces[kingSquare-1] == Piece::NONE
             && pieces[kingSquare-2] == Piece::NONE
             && pieces[kingSquare-3] == Piece::NONE
-            && pieces[kingSquare-4] == (colorToMove == WHITE ? Piece::WHITE_ROOK : Piece::BLACK_ROOK)
+            && !(inCheck == -1 ? this->inCheck() : inCheck)
             && !isSquareAttacked(kingSquare-1, enemyColor) 
             && !isSquareAttacked(kingSquare-2, enemyColor))
                 moves.add(Move(kingSquare, kingSquare - 2, Move::CASTLING_FLAG));
@@ -771,7 +776,7 @@ class Board
             return true;
 
         // En passant
-        if (enPassantSquare != 0 && enPassantSquare == square && colorAttacking == colorToMove)
+        if (enPassantSquare == square && colorAttacking == colorToMove)
             return true;
 
         // DEBUG cout << "not attacked by pawns" << endl;
