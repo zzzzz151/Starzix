@@ -53,16 +53,19 @@ inline void setupTime(vector<string> &words, Color color)
 
 inline bool isHardTimeUp()
 {
+    if (pvLines[0][0] == NULL_MOVE)
+        return false;
     if (hardTimeUp) 
         return true;
-    hardTimeUp = (chrono::steady_clock::now() - start) / chrono::milliseconds(1) >= hardMillisecondsForThisTurn;
-    return hardTimeUp;
+    return (hardTimeUp = (chrono::steady_clock::now() - start) / chrono::milliseconds(1) >= hardMillisecondsForThisTurn);
 }
 
 inline bool isSoftTimeUp()
 {
     if (isMoveTime) 
         return isHardTimeUp();
+    if (pvLines[0][0] == NULL_MOVE)
+        return false;
 
     Move bestMove = pvLines[0][0];
     double bestMoveFraction = (double)movesNodes[bestMove.from()][bestMove.to()] / (double)nodes;

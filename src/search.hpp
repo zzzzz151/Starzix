@@ -43,12 +43,12 @@ const int LMR_HISTORY_DIVISOR = 1024;
 
 const int POS_INFINITY = 9999999, NEG_INFINITY = -POS_INFINITY, MIN_MATE_SCORE = POS_INFINITY - 512;
 Board board;
-Move pvLines[MAX_DEPTH*2][MAX_DEPTH*2];
-int pvLengths[MAX_DEPTH*2];
+Move pvLines[MAX_DEPTH * 2][MAX_DEPTH * 2];
+int pvLengths[MAX_DEPTH * 2];
 uint64_t nodes;
 uint64_t movesNodes[64][64]; // from, to
 int maxPlyReached;
-Move killerMoves[MAX_DEPTH*2][2]; // ply, move
+Move killerMoves[MAX_DEPTH * 2][2]; // ply, killerIndex
 int history[2][6][64];            // color, pieceType, targetSquare
 Move counterMoves[2][1ULL << 16]; // color, moveEncoded
 int lmrTable[MAX_DEPTH * 2][256]; // depth, move
@@ -76,7 +76,10 @@ inline void initLmrTable()
 
 inline int qSearch(int alpha, int beta, int plyFromRoot)
 {
-    // Quiescence saarch: search capture moves until a 'quiet' position is reached
+    // Quiescence search: search capture moves until a 'quiet' position is reached
+
+    if (plyFromRoot > maxPlyReached)
+        maxPlyReached = plyFromRoot;
 
     int eval = nnue::evaluate(board.sideToMove());
     if (eval >= beta) 
@@ -86,16 +89,16 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
 
     // probe TT
     TTEntry *ttEntry = &(tt[board.getZobristHash() % tt.size()]);
-    if (plyFromRoot > 0 && board.getZobristHash() == ttEntry->zobristHash)
-        if (ttEntry->type == EXACT || (ttEntry->type == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->type == UPPER_BOUND && ttEntry->score <= alpha))
-        {
-            int ret = ttEntry->score;
-            if (abs(ret) >= MIN_MATE_SCORE) ret += ret < 0 ? plyFromRoot : -plyFromRoot;
-            return ret;
-        }
+    if (plyFromRoot > 0 && board.getZobristHash() == ttEntry->zobristHash
+    && (ttEntry->type == EXACT || (ttEntry->type == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->type == UPPER_BOUND && ttEntry->score <= alpha)))
+    {
+        int score = ttEntry->score;
+        if (abs(score) >= MIN_MATE_SCORE) 
+            score += score < 0 ? plyFromRoot : -plyFromRoot;
+        return score;
+    }
 
     MovesList moves = board.pseudolegalMoves(true);
-
     int scores[256];
     scoreMoves(moves, scores, *ttEntry, plyFromRoot);
     int bestScore = eval;
@@ -161,13 +164,14 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
 
     // Probe TT
     TTEntry *ttEntry = &(tt[board.getZobristHash() % tt.size()]);
-    if (plyFromRoot > 0 && ttEntry->zobristHash == board.getZobristHash() && ttEntry->depth >= depth)
-        if (ttEntry->type == EXACT || (ttEntry->type == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->type == UPPER_BOUND && ttEntry->score <= alpha))
-        {
-            int ret = ttEntry->score;
-            if (abs(ret) >= MIN_MATE_SCORE) ret += ret < 0 ? plyFromRoot : -plyFromRoot;
-            return ret;
-        }
+    if (plyFromRoot > 0 && ttEntry->zobristHash == board.getZobristHash() && ttEntry->depth >= depth
+    && (ttEntry->type == EXACT || (ttEntry->type == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->type == UPPER_BOUND && ttEntry->score <= alpha)))
+    {
+        int score = ttEntry->score;
+        if (abs(score) >= MIN_MATE_SCORE) 
+            score += score < 0 ? plyFromRoot : -plyFromRoot;
+        return score;
+    }
 
     // IIR (Internal iterative reduction)
     if (ttEntry->zobristHash != board.getZobristHash() && depth >= IIR_MIN_DEPTH && !inCheck)
@@ -362,12 +366,12 @@ inline void iterativeDeepening()
 {
     // clear stuff
     nodes = 0;
-    memset(&(movesNodes[0][0]), 0, sizeof(movesNodes));
-    memset(&(pvLines[0][0]), 0, sizeof(pvLines));
-    memset(&(pvLengths[0]), 0, sizeof(pvLengths));
-    memset(&(killerMoves[0][0]), 0, sizeof(killerMoves));
-    memset(&(counterMoves[0][0]), 0, sizeof(counterMoves));
-    memset(&(history[0][0][0]), 0, sizeof(history));
+    memset(movesNodes, 0, sizeof(movesNodes));
+    memset(pvLines, 0, sizeof(pvLines));
+    memset(pvLengths, 0, sizeof(pvLengths));
+    memset(killerMoves, 0, sizeof(killerMoves));
+    memset(counterMoves, 0, sizeof(counterMoves));
+    memset(history, 0, sizeof(history));
 
     int iterationDepth = 1, score = 0;
     while (iterationDepth <= MAX_DEPTH)
@@ -378,13 +382,13 @@ inline void iterativeDeepening()
                 ? aspiration(iterationDepth, score) 
                 : search(iterationDepth, NEG_INFINITY, POS_INFINITY, 0);
 
-        if (pvLines[0][0] != NULL_MOVE && isHardTimeUp())
+        if (isHardTimeUp())
             break;
 
         uci::info(iterationDepth, score);
         iterationDepth++;
 
-        if (pvLines[0][0] != NULL_MOVE && isSoftTimeUp())
+        if (isSoftTimeUp())
             break;
 
     }
