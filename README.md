@@ -1,8 +1,8 @@
 # z5 - C++ chess engine
 
-# How to build
+# How to compile
 
-```clang++ -O3 -march=native -std=c++20 main.cpp -o z5.exe```
+```clang++ -O3 -march=native -std=c++20 src/main.cpp -o z5.exe```
 
 # UCI (Universal Chess Interface)
 
@@ -20,11 +20,13 @@
 
 Bitboards
 
-Pseudolegal move generation (magic bitboards for sliders, lookup tables for knight and king)
+Pseudolegal move generation (magic bitboards for sliders, lookup tables for pawns, knights and king)
 
 NNUE evaluation (768->384x2->1)
 
-Negamax with alpha beta pruning and principal variation search
+Principal variation search with Negamax
+
+Alpha beta pruning
 
 Iterative deepening
 

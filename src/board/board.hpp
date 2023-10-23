@@ -549,6 +549,8 @@ class Board
         colorToMove = oppSide();
         zobristHash ^= zobristColorToMove;
 
+        pliesSincePawnMoveOrCapture++;
+
         if (colorToMove == WHITE)
             currentMoveCounter++;
 
