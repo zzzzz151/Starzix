@@ -14,12 +14,6 @@ debug.txt
 notes.txt
 stderr.txt
 
-**/data_d9_2021_09_02.binpack
-**/sf_d9.plain
-**/sf_d9_data
-**/sf_d9_data/*
-**/sf_d9_marlinflow.txt
-
 sprt.py
 4moves_noob.epd
 openings-8ply-10k.pgn

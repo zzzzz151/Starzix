@@ -275,14 +275,15 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
         if (plyFromRoot == 0)
             movesNodes[move.from()][targetSquare] += nodes - prevNodes;
 
-        if (isQuietMove)
-            pointersFailLowQuietsHistory[numFailLowQuiets++] = pointerMoveHistory;
-
         if (score > bestScore)
             bestScore = score;
 
         if (score <= alpha)
+        {
+            if (isQuietMove)
+                pointersFailLowQuietsHistory[numFailLowQuiets++] = pointerMoveHistory;
             continue;
+        }
 
         alpha = score;
         bestMove = move;
@@ -308,13 +309,14 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
             killerMoves[plyFromRoot][1] = killerMoves[plyFromRoot][0];
             killerMoves[plyFromRoot][0] = move;
         }
+
         if (isQuietMove)
         {
             counterMoves[(int)board.oppSide()][board.getLastMove().move()] = move;
             *pointerMoveHistory += depth * depth;
 
-            // Penalize quiets that failed low (this one failed high so dont penalize it)
-            for (int i = 0; i < numFailLowQuiets - 1; i++)
+            // Penalize quiets that failed low
+            for (int i = 0; i < numFailLowQuiets; i++)
                 *pointersFailLowQuietsHistory[i] -= depth * depth;
         }
 
