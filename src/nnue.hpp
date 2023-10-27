@@ -2,9 +2,6 @@
 
 // clang-format off
 
-#include <stdio.h>
-#include <array>
-
 namespace nnue
 {
     const char* NET_FILE = "net_384_1B_25wdl.nnue";
@@ -23,21 +20,30 @@ namespace nnue
     inline void loadNetFromFile()
     {        
         FILE *netFile;
-        errno_t error = fopen_s(&netFile, NET_FILE, "rb");
 
-        if (error == 0) {
-            // Read binary data into the struct
-            fread(nn.featureWeights.data(), sizeof(int16_t), nn.featureWeights.size(), netFile);
-            fread(nn.featureBiases.data(), sizeof(int16_t), nn.featureBiases.size(), netFile);
-            fread(nn.outputWeights.data(), sizeof(int8_t), nn.outputWeights.size(), netFile);
-            fread(&nn.outputBias, sizeof(int16_t), 1, netFile);
-            fclose(netFile); 
-        } 
-        else 
+        #if defined(_WIN32) // windows 32 or 64
+        int error = fopen_s(&netFile, NET_FILE, "rb");
+        if (error != 0)
         {
             cout << "Error opening net file " << NET_FILE << endl;
             exit(0);
         }
+
+        #elif defined(__unix__) // linux
+        netFile = fopen(NET_FILE, "rb");
+        if (netFile == NULL)
+        {
+            cout << "Error opening net file " << NET_FILE << endl;
+            exit(0);
+        }
+        #endif
+
+        // Read binary data into the struct
+        fread(nn.featureWeights.data(), sizeof(int16_t), nn.featureWeights.size(), netFile);
+        fread(nn.featureBiases.data(), sizeof(int16_t), nn.featureBiases.size(), netFile);
+        fread(nn.outputWeights.data(), sizeof(int8_t), nn.outputWeights.size(), netFile);
+        fread(&nn.outputBias, sizeof(int16_t), 1, netFile);
+        fclose(netFile); 
     }
 
     struct Accumulator

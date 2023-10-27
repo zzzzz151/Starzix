@@ -2,7 +2,13 @@
 
 # How to compile
 
+**Windows**
+
 ```clang++ -O3 -march=native -std=c++20 src/main.cpp -o z5.exe```
+
+**Linux**
+
+```clang++ -O3 -march=native -std=c++20 src/main.cpp -o z5```
 
 # UCI (Universal Chess Interface)
 
@@ -39,6 +45,8 @@ Move ordering (hash move > good captures by SEE + MVVLVA > promotions > killer m
 Aspiration windows
 
 Check extension
+
+Singular extensions
 
 Internal iterative reduction
 

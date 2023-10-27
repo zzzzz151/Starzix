@@ -55,6 +55,7 @@ Move killerMoves[MAX_DEPTH * 3][2]; // ply, killerIndex
 int history[2][6][64]; // color, pieceType, targetSquare
 Move counterMoves[2][1ULL << 16]; // color, moveEncoded
 int lmrTable[MAX_DEPTH * 2][256]; // depth, move
+int doubleExtensions[MAX_DEPTH * 2]; // ply
 
 // ----- End global vars -----
 
@@ -146,7 +147,7 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
     return bestScore;
 }
 
-inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp = false)
+inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp = false, Move singularMove = NULL_MOVE)
 {
     if (isHardTimeUp())
         return 0;
@@ -167,7 +168,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
 
     // Probe TT
     TTEntry *ttEntry = &(tt[board.getZobristHash() % tt.size()]);
-    if (plyFromRoot > 0 && ttEntry->zobristHash == board.getZobristHash() && ttEntry->depth >= depth
+    if (plyFromRoot > 0 && ttEntry->zobristHash == board.getZobristHash() && ttEntry->depth >= depth && singularMove == NULL_MOVE
     && (ttEntry->type == EXACT || (ttEntry->type == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->type == UPPER_BOUND && ttEntry->score <= alpha)))
     {
         int score = ttEntry->score;
@@ -202,19 +203,29 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
         }
     }
 
+    bool trySingular = singularMove == NULL_MOVE && depth >= 8 && plyFromRoot > 0
+                       && ttEntry->zobristHash == board.getZobristHash() && ttEntry->depth >= depth - 3
+                       && ttEntry->type != UPPER_BOUND && abs(ttEntry->score) < MIN_MATE_SCORE;
+
     MovesList moves = board.pseudolegalMoves();
     int scores[256];
     scoreMoves(moves, scores, *ttEntry, plyFromRoot);
     int bestScore = NEG_INFINITY;
     Move bestMove;
+    int originalAlpha = alpha;
     int legalMovesPlayed = 0;
     int stm = board.sideToMove();
     int* pointersFailLowQuietsHistory[256], numFailLowQuiets = 0;
-    int originalAlpha = alpha;
+    doubleExtensions[plyFromRoot + 1] = doubleExtensions[plyFromRoot];
 
     for (int i = 0; i < moves.size(); i++)
     {
         Move move = incrementalSort(moves, scores, i);
+
+        // don't search singular move in singular search
+        if (move == singularMove)
+            continue;
+
         bool historyMoveOrLosing = scores[i] < KILLER_SCORE;
         int lmr = lmrTable[depth][legalMovesPlayed];
         bool isQuietMove = !board.isCapture(move) && move.promotionPieceType() == PieceType::NONE;
@@ -242,14 +253,40 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
         uint64_t prevNodes = nodes;
         nodes++;
         legalMovesPlayed++;
+
+        // SE (Singular extension)
+        // Singular search: before searching any move, search this node at a shallower depth with TT move excluded
+        int extension = 0;
+        if (trySingular && move == ttEntry->bestMove)
+        {
+            board.undoMove(); // undo TT move we just made
+            int singularBeta = ttEntry->score - depth * 2;
+            int singularScore = search((depth - 1) / 2, singularBeta - 1, singularBeta, plyFromRoot, true, move);
+            board.makeMove(move);
+
+            if (!pvNode && singularScore < singularBeta && singularScore < singularBeta - 24 && doubleExtensions[plyFromRoot + 1] < 5)
+            {
+                // singularScore is way lower than TT score
+                // TT move is probably MUCH better than all others, so extend its search by 2 plies
+                extension = 2;
+                doubleExtensions[plyFromRoot + 1]++; // Keep track of these double extensions so search doesn't explode
+            }
+            else if (singularScore < singularBeta)
+                // TT move is probably better than all others, so extend its search by 1 ply
+                extension = 1;
+            else if (ttEntry->score >= beta)
+                // some other move is probably better than TT move, so reduce TT move search by 1 ply
+                extension = -1;
+        }
+
         Square targetSquare = move.to();
         int pieceType = move.promotionPieceType() != PieceType::NONE ? (int)PieceType::PAWN : (int)board.pieceTypeAt(targetSquare);
         int *pointerMoveHistory = &(history[stm][pieceType][targetSquare]);
 
-        int score = 0;
         // PVS (Principal variation search)
+        int score = 0;
         if (legalMovesPlayed == 1)
-            score = -search(depth - 1, -beta, -alpha, plyFromRoot + 1);
+            score = -search(depth - 1 + extension, -beta, -alpha, plyFromRoot + 1);
         else
         {
             // LMR (Late move reductions)
@@ -380,6 +417,7 @@ inline void iterativeDeepening()
     memset(killerMoves, 0, sizeof(killerMoves));
     memset(counterMoves, 0, sizeof(counterMoves));
     memset(history, 0, sizeof(history));
+    memset(doubleExtensions, 0, sizeof(doubleExtensions));
 
     int iterationDepth = 1, score = 0;
     while (iterationDepth <= MAX_DEPTH)

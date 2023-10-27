@@ -1,7 +1,10 @@
 // clang-format off
 
+#include <stdio.h>
+#include <array>
 #include <cstring> // for memset()
 #include <chrono>
+#include <limits.h>
 #include "board/board.hpp"
 #include "search.hpp"
 #include "uci.hpp"
