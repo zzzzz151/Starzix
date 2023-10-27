@@ -26,16 +26,19 @@ const int FP_MAX_DEPTH = 7,
           FP_MULTIPLIER = 65;
 
 const int LMP_MAX_DEPTH = 8,
-          LMP_MIN_MOVES_BASE = 2;
+          LMP_MIN_MOVES_BASE = 3;
 
-const int SEE_PRUNING_MAX_DEPTH = 9,
-          SEE_PRUNING_NOISY_THRESHOLD = -90,
+const int SEE_PRUNING_NOISY_THRESHOLD = -90,
           SEE_PRUNING_QUIET_THRESHOLD = -50;
+
+const int HISTORY_MIN_BONUS = 1570,
+          HISTORY_BONUS_MULTIPLIER = 370,
+          HISTORY_MAX = 16384;
 
 const int LMR_MIN_DEPTH = 1;
 const double LMR_BASE = 1,
-             LMR_DIVISOR = 2;
-const int LMR_HISTORY_DIVISOR = 1024;
+             LMR_MULTIPLIER = 0.5;
+const int LMR_HISTORY_DIVISOR = 8192;
 
 // ----- End tunable params -----
 
@@ -48,8 +51,8 @@ int pvLengths[MAX_DEPTH * 2];
 uint64_t nodes;
 uint64_t movesNodes[64][64]; // from, to
 int maxPlyReached;
-Move killerMoves[MAX_DEPTH * 2][2]; // ply, killerIndex
-int history[2][6][64];            // color, pieceType, targetSquare
+Move killerMoves[MAX_DEPTH * 3][2]; // ply, killerIndex
+int history[2][6][64]; // color, pieceType, targetSquare
 Move counterMoves[2][1ULL << 16]; // color, moveEncoded
 int lmrTable[MAX_DEPTH * 2][256]; // depth, move
 
@@ -71,7 +74,7 @@ inline void initLmrTable()
     for (int depth = 0; depth < MAX_DEPTH * 2; depth++)
         for (int move = 0; move < 256; move++)
             // log(x) is ln(x)
-            lmrTable[depth][move] = depth == 0 || move == 0 ? 0 : round(LMR_BASE + log(depth) * log(move) / LMR_DIVISOR);
+            lmrTable[depth][move] = depth == 0 || move == 0 ? 0 : round(LMR_BASE + log(depth) * log(move) * LMR_MULTIPLIER);
 }
 
 inline int qSearch(int alpha, int beta, int plyFromRoot)
@@ -145,11 +148,11 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
 
 inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp = false)
 {
-    if (plyFromRoot > maxPlyReached) 
-        maxPlyReached = plyFromRoot;
-
     if (isHardTimeUp())
         return 0;
+
+    if (plyFromRoot > maxPlyReached) 
+        maxPlyReached = plyFromRoot;
 
     pvLengths[plyFromRoot] = 0;
 
@@ -190,7 +193,8 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
         if (depth >= NMP_MIN_DEPTH && !skipNmp && eval >= beta && board.hasNonPawnMaterial(board.sideToMove()))
         {
             board.makeNullMove();
-            int score = -search(depth - NMP_BASE_REDUCTION - depth / NMP_REDUCTION_DIVISOR, -beta, -alpha, plyFromRoot + 1, true);
+            int nmpDepth = depth - NMP_BASE_REDUCTION - depth / NMP_REDUCTION_DIVISOR - min((eval - beta)/200, 3);
+            int score = -search(nmpDepth, -beta, -alpha, plyFromRoot + 1, true);
             board.undoNullMove();
 
             if (score >= MIN_MATE_SCORE) return beta;
@@ -219,7 +223,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
         if (historyMoveOrLosing && bestScore > -MIN_MATE_SCORE)
         {
             // LMP (Late move pruning)
-            if (depth <= LMP_MAX_DEPTH && legalMovesPlayed >= LMP_MIN_MOVES_BASE + depth * depth * 2)
+            if (depth <= LMP_MAX_DEPTH && legalMovesPlayed >= LMP_MIN_MOVES_BASE + pvNode + inCheck + depth * depth)
                 break;
 
             // FP (Futility pruning)
@@ -228,7 +232,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
 
             // SEE pruning
             int threshold = depth * (isQuietMove ? SEE_PRUNING_QUIET_THRESHOLD : SEE_PRUNING_NOISY_THRESHOLD);
-            if (depth <= SEE_PRUNING_MAX_DEPTH && !SEE(board, move, threshold))
+            if (!SEE(board, move, threshold))
                 continue;
         }
 
@@ -249,8 +253,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
         else
         {
             // LMR (Late move reductions)
-            bool canLmr = depth >= LMR_MIN_DEPTH && !inCheck && historyMoveOrLosing;
-            if (canLmr)
+            if (depth >= LMR_MIN_DEPTH && historyMoveOrLosing)
             {
                 lmr -= board.inCheck(); // reduce checks less
                 lmr -= pvNode;          // reduce pv nodes less
@@ -280,6 +283,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
 
         if (score <= alpha)
         {
+            // Fail low
             if (isQuietMove)
                 pointersFailLowQuietsHistory[numFailLowQuiets++] = pointerMoveHistory;
             continue;
@@ -302,7 +306,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
         if (score < beta) 
             continue;
 
-        // Beta cutoff
+        // Fail high / Beta cutoff
 
         if (isQuietMove && move != killerMoves[plyFromRoot][0])
         {
@@ -313,14 +317,16 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
         if (isQuietMove)
         {
             counterMoves[(int)board.oppSide()][board.getLastMove().move()] = move;
-            *pointerMoveHistory += depth * depth;
+
+            int bonus = min(HISTORY_MIN_BONUS, HISTORY_BONUS_MULTIPLIER * (depth - 1));
+            *pointerMoveHistory += bonus - *pointerMoveHistory * bonus / HISTORY_MAX;
 
             // Penalize quiets that failed low
             for (int i = 0; i < numFailLowQuiets; i++)
-                *pointersFailLowQuietsHistory[i] -= depth * depth;
+                *pointersFailLowQuietsHistory[i] -= bonus + *pointersFailLowQuietsHistory[i] * bonus / HISTORY_MAX;
         }
 
-        break; // Beta cutoff
+        break; // Fail high / Beta cutoff
     }
 
     if (legalMovesPlayed == 0) 
