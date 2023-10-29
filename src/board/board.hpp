@@ -18,7 +18,7 @@ struct BoardState
     public:
 
     uint64_t zobristHash;
-    array<array<bool, 2>, 2> castlingRights; // color, CASTLE_SHORT/CASTLE_LONG
+    array<array<bool, 2>, 2> castlingRights; // [color][CASTLE_SHORT or CASTLE_LONG]
     Square enPassantSquare;
     uint16_t pliesSincePawnMoveOrCapture;
     Piece capturedPiece;
@@ -41,11 +41,11 @@ class Board
 {
     private:
 
-    array<Piece, 64> pieces;
-    array<uint64_t, 2> colorBitboard;
-    array<array<uint64_t, 6>, 2> bitboards; // color, pieceType
+    array<Piece, 64> pieces;                // [square]
+    array<uint64_t, 2> colorBitboard;       // [color]
+    array<array<uint64_t, 6>, 2> bitboards; // [color][pieceType]
 
-    array<array<bool, 2>, 2> castlingRights; // color, CASTLE_SHORT/CASTLE_LONG
+    array<array<bool, 2>, 2> castlingRights; // [color][CASTLE_SHORT or CASTLE_LONG]
     const static uint8_t CASTLE_SHORT = 0, CASTLE_LONG = 1;
 
     Color colorToMove;

@@ -2,10 +2,11 @@
 
 // clang-format off
 
-// ----- Tunable params ------
+// Tunable search params
 
 const int MAX_DEPTH = 100;
 
+                          // P    N    B    R    Q    K      NONE
 const int PIECE_VALUES[7] = {100, 302, 320, 500, 900, 15000, 0};
 
 const int ASPIRATION_MIN_DEPTH = 6,
@@ -46,22 +47,22 @@ const double LMR_BASE = 1,
              LMR_MULTIPLIER = 0.5;
 const int LMR_HISTORY_DIVISOR = 8192;
 
-// ----- End tunable params -----
+// ----- End tunable search params -----
 
 // ----- Global vars -----
 
 const int POS_INFINITY = 9999999, NEG_INFINITY = -POS_INFINITY, MIN_MATE_SCORE = POS_INFINITY - 512;
 Board board;
-Move pvLines[MAX_DEPTH * 2][MAX_DEPTH * 2];
-int pvLengths[MAX_DEPTH * 2];
+Move pvLines[MAX_DEPTH * 2][MAX_DEPTH * 2]; // [ply][ply]
+int pvLengths[MAX_DEPTH * 2];               // [pvLineIndex]
 uint64_t nodes;
-uint64_t movesNodes[64][64]; // from, to
 int maxPlyReached;
-Move killerMoves[MAX_DEPTH * 3][2]; // ply, killerIndex
-int history[2][6][64]; // color, pieceType, targetSquare
-Move counterMoves[2][1ULL << 16]; // color, moveEncoded
-int lmrTable[MAX_DEPTH * 2][256]; // depth, move
-int doubleExtensions[MAX_DEPTH * 2]; // ply
+uint64_t movesNodes[64][64];         // [from][to]
+Move killerMoves[MAX_DEPTH * 3][2];  // [ply][killerIndex]
+int history[2][6][64];               // [color][pieceType][targetSquare]
+Move counterMoves[2][1ULL << 16];    // [color][move]
+int lmrTable[MAX_DEPTH * 2][256];    // [depth][moveIndex]
+int doubleExtensions[MAX_DEPTH * 2]; // [ply]
 
 // ----- End global vars -----
 
@@ -86,7 +87,7 @@ inline void initLmrTable()
 
 inline int qSearch(int alpha, int beta, int plyFromRoot)
 {
-    // Quiescence search: search capture moves until a 'quiet' position is reached
+    // Quiescence search: search captures until a 'quiet' position is reached
 
     if (plyFromRoot > maxPlyReached)
         maxPlyReached = plyFromRoot;
@@ -97,7 +98,7 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
     if (alpha < eval) 
         alpha = eval;
 
-    // probe TT
+    // Probe TT
     TTEntry *ttEntry = &(tt[board.getZobristHash() % tt.size()]);
     if (plyFromRoot > 0 && board.getZobristHash() == ttEntry->zobristHash
     && (ttEntry->type == EXACT || (ttEntry->type == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->type == UPPER_BOUND && ttEntry->score <= alpha)))
@@ -108,23 +109,22 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
         return score;
     }
 
-    MovesList moves = board.pseudolegalMoves(true);
-    int scores[256];
-    scoreMoves(moves, scores, *ttEntry, plyFromRoot);
+    MovesList moves = board.pseudolegalMoves(true); // arg = true => captures only
+    array<int, 256> movesScores = scoreMoves(moves, *ttEntry, plyFromRoot);
     int bestScore = eval;
     Move bestMove = NULL_MOVE;
     int originalAlpha = alpha;
 
     for (int i = 0; i < moves.size(); i++)
     {
-        Move capture = incrementalSort(moves, scores, i);
+        auto [captureMove, moveScore] = incrementalSort(moves, movesScores, i);
 
         // SEE pruning (skip bad captures)
-        if (!SEE(board, capture)) 
+        if (!SEE(board, captureMove)) 
             continue;
 
-        if (!board.makeMove(capture))
-            continue; // illegal move
+        if (!board.makeMove(captureMove))
+            continue; // skip illegal move
 
         nodes++;
         int score = -qSearch(-beta, -alpha, plyFromRoot + 1);
@@ -137,13 +137,13 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
 
         if (score >= beta) 
         {
-            bestMove = capture;
+            bestMove = captureMove;
             break;
         }
         if (score > alpha) 
         {
             alpha = score;
-            bestMove = capture;
+            bestMove = captureMove;
         }
     }
 
@@ -215,10 +215,9 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, Move singular
                        && ttEntry->type != UPPER_BOUND && abs(ttEntry->score) < MIN_MATE_SCORE;
 
     MovesList moves = board.pseudolegalMoves();
-    int scores[256];
-    scoreMoves(moves, scores, *ttEntry, plyFromRoot);
+    array<int, 256> movesScores = scoreMoves(moves, *ttEntry, plyFromRoot);
     int bestScore = NEG_INFINITY;
-    Move bestMove;
+    Move bestMove = NULL_MOVE;
     int originalAlpha = alpha;
     int legalMovesPlayed = 0;
     int stm = board.sideToMove();
@@ -227,13 +226,13 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, Move singular
 
     for (int i = 0; i < moves.size(); i++)
     {
-        Move move = incrementalSort(moves, scores, i);
+        auto [move, moveScore] = incrementalSort(moves, movesScores, i);
 
         // don't search singular move in singular search
         if (move == singularMove)
             continue;
 
-        bool historyMoveOrLosing = scores[i] < KILLER_SCORE;
+        bool historyMoveOrLosing = moveScore < KILLER_SCORE;
         int lmr = lmrTable[depth][legalMovesPlayed];
         bool isQuietMove = !board.isCapture(move) && move.promotionPieceType() == PieceType::NONE;
 
@@ -255,7 +254,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, Move singular
         }
 
         if (!board.makeMove(move))
-            continue; // illegal move
+            continue; // skip illegal move
 
         uint64_t prevNodes = nodes;
         nodes++;

@@ -10,8 +10,10 @@ const int HASH_MOVE_SCORE = INT_MAX,
           HISTORY_SCORE = 0, // non-killer quiets
           BAD_CAPTURE_SCORE = -500'000'000;
 
-inline void scoreMoves(MovesList &moves, int *scores, TTEntry &ttEntry, int plyFromRoot)
+inline array<int, 256> scoreMoves(MovesList &moves, TTEntry &ttEntry, int plyFromRoot)
 {
+    array<int, 256> scores;
+
     for (int i = 0; i < moves.size(); i++)
     {
         Move move = moves[i];
@@ -42,17 +44,19 @@ inline void scoreMoves(MovesList &moves, int *scores, TTEntry &ttEntry, int plyF
             scores[i] = HISTORY_SCORE + history[stm][pieceType][targetSqiare];
         }
     }
+
+    return scores;
 }
 
-inline Move incrementalSort(MovesList &moves, int *scores, int i)
+inline pair<Move, int> incrementalSort(MovesList &moves, array<int, 256> &movesScores, int i)
 {
     for (int j = i + 1; j < moves.size(); j++)
-        if (scores[j] > scores[i])
+        if (movesScores[j] > movesScores[i])
         {
             moves.swap(i, j);
-            swap(scores[i], scores[j]);
+            swap(movesScores[i], movesScores[j]);
         }
 
-    return moves[i];
+    return { moves[i], movesScores[i] };
 }
 
