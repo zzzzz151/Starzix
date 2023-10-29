@@ -32,7 +32,7 @@ inline void scoreMoves(MovesList &moves, int *scores, TTEntry &ttEntry, int plyF
             scores[i] = KILLER_SCORE + 1;
         else if (killerMoves[plyFromRoot][1] == move)
             scores[i] = KILLER_SCORE;
-        else if (move == counterMoves[board.oppSide()][board.getLastMove().move()])
+        else if (move == counterMoves[board.oppSide()][board.getLastMove().getMove()])
             scores[i] = COUNTERMOVE_SCORE;
         else
         {

@@ -288,8 +288,7 @@ class Board
 
     inline static void initZobrist()
     {
-        random_device rd; // random device to seed the rng
-        mt19937_64 gen(rd()); // 64 bit Mersenne Twister rng
+        mt19937_64 gen(12345); // 64 bit Mersenne Twister rng with seed 12345
         uniform_int_distribution<uint64_t> distribution; // distribution(gen) returns random uint64_t
         
         zobristColorToMove = distribution(gen);

@@ -153,7 +153,7 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
     return bestScore;
 }
 
-inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp = false, Move singularMove = NULL_MOVE)
+inline int search(int depth, int alpha, int beta, int plyFromRoot, Move singularMove = NULL_MOVE)
 {
     if (isHardTimeUp())
         return 0;
@@ -197,11 +197,12 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
             return eval;
 
         // NMP (Null move pruning)
-        if (depth >= NMP_MIN_DEPTH && !skipNmp && eval >= beta && board.hasNonPawnMaterial(board.sideToMove()))
+        if (depth >= NMP_MIN_DEPTH && board.getLastMove() != NULL_MOVE && singularMove == NULL_MOVE
+        && board.hasNonPawnMaterial(board.sideToMove()) && eval >= beta)
         {
             board.makeNullMove();
             int nmpDepth = depth - NMP_BASE_REDUCTION - depth / NMP_REDUCTION_DIVISOR - min((eval - beta)/200, 3);
-            int score = -search(nmpDepth, -beta, -alpha, plyFromRoot + 1, true);
+            int score = -search(nmpDepth, -beta, -alpha, plyFromRoot + 1);
             board.undoNullMove();
 
             if (score >= MIN_MATE_SCORE) return beta;
@@ -267,7 +268,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
             // Singular search: before searching any move, search this node at a shallower depth with TT move excluded
             board.undoMove(); // undo TT move we just made
             int singularBeta = ttEntry->score - depth * SINGULAR_BETA_DEPTH_MULTIPLIER;
-            int singularScore = search((depth - 1) / 2, singularBeta - 1, singularBeta, plyFromRoot, true, move);
+            int singularScore = search((depth - 1) / 2, singularBeta - 1, singularBeta, plyFromRoot, move);
             board.makeMove(move, false); // second arg = false => don't check legality (we already verified it's a legal move)
 
             if (!pvNode && singularScore < singularBeta && singularScore < singularBeta - SINGULAR_BETA_MARGIN 
@@ -360,7 +361,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
 
         if (isQuietMove)
         {
-            counterMoves[(int)board.oppSide()][board.getLastMove().move()] = move;
+            counterMoves[(int)board.oppSide()][board.getLastMove().getMove()] = move;
 
             int bonus = min(HISTORY_MIN_BONUS, HISTORY_BONUS_MULTIPLIER * (depth - 1));
             *pointerMoveHistory += bonus - *pointerMoveHistory * bonus / HISTORY_MAX;

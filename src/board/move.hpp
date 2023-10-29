@@ -50,7 +50,7 @@ struct Move
 
     inline Move(string from, string to, uint16_t typeFlag) : Move(strToSquare(from), strToSquare(to), typeFlag) {}
 
-    inline uint16_t move() { return moveEncoded; }
+    inline uint16_t getMove() { return moveEncoded; }
 
     inline Square from() { return (moveEncoded >> 10) & 0b111111; }
 
