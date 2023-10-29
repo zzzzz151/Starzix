@@ -358,7 +358,7 @@ class Board
 
     public:
 
-    inline bool makeMove(Move move)
+    inline bool makeMove(Move move, bool checkLegality = true)
     {
         Square from = move.from();
         Square to = move.to();
@@ -396,7 +396,7 @@ class Board
             removePiece(capturedSquare);
         }
 
-        if (inCheck())
+        if (checkLegality && inCheck())
         {
             // move is illegal
             undoMove(move, capturedPiece);
@@ -473,9 +473,9 @@ class Board
         return true; // move is legal
     }
 
-    inline bool makeMove(string uci)
+    inline bool makeMove(string uci, bool checkLegality = true)
     {
-        return makeMove(Move::fromUci(uci, pieces));
+        return makeMove(Move::fromUci(uci, pieces), checkLegality);
     }
 
     inline void undoMove(Move illegalMove = NULL_MOVE, Piece illegalyCapturedPiece = Piece::NONE)

@@ -35,6 +35,12 @@ const int HISTORY_MIN_BONUS = 1570,
           HISTORY_BONUS_MULTIPLIER = 370,
           HISTORY_MAX = 16384;
 
+const int SINGULAR_MIN_DEPTH = 8,
+          SINGULAR_DEPTH_MARGIN = 1,
+          SINGULAR_BETA_DEPTH_MULTIPLIER = 3,
+          SINGULAR_BETA_MARGIN = 24,
+          SINGULAR_MAX_DOUBLE_EXTENSIONS = 10;
+
 const int LMR_MIN_DEPTH = 1;
 const double LMR_BASE = 1,
              LMR_MULTIPLIER = 0.5;
@@ -203,8 +209,8 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
         }
     }
 
-    bool trySingular = singularMove == NULL_MOVE && depth >= 8 && plyFromRoot > 0
-                       && ttEntry->zobristHash == board.getZobristHash() && ttEntry->depth >= depth - 3
+    bool trySingular = singularMove == NULL_MOVE && depth >= SINGULAR_MIN_DEPTH && plyFromRoot > 0
+                       && ttEntry->zobristHash == board.getZobristHash() && ttEntry->depth >= depth - SINGULAR_DEPTH_MARGIN
                        && ttEntry->type != UPPER_BOUND && abs(ttEntry->score) < MIN_MATE_SCORE;
 
     MovesList moves = board.pseudolegalMoves();
@@ -255,16 +261,17 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
         legalMovesPlayed++;
 
         // SE (Singular extension)
-        // Singular search: before searching any move, search this node at a shallower depth with TT move excluded
         int extension = 0;
         if (trySingular && move == ttEntry->bestMove)
         {
+            // Singular search: before searching any move, search this node at a shallower depth with TT move excluded
             board.undoMove(); // undo TT move we just made
-            int singularBeta = ttEntry->score - depth * 2;
+            int singularBeta = ttEntry->score - depth * SINGULAR_BETA_DEPTH_MULTIPLIER;
             int singularScore = search((depth - 1) / 2, singularBeta - 1, singularBeta, plyFromRoot, true, move);
-            board.makeMove(move);
+            board.makeMove(move, false); // second arg = false => don't check legality (we already verified it's a legal move)
 
-            if (!pvNode && singularScore < singularBeta && singularScore < singularBeta - 24 && doubleExtensions[plyFromRoot + 1] < 5)
+            if (!pvNode && singularScore < singularBeta && singularScore < singularBeta - SINGULAR_BETA_MARGIN 
+            && doubleExtensions[plyFromRoot + 1] < SINGULAR_MAX_DOUBLE_EXTENSIONS)
             {
                 // singularScore is way lower than TT score
                 // TT move is probably MUCH better than all others, so extend its search by 2 plies
@@ -275,8 +282,8 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool skipNmp 
                 // TT move is probably better than all others, so extend its search by 1 ply
                 extension = 1;
             else if (ttEntry->score >= beta)
-                // some other move is probably better than TT move, so reduce TT move search by 1 ply
-                extension = -1;
+                // some other move is probably better than TT move, so reduce TT move search by 2 plies
+                extension = -2;
         }
 
         Square targetSquare = move.to();
