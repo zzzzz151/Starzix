@@ -153,7 +153,7 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
     return bestScore;
 }
 
-inline int search(int depth, int alpha, int beta, int plyFromRoot, Move singularMove = NULL_MOVE)
+inline int search(int depth, int alpha, int beta, int plyFromRoot, bool cutNode, Move singularMove = NULL_MOVE)
 {
     if (isHardTimeUp())
         return 0;
@@ -202,7 +202,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, Move singular
         {
             board.makeNullMove();
             int nmpDepth = depth - NMP_BASE_REDUCTION - depth / NMP_REDUCTION_DIVISOR - min((eval - beta)/200, 3);
-            int score = -search(nmpDepth, -beta, -alpha, plyFromRoot + 1);
+            int score = -search(nmpDepth, -beta, -alpha, plyFromRoot + 1, !cutNode);
             board.undoNullMove();
 
             if (score >= MIN_MATE_SCORE) return beta;
@@ -233,7 +233,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, Move singular
             continue;
 
         bool historyMoveOrLosing = moveScore < KILLER_SCORE;
-        int lmr = lmrTable[depth][legalMovesPlayed];
+        int lmr = lmrTable[depth][legalMovesPlayed + 1];
         bool isQuietMove = !board.isCapture(move) && move.promotionPieceType() == PieceType::NONE;
 
         // Moves loop pruning
@@ -267,7 +267,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, Move singular
             // Singular search: before searching any move, search this node at a shallower depth with TT move excluded
             board.undoMove(); // undo TT move we just made
             int singularBeta = ttEntry->score - depth * SINGULAR_BETA_DEPTH_MULTIPLIER;
-            int singularScore = search((depth - 1) / 2, singularBeta - 1, singularBeta, plyFromRoot, move);
+            int singularScore = search((depth - 1) / 2, singularBeta - 1, singularBeta, plyFromRoot, cutNode, move);
             board.makeMove(move, false); // second arg = false => don't check legality (we already verified it's a legal move)
 
             if (!pvNode && singularScore < singularBeta && singularScore < singularBeta - SINGULAR_BETA_MARGIN 
@@ -284,6 +284,8 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, Move singular
             else if (ttEntry->score >= beta)
                 // some other move is probably better than TT move, so reduce TT move search by 2 plies
                 extension = -2;
+            else if (cutNode)
+                extension = -1;
         }
 
         Square targetSquare = move.to();
@@ -293,7 +295,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, Move singular
         // PVS (Principal variation search)
         int score = 0;
         if (legalMovesPlayed == 1)
-            score = -search(depth - 1 + extension, -beta, -alpha, plyFromRoot + 1);
+            score = -search(depth - 1 + extension, -beta, -alpha, plyFromRoot + 1, false);
         else
         {
             // LMR (Late move reductions)
@@ -311,9 +313,9 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, Move singular
             else
                 lmr = 0;
 
-            score = -search(depth - 1 - lmr, -alpha - 1, -alpha, plyFromRoot + 1);
+            score = -search(depth - 1 - lmr, -alpha - 1, -alpha, plyFromRoot + 1, true);
             if (score > alpha && (score < beta || lmr > 0))
-                score = -search(depth - 1, -beta, -alpha, plyFromRoot + 1);
+                score = -search(depth - 1, -beta, -alpha, plyFromRoot + 1, score < beta ? false : !cutNode);
         }
 
         board.undoMove();
@@ -390,7 +392,7 @@ inline int aspiration(int maxDepth, int score)
 
     while (true)
     {
-        score = search(depth, alpha, beta, 0);
+        score = search(depth, alpha, beta, 0, false);
 
         if (isHardTimeUp()) return 0;
 
@@ -433,7 +435,7 @@ inline void iterativeDeepening()
 
         score = iterationDepth >= ASPIRATION_MIN_DEPTH 
                 ? aspiration(iterationDepth, score) 
-                : search(iterationDepth, NEG_INFINITY, POS_INFINITY, 0);
+                : search(iterationDepth, NEG_INFINITY, POS_INFINITY, 0, false);
 
         if (isHardTimeUp())
             break;
