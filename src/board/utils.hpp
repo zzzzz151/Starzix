@@ -107,3 +107,9 @@ inline uint64_t shiftLeft(uint64_t bb) {
 inline uint64_t shiftUp(uint64_t bb) { return bb << 8ULL; }
 
 inline uint64_t shiftDown(uint64_t bb) { return bb >> 8ULL; }
+
+inline double ln(int x)
+{
+    assert(x > 0);
+    return log(x);
+}

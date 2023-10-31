@@ -16,8 +16,7 @@ int main()
     Board::initZobrist();
     attacks::initAttacks();
     nnue::loadNetFromFile();
-    initTT();
-    initLmrTable();
+    initSearch();
     board = Board(START_FEN);
     uci::uciLoop();
     return 0;

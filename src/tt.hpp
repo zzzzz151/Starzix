@@ -2,25 +2,25 @@
 
 // clang-format off
 
-int TT_SIZE_MB = 64; // default and current
+const int TT_SIZE_MB = 64; // default
 
-const uint8_t INVALID = 0, EXACT = 1, LOWER_BOUND = 2, UPPER_BOUND = 3;
+const uint8_t INVALID_BOUND = 0, EXACT = 1, LOWER_BOUND = 2, UPPER_BOUND = 3;
 struct TTEntry
 {
     uint64_t zobristHash = 0;
     int score = 0;
     Move bestMove = NULL_MOVE;
-    uint8_t depth = 0;
-    uint8_t type = INVALID;
+    uint8_t depth = 0; 
+    uint8_t bound = INVALID_BOUND;
 };
-vector<TTEntry> tt;
 
-inline void initTT()
+vector<TTEntry> tt(TT_SIZE_MB * 1024 * 1024 / sizeof(TTEntry)); // initializes the elements
+
+inline void resizeTT(int sizeMB)
 {
-    int numEntries = (TT_SIZE_MB * 1024 * 1024) / sizeof(TTEntry);
     tt.clear();
+    int numEntries = sizeMB * 1024 * 1024 / sizeof(TTEntry);
     tt.resize(numEntries);
-    //cout << "TT size = " << TT_SIZE_MB << "MB => " << numEntries << " entries" << endl;
 }
 
 inline void clearTT()
@@ -39,9 +39,9 @@ inline void storeInTT(TTEntry *ttEntry, uint8_t depth, Move &bestMove, int bestS
         ttEntry->score += bestScore < 0 ? -plyFromRoot : plyFromRoot;
 
     if (bestScore <= originalAlpha) 
-        ttEntry->type = UPPER_BOUND;
+        ttEntry->bound = UPPER_BOUND;
     else if (bestScore >= beta) 
-        ttEntry->type = LOWER_BOUND;
+        ttEntry->bound = LOWER_BOUND;
     else 
-        ttEntry->type = EXACT;
+        ttEntry->bound = EXACT;
 }

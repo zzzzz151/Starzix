@@ -14,8 +14,8 @@ namespace uci
 
         if (optionName == "Hash" || optionName == "hash")
         {
-            TT_SIZE_MB = stoi(optionValue);
-            initTT();
+            int ttSizeMB = stoi(optionValue);
+            resizeTT(ttSizeMB);
         }
     }
 

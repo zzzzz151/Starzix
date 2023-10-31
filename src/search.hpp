@@ -29,7 +29,8 @@ const int FP_MAX_DEPTH = 7,
 const int LMP_MAX_DEPTH = 8,
           LMP_MIN_MOVES_BASE = 3;
 
-const int SEE_PRUNING_NOISY_THRESHOLD = -90,
+const int SEE_PRUNING_MAX_DEPTH = 9,
+          SEE_PRUNING_NOISY_THRESHOLD = -90,
           SEE_PRUNING_QUIET_THRESHOLD = -50;
 
 const int HISTORY_MIN_BONUS = 1570,
@@ -53,16 +54,16 @@ const int LMR_HISTORY_DIVISOR = 8192;
 
 const int POS_INFINITY = 9999999, NEG_INFINITY = -POS_INFINITY, MIN_MATE_SCORE = POS_INFINITY - 512;
 Board board;
-Move pvLines[MAX_DEPTH * 2][MAX_DEPTH * 2]; // [ply][ply]
-int pvLengths[MAX_DEPTH * 2];               // [pvLineIndex]
 uint64_t nodes;
 int maxPlyReached;
-uint64_t movesNodes[64][64];         // [from][to]
-Move killerMoves[MAX_DEPTH * 3][2];  // [ply][killerIndex]
-int history[2][6][64];               // [color][pieceType][targetSquare]
-Move counterMoves[2][1ULL << 16];    // [color][move]
-int lmrTable[MAX_DEPTH * 2][256];    // [depth][moveIndex]
-int doubleExtensions[MAX_DEPTH * 2]; // [ply]
+uint64_t movesNodes[64][64];            // [from][to]
+Move pvLines[MAX_DEPTH*2][MAX_DEPTH*2]; // [ply][ply]
+int pvLengths[MAX_DEPTH*2];             // [pvLineIndex]
+int lmrTable[MAX_DEPTH*2][256];         // [depth][moveIndex]
+int doubleExtensions[MAX_DEPTH*2];      // [ply]
+Move killerMoves[MAX_DEPTH*3][2];       // [ply][killerIndex]
+int history[2][6][64];                  // [color][pieceType][targetSquare]
+Move counterMoves[2][1ULL << 16];       // [color][move]
 
 // ----- End global vars -----
 
@@ -77,12 +78,12 @@ namespace uci
     inline void info(int depth, int score); 
 }
 
-inline void initLmrTable()
+inline void initSearch()
 {
+    // init lmrTable
     for (int depth = 0; depth < MAX_DEPTH * 2; depth++)
         for (int move = 0; move < 256; move++)
-            // log(x) is ln(x)
-            lmrTable[depth][move] = depth == 0 || move == 0 ? 0 : round(LMR_BASE + log(depth) * log(move) * LMR_MULTIPLIER);
+            lmrTable[depth][move] = depth == 0 || move == 0 ? 0 : round(LMR_BASE + ln(depth) * ln(move) * LMR_MULTIPLIER);
 }
 
 inline int qSearch(int alpha, int beta, int plyFromRoot)
@@ -101,7 +102,7 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
     // Probe TT
     TTEntry *ttEntry = &(tt[board.getZobristHash() % tt.size()]);
     if (plyFromRoot > 0 && board.getZobristHash() == ttEntry->zobristHash
-    && (ttEntry->type == EXACT || (ttEntry->type == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->type == UPPER_BOUND && ttEntry->score <= alpha)))
+    && (ttEntry->bound == EXACT || (ttEntry->bound == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->bound == UPPER_BOUND && ttEntry->score <= alpha)))
     {
         int score = ttEntry->score;
         if (abs(score) >= MIN_MATE_SCORE) 
@@ -175,7 +176,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool cutNode,
     // Probe TT
     TTEntry *ttEntry = &(tt[board.getZobristHash() % tt.size()]);
     if (plyFromRoot > 0 && ttEntry->zobristHash == board.getZobristHash() && ttEntry->depth >= depth && singularMove == NULL_MOVE
-    && (ttEntry->type == EXACT || (ttEntry->type == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->type == UPPER_BOUND && ttEntry->score <= alpha)))
+    && (ttEntry->bound == EXACT || (ttEntry->bound == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->bound == UPPER_BOUND && ttEntry->score <= alpha)))
     {
         int score = ttEntry->score;
         if (abs(score) >= MIN_MATE_SCORE) 
@@ -212,7 +213,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool cutNode,
 
     bool trySingular = singularMove == NULL_MOVE && depth >= SINGULAR_MIN_DEPTH && plyFromRoot > 0
                        && ttEntry->zobristHash == board.getZobristHash() && ttEntry->depth >= depth - SINGULAR_DEPTH_MARGIN
-                       && ttEntry->type != UPPER_BOUND && abs(ttEntry->score) < MIN_MATE_SCORE;
+                       && ttEntry->bound != UPPER_BOUND && abs(ttEntry->score) < MIN_MATE_SCORE;
 
     MovesList moves = board.pseudolegalMoves();
     array<int, 256> movesScores = scoreMoves(moves, *ttEntry, plyFromRoot);
@@ -240,16 +241,18 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool cutNode,
         if (historyMoveOrLosing && bestScore > -MIN_MATE_SCORE)
         {
             // LMP (Late move pruning)
-            if (depth <= LMP_MAX_DEPTH && legalMovesPlayed >= LMP_MIN_MOVES_BASE + pvNode + inCheck + depth * depth)
+            if (depth <= LMP_MAX_DEPTH 
+            && legalMovesPlayed >= LMP_MIN_MOVES_BASE + pvNode + inCheck + depth * depth)
                 break;
 
             // FP (Futility pruning)
-            if (depth <= FP_MAX_DEPTH && alpha < MIN_MATE_SCORE && eval + FP_BASE + max(depth - lmr, 0) * FP_MULTIPLIER <= alpha)
+            if (depth <= FP_MAX_DEPTH && alpha < MIN_MATE_SCORE 
+            && eval + FP_BASE + max(depth - lmr, 0) * FP_MULTIPLIER <= alpha)
                 break;
 
             // SEE pruning
-            int threshold = depth * (isQuietMove ? SEE_PRUNING_QUIET_THRESHOLD : SEE_PRUNING_NOISY_THRESHOLD);
-            if (!SEE(board, move, threshold))
+            if (depth <= SEE_PRUNING_MAX_DEPTH
+            && !SEE(board, move, depth * (isQuietMove ? SEE_PRUNING_QUIET_THRESHOLD : SEE_PRUNING_NOISY_THRESHOLD)))
                 continue;
         }
 
