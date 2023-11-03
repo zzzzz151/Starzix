@@ -3,8 +3,8 @@
 #include <string>
 #include <sstream>
 #include <vector>
-#include "../src-test/board/board.hpp"
-#include "../src-test/board/attacks.hpp"
+#include "../src-test/board.hpp"
+#include "../src-test/attacks.hpp"
 #include "../src-test/see.hpp"
 using namespace std;
 

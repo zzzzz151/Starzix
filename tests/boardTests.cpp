@@ -1,6 +1,6 @@
 // clang-format off
-#include "../src-test/board/board.hpp"
-#include "../src-test/board/perft.hpp"
+#include "../src-test/board.hpp"
+#include "../src-test/perft.hpp"
 using namespace std;
 
 int failed = 0, passed = 0;

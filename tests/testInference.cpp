@@ -1,7 +1,7 @@
 #include <iostream>
 #include <cstdint>
 #include <string>
-#include "../src-test/board/board.hpp"
+#include "../src-test/board.hpp"
 #include "../src-test/nnue.hpp"
 
 int main()
