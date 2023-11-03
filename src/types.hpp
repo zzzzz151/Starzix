@@ -82,3 +82,6 @@ unordered_map<Piece, char> pieceToChar = {
     {Piece::BLACK_KING, 'k'}
 };
 
+const inline int32_t MAX_INT32 = 2147483647;
+
+const int16_t POS_INFINITY = 32500, NEG_INFINITY = -POS_INFINITY, MIN_MATE_SCORE = POS_INFINITY - 256;

@@ -126,7 +126,7 @@ namespace nnue
         currentAccumulator = &accumulators.back();
     }
 
-    inline int32_t crelu(int16_t x)
+    inline int32_t crelu(int32_t x)
     {
         if (x < 0)
             return 0;
@@ -135,7 +135,7 @@ namespace nnue
         return x;
     }
 
-    inline int32_t evaluate(Color color)
+    inline int16_t evaluate(Color color)
     {
         int16_t *us, *them;
         if (color == WHITE)
@@ -156,7 +156,7 @@ namespace nnue
             sum += crelu(them[i]) * nn.outputWeights[HIDDEN_LAYER_SIZE + i];
         }
 
-        return sum * 400 / Q;
+        return clamp(sum * 400 / Q, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
     }
 
 }

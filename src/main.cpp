@@ -4,8 +4,7 @@
 #include <array>
 #include <cstring> // for memset()
 #include <chrono>
-#include <limits.h>
-#include "board/board.hpp"
+#include "board.hpp"
 #include "search.hpp"
 #include "uci.hpp"
 

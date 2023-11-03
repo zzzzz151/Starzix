@@ -2,7 +2,7 @@
 
 // clang-format-off
 
-#include "board/perft.hpp"
+#include "perft.hpp"
 
 namespace uci
 {
@@ -50,7 +50,7 @@ namespace uci
         cout << "bestmove " + pvLines[0][0].toUci() + "\n";
     }
 
-    inline void info(int depth, int score)
+    inline void info(int depth, int16_t score)
     {
         double millisecondsElapsed = (chrono::steady_clock::now() - start) / chrono::milliseconds(1);
         uint64_t nps = nodes / (millisecondsElapsed > 0 ? millisecondsElapsed : 1) * 1000;

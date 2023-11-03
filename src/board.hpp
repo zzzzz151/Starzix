@@ -10,7 +10,7 @@
 #include "utils.hpp"
 #include "move.hpp"
 #include "attacks.hpp"
-#include "../nnue.hpp"
+#include "nnue.hpp"
 using namespace std;
 
 struct BoardState
@@ -663,9 +663,10 @@ class Board
         }
 
         // Castling
-        int inCheck = -1;
         if (!capturesOnly)
         {
+            int inCheck = -1;
+
             if (castlingRights[colorToMove][CASTLE_SHORT]
             && pieces[kingSquare+1] == Piece::NONE
             && pieces[kingSquare+2] == Piece::NONE

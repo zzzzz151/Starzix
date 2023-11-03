@@ -113,3 +113,13 @@ inline double ln(int x)
     assert(x > 0);
     return log(x);
 }
+
+inline int16_t min(int16_t a, int16_t b)
+{
+    return a < b ? a : b;
+}
+
+inline int16_t max(int16_t a, int16_t b)
+{
+    return a > b ? a : b;
+}

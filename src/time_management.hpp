@@ -2,16 +2,24 @@
 
 // clang-format off
 
+const int32_t OVERHEAD_MILLISECONDS = 10;
+const double MOVESTOGO_HARD_TIME_PERCENTAGE = 0.75,
+             MOVESTOGO_SOFT_TIME_PERCENTAGE = 0.5,
+             SUDDEN_DEATH_HARD_TIME_PERCENTAGE = 1.0 / 4.0,
+             SUDDEN_DEATH_SOFT_TIME_PERCENTAGE = 1.0 / 30.0,
+             SOFT_TIME_SCALE_BASE = 0.25,
+             SOFT_TIME_SCALE_MULTIPLIER = 1.75;
+
 chrono::steady_clock::time_point start;
 bool isMoveTime = false;
-int hardMillisecondsForThisTurn, softMillisecondsForThisTurn;
+int32_t hardMillisecondsForThisTurn, softMillisecondsForThisTurn;
 bool hardTimeUp = false;
 
 inline void setupTime(vector<string> &words, Color color)
 {
     start = chrono::steady_clock::now();
     isMoveTime = hardTimeUp = false;
-    int milliseconds = -1, movesToGo = -1, increment = 0;
+    int32_t milliseconds = -1, movesToGo = -1, increment = 0;
 
     for (int i = 0; i < words.size(); i++)
     {
@@ -29,25 +37,26 @@ inline void setupTime(vector<string> &words, Color color)
     }
 
     if (isMoveTime)
-    {
-        softMillisecondsForThisTurn = hardMillisecondsForThisTurn = milliseconds - min(10, milliseconds / 2); 
-    }
+        softMillisecondsForThisTurn = hardMillisecondsForThisTurn = milliseconds - min(OVERHEAD_MILLISECONDS, milliseconds / 2); 
     else if (movesToGo != -1)
     {
-        hardMillisecondsForThisTurn = movesToGo == 1 ? milliseconds - min(10, milliseconds / 2) : milliseconds * 0.75;
-        softMillisecondsForThisTurn = min(0.5 * milliseconds / movesToGo, (double)hardMillisecondsForThisTurn);
+        hardMillisecondsForThisTurn = movesToGo == 1 
+                                    ? milliseconds - min(OVERHEAD_MILLISECONDS, milliseconds / 2)
+                                    : milliseconds * MOVESTOGO_HARD_TIME_PERCENTAGE;
+
+        softMillisecondsForThisTurn = min(MOVESTOGO_SOFT_TIME_PERCENTAGE * milliseconds / movesToGo, (double)hardMillisecondsForThisTurn);
     }
     else if (milliseconds != -1)
     {
         // "go wtime 10000 btime 10000 winc 100 binc 100"
-        hardMillisecondsForThisTurn = milliseconds / 4;
-        softMillisecondsForThisTurn = milliseconds / 30;
+        hardMillisecondsForThisTurn = milliseconds * SUDDEN_DEATH_HARD_TIME_PERCENTAGE;
+        softMillisecondsForThisTurn = milliseconds * SUDDEN_DEATH_SOFT_TIME_PERCENTAGE;
     }
     else
     {
         // received just 'go' or 'go infinite'
         isMoveTime = true;
-        softMillisecondsForThisTurn = hardMillisecondsForThisTurn = INT_MAX;
+        softMillisecondsForThisTurn = hardMillisecondsForThisTurn = MAX_INT32;
     }
 }
 
@@ -67,9 +76,8 @@ inline bool isSoftTimeUp()
     if (pvLines[0][0] == NULL_MOVE)
         return false;
 
-    Move bestMove = pvLines[0][0];
-    double bestMoveFraction = (double)movesNodes[bestMove.from()][bestMove.to()] / (double)nodes;
-    double softTimeScale = (1.25 - bestMoveFraction) * 1.75;
+    double bestMoveNodesFraction = (double)movesNodes[pvLines[0][0].getMove()] / (double)nodes;
+    double softTimeScale = (SOFT_TIME_SCALE_BASE + 1 - bestMoveNodesFraction) * SOFT_TIME_SCALE_MULTIPLIER;
     return (chrono::steady_clock::now() - start) / chrono::milliseconds(1) >= softMillisecondsForThisTurn * softTimeScale;
 }
 

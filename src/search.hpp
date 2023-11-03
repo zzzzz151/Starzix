@@ -4,10 +4,7 @@
 
 // Tunable search params
 
-const int MAX_DEPTH = 100;
-
-                          // P    N    B    R    Q    K      NONE
-const int PIECE_VALUES[7] = {100, 302, 320, 500, 900, 15000, 0};
+const uint8_t MAX_DEPTH = 100;
 
 const int ASPIRATION_MIN_DEPTH = 6,
           ASPIRATION_INITIAL_DELTA = 25;
@@ -28,6 +25,7 @@ const int FP_MAX_DEPTH = 7,
 
 const int LMP_MAX_DEPTH = 8,
           LMP_MIN_MOVES_BASE = 3;
+const double LMP_DEPTH_MULTIPLIER = 0.75;
 
 const int SEE_PRUNING_MAX_DEPTH = 9,
           SEE_PRUNING_NOISY_THRESHOLD = -90,
@@ -52,11 +50,10 @@ const int LMR_HISTORY_DIVISOR = 8192;
 
 // ----- Global vars -----
 
-const int POS_INFINITY = 9999999, NEG_INFINITY = -POS_INFINITY, MIN_MATE_SCORE = POS_INFINITY - 512;
 Board board;
 uint64_t nodes;
 int maxPlyReached;
-uint64_t movesNodes[64][64];            // [from][to]
+uint64_t movesNodes[1ULL << 16];        // [move]
 Move pvLines[MAX_DEPTH*2][MAX_DEPTH*2]; // [ply][ply]
 int pvLengths[MAX_DEPTH*2];             // [pvLineIndex]
 int lmrTable[MAX_DEPTH*2][256];         // [depth][moveIndex]
@@ -75,7 +72,7 @@ Move counterMoves[2][1ULL << 16];       // [color][move]
 
 namespace uci
 {
-    inline void info(int depth, int score); 
+    inline void info(int depth, int16_t score); 
 }
 
 inline void initSearch()
@@ -86,35 +83,30 @@ inline void initSearch()
             lmrTable[depth][move] = depth == 0 || move == 0 ? 0 : round(LMR_BASE + ln(depth) * ln(move) * LMR_MULTIPLIER);
 }
 
-inline int qSearch(int alpha, int beta, int plyFromRoot)
+inline int16_t qSearch(int16_t alpha, int16_t beta, int plyFromRoot)
 {
     // Quiescence search: search captures until a 'quiet' position is reached
 
     if (plyFromRoot > maxPlyReached)
         maxPlyReached = plyFromRoot;
 
-    int eval = nnue::evaluate(board.sideToMove());
+    int16_t eval = nnue::evaluate(board.sideToMove());
     if (eval >= beta) 
         return eval;
     if (alpha < eval) 
         alpha = eval;
 
     // Probe TT
-    TTEntry *ttEntry = &(tt[board.getZobristHash() % tt.size()]);
-    if (plyFromRoot > 0 && board.getZobristHash() == ttEntry->zobristHash
-    && (ttEntry->bound == EXACT || (ttEntry->bound == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->bound == UPPER_BOUND && ttEntry->score <= alpha)))
-    {
-        int score = ttEntry->score;
-        if (abs(score) >= MIN_MATE_SCORE) 
-            score += score < 0 ? plyFromRoot : -plyFromRoot;
-        return score;
-    }
+    auto [ttEntry, shouldCutoff] = probeTT(0, alpha, beta, plyFromRoot);
+    if (shouldCutoff)
+        return adjustScoreFromTT(ttEntry, plyFromRoot);
 
+    Move ttMove = board.getZobristHash() == ttEntry->zobristHash ? ttEntry->bestMove : NULL_MOVE;
     MovesList moves = board.pseudolegalMoves(true); // arg = true => captures only
-    array<int, 256> movesScores = scoreMoves(moves, *ttEntry, plyFromRoot);
-    int bestScore = eval;
+    array<int32_t, 256> movesScores = scoreMoves(moves, ttMove, killerMoves[plyFromRoot]);
+    int16_t bestScore = eval;
     Move bestMove = NULL_MOVE;
-    int originalAlpha = alpha;
+    int16_t originalAlpha = alpha;
 
     for (int i = 0; i < moves.size(); i++)
     {
@@ -128,7 +120,7 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
             continue; // skip illegal move
 
         nodes++;
-        int score = -qSearch(-beta, -alpha, plyFromRoot + 1);
+        int16_t score = -qSearch(-beta, -alpha, plyFromRoot + 1);
         board.undoMove();
 
         if (score <= bestScore)
@@ -154,7 +146,7 @@ inline int qSearch(int alpha, int beta, int plyFromRoot)
     return bestScore;
 }
 
-inline int search(int depth, int alpha, int beta, int plyFromRoot, bool cutNode, Move singularMove = NULL_MOVE)
+inline int16_t PVS(int depth, int16_t alpha, int16_t beta, int plyFromRoot, bool cutNode, Move singularMove = NULL_MOVE)
 {
     if (isHardTimeUp())
         return 0;
@@ -174,22 +166,16 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool cutNode,
         return qSearch(alpha, beta, plyFromRoot);
 
     // Probe TT
-    TTEntry *ttEntry = &(tt[board.getZobristHash() % tt.size()]);
-    if (plyFromRoot > 0 && ttEntry->zobristHash == board.getZobristHash() && ttEntry->depth >= depth && singularMove == NULL_MOVE
-    && (ttEntry->bound == EXACT || (ttEntry->bound == LOWER_BOUND && ttEntry->score >= beta) || (ttEntry->bound == UPPER_BOUND && ttEntry->score <= alpha)))
-    {
-        int score = ttEntry->score;
-        if (abs(score) >= MIN_MATE_SCORE) 
-            score += score < 0 ? plyFromRoot : -plyFromRoot;
-        return score;
-    }
+    auto [ttEntry, shouldCutoff] = probeTT(depth, alpha, beta, plyFromRoot, singularMove);
+    if (shouldCutoff)
+        return adjustScoreFromTT(ttEntry, plyFromRoot);
 
-    // IIR (Internal iterative reduction)
-    if (ttEntry->zobristHash != board.getZobristHash() && depth >= IIR_MIN_DEPTH && !inCheck)
-        depth--;
+    Move ttMove = board.getZobristHash() == ttEntry->zobristHash && singularMove == NULL_MOVE
+                ? ttEntry->bestMove : NULL_MOVE;
 
     bool pvNode = beta - alpha > 1 || plyFromRoot == 0;
-    int eval = nnue::evaluate(board.sideToMove());
+    int16_t eval = nnue::evaluate(board.sideToMove());
+
 
     if (!pvNode && !inCheck)
     {
@@ -203,7 +189,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool cutNode,
         {
             board.makeNullMove();
             int nmpDepth = depth - NMP_BASE_REDUCTION - depth / NMP_REDUCTION_DIVISOR - min((eval - beta)/200, 3);
-            int score = -search(nmpDepth, -beta, -alpha, plyFromRoot + 1, !cutNode);
+            int16_t score = -PVS(nmpDepth, -beta, -alpha, plyFromRoot + 1, !cutNode);
             board.undoNullMove();
 
             if (score >= MIN_MATE_SCORE) return beta;
@@ -212,17 +198,21 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool cutNode,
     }
 
     bool trySingular = singularMove == NULL_MOVE && depth >= SINGULAR_MIN_DEPTH && plyFromRoot > 0
-                       && ttEntry->zobristHash == board.getZobristHash() && ttEntry->depth >= depth - SINGULAR_DEPTH_MARGIN
-                       && ttEntry->bound != UPPER_BOUND && abs(ttEntry->score) < MIN_MATE_SCORE;
+                       && ttMove != NULL_MOVE && abs(ttEntry->score) < MIN_MATE_SCORE
+                       && ttEntry->depth >= depth - SINGULAR_DEPTH_MARGIN && ttEntry->bound != UPPER_BOUND;
+                       
+    // IIR (Internal iterative reduction)
+    if (ttMove == NULL_MOVE && depth >= IIR_MIN_DEPTH && !inCheck && (pvNode || cutNode))
+        depth--;
 
     MovesList moves = board.pseudolegalMoves();
-    array<int, 256> movesScores = scoreMoves(moves, *ttEntry, plyFromRoot);
-    int bestScore = NEG_INFINITY;
+    array<int32_t, 256> movesScores = scoreMoves(moves, ttMove, killerMoves[plyFromRoot]);
+    int16_t bestScore = NEG_INFINITY;
     Move bestMove = NULL_MOVE;
-    int originalAlpha = alpha;
+    int16_t originalAlpha = alpha;
     int legalMovesPlayed = 0;
     int stm = board.sideToMove();
-    int* pointersFailLowQuietsHistory[256], numFailLowQuiets = 0;
+    int *pointersFailLowQuietsHistory[256], numFailLowQuiets = 0;
     doubleExtensions[plyFromRoot + 1] = doubleExtensions[plyFromRoot];
 
     for (int i = 0; i < moves.size(); i++)
@@ -242,7 +232,7 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool cutNode,
         {
             // LMP (Late move pruning)
             if (depth <= LMP_MAX_DEPTH 
-            && legalMovesPlayed >= LMP_MIN_MOVES_BASE + pvNode + inCheck + depth * depth * 0.75)
+            && legalMovesPlayed >= LMP_MIN_MOVES_BASE + pvNode + inCheck + depth * depth * LMP_DEPTH_MULTIPLIER)
                 break;
 
             // FP (Futility pruning)
@@ -269,8 +259,8 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool cutNode,
         {
             // Singular search: before searching any move, search this node at a shallower depth with TT move excluded
             board.undoMove(); // undo TT move we just made
-            int singularBeta = ttEntry->score - depth * SINGULAR_BETA_DEPTH_MULTIPLIER;
-            int singularScore = search((depth - 1) / 2, singularBeta - 1, singularBeta, plyFromRoot, cutNode, move);
+            int16_t singularBeta = ttEntry->score - depth * SINGULAR_BETA_DEPTH_MULTIPLIER;
+            int16_t singularScore = PVS((depth - 1) / 2, singularBeta - 1, singularBeta, plyFromRoot, cutNode, move);
             board.makeMove(move, false); // second arg = false => don't check legality (we already verified it's a legal move)
 
             if (!pvNode && singularScore < singularBeta && singularScore < singularBeta - SINGULAR_BETA_MARGIN 
@@ -296,9 +286,9 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool cutNode,
         int *pointerMoveHistory = &(history[stm][pieceType][targetSquare]);
 
         // PVS (Principal variation search)
-        int score = 0;
+        int16_t score = 0;
         if (legalMovesPlayed == 1)
-            score = -search(depth - 1 + extension, -beta, -alpha, plyFromRoot + 1, false);
+            score = -PVS(depth - 1 + extension, -beta, -alpha, plyFromRoot + 1, false);
         else
         {
             // LMR (Late move reductions)
@@ -316,16 +306,16 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool cutNode,
             else
                 lmr = 0;
 
-            score = -search(depth - 1 - lmr, -alpha - 1, -alpha, plyFromRoot + 1, true);
+            score = -PVS(depth - 1 - lmr, -alpha - 1, -alpha, plyFromRoot + 1, true);
             if (score > alpha && (score < beta || lmr > 0))
-                score = -search(depth - 1, -beta, -alpha, plyFromRoot + 1, score < beta ? false : !cutNode);
+                score = -PVS(depth - 1, -beta, -alpha, plyFromRoot + 1, score < beta ? false : !cutNode);
         }
 
         board.undoMove();
         if (isHardTimeUp()) return 0;
 
         if (plyFromRoot == 0)
-            movesNodes[move.from()][targetSquare] += nodes - prevNodes;
+            movesNodes[move.getMove()] += nodes - prevNodes;
 
         if (score > bestScore)
             bestScore = score;
@@ -344,12 +334,10 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool cutNode,
         if (pvNode)
         {
             // Update pv line
-            plyFromRoot++;
-            int subPvLineLength = pvLengths[plyFromRoot];
-            pvLengths[plyFromRoot - 1] = 1 + subPvLineLength;
-            pvLines[plyFromRoot - 1][0] = move;
-            memcpy(&(pvLines[plyFromRoot - 1][1]), pvLines[plyFromRoot], subPvLineLength * sizeof(Move)); // dst, src, size
-            plyFromRoot--;
+            int subPvLineLength = pvLengths[plyFromRoot + 1];
+            pvLengths[plyFromRoot] = 1 + subPvLineLength;
+            pvLines[plyFromRoot][0] = move;
+            memcpy(&(pvLines[plyFromRoot][1]), pvLines[plyFromRoot + 1], subPvLineLength * sizeof(Move)); // dst, src, size
         }
 
         if (score < beta) 
@@ -386,16 +374,16 @@ inline int search(int depth, int alpha, int beta, int plyFromRoot, bool cutNode,
     return bestScore;
 }
 
-inline int aspiration(int maxDepth, int score)
+inline int16_t aspiration(int maxDepth, int16_t score)
 {
-    int delta = ASPIRATION_INITIAL_DELTA;
-    int alpha = max(NEG_INFINITY, score - delta);
-    int beta = min(POS_INFINITY, score + delta);
+    int16_t delta = ASPIRATION_INITIAL_DELTA;
+    int16_t alpha = max(NEG_INFINITY, score - delta);
+    int16_t beta = min(POS_INFINITY, score + delta);
     int depth = maxDepth;
 
     while (true)
     {
-        score = search(depth, alpha, beta, 0, false);
+        score = PVS(depth, alpha, beta, 0, false);
 
         if (isHardTimeUp()) return 0;
 
@@ -431,24 +419,22 @@ inline void iterativeDeepening()
     memset(history, 0, sizeof(history));
     memset(doubleExtensions, 0, sizeof(doubleExtensions));
 
-    int iterationDepth = 1, score = 0;
-    while (iterationDepth <= MAX_DEPTH)
+    int16_t score = 0;
+    for (int iterationDepth = 1; iterationDepth <= MAX_DEPTH; iterationDepth++)
     {
         maxPlyReached = -1;
 
         score = iterationDepth >= ASPIRATION_MIN_DEPTH 
                 ? aspiration(iterationDepth, score) 
-                : search(iterationDepth, NEG_INFINITY, POS_INFINITY, 0, false);
+                : PVS(iterationDepth, NEG_INFINITY, POS_INFINITY, 0, false);
 
         if (isHardTimeUp())
             break;
 
         uci::info(iterationDepth, score);
-        iterationDepth++;
 
         if (isSoftTimeUp())
             break;
-
     }
 }
 

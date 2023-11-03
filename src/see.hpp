@@ -4,10 +4,10 @@
 // clang-format off
 
                               // P    N    B    R    Q    K  NONE
-const int SEE_PIECE_VALUES[7] = {100, 300, 300, 500, 900, 0, 0};
-const int PAWN_INDEX = 0;
+const int32_t SEE_PIECE_VALUES[7] = {100, 300, 300, 500, 900, 0, 0};
+const uint8_t PAWN_INDEX = 0;
 
-inline int gain(Board &board, Move move)
+inline int32_t gain(Board &board, Move move)
 {
     auto moveFlag = move.typeFlag();
 
@@ -17,7 +17,7 @@ inline int gain(Board &board, Move move)
     if (moveFlag == Move::EN_PASSANT_FLAG)
         return SEE_PIECE_VALUES[PAWN_INDEX];
 
-    int score = SEE_PIECE_VALUES[(int)board.pieceTypeAt(move.to())];
+    int32_t score = SEE_PIECE_VALUES[(int)board.pieceTypeAt(move.to())];
 
     PieceType promotionPieceType = move.promotionPieceType();
     if (promotionPieceType != PieceType::NONE)
@@ -41,9 +41,9 @@ inline PieceType popLeastValuable(Board &board, uint64_t &occ, uint64_t attacker
     return PieceType::NONE;
 }
 
-inline bool SEE(Board &board, Move move, int threshold = 0)
+inline bool SEE(Board &board, Move move, int32_t threshold = 0)
 {
-    int score = gain(board, move) - threshold;
+    int32_t score = gain(board, move) - threshold;
     if (score < 0)
         return false;
 
