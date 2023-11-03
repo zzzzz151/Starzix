@@ -28,8 +28,8 @@ const int LMP_MAX_DEPTH = 8,
 const double LMP_DEPTH_MULTIPLIER = 0.75;
 
 const int SEE_PRUNING_MAX_DEPTH = 9,
-          SEE_PRUNING_NOISY_THRESHOLD = -90,
-          SEE_PRUNING_QUIET_THRESHOLD = -50;
+          SEE_PRUNING_NOISY_THRESHOLD = -20,
+          SEE_PRUNING_QUIET_THRESHOLD = -65;
 
 const int HISTORY_MIN_BONUS = 1570,
           HISTORY_BONUS_MULTIPLIER = 370,
@@ -176,7 +176,6 @@ inline int16_t PVS(int depth, int16_t alpha, int16_t beta, int plyFromRoot, bool
     bool pvNode = beta - alpha > 1 || plyFromRoot == 0;
     int16_t eval = nnue::evaluate(board.sideToMove());
 
-
     if (!pvNode && !inCheck)
     {
         // RFP (Reverse futility pruning)
@@ -241,8 +240,8 @@ inline int16_t PVS(int depth, int16_t alpha, int16_t beta, int plyFromRoot, bool
                 break;
 
             // SEE pruning
-            if (depth <= SEE_PRUNING_MAX_DEPTH
-            && !SEE(board, move, depth * (isQuietMove ? SEE_PRUNING_QUIET_THRESHOLD : SEE_PRUNING_NOISY_THRESHOLD)))
+            int threshold = isQuietMove ? depth * SEE_PRUNING_QUIET_THRESHOLD : depth * depth * SEE_PRUNING_NOISY_THRESHOLD;
+            if (depth <= SEE_PRUNING_MAX_DEPTH && !SEE(board, move, threshold))
                 continue;
         }
 
