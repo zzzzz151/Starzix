@@ -82,8 +82,10 @@ namespace uci
 
     inline void uciLoop()
     {
-        string received;
-        getline(cin, received);
+        string received = "";
+        while (trim(received) != "uci")
+            getline(cin, received);
+
         cout << "id name z5\n";
         cout << "id author zzzzz\n";
         cout << "option name Hash type spin default " << TT_SIZE_MB << " min 1 max 1024\n";
@@ -92,6 +94,12 @@ namespace uci
         while (true)
         {
             getline(cin, received);
+            received = trim(received);
+            if (received == "")
+                continue;
+
+            try {
+
             istringstream stringStream(received);
             vector<string> words;
             string word;
@@ -117,6 +125,13 @@ namespace uci
             }
             else if (words[0] == "eval")
                 cout << "eval " << nnue::evaluate(board.sideToMove()) << " cp" << endl;
+
+            } 
+            catch (const char* errorMessage)
+            {
+
+            }
+            
         }
     }
 

@@ -23,9 +23,10 @@ struct BoardState
     uint16_t pliesSincePawnMoveOrCapture;
     Piece capturedPiece;
     Move move;
+    PieceType pieceTypeMoved;
 
     inline BoardState(uint64_t zobristHash, array<array<bool, 2>, 2> castlingRights, Square enPassantSquare, 
-                      uint16_t pliesSincePawnMoveOrCapture, Piece capturedPiece, Move move)
+                      uint16_t pliesSincePawnMoveOrCapture, Piece capturedPiece, Move move, PieceType pieceTypeMoved)
     {
         this->zobristHash = zobristHash;
         this->castlingRights = castlingRights;
@@ -33,6 +34,7 @@ struct BoardState
         this->pliesSincePawnMoveOrCapture = pliesSincePawnMoveOrCapture;
         this->capturedPiece = capturedPiece;
         this->move = move;
+        this->pieceTypeMoved = pieceTypeMoved;
     }
 
 };
@@ -402,8 +404,11 @@ class Board
             return false;
         }
 
+        PieceType pieceType = pieceToPieceType(pieceMoving);
+
         // push board state
-        BoardState state = BoardState(zobristHash, castlingRights, enPassantSquare, pliesSincePawnMoveOrCapture, capturedPiece, move);
+        BoardState state = BoardState(zobristHash, castlingRights, enPassantSquare,
+                                      pliesSincePawnMoveOrCapture, capturedPiece, move, pieceType);
         states.push_back(state); // append
 
         nnue::push(); // save current accumulator
@@ -420,8 +425,6 @@ class Board
                 updateZobristAndAccumulator(colorToMove, castlingRookSquareAfter, castlingRook, true); // place castling rook
             }
         }
-
-        PieceType pieceType = pieceToPieceType(pieceMoving);
 
         // Update castling rights
         if (pieceType == PieceType::KING)
@@ -542,7 +545,8 @@ class Board
     inline void makeNullMove()
     {
         // push board state
-        BoardState state = BoardState(zobristHash, castlingRights, enPassantSquare, pliesSincePawnMoveOrCapture, Piece::NONE, NULL_MOVE);
+        BoardState state = BoardState(zobristHash, castlingRights, enPassantSquare, 
+                                      pliesSincePawnMoveOrCapture, Piece::NONE, NULL_MOVE, PieceType::NONE);
         states.push_back(state); // append
 
         colorToMove = oppSide();
@@ -816,9 +820,23 @@ class Board
         return false;
     }
 
+    inline uint16_t numMovesMade() { return states.size(); }
+
     inline Move getLastMove() 
     { 
         return states.size() > 0 ? states.back().move : NULL_MOVE; 
+    }
+
+    inline Move getNthToLastMove(uint16_t n)
+    {
+        assert(n >= 1); 
+        return states.size() >= n ? states[states.size() - n].move : NULL_MOVE;
+    }
+
+    inline PieceType getNthToLastMovePieceType(uint16_t n)
+    {
+        assert(n >= 1); 
+        return states.size() >= n ? states[states.size() - n].pieceTypeMoved : PieceType::NONE;
     }
     
 };

@@ -40,13 +40,15 @@ Transposition table
 
 Quiescence search with SEE pruning
 
-Move ordering (hash move > good captures by SEE + MVVLVA > promotions > killer moves > countermove > quiet moves by history > bad captures)
+Move ordering (TT move > good captures by SEE + MVVLVA > promotions > killer move > countermove > quiet moves by history > bad captures)
+
+History (main history, countermove history, follow-up move history)
 
 Aspiration windows
 
 Check extension
 
-Singular extensions
+Singular extensions (double extensions, negative extension)
 
 Internal iterative reduction
 

@@ -15,7 +15,7 @@ bool isMoveTime = false;
 int32_t hardMillisecondsForThisTurn, softMillisecondsForThisTurn;
 bool hardTimeUp = false;
 
-inline void setupTime(vector<string> &words, Color color)
+inline void setupTime(vector<string> &words, Color colorToMove)
 {
     start = chrono::steady_clock::now();
     isMoveTime = hardTimeUp = false;
@@ -23,9 +23,9 @@ inline void setupTime(vector<string> &words, Color color)
 
     for (int i = 0; i < words.size(); i++)
     {
-        if ((words[i] == "wtime" && color == WHITE) || (words[i] == "btime" && color == BLACK))
+        if ((words[i] == "wtime" && colorToMove == WHITE) || (words[i] == "btime" && colorToMove == BLACK))
             milliseconds = stoi(words[i + 1]);
-        else if ((words[i] == "winc" && color == WHITE) || (words[i] == "binc" && color == BLACK))
+        else if ((words[i] == "winc" && colorToMove == WHITE) || (words[i] == "binc" && colorToMove == BLACK))
             increment = stoi(words[i+1]);
         else if (words[i] == "movestogo")
             movesToGo = stoi(words[i + 1]);
