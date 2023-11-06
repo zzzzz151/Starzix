@@ -83,8 +83,11 @@ namespace uci
     inline void uciLoop()
     {
         string received = "";
-        while (trim(received) != "uci")
+        while (received != "uci")
+        {
             getline(cin, received);
+            trim(received);
+        }
 
         cout << "id name z5\n";
         cout << "id author zzzzz\n";
@@ -94,17 +97,12 @@ namespace uci
         while (true)
         {
             getline(cin, received);
-            received = trim(received);
-            if (received == "")
+            trim(received);
+            vector<string> words = splitString(received, ' ');
+            if (received == "" || words.size() == 0)
                 continue;
 
             try {
-
-            istringstream stringStream(received);
-            vector<string> words;
-            string word;
-            while (getline(stringStream, word, ' '))
-                words.push_back(word);
 
             if (received == "quit" || !cin.good())
                 break;

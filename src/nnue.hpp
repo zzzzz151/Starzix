@@ -51,26 +51,10 @@ namespace nnue
         int16_t white[HIDDEN_LAYER_SIZE];
         int16_t black[HIDDEN_LAYER_SIZE];
 
-        inline Accumulator(uint64_t piecesBitboards[6][2] = nullptr)
+        inline Accumulator()
         {
             for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
                 white[i] = black[i] = nn.featureBiases[i];
-
-            if (piecesBitboards == nullptr)
-                return;
-
-            for (int pt = 0; pt <= 5; pt++)
-            {
-                for (int color = 0; color <= 1; color++)
-                {
-                    uint64_t bb = piecesBitboards[pt][color];
-                    while (bb > 0)
-                    {
-                        Square sq = poplsb(bb);
-                        activate(color, sq, (PieceType)pt);
-                    }
-                }
-            }
         }
 
         inline void activate(Color color, Square sq, PieceType pieceType)
@@ -105,11 +89,11 @@ namespace nnue
     vector<Accumulator> accumulators;
     Accumulator *currentAccumulator;
 
-    inline void reset(uint64_t piecesBitboards[6][2] = nullptr)
+    inline void reset()
     {
         accumulators.clear();
         accumulators.reserve(256);
-        accumulators.push_back(Accumulator(piecesBitboards));
+        accumulators.push_back(Accumulator());
         currentAccumulator = &accumulators.back();
     }
 
@@ -135,7 +119,7 @@ namespace nnue
         return x;
     }
 
-    inline int16_t evaluate(Color color)
+    inline int32_t evaluate(Color color)
     {
         int16_t *us, *them;
         if (color == WHITE)
@@ -156,7 +140,7 @@ namespace nnue
             sum += crelu(them[i]) * nn.outputWeights[HIDDEN_LAYER_SIZE + i];
         }
 
-        return clamp(sum * 400 / Q, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
+        return sum * 400 / Q;
     }
 
 }

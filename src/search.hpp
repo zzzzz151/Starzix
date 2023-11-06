@@ -44,6 +44,11 @@ const double LMR_BASE = 1,
              LMR_MULTIPLIER = 0.5;
 const int LMR_HISTORY_DIVISOR = 8192;
 
+const int16_t POS_INFINITY = 32500, 
+              NEG_INFINITY = -POS_INFINITY, 
+              MIN_MATE_SCORE = POS_INFINITY - 300,
+              INVALID_EVAL = POS_INFINITY;
+
 Board board;
 uint64_t nodes;
 int maxPlyReached;
@@ -84,7 +89,7 @@ inline int16_t qSearch(int16_t alpha, int16_t beta, int plyFromRoot)
     if (plyFromRoot > maxPlyReached)
         maxPlyReached = plyFromRoot;
 
-    int16_t eval = nnue::evaluate(board.sideToMove());
+    int16_t eval = clamp(nnue::evaluate(board.sideToMove()), -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
     if (eval >= beta) 
         return eval;
     if (alpha < eval) 
@@ -151,7 +156,7 @@ inline int16_t PVS(int depth, int16_t alpha, int16_t beta, int plyFromRoot, bool
 
     pvLengths[plyFromRoot] = 0;
 
-    if (plyFromRoot > 0 && (board.isDraw() || board.isRepetition()))
+    if (plyFromRoot > 0 && board.isDraw())
         // Instead of returning 0, introduce very slight randomness to drawn positions
         return -1 + (nodes % 3);
 
@@ -172,7 +177,7 @@ inline int16_t PVS(int depth, int16_t alpha, int16_t beta, int plyFromRoot, bool
     bool pvNode = beta - alpha > 1 || plyFromRoot == 0;
     int stm = board.sideToMove();
     if (eval == INVALID_EVAL)
-        eval = nnue::evaluate(stm);
+        eval = clamp(nnue::evaluate(stm), -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
 
     if (!pvNode && !inCheck)
     {

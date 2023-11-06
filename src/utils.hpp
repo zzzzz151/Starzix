@@ -6,15 +6,127 @@
 #include <iostream>
 #include <algorithm>
 #include <bitset>
+#include <cassert>
 #include "types.hpp"
 using namespace std;
+
+inline uint8_t lsb(uint64_t b);
+
+inline uint8_t msb(uint64_t b);
+
+#if defined(__GNUC__) // GCC, Clang, ICC
+inline uint8_t lsb(uint64_t b)
+{
+    assert(b);
+    return uint8_t(__builtin_ctzll(b));
+}
+
+inline uint8_t msb(uint64_t b)
+{
+    assert(b);
+    return uint8_t(63 ^ __builtin_clzll(b));
+}
+
+#elif defined(_MSC_VER) // MSVC
+
+#ifdef _WIN64 // MSVC, WIN64
+#include <intrin.h>
+inline uint8_t lsb(uint64_t b)
+{
+    unsigned long idx;
+    _BitScanForward64(&idx, b);
+    return (uint8_t)idx;
+}
+
+inline uint8_t msb(uint64_t b)
+{
+    unsigned long idx;
+    _BitScanReverse64(&idx, b);
+    return (uint8_t)idx;
+}
+
+#else // MSVC, WIN32
+#include <intrin.h>
+inline uint8_t lsb(uint64_t b)
+{
+    unsigned long idx;
+
+    if (b & 0xffffffff)
+    {
+        _BitScanForward(&idx, int32_t(b));
+        return uint8_t(idx);
+    }
+    else
+    {
+        _BitScanForward(&idx, int32_t(b >> 32));
+        return uint8_t(idx + 32);
+    }
+}
+
+inline uint8_t msb(uint64_t b)
+{
+    unsigned long idx;
+
+    if (b >> 32)
+    {
+        _BitScanReverse(&idx, int32_t(b >> 32));
+        return uint8_t(idx + 32);
+    }
+    else
+    {
+        _BitScanReverse(&idx, int32_t(b));
+        return uint8_t(idx);
+    }
+}
+
+#endif
+
+#else // Compiler is neither GCC nor MSVC compatible
+
+#error "Compiler not supported."
+
+#endif
+
+inline uint8_t poplsb(uint64_t &mask)
+{
+    uint8_t s = lsb(mask);
+    mask &= mask - 1; // compiler optimizes this to _blsr_uint64_t
+    return uint8_t(s);
+}
+
+inline uint64_t pdep(uint64_t val, uint64_t mask) {
+    uint64_t res = 0;
+    for (uint64_t bb = 1; mask; bb += bb) {
+        if (val & bb)
+            res |= mask & -mask;
+        mask &= mask - 1;
+    }
+    return res;
+}
 
 inline uint8_t squareFile(Square square) { return square & 7; }
 
 inline uint8_t squareRank(Square square) { return square >> 3; }
 
-inline vector<string> splitString(string str, char delimiter)
+inline void trim(string &str) {
+    size_t first = str.find_first_not_of(" \t\n\r");
+    size_t last = str.find_last_not_of(" \t\n\r");
+    
+    if (first == string::npos) // The string is empty or contains only whitespace characters
+    {
+        str = "";
+        return;
+    }
+    
+    str = str.substr(first, (last - first + 1));
+}
+
+inline vector<string> splitString(string &str, char delimiter)
 {
+    trim(str);
+    if (str == "")
+        return vector<string>{};
+
     vector<string> strSplit;
     stringstream ss(str);
     string token;
@@ -25,15 +137,6 @@ inline vector<string> splitString(string str, char delimiter)
     return strSplit;
 }
 
-inline string trim(string &str) {
-    size_t first = str.find_first_not_of(" \t\n\r");
-    size_t last = str.find_last_not_of(" \t\n\r");
-    
-    if (first == std::string::npos) // The string is empty or contains only whitespace characters
-        return "";
-    
-    return str.substr(first, (last - first + 1));
-}
 
 inline void printBitboard(uint64_t bb)
 {

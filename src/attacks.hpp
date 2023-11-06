@@ -1,7 +1,6 @@
 #pragma once
 
 // clang-format off
-#include "builtin.hpp"
 #include "types.hpp"
 #include "utils.hpp"
 

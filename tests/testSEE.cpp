@@ -35,7 +35,7 @@ int main() {
         while (std::getline(iss, part, '|')) {
             part.erase(0, part.find_first_not_of(" \t"));
             part.erase(part.find_last_not_of(" \t") + 1);
-            part = trim(part);
+            trim(part);
             tokens.push_back(part);
         }
 

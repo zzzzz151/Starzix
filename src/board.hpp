@@ -6,7 +6,6 @@
 #include <random>
 #include <cassert>
 #include "types.hpp"
-#include "builtin.hpp"
 #include "utils.hpp"
 #include "move.hpp"
 #include "attacks.hpp"
@@ -75,7 +74,7 @@ class Board
 
         nnue::reset();
 
-        fen = trim(fen);
+        trim(fen);
         vector<string> fenSplit = splitString(fen, ' ');
 
         colorToMove = fenSplit[1] == "b" ? BLACK : WHITE;
@@ -91,6 +90,8 @@ class Board
 
         pliesSincePawnMoveOrCapture = fenSplit.size() >= 5 ? stoi(fenSplit[4]) : 0;
         currentMoveCounter = fenSplit.size() >= 6 ? stoi(fenSplit[5]) : 1;
+
+        perft = false;
     }
 
     private:
@@ -323,6 +324,9 @@ class Board
 
     inline bool isDraw()
     {
+        if (isRepetition())
+            return true;
+
         if (pliesSincePawnMoveOrCapture >= 100)
             return true;
 
@@ -359,7 +363,7 @@ class Board
 
     public:
 
-    inline bool makeMove(Move move, bool checkLegality = true)
+    inline bool makeMove(Move move, bool verifyCheckLegality = true)
     {
         Square from = move.from();
         Square to = move.to();
@@ -397,7 +401,9 @@ class Board
             removePiece(capturedSquare);
         }
 
-        if (checkLegality && inCheck())
+        // Verify that this pseudolegal move is legal
+        // (side that played it is not in check after the move)
+        if (verifyCheckLegality && inCheck())
         {
             // move is illegal
             undoMove(move, capturedPiece);
@@ -475,9 +481,9 @@ class Board
         return true; // move is legal
     }
 
-    inline bool makeMove(string uci, bool checkLegality = true)
+    inline bool makeMove(string uci, bool verifyCheckLegality = true)
     {
-        return makeMove(Move::fromUci(uci, pieces), checkLegality);
+        return makeMove(Move::fromUci(uci, pieces), verifyCheckLegality);
     }
 
     inline void undoMove(Move illegalMove = NULL_MOVE, Piece illegalyCapturedPiece = Piece::NONE)
@@ -531,13 +537,14 @@ class Board
     inline void pullState()
     {
         assert(states.size() > 0);
-        BoardState state = states.back();
-        states.pop_back();
+        BoardState *state = &(states.back());
 
-        zobristHash = state.zobristHash;
-        castlingRights = state.castlingRights;
-        enPassantSquare = state.enPassantSquare;
-        pliesSincePawnMoveOrCapture = state.pliesSincePawnMoveOrCapture;
+        zobristHash = state->zobristHash;
+        castlingRights = state->castlingRights;
+        enPassantSquare = state->enPassantSquare;
+        pliesSincePawnMoveOrCapture = state->pliesSincePawnMoveOrCapture;
+
+        states.pop_back();
     }
 
     public:
@@ -742,9 +749,7 @@ class Board
 
     inline bool isSquareAttacked(Square square, Color colorAttacking)
     {
-         //idea: put a super piece in this square and see if its attacks intersect with an enemy piece
-
-        // DEBUG cout << "isSquareAttacked() called on square " << squareToStr[square] << ", colorAttacking " << (int)colorAttacking << endl;
+         // Idea: put a super piece in this square and see if its attacks intersect with an enemy piece
 
         uint64_t occupied = occupancy();
 
@@ -757,25 +762,17 @@ class Board
         if ((bishopAttacks & (attackerBishops | attackerQueens)) > 0)
             return true;
  
-        // DEBUG cout << "not attacked by bishops" << endl;
-
         uint64_t rookAttacks = attacks::rookAttacks(square, occupied);
         if ((rookAttacks & (attackerRooks | attackerQueens)) > 0)
             return true;
-
-        // DEBUG cout << "not attacked by rooks" << endl;
 
         uint64_t knightAttacks = attacks::knightAttacks(square);
         if ((knightAttacks & (bitboards[colorAttacking][(int)PieceType::KNIGHT])) > 0) 
             return true;
 
-         // DEBUG cout << "not attacked by knights" << endl;
-
         uint64_t kingAttacks = attacks::kingAttacks(square);
         if ((kingAttacks & bitboards[colorAttacking][(int)PieceType::KING]) > 0) 
             return true;
-
-        // DEBUG cout << "not attacked by kings" << endl;
 
         uint64_t pawnAttacks = attacks::pawnAttacks(square, oppColor(colorAttacking));
         if ((pawnAttacks & bitboards[colorAttacking][(int)PieceType::PAWN]) > 0)
@@ -784,9 +781,6 @@ class Board
         // En passant
         if (enPassantSquare == square && colorAttacking == colorToMove)
             return true;
-
-        // DEBUG cout << "not attacked by pawns" << endl;
-        // DEBUG cout << "square not attacked" << endl;
 
         return false;
     }   
@@ -805,7 +799,7 @@ class Board
 
     inline bool hasNonPawnMaterial(Color color = NULL_COLOR)
     {
-        // p, n, b, r, q, k
+        // N, B, R, Q
         for (int pt = 1; pt <= 4; pt++)
         {
             if (color == NULL_COLOR)
@@ -819,8 +813,6 @@ class Board
 
         return false;
     }
-
-    inline uint16_t numMovesMade() { return states.size(); }
 
     inline Move getLastMove() 
     { 
