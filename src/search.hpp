@@ -140,7 +140,7 @@ inline int16_t qSearch(int16_t alpha, int16_t beta, int plyFromRoot)
     return bestScore;
 }
 
-inline int16_t PVS(int depth, int16_t alpha, int16_t beta, int plyFromRoot, bool cutNode, Move singularMove = NULL_MOVE)
+inline int16_t PVS(int depth, int16_t alpha, int16_t beta, int plyFromRoot, bool cutNode, Move singularMove = NULL_MOVE, int16_t eval = INVALID_EVAL)
 {
     if (isHardTimeUp())
         return 0;
@@ -171,7 +171,8 @@ inline int16_t PVS(int depth, int16_t alpha, int16_t beta, int plyFromRoot, bool
 
     bool pvNode = beta - alpha > 1 || plyFromRoot == 0;
     int stm = board.sideToMove();
-    int16_t eval = nnue::evaluate(stm);
+    if (eval == INVALID_EVAL)
+        eval = nnue::evaluate(stm);
 
     if (!pvNode && !inCheck)
     {
@@ -258,7 +259,7 @@ inline int16_t PVS(int depth, int16_t alpha, int16_t beta, int plyFromRoot, bool
             // Singular search: before searching any move, search this node at a shallower depth with TT move excluded
             board.undoMove(); // undo TT move we just made
             int16_t singularBeta = ttEntry->score - depth * SINGULAR_BETA_DEPTH_MULTIPLIER;
-            int16_t singularScore = PVS((depth - 1) / 2, singularBeta - 1, singularBeta, plyFromRoot, cutNode, move);
+            int16_t singularScore = PVS((depth - 1) / 2, singularBeta - 1, singularBeta, plyFromRoot, cutNode, move, eval);
             board.makeMove(move, false); // second arg = false => don't check legality (we already verified it's a legal move)
 
             if (!pvNode && singularScore < singularBeta && singularScore < singularBeta - SINGULAR_BETA_MARGIN 

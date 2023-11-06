@@ -84,4 +84,7 @@ unordered_map<Piece, char> pieceToChar = {
 
 const inline int32_t MAX_INT32 = 2147483647;
 
-const int16_t POS_INFINITY = 32500, NEG_INFINITY = -POS_INFINITY, MIN_MATE_SCORE = POS_INFINITY - 256;
+const int16_t POS_INFINITY = 32500, 
+              NEG_INFINITY = -POS_INFINITY, 
+              MIN_MATE_SCORE = POS_INFINITY - 256,
+              INVALID_EVAL = POS_INFINITY;
