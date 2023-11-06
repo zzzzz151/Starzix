@@ -126,21 +126,13 @@ inline int16_t qSearch(int16_t alpha, int16_t beta, int plyFromRoot)
             continue;
 
         bestScore = score;
+        bestMove = captureMove;
 
-        if (score >= beta) 
-        {
-            bestMove = captureMove;
-            break;
-        }
-        if (score > alpha) 
-        {
-            alpha = score;
-            bestMove = captureMove;
-        }
+        if (bestScore >= beta) break;
+        if (bestScore > alpha) alpha = bestScore;
     }
 
-    if (ttEntry->depth <= 0)
-        storeInTT(ttEntry, 0, bestMove, bestScore, plyFromRoot, originalAlpha, beta);
+    storeInTT(ttEntry, 0, bestMove, bestScore, plyFromRoot, originalAlpha, beta);
 
     return bestScore;
 }
