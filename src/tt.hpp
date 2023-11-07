@@ -2,19 +2,37 @@
 
 // clang-format off
 
-const uint16_t TT_SIZE_MB = 64; // default
-
+const uint16_t TT_DEFAULT_SIZE_MB = 64;
 const uint8_t INVALID_BOUND = 0, EXACT = 1, LOWER_BOUND = 2, UPPER_BOUND = 3;
+uint8_t ttAge = 0;
+
 struct TTEntry
 {
     uint64_t zobristHash = 0;
     int16_t score = 0;
     Move bestMove = NULL_MOVE;
     uint8_t depth = 0; 
-    uint8_t bound = INVALID_BOUND;
-};
+    uint8_t boundAndAge = 0; // lowest 2 bits for bound, highest 6 bits for age
 
-vector<TTEntry> tt(TT_SIZE_MB * 1024 * 1024 / sizeof(TTEntry)); // initializes the elements
+    inline uint8_t getBound() {
+         return boundAndAge & 0b0000'0011; 
+    }
+
+    inline void setBound(uint8_t newBound) { 
+        boundAndAge = (boundAndAge & 0b1111'1100) | newBound; 
+    }
+
+    inline uint8_t getAge() { 
+        return boundAndAge & 0b1111'1100;
+    }
+
+    inline void setAge(uint8_t newAge) { 
+        boundAndAge &= 0b0000'0011;
+        boundAndAge |= (newAge << 2);
+    }
+} __attribute__((packed)); 
+
+vector<TTEntry> tt(TT_DEFAULT_SIZE_MB * 1024 * 1024 / sizeof(TTEntry)); // initializes the elements
 
 inline void resizeTT(uint16_t sizeMB)
 {
@@ -26,6 +44,7 @@ inline void resizeTT(uint16_t sizeMB)
 inline void clearTT()
 {
     memset(tt.data(), 0, sizeof(TTEntry) * tt.size());
+    ttAge = 0;
 }
 
 inline int16_t adjustScoreFromTT(TTEntry *ttEntry, int plyFromRoot)
@@ -41,14 +60,15 @@ inline int16_t adjustScoreFromTT(TTEntry *ttEntry, int plyFromRoot)
 inline pair<TTEntry*, bool> probeTT(int depth, int16_t alpha, int16_t beta, int plyFromRoot, Move singularMove = NULL_MOVE)
 {
     TTEntry *ttEntry = &(tt[board.getZobristHash() % tt.size()]);
+    uint8_t ttEntryBound = ttEntry->getBound();
 
     bool shouldCutoff = plyFromRoot > 0 
                         && ttEntry->zobristHash == board.getZobristHash() 
                         && ttEntry->depth >= depth 
                         && singularMove == NULL_MOVE
-                        && (ttEntry->bound == EXACT 
-                        || (ttEntry->bound == LOWER_BOUND && ttEntry->score >= beta) 
-                        || (ttEntry->bound == UPPER_BOUND && ttEntry->score <= alpha));
+                        && (ttEntryBound == EXACT 
+                        || (ttEntryBound == LOWER_BOUND && ttEntry->score >= beta) 
+                        || (ttEntryBound == UPPER_BOUND && ttEntry->score <= alpha));
 
     return { ttEntry, shouldCutoff };
 }
@@ -57,10 +77,28 @@ inline void storeInTT(TTEntry *ttEntry, int depth, Move bestMove, int16_t bestSc
 {
     assert(depth >= 0 && depth <= 255);
 
+    uint8_t bound = EXACT;
+    if (bestScore <= originalAlpha) 
+        bound = UPPER_BOUND;
+    else if (bestScore >= beta) 
+        bound = LOWER_BOUND;
+
+    /*
+    bool replace = ttEntry->zobristHash == 0 
+                   || bound == EXACT
+                   || ttEntry->getAge() != ttAge 
+                   || ttEntry->depth < depth + (ttEntry->zobristHash == board.getZobristHash() ? 3 : 0);
+
+    if (!replace)
+        return;
+    */
+
     ttEntry->zobristHash = board.getZobristHash();
     ttEntry->depth = depth;
-    ttEntry->bestMove = bestMove;
     ttEntry->score = bestScore;
+    if (bestMove != NULL_MOVE)
+        ttEntry->bestMove = bestMove;
+    ttEntry->boundAndAge = (ttAge << 2) | bound;
 
     // Adjust mate scores based on ply
     if (bestScore >= MIN_MATE_SCORE)
@@ -68,10 +106,4 @@ inline void storeInTT(TTEntry *ttEntry, int depth, Move bestMove, int16_t bestSc
     else if (bestScore <= -MIN_MATE_SCORE)
         ttEntry->score -= plyFromRoot;
 
-    if (bestScore <= originalAlpha) 
-        ttEntry->bound = UPPER_BOUND;
-    else if (bestScore >= beta) 
-        ttEntry->bound = LOWER_BOUND;
-    else 
-        ttEntry->bound = EXACT;
 }

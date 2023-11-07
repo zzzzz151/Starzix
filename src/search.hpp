@@ -193,7 +193,7 @@ inline int16_t PVS(int depth, int16_t alpha, int16_t beta, int plyFromRoot, bool
 
     bool trySingular = singularMove == NULL_MOVE && depth >= SINGULAR_MIN_DEPTH && plyFromRoot > 0
                        && ttMove != NULL_MOVE && abs(ttEntry->score) < MIN_MATE_SCORE
-                       && ttEntry->depth >= depth - SINGULAR_DEPTH_MARGIN && ttEntry->bound != UPPER_BOUND;
+                       && ttEntry->depth >= depth - SINGULAR_DEPTH_MARGIN && ttEntry->getBound() != UPPER_BOUND;
                        
     // IIR (Internal iterative reduction)
     if (ttMove == NULL_MOVE && depth >= IIR_MIN_DEPTH && !inCheck && (pvNode || cutNode))
@@ -443,5 +443,8 @@ inline void iterativeDeepening()
         if (isSoftTimeUp())
             break;
     }
+
+    if (ttAge < 63)
+        ttAge++;
 }
 
