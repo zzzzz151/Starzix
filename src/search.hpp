@@ -420,9 +420,6 @@ inline void iterativeDeepening()
     memset(movesNodes, 0, sizeof(movesNodes));
     memset(pvLines, 0, sizeof(pvLines));
     memset(pvLengths, 0, sizeof(pvLengths));
-    memset(killerMoves, 0, sizeof(killerMoves));
-    memset(counterMoves, 0, sizeof(counterMoves));
-    memset(historyTable, 0, sizeof(historyTable));
     memset(doubleExtensions, 0, sizeof(doubleExtensions));
 
     // ID (Iterative Deepening)

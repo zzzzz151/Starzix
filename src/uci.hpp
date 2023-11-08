@@ -19,6 +19,14 @@ namespace uci
         }
     }
 
+    inline void ucinewgame()
+    {
+        clearTT();
+        memset(killerMoves, 0, sizeof(killerMoves));   // clear killer moves
+        memset(counterMoves, 0, sizeof(counterMoves)); // clear countermoves
+        memset(historyTable, 0, sizeof(historyTable)); // clear history
+    }
+
     inline void position(vector<string> &words)
     {
         int movesTokenIndex = -1;
@@ -109,7 +117,7 @@ namespace uci
             else if (words[0] == "setoption") // e.g. "setoption name Hash value 32"
                 setoption(words);
             else if (received == "ucinewgame")
-                clearTT();
+                ucinewgame();
             else if (received == "isready")
                 cout << "readyok\n";
             else if (words[0] == "position")
