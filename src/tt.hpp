@@ -30,6 +30,11 @@ struct TTEntry
         boundAndAge &= 0b0000'0011;
         boundAndAge |= (newAge << 2);
     }
+
+    inline void setBoundAndAge(uint8_t bound, uint8_t age) {
+        boundAndAge = (age << 2) | bound;
+    }
+
 } __attribute__((packed)); 
 
 vector<TTEntry> tt(TT_DEFAULT_SIZE_MB * 1024 * 1024 / sizeof(TTEntry)); // initializes the elements
@@ -77,28 +82,26 @@ inline void storeInTT(TTEntry *ttEntry, int depth, Move bestMove, int16_t bestSc
 {
     assert(depth >= 0 && depth <= 255);
 
+    if (bestMove != NULL_MOVE)
+        ttEntry->bestMove = bestMove;
+
     uint8_t bound = EXACT;
     if (bestScore <= originalAlpha) 
         bound = UPPER_BOUND;
     else if (bestScore >= beta) 
         bound = LOWER_BOUND;
 
-    /*
-    bool replace = ttEntry->zobristHash == 0 
-                   || bound == EXACT
-                   || ttEntry->getAge() != ttAge 
-                   || ttEntry->depth < depth + (ttEntry->zobristHash == board.getZobristHash() ? 3 : 0);
-
-    if (!replace)
+    // replacement scheme
+    if (board.getZobristHash() != 0
+    && bound != EXACT 
+    && ttEntry->depth >= depth + (board.getZobristHash() == ttEntry->zobristHash ? 3 : 0)
+    && ttEntry->getAge() == ttAge)
         return;
-    */
 
     ttEntry->zobristHash = board.getZobristHash();
     ttEntry->depth = depth;
     ttEntry->score = bestScore;
-    if (bestMove != NULL_MOVE)
-        ttEntry->bestMove = bestMove;
-    ttEntry->boundAndAge = (ttAge << 2) | bound;
+    ttEntry->setBoundAndAge(bound, ttAge);
 
     // Adjust mate scores based on ply
     if (bestScore >= MIN_MATE_SCORE)
