@@ -62,13 +62,13 @@ inline int16_t adjustScoreFromTT(TTEntry *ttEntry, int plyFromRoot)
     return ttEntry->score;
 }
 
-inline pair<TTEntry*, bool> probeTT(int depth, int16_t alpha, int16_t beta, int plyFromRoot, Move singularMove = NULL_MOVE)
+inline pair<TTEntry*, bool> probeTT(uint64_t zobristHash, int depth, int16_t alpha, int16_t beta, int plyFromRoot, Move singularMove = NULL_MOVE)
 {
-    TTEntry *ttEntry = &(tt[board.getZobristHash() % tt.size()]);
+    TTEntry *ttEntry = &(tt[zobristHash % tt.size()]);
     uint8_t ttEntryBound = ttEntry->getBound();
 
     bool shouldCutoff = plyFromRoot > 0 
-                        && ttEntry->zobristHash == board.getZobristHash() 
+                        && ttEntry->zobristHash == zobristHash
                         && ttEntry->depth >= depth 
                         && singularMove == NULL_MOVE
                         && (ttEntryBound == EXACT 
@@ -78,7 +78,7 @@ inline pair<TTEntry*, bool> probeTT(int depth, int16_t alpha, int16_t beta, int 
     return { ttEntry, shouldCutoff };
 }
 
-inline void storeInTT(TTEntry *ttEntry, int depth, Move bestMove, int16_t bestScore, int plyFromRoot, int16_t originalAlpha, int16_t beta)
+inline void storeInTT(TTEntry *ttEntry, uint64_t zobristHash, int depth, Move bestMove, int16_t bestScore, int plyFromRoot, int16_t originalAlpha, int16_t beta)
 {
     assert(depth >= 0 && depth <= 255);
 
@@ -92,13 +92,13 @@ inline void storeInTT(TTEntry *ttEntry, int depth, Move bestMove, int16_t bestSc
         bound = LOWER_BOUND;
 
     // replacement scheme
-    if (board.getZobristHash() != 0
+    if (zobristHash != 0
     && bound != EXACT 
-    && ttEntry->depth >= depth + (board.getZobristHash() == ttEntry->zobristHash ? 3 : 0)
+    && ttEntry->depth >= depth + (zobristHash == ttEntry->zobristHash ? 3 : 0)
     && ttEntry->getAge() == ttAge)
         return;
 
-    ttEntry->zobristHash = board.getZobristHash();
+    ttEntry->zobristHash = zobristHash;
     ttEntry->depth = depth;
     ttEntry->score = bestScore;
     ttEntry->setBoundAndAge(bound, ttAge);

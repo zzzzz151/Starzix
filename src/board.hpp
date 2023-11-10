@@ -350,6 +350,13 @@ class Board
         return false;
     }
 
+    inline PieceType captured(Move move)
+    {
+        if (move == NULL_MOVE) 
+            return PieceType::NONE;
+        return move.typeFlag() == Move::EN_PASSANT_FLAG ? PieceType::PAWN : pieceTypeAt(move.to());
+    }
+
     private:
 
     inline void disableCastlingRight(Color color, int castlingRight)

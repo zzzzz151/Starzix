@@ -54,8 +54,8 @@ namespace uci
     inline void go(vector<string> &words)
     {
         setupTime(words, board.sideToMove());
-        iterativeDeepening();
-        cout << "bestmove " + pvLines[0][0].toUci() + "\n";
+        Move bestMove = iterativeDeepening();
+        cout << "bestmove " + bestMove.toUci() + "\n";
     }
 
     inline void info(int depth, int16_t score)

@@ -8,7 +8,7 @@ struct HistoryEntry
     int32_t countermoveHistory[6][64];  // [lastMovePieceType][lastMoveTargetSquare]
     int32_t followupMoveHistory[6][64]; // [lastLastMovePieceType][lastLastMoveTargetSquare]
 
-    inline int32_t totalHistory()
+    inline int32_t totalHistory(Board &board)
     {
         // add main history
         int32_t totalHist = mainHistory;
@@ -34,7 +34,7 @@ struct HistoryEntry
         return totalHist;
     }
 
-    inline void updateHistory(int32_t bonus)
+    inline void updateHistory(Board &board, int32_t bonus)
     {
         // Update main history
         mainHistory += bonus - mainHistory * abs(bonus) / HISTORY_MAX;
