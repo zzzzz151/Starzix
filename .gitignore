@@ -17,6 +17,7 @@ stderr.txt
 sprt.py
 4moves_noob.epd
 openings-8ply-10k.pgn
+openings-10ply-100k.pgn
 
 nets
 nets/

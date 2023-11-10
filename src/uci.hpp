@@ -22,9 +22,9 @@ namespace uci
     inline void ucinewgame()
     {
         clearTT();
+        memset(historyTable, 0, sizeof(historyTable)); // clear history
         memset(killerMoves, 0, sizeof(killerMoves));   // clear killer moves
         memset(counterMoves, 0, sizeof(counterMoves)); // clear countermoves
-        memset(historyTable, 0, sizeof(historyTable)); // clear history
     }
 
     inline void position(vector<string> &words)

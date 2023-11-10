@@ -168,7 +168,7 @@ inline int16_t PVS(int depth, int16_t alpha, int16_t beta, int plyFromRoot, bool
 
     bool pvNode = beta - alpha > 1 || plyFromRoot == 0;
     int stm = board.sideToMove();
-    if (eval == INVALID_EVAL)
+    if (eval == INVALID_EVAL && !inCheck)
         eval = clamp(nnue::evaluate(stm), -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
 
     if (!pvNode && !inCheck)
@@ -232,7 +232,7 @@ inline int16_t PVS(int depth, int16_t alpha, int16_t beta, int plyFromRoot, bool
                 break;
 
             // FP (Futility pruning)
-            if (depth <= FP_MAX_DEPTH && alpha < MIN_MATE_SCORE 
+            if (depth <= FP_MAX_DEPTH && !inCheck && alpha < MIN_MATE_SCORE 
             && eval + FP_BASE + max(depth - lmr, 0) * FP_MULTIPLIER <= alpha)
                 break;
 
