@@ -54,7 +54,7 @@ const double LMR_BASE = 1,
              LMR_MULTIPLIER = 0.5;
 const int LMR_HISTORY_DIVISOR = 8192;
 
-const int16_t POS_INFINITY = 32500, 
+const int16_t POS_INFINITY = 32000, 
               NEG_INFINITY = -POS_INFINITY, 
               MIN_MATE_SCORE = POS_INFINITY - MAX_DEPTH*2;
 
@@ -110,7 +110,7 @@ inline int16_t qSearch(int16_t alpha, int16_t beta, int plyFromRoot)
 
     // Probe TT
     auto [ttEntry, shouldCutoff] = probeTT(board.getZobristHash(), 0, alpha, beta, plyFromRoot);
-    if (shouldCutoff) return adjustScoreFromTT(ttEntry, plyFromRoot);
+    if (shouldCutoff) return ttEntry->adjustedScore(plyFromRoot);
 
     Move ttMove = board.getZobristHash() == ttEntry->zobristHash ? ttEntry->bestMove : NULL_MOVE;
     MovesList moves = board.pseudolegalMoves(true); // arg = true => captures only
@@ -177,7 +177,7 @@ inline int16_t PVS(int depth, int16_t alpha, int16_t beta, int plyFromRoot, bool
 
     bool inCheck = board.inCheck();
 
-    // Clamp depth and check extension
+    // Clamp depth, check extension
     depth = clamp(depth + inCheck, (int)inCheck, (int)MAX_DEPTH); 
 
     // Quiescence search at terminal nodes
@@ -185,7 +185,7 @@ inline int16_t PVS(int depth, int16_t alpha, int16_t beta, int plyFromRoot, bool
 
     // Probe TT
     auto [ttEntry, shouldCutoff] = probeTT(board.getZobristHash(), depth, alpha, beta, plyFromRoot, singularMove);
-    if (shouldCutoff) return adjustScoreFromTT(ttEntry, plyFromRoot);
+    if (shouldCutoff) return ttEntry->adjustedScore(plyFromRoot);
 
     Move ttMove = board.getZobristHash() == ttEntry->zobristHash && singularMove == NULL_MOVE
                 ? ttEntry->bestMove : NULL_MOVE;

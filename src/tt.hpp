@@ -14,6 +14,15 @@ struct TTEntry
     uint8_t depth = 0; 
     uint8_t boundAndAge = 0; // lowest 2 bits for bound, highest 6 bits for age
 
+    inline int16_t adjustedScore(int plyFromRoot)
+    {
+        if (score >= MIN_MATE_SCORE)
+            return score - plyFromRoot;
+        else if (score <= -MIN_MATE_SCORE)
+            return score + plyFromRoot;
+        return score;
+    }
+
     inline uint8_t getBound() {
          return boundAndAge & 0b0000'0011; 
     }
@@ -52,16 +61,6 @@ inline void clearTT()
     ttAge = 0;
 }
 
-inline int16_t adjustScoreFromTT(TTEntry *ttEntry, int plyFromRoot)
-{
-    if (ttEntry->score >= MIN_MATE_SCORE)
-        return ttEntry->score - plyFromRoot;
-    else if (ttEntry->score <= -MIN_MATE_SCORE)
-        return ttEntry->score + plyFromRoot;
-
-    return ttEntry->score;
-}
-
 inline pair<TTEntry*, bool> probeTT(uint64_t zobristHash, int depth, int16_t alpha, int16_t beta, int plyFromRoot, Move singularMove = NULL_MOVE)
 {
     TTEntry *ttEntry = &(tt[zobristHash % tt.size()]);
@@ -90,7 +89,7 @@ inline void storeInTT(TTEntry *ttEntry, uint64_t zobristHash, int depth, Move be
         bound = LOWER_BOUND;
 
     // replacement scheme
-    if (zobristHash != 0
+    if (ttEntry->zobristHash != 0
     && bound != EXACT 
     && ttEntry->depth >= depth + (zobristHash == ttEntry->zobristHash ? 3 : 0)
     && ttEntry->getAge() == ttAge)
