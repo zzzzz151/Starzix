@@ -104,6 +104,10 @@ inline int16_t qSearch(int16_t alpha, int16_t beta, int plyFromRoot)
     // Update seldepth
     if (plyFromRoot > maxPlyReached) maxPlyReached = plyFromRoot;
 
+    if (board.isDraw())
+        // Instead of returning 0, introduce very slight randomness to drawn positions
+        return -1 + (nodes % 3);
+
     int16_t eval = clamp(nnue::evaluate(board.sideToMove()), -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
     if (eval >= beta) return eval;
     if (eval > alpha) alpha = eval;
@@ -223,7 +227,7 @@ inline int16_t PVS(int depth, int16_t alpha, int16_t beta, int plyFromRoot, bool
                        && ttEntry->depth >= depth - SINGULAR_DEPTH_MARGIN && ttEntry->getBound() != UPPER_BOUND;
                        
     // IIR (Internal iterative reduction)
-    if (ttMove == NULL_MOVE && depth >= IIR_MIN_DEPTH && !inCheck && (pvNode || cutNode))
+    if (ttMove == NULL_MOVE && depth >= IIR_MIN_DEPTH && !inCheck)
         depth--;
 
     MovesList moves = board.pseudolegalMoves();
