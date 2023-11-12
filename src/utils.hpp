@@ -226,3 +226,17 @@ inline int16_t max(int16_t a, int16_t b)
 {
     return a > b ? a : b;
 }
+
+#include "move.hpp"
+
+inline pair<Move, int32_t> incrementalSort(MovesList &moves, array<int32_t, 256> &movesScores, int i)
+{
+    for (int j = i + 1; j < moves.size(); j++)
+        if (movesScores[j] > movesScores[i])
+        {
+            moves.swap(i, j);
+            swap(movesScores[i], movesScores[j]);
+        }
+
+    return { moves[i], movesScores[i] };
+}

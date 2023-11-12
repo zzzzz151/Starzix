@@ -80,8 +80,6 @@ inline pair<TTEntry*, bool> probeTT(uint64_t zobristHash, int depth, int16_t alp
 
 inline void storeInTT(TTEntry *ttEntry, uint64_t zobristHash, int depth, Move bestMove, int16_t bestScore, int plyFromRoot, int16_t originalAlpha, int16_t beta)
 {
-    assert(depth >= 0 && depth <= 255);
-
     if (bestMove != NULL_MOVE)
         ttEntry->bestMove = bestMove;
 

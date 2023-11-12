@@ -13,22 +13,22 @@ struct HistoryEntry
         // add main history
         int32_t totalHist = mainHistory;
         
-        // add countermove history
+        // add countermove history using last move
         Move lastMove;
         if ((lastMove = board.getNthToLastMove(1)) != NULL_MOVE)
         {
-            int lastMovePieceType = (int)board.getNthToLastMovePieceType(1);
-            int lastMoveTargetSq = (int)lastMove.to();
-            totalHist += countermoveHistory[lastMovePieceType][lastMoveTargetSq];
+            int pieceType = (int)board.getNthToLastMovePieceType(1);
+            int targetSq = (int)lastMove.to();
+            totalHist += countermoveHistory[pieceType][targetSq];
         }
 
-        // add follow-up move history
+        // add follow-up move history using 2nd-to-last move
         Move lastLastMove;
         if ((lastLastMove = board.getNthToLastMove(2)) != NULL_MOVE)
         {
-            int lastLastMovePieceType = (int)board.getNthToLastMovePieceType(2);
-            int lastLastMoveTargetSq = (int)lastLastMove.to();
-            totalHist += followupMoveHistory[lastLastMovePieceType][lastLastMoveTargetSq];
+            int pieceType = (int)board.getNthToLastMovePieceType(2);
+            int targetSq = (int)lastLastMove.to();
+            totalHist += followupMoveHistory[pieceType][targetSq];
         }
        
         return totalHist;
@@ -39,24 +39,24 @@ struct HistoryEntry
         // Update main history
         mainHistory += bonus - mainHistory * abs(bonus) / HISTORY_MAX;
 
-        // Update countermove history
+        // Update countermove history using last move
         Move lastMove;
         if ((lastMove = board.getNthToLastMove(1)) != NULL_MOVE)
         {
-            int lastMovePieceType = (int)board.getNthToLastMovePieceType(1);
-            int lastMoveTargetSq = (int)lastMove.to();
-            int32_t countermoveHistDelta = bonus - countermoveHistory[lastMovePieceType][lastMoveTargetSq] * abs(bonus) / HISTORY_MAX;
-            countermoveHistory[lastMovePieceType][lastMoveTargetSq] += countermoveHistDelta;
+            int pieceType = (int)board.getNthToLastMovePieceType(1);
+            int targetSq = (int)lastMove.to();
+            int32_t countermoveHistDelta = bonus - countermoveHistory[pieceType][targetSq] * abs(bonus) / HISTORY_MAX;
+            countermoveHistory[pieceType][targetSq] += countermoveHistDelta;
         }
 
-        // Update follow-up move history
+        // Update follow-up move history using 2nd-to-last move
         Move lastLastMove;
         if ((lastLastMove = board.getNthToLastMove(2)) != NULL_MOVE)
         {
-            int lastLastMovePieceType = (int)board.getNthToLastMovePieceType(2);
-            int lastLastMoveTargetSq = (int)lastLastMove.to();
-            int32_t followupHistDelta = bonus - followupMoveHistory[lastLastMovePieceType][lastLastMoveTargetSq] * abs(bonus) / HISTORY_MAX;
-            followupMoveHistory[lastLastMovePieceType][lastLastMoveTargetSq] += followupHistDelta;
+            int pieceType = (int)board.getNthToLastMovePieceType(2);
+            int targetSq = (int)lastLastMove.to();
+            int32_t followupHistDelta = bonus - followupMoveHistory[pieceType][targetSq] * abs(bonus) / HISTORY_MAX;
+            followupMoveHistory[pieceType][targetSq] += followupHistDelta;
         }
     }
 

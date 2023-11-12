@@ -3,7 +3,7 @@
 
 // clang-format off
 
-                              // P    N    B    R    Q    K  NONE
+                                  // P    N    B    R    Q    K  NONE
 const int32_t SEE_PIECE_VALUES[7] = {100, 300, 300, 500, 900, 0, 0};
 const uint8_t PAWN_INDEX = 0;
 
