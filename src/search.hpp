@@ -23,6 +23,9 @@ const int IIR_MIN_DEPTH = 4;
 const int RFP_MAX_DEPTH = 8,
           RFP_DEPTH_MULTIPLIER = 75;
 
+const int RAZORING_MAX_DEPTH = 6,
+          RAZORING_DEPTH_MULTIPLIER = 252;
+
 const int NMP_MIN_DEPTH = 3,
           NMP_BASE_REDUCTION = 3,
           NMP_REDUCTION_DIVISOR = 3;
@@ -207,6 +210,13 @@ inline int16_t PVS(int depth, int16_t alpha, int16_t beta, int plyFromRoot, bool
         // RFP (Reverse futility pruning) / Static NMP
         if (depth <= RFP_MAX_DEPTH && eval >= beta + RFP_DEPTH_MULTIPLIER * depth)
             return eval;
+
+        // Razoring
+        if (depth <= RAZORING_MAX_DEPTH && alpha > eval + depth * RAZORING_DEPTH_MULTIPLIER) {
+            int16_t score = qSearch(alpha, beta, plyFromRoot);
+            if (score <= alpha)
+                return score;
+        }
 
         // NMP (Null move pruning)
         if (depth >= NMP_MIN_DEPTH && board.getLastMove() != NULL_MOVE && singularMove == NULL_MOVE
