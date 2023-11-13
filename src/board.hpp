@@ -20,20 +20,23 @@ struct BoardState
     array<array<bool, 2>, 2> castlingRights; // [color][CASTLE_SHORT or CASTLE_LONG]
     Square enPassantSquare;
     uint16_t pliesSincePawnMoveOrCapture;
-    Piece capturedPiece;
     Move move;
     PieceType pieceTypeMoved;
+    Piece capturedPiece;
+    int8_t inCheckCached;
 
-    inline BoardState(uint64_t zobristHash, array<array<bool, 2>, 2> castlingRights, Square enPassantSquare, 
-                      uint16_t pliesSincePawnMoveOrCapture, Piece capturedPiece, Move move, PieceType pieceTypeMoved)
+    inline BoardState(uint64_t zobristHash, array<array<bool, 2>, 2> castlingRights, 
+                      Square enPassantSquare, uint16_t pliesSincePawnMoveOrCapture, 
+                      Move move, PieceType pieceTypeMoved, Piece capturedPiece, int8_t inCheckCached)
     {
         this->zobristHash = zobristHash;
         this->castlingRights = castlingRights;
         this->enPassantSquare = enPassantSquare;
         this->pliesSincePawnMoveOrCapture = pliesSincePawnMoveOrCapture;
-        this->capturedPiece = capturedPiece;
         this->move = move;
         this->pieceTypeMoved = pieceTypeMoved;
+        this->capturedPiece = capturedPiece;
+        this->inCheckCached = inCheckCached;
     }
 
 };
@@ -61,6 +64,8 @@ class Board
                            zobristCastlingRights[2][2],
                            zobristEnPassantFiles[8];
 
+    int8_t inCheckCached = -1; // -1 means invalid (need to calculate inCheck())
+
     public:
 
     bool perft = false; // In perft, dont update zobrist hash nor nnue accumulator
@@ -69,10 +74,11 @@ class Board
 
     inline Board(string fen)
     {
-        perft = false;
-
         states.clear();
         states.reserve(256);
+
+        perft = false;
+        inCheckCached = -1;
 
         nnue::reset();
 
@@ -410,7 +416,7 @@ class Board
 
         // Verify that this pseudolegal move is legal
         // (side that played it is not in check after the move)
-        if (verifyCheckLegality && inCheck())
+        if (verifyCheckLegality && inCheckNoCache())
         {
             // move is illegal
             undoMove(move, capturedPiece);
@@ -419,10 +425,10 @@ class Board
 
         PieceType pieceType = pieceToPieceType(pieceMoving);
 
-        // push board state
-        BoardState state = BoardState(zobristHash, castlingRights, enPassantSquare,
-                                      pliesSincePawnMoveOrCapture, capturedPiece, move, pieceType);
-        states.push_back(state); // append
+        // append board state
+        BoardState state = BoardState(zobristHash, castlingRights, enPassantSquare, pliesSincePawnMoveOrCapture,
+                                      move, pieceType, capturedPiece, inCheckCached);
+        states.push_back(state);
 
         nnue::push(); // save current accumulator
 
@@ -484,6 +490,8 @@ class Board
 
         colorToMove = oppositeColor;
         zobristHash ^= zobristColorToMove;
+
+        inCheckCached = -1;
 
         return true; // move is legal
     }
@@ -550,18 +558,20 @@ class Board
         castlingRights = state->castlingRights;
         enPassantSquare = state->enPassantSquare;
         pliesSincePawnMoveOrCapture = state->pliesSincePawnMoveOrCapture;
+        inCheckCached = state->inCheckCached;
 
         states.pop_back();
     }
 
     public:
 
+    // Do not makeNullMove() in check!
     inline void makeNullMove()
     {
-        // push board state
-        BoardState state = BoardState(zobristHash, castlingRights, enPassantSquare, 
-                                      pliesSincePawnMoveOrCapture, Piece::NONE, NULL_MOVE, PieceType::NONE);
-        states.push_back(state); // append
+        // append board state
+        BoardState state = BoardState(zobristHash, castlingRights, enPassantSquare, pliesSincePawnMoveOrCapture, 
+                                      NULL_MOVE, PieceType::NONE, Piece::NONE, inCheckCached);
+        states.push_back(state);
 
         colorToMove = oppSide();
         zobristHash ^= zobristColorToMove;
@@ -577,6 +587,8 @@ class Board
             zobristHash ^= zobristEnPassantFiles[squareFile(enPassantSquare)];
             enPassantSquare = 255;
         }
+
+        inCheckCached = false;
     }
 
     inline void undoNullMove()
@@ -586,6 +598,8 @@ class Board
         colorToMove = oppSide();
         if (colorToMove == BLACK)
             currentMoveCounter--;
+
+        assert(!inCheckCached);
     }
 
     inline MovesList pseudolegalMoves(bool capturesOnly = false)
@@ -683,12 +697,10 @@ class Board
         // Castling
         if (!capturesOnly)
         {
-            int inCheck = -1;
-
             if (castlingRights[colorToMove][CASTLE_SHORT]
             && pieces[kingSquare+1] == Piece::NONE
             && pieces[kingSquare+2] == Piece::NONE
-            && !(inCheck = this->inCheck())
+            && !inCheck()
             && !isSquareAttacked(kingSquare+1, enemyColor) 
             && !isSquareAttacked(kingSquare+2, enemyColor))
                 moves.add(Move(kingSquare, kingSquare + 2, Move::CASTLING_FLAG));
@@ -697,7 +709,7 @@ class Board
             && pieces[kingSquare-1] == Piece::NONE
             && pieces[kingSquare-2] == Piece::NONE
             && pieces[kingSquare-3] == Piece::NONE
-            && !(inCheck == -1 ? this->inCheck() : inCheck)
+            && !inCheck()
             && !isSquareAttacked(kingSquare-1, enemyColor) 
             && !isSquareAttacked(kingSquare-2, enemyColor))
                 moves.add(Move(kingSquare, kingSquare - 2, Move::CASTLING_FLAG));
@@ -799,10 +811,24 @@ class Board
 
     inline bool inCheck()
     {
+        if (inCheckCached != -1) return inCheckCached;
+
+        uint64_t ourKingBitboard = bitboards[colorToMove][(int)PieceType::KING];
+        Square ourKingSquare = lsb(ourKingBitboard);
+        return inCheckCached = isSquareAttacked(ourKingSquare, oppSide());
+    }
+
+    private:
+
+    // Used internally in makeMove()
+    inline bool inCheckNoCache()
+    {
         uint64_t ourKingBitboard = bitboards[colorToMove][(int)PieceType::KING];
         Square ourKingSquare = lsb(ourKingBitboard);
         return isSquareAttacked(ourKingSquare, oppSide());
     }
+
+    public:
 
     inline bool hasNonPawnMaterial(Color color = NULL_COLOR)
     {
