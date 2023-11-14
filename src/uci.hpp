@@ -24,7 +24,7 @@ namespace uci
         clearTT();
         memset(historyTable, 0, sizeof(historyTable)); // clear history
         memset(killerMoves, 0, sizeof(killerMoves));   // clear killer moves
-        memset(counterMoves, 0, sizeof(counterMoves)); // clear countermoves
+        memset(countermoves, 0, sizeof(countermoves)); // clear countermoves
     }
 
     inline void position(vector<string> &words)

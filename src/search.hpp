@@ -42,7 +42,7 @@ const int SINGULAR_MIN_DEPTH = 8,
           SINGULAR_BETA_MARGIN = 24,
           SINGULAR_MAX_DOUBLE_EXTENSIONS = 10;
 
-const int LMR_MIN_DEPTH = 1;
+const int LMR_MIN_DEPTH = 3;
 const double LMR_BASE = 1,
              LMR_MULTIPLIER = 0.5;
 const int LMR_HISTORY_DIVISOR = 8192;
@@ -55,7 +55,6 @@ const int16_t POS_INFINITY = 32000,
 #include "tt.hpp"
 #include "history_entry.hpp"
 #include "see.hpp"
-#include "move_scoring.hpp"
 #include "nnue.hpp"
 
 Board board;
@@ -64,11 +63,13 @@ int maxPlyReached;
 uint64_t movesNodes[1ULL << 16];        // [move]
 Move pvLines[MAX_DEPTH+1][MAX_DEPTH+1]; // [ply][ply]
 int pvLengths[MAX_DEPTH+1];             // [pvLineIndex]
-int lmrTable[MAX_DEPTH][256];           // [depth][moveIndex]
+int lmrTable[MAX_DEPTH+1][256];         // [depth][moveIndex]
 int doubleExtensions[MAX_DEPTH+1];      // [ply]
 Move killerMoves[MAX_DEPTH];            // [ply]
-Move counterMoves[2][1ULL << 16];       // [color][move]
+Move countermoves[2][1ULL << 16];       // [color][move]
 HistoryEntry historyTable[2][6][64];    // [color][pieceType][targetSquare]
+
+#include "move_scoring.hpp"
 
 namespace uci
 {
@@ -78,7 +79,7 @@ namespace uci
 inline void initSearch()
 {
     // init lmrTable
-    for (int depth = 0; depth < MAX_DEPTH; depth++)
+    for (int depth = 0; depth < MAX_DEPTH+1; depth++)
         for (int move = 0; move < 256; move++)
             lmrTable[depth][move] = depth == 0 || move == 0 ? 0 : round(LMR_BASE + ln(depth) * ln(move) * LMR_MULTIPLIER);
 }
@@ -116,7 +117,7 @@ inline int16_t qSearch(int16_t alpha, int16_t beta, int plyFromRoot)
 
     // if in check, generate and score all moves, else only captures
     MovesList moves = board.pseudolegalMoves(!board.inCheck()); 
-    array<int32_t, 256> movesScores = scoreMoves(board, moves, ttMove, killerMoves[plyFromRoot], historyTable, !board.inCheck());
+    array<int32_t, 256> movesScores = scoreMoves(moves, ttMove, killerMoves[plyFromRoot], !board.inCheck());
     
     int legalMovesPlayed = 0;
     int16_t bestScore = eval;
@@ -181,7 +182,7 @@ inline int16_t PVS(int depth, int16_t alpha, int16_t beta, int plyFromRoot, bool
     Move ttMove = board.getZobristHash() == ttEntry->zobristHash && singularMove == NULL_MOVE
                   ? ttEntry->bestMove : NULL_MOVE;
 
-    int stm = board.sideToMove();
+    Color stm = board.sideToMove();
     bool pvNode = beta - alpha > 1 || plyFromRoot == 0;
 
     // We don't use eval in check because it's unreliable, so don't bother calculating it if in check
@@ -225,7 +226,7 @@ inline int16_t PVS(int depth, int16_t alpha, int16_t beta, int plyFromRoot, bool
         depth--;
 
     MovesList moves = board.pseudolegalMoves();
-    array<int32_t, 256> movesScores = scoreMoves(board, moves, ttMove, killerMoves[plyFromRoot], historyTable);
+    array<int32_t, 256> movesScores = scoreMoves(moves, ttMove, killerMoves[plyFromRoot]);
 
     int legalMovesPlayed = 0;
     int16_t bestScore = NEG_INFINITY;
@@ -378,7 +379,8 @@ inline int16_t PVS(int depth, int16_t alpha, int16_t beta, int plyFromRoot, bool
 
         // This quiet move is a killer move and a countermove
         killerMoves[plyFromRoot] = move;
-        counterMoves[(int)board.oppSide()][board.getLastMove().getMove()] = move;
+        if (board.getLastMove() != NULL_MOVE)
+            countermoves[stm][board.getLastMove().getMove()] = move;
 
         int pieceType = (int)board.pieceTypeAt(move.from());
         int targetSquare = (int)move.to();
