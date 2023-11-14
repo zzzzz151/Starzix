@@ -79,9 +79,6 @@ inline pair<TTEntry*, bool> probeTT(uint64_t zobristHash, int depth, int16_t alp
 
 inline void storeInTT(TTEntry *ttEntry, uint64_t zobristHash, int depth, Move bestMove, int16_t bestScore, int plyFromRoot, int16_t originalAlpha, int16_t beta)
 {
-    if (bestMove != NULL_MOVE)
-        ttEntry->bestMove = bestMove;
-
     uint8_t bound = EXACT;
     if (bestScore <= originalAlpha) 
         bound = UPPER_BOUND;
@@ -89,16 +86,17 @@ inline void storeInTT(TTEntry *ttEntry, uint64_t zobristHash, int depth, Move be
         bound = LOWER_BOUND;
 
     // replacement scheme
-    if (ttEntry->zobristHash != 0
-    && bound != EXACT 
-    && ttEntry->depth >= depth + (zobristHash == ttEntry->zobristHash ? 3 : 0)
-    && ttEntry->getAge() == ttAge)
+    if (ttEntry->zobristHash != 0   // always replace empty entries
+    && bound != EXACT               // always replace if new bound is exact
+    && ttEntry->depth >= depth + 3  // keep entry if its depth is much higher
+    && ttEntry->getAge() == ttAge)  // always replace entries from previous searches ('go' commands)
         return;
 
     ttEntry->zobristHash = zobristHash;
     ttEntry->depth = depth;
     ttEntry->score = bestScore;
     ttEntry->setBoundAndAge(bound, ttAge);
+    if (bestMove != NULL_MOVE) ttEntry->bestMove = bestMove;
 
     // Adjust mate scores based on ply
     if (bestScore >= MIN_MATE_SCORE)
