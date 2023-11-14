@@ -61,7 +61,7 @@ inline void clearTT()
     ttAge = 0;
 }
 
-inline pair<TTEntry*, bool> probeTT(uint64_t zobristHash, int depth, int16_t alpha, int16_t beta, int plyFromRoot, Move singularMove = NULL_MOVE)
+inline pair<TTEntry*, bool> probeTT(uint64_t zobristHash, int depth, int plyFromRoot, int16_t alpha, int16_t beta)
 {
     TTEntry *ttEntry = &(tt[zobristHash % tt.size()]);
     uint8_t ttEntryBound = ttEntry->getBound();
@@ -69,7 +69,6 @@ inline pair<TTEntry*, bool> probeTT(uint64_t zobristHash, int depth, int16_t alp
     bool shouldCutoff = plyFromRoot > 0 
                         && ttEntry->zobristHash == zobristHash
                         && ttEntry->depth >= depth 
-                        && singularMove == NULL_MOVE
                         && (ttEntryBound == EXACT 
                         || (ttEntryBound == LOWER_BOUND && ttEntry->score >= beta) 
                         || (ttEntryBound == UPPER_BOUND && ttEntry->score <= alpha));
@@ -77,12 +76,12 @@ inline pair<TTEntry*, bool> probeTT(uint64_t zobristHash, int depth, int16_t alp
     return { ttEntry, shouldCutoff };
 }
 
-inline void storeInTT(TTEntry *ttEntry, uint64_t zobristHash, int depth, Move bestMove, int16_t bestScore, int plyFromRoot, int16_t originalAlpha, int16_t beta)
+inline void storeInTT(TTEntry *ttEntry, uint64_t zobristHash, int depth, int16_t score, Move bestMove, int plyFromRoot, int16_t originalAlpha, int16_t beta)
 {
     uint8_t bound = EXACT;
-    if (bestScore <= originalAlpha) 
+    if (score <= originalAlpha) 
         bound = UPPER_BOUND;
-    else if (bestScore >= beta) 
+    else if (score >= beta) 
         bound = LOWER_BOUND;
 
     // replacement scheme
@@ -94,14 +93,14 @@ inline void storeInTT(TTEntry *ttEntry, uint64_t zobristHash, int depth, Move be
 
     ttEntry->zobristHash = zobristHash;
     ttEntry->depth = depth;
-    ttEntry->score = bestScore;
+    ttEntry->score = score;
     ttEntry->setBoundAndAge(bound, ttAge);
     if (bestMove != NULL_MOVE) ttEntry->bestMove = bestMove;
 
     // Adjust mate scores based on ply
-    if (bestScore >= MIN_MATE_SCORE)
+    if (ttEntry->score >= MIN_MATE_SCORE)
         ttEntry->score += plyFromRoot;
-    else if (bestScore <= -MIN_MATE_SCORE)
+    else if (ttEntry->score <= -MIN_MATE_SCORE)
         ttEntry->score -= plyFromRoot;
 
 }
