@@ -13,6 +13,10 @@ const int IIR_MIN_DEPTH = 4;
 const int RFP_MAX_DEPTH = 8,
           RFP_DEPTH_MULTIPLIER = 75;
 
+// Alpha pruning
+const int AP_MAX_DEPTH = 4,
+          AP_EVAL_MARGIN = 1750;
+
 const int RAZORING_MAX_DEPTH = 6,
           RAZORING_DEPTH_MULTIPLIER = 252;
 
@@ -20,21 +24,17 @@ const int NMP_MIN_DEPTH = 3,
           NMP_BASE_REDUCTION = 3,
           NMP_REDUCTION_DIVISOR = 3;
 
-const int FP_MAX_DEPTH = 7,
-          FP_BASE = 120,
-          FP_MULTIPLIER = 65;
-
 const int LMP_MAX_DEPTH = 8,
           LMP_MIN_MOVES_BASE = 3;
 const double LMP_DEPTH_MULTIPLIER = 0.75;
 
+const int FP_MAX_DEPTH = 7,
+          FP_BASE = 120,
+          FP_MULTIPLIER = 65;
+
 const int SEE_PRUNING_MAX_DEPTH = 9,
           SEE_PRUNING_NOISY_THRESHOLD = -20,
           SEE_PRUNING_QUIET_THRESHOLD = -65;
-
-const int32_t HISTORY_MIN_BONUS = 1570,
-              HISTORY_BONUS_MULTIPLIER = 370,
-              HISTORY_MAX = 16384;
 
 const int SINGULAR_MIN_DEPTH = 8,
           SINGULAR_DEPTH_MARGIN = 3,
@@ -46,6 +46,10 @@ const int LMR_MIN_DEPTH = 3;
 const double LMR_BASE = 1,
              LMR_MULTIPLIER = 0.5;
 const int LMR_HISTORY_DIVISOR = 8192;
+
+const int32_t HISTORY_MIN_BONUS = 1570,
+              HISTORY_BONUS_MULTIPLIER = 370,
+              HISTORY_MAX = 16384;
 
 const int16_t POS_INFINITY = 32000, 
               NEG_INFINITY = -POS_INFINITY, 
@@ -199,8 +203,12 @@ inline int16_t PVS(int depth, int plyFromRoot, int16_t alpha, int16_t beta, bool
     if (!pvNode && !board.inCheck() && singularMove == NULL_MOVE)
     {
         // RFP (Reverse futility pruning) / Static NMP
-        if (depth <= RFP_MAX_DEPTH && eval >= beta + RFP_DEPTH_MULTIPLIER * depth)
+        if (depth <= RFP_MAX_DEPTH && eval >= beta + depth * RFP_DEPTH_MULTIPLIER)
             return eval;
+
+        // AP (Alpha pruning)
+        if (depth <= AP_MAX_DEPTH && eval + AP_EVAL_MARGIN <= alpha)
+            return eval; 
 
         // Razoring
         if (depth <= RAZORING_MAX_DEPTH && alpha > eval + depth * RAZORING_DEPTH_MULTIPLIER) {

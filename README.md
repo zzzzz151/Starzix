@@ -54,9 +54,13 @@ Internal iterative reduction
 
 Late move reductions
 
-Null move pruning
-
 Reverse futility pruning
+
+Alpha pruning
+
+Razoring
+
+Null move pruning
 
 Futility pruning
 
