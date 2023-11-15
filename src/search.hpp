@@ -68,7 +68,6 @@ uint64_t movesNodes[1ULL << 16];        // [move]
 Move pvLines[MAX_DEPTH+1][MAX_DEPTH+1]; // [ply][ply]
 int pvLengths[MAX_DEPTH+1];             // [pvLineIndex]
 int lmrTable[MAX_DEPTH+1][256];         // [depth][moveIndex]
-int doubleExtensions[MAX_DEPTH+1];      // [ply]
 Move killerMoves[MAX_DEPTH];            // [ply]
 Move countermoves[2][1ULL << 16];       // [color][move]
 HistoryEntry historyTable[2][6][64];    // [color][pieceType][targetSquare]
@@ -161,17 +160,12 @@ inline int16_t qSearch(int plyFromRoot, int16_t alpha, int16_t beta)
     return bestScore;
 }
 
-inline int16_t PVS(int depth, int plyFromRoot, int16_t alpha, int16_t beta, bool cutNode, Move singularMove = NULL_MOVE, int16_t eval = 0)
+inline int16_t PVS(int depth, int plyFromRoot, int16_t alpha, int16_t beta, bool cutNode, 
+                   int doubleExtensionsLeft, Move singularMove = NULL_MOVE, int16_t eval = 0)
 {
     if (isHardTimeUp()) return 0;
 
     pvLengths[plyFromRoot] = 0; // Ensure fresh PV
-
-    depth = clamp(depth, 0, (int)MAX_DEPTH);
-
-    // Check extension
-    if (plyFromRoot > 0 && depth < MAX_DEPTH) 
-        depth += board.inCheck();
 
     // Drop into qsearch on terminal nodes
     if (depth <= 0) return qSearch(plyFromRoot, alpha, beta);
@@ -183,6 +177,8 @@ inline int16_t PVS(int depth, int plyFromRoot, int16_t alpha, int16_t beta, bool
 
     if (plyFromRoot >= MAX_DEPTH) 
         return board.inCheck() ? 0 : evaluate();
+
+    if (depth > MAX_DEPTH) depth = MAX_DEPTH;
 
     // Probe TT
     auto [ttEntry, shouldCutoff] = probeTT(board.getZobristHash(), depth, plyFromRoot, alpha, beta);
@@ -222,7 +218,7 @@ inline int16_t PVS(int depth, int plyFromRoot, int16_t alpha, int16_t beta, bool
         {
             board.makeNullMove();
             int nmpDepth = depth - NMP_BASE_REDUCTION - depth / NMP_REDUCTION_DIVISOR - min((eval - beta)/200, 3);
-            int16_t score = -PVS(nmpDepth, plyFromRoot + 1, -beta, -alpha, !cutNode);
+            int16_t score = -PVS(nmpDepth, plyFromRoot + 1, -beta, -alpha, !cutNode, doubleExtensionsLeft);
             board.undoNullMove();
 
             if (score >= MIN_MATE_SCORE) return beta;
@@ -245,7 +241,6 @@ inline int16_t PVS(int depth, int plyFromRoot, int16_t alpha, int16_t beta, bool
     int16_t bestScore = NEG_INFINITY;
     Move bestMove = NULL_MOVE;
     int16_t originalAlpha = alpha;
-    doubleExtensions[plyFromRoot + 1] = doubleExtensions[plyFromRoot];
 
     // Fail low quiets at beginning of array, fail low captures at the end
     HistoryEntry *pointersFailLowsHistoryEntry[256]; 
@@ -297,17 +292,16 @@ inline int16_t PVS(int depth, int plyFromRoot, int16_t alpha, int16_t beta, bool
             // Singular search: before searching any move, search this node at a shallower depth with TT move excluded
             board.undoMove(); // undo TT move we just made
             int16_t singularBeta = ttEntry->score - depth * SINGULAR_BETA_DEPTH_MULTIPLIER;
-            int16_t singularScore = PVS((depth - 1) / 2, plyFromRoot, singularBeta - 1, singularBeta, cutNode, move, eval);
+            int16_t singularScore = PVS((depth - 1) / 2, plyFromRoot, singularBeta - 1, singularBeta, cutNode, doubleExtensionsLeft, move, eval);
             board.makeMove(move, false); // second arg = false => don't check legality (we already verified it's a legal move)
 
-            if (!pvNode && singularScore < singularBeta && singularScore < singularBeta - SINGULAR_BETA_MARGIN 
-            && doubleExtensions[plyFromRoot + 1] < SINGULAR_MAX_DOUBLE_EXTENSIONS)
+            if (!pvNode && doubleExtensionsLeft > 0 && singularScore < singularBeta - SINGULAR_BETA_MARGIN)
             {
                 // Double extension
                 // singularScore is way lower than TT score
                 // TT move is probably MUCH better than all others, so extend its search by 2 plies
                 extension = 2;
-                doubleExtensions[plyFromRoot + 1]++; // Keep track of these double extensions so search doesn't explode
+                doubleExtensionsLeft--;
             }
             else if (singularScore < singularBeta)
                 // Normal singular extension
@@ -320,12 +314,15 @@ inline int16_t PVS(int depth, int plyFromRoot, int16_t alpha, int16_t beta, bool
             else if (cutNode)
                 extension = -1;
         }
+        // Check extension if no singular extensions
+        else if (plyFromRoot > 0 && board.inCheck())
+            extension = 1;
         
         // In PVS (Principal Variation Search), the highest ranked move (TT move if one exists) is searched normally, with a full window
-        int16_t score = 0;
+        int16_t score = 0, searchDepth = depth - 1 + extension;
         if (legalMovesPlayed == 1)
         {
-            score = -PVS(depth - 1 + extension, plyFromRoot + 1, -beta, -alpha, false);
+            score = -PVS(searchDepth, plyFromRoot + 1, -beta, -alpha, false, doubleExtensionsLeft);
             goto searchingDone;
         }
         
@@ -340,16 +337,17 @@ inline int16_t PVS(int depth, int plyFromRoot, int16_t alpha, int16_t beta, bool
                 lmr -= round((moveScore - HISTORY_MOVE_BASE_SCORE) / (double)LMR_HISTORY_DIVISOR);
 
             // if lmr is negative, we would have an extension instead of a reduction
-            if (lmr < 0) lmr = 0;
+            // dont reduce into qsearch
+            lmr = clamp(lmr, 0, searchDepth - 1);
         }
         else
             lmr = 0;
 
         // In PVS, the other moves (not TT move) are searched with a null/zero window
         // and researched with a full window if they're better than expected (score > alpha)
-        score = -PVS(depth - 1 - lmr, plyFromRoot + 1, -alpha - 1, -alpha, true);
+        score = -PVS(searchDepth - lmr, plyFromRoot + 1, -alpha - 1, -alpha, true, doubleExtensionsLeft);
         if (score > alpha && (score < beta || lmr > 0))
-            score = -PVS(depth - 1, plyFromRoot + 1, -beta, -alpha, score < beta ? false : !cutNode);
+            score = -PVS(searchDepth, plyFromRoot + 1, -beta, -alpha, score < beta ? false : !cutNode, doubleExtensionsLeft);
 
         searchingDone:
 
@@ -442,7 +440,7 @@ inline int16_t aspiration(int maxDepth, int16_t score)
 
     while (true)
     {
-        score = PVS(depth, 0, alpha, beta, false);
+        score = PVS(depth, 0, alpha, beta, false, SINGULAR_MAX_DOUBLE_EXTENSIONS);
 
         if (isHardTimeUp()) return 0;
 
@@ -473,7 +471,6 @@ inline Move iterativeDeepening()
     memset(movesNodes, 0, sizeof(movesNodes));
     memset(pvLines, 0, sizeof(pvLines));
     memset(pvLengths, 0, sizeof(pvLengths));
-    memset(doubleExtensions, 0, sizeof(doubleExtensions));
 
     // ID (Iterative Deepening)
     int16_t score = 0;
@@ -483,7 +480,7 @@ inline Move iterativeDeepening()
 
         score = iterationDepth >= ASPIRATION_MIN_DEPTH 
                 ? aspiration(iterationDepth, score) 
-                : PVS(iterationDepth, 0, NEG_INFINITY, POS_INFINITY, false);
+                : PVS(iterationDepth, 0, NEG_INFINITY, POS_INFINITY, false, SINGULAR_MAX_DOUBLE_EXTENSIONS);
 
         if (isHardTimeUp()) break;
 
