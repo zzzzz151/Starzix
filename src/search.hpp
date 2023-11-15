@@ -236,9 +236,11 @@ inline int16_t PVS(int depth, int plyFromRoot, int16_t alpha, int16_t beta, bool
     int16_t bestScore = NEG_INFINITY;
     Move bestMove = NULL_MOVE;
     int16_t originalAlpha = alpha;
-    HistoryEntry *pointersFailLowQuietsHistoryEntry[256];
-    int numFailLowQuiets = 0;
     doubleExtensions[plyFromRoot + 1] = doubleExtensions[plyFromRoot];
+
+    // Fail low quiets at beginning of array, fail low captures at the end
+    HistoryEntry *pointersFailLowsHistoryEntry[256]; 
+    int numFailLowQuiets = 0, numFailLowCaptures = 0;
 
     for (int i = 0; i < moves.size(); i++)
     {
@@ -349,14 +351,17 @@ inline int16_t PVS(int depth, int plyFromRoot, int16_t alpha, int16_t beta, bool
 
         if (score > bestScore) bestScore = score;
 
+        int pieceType = (int)board.pieceTypeAt(move.from());
+        int targetSquare = (int)move.to();
+
         if (score <= alpha) // Fail low
         {
+            // Fail low quiets at beginning of array, fail low captures at the end
             if (isQuietMove)
-            {
-                int pieceType = (int)board.pieceTypeAt(move.from());
-                int targetSquare = (int)move.to();
-                pointersFailLowQuietsHistoryEntry[numFailLowQuiets++] = &(historyTable[stm][pieceType][targetSquare]);
-            }
+                pointersFailLowsHistoryEntry[numFailLowQuiets++] = &(historyTable[stm][pieceType][targetSquare]);
+            else if (board.isCapture(move))
+                pointersFailLowsHistoryEntry[256 - ++numFailLowCaptures] = &(historyTable[stm][pieceType][targetSquare]);
+
             continue;
         }
 
@@ -376,23 +381,31 @@ inline int16_t PVS(int depth, int plyFromRoot, int16_t alpha, int16_t beta, bool
 
         // Fail high / Beta cutoff
 
-        if (!isQuietMove) break;
-
-        // This quiet move is a killer move and a countermove
-        killerMoves[plyFromRoot] = move;
-        if (board.getLastMove() != NULL_MOVE)
-            countermoves[stm][board.getLastMove().getMove()] = move;
-
-        int pieceType = (int)board.pieceTypeAt(move.from());
-        int targetSquare = (int)move.to();
-
-        // Increase this quiet's history
         int32_t historyBonus = min(HISTORY_MIN_BONUS, HISTORY_BONUS_MULTIPLIER * (depth - 1));
-        historyTable[stm][pieceType][targetSquare].updateHistory(board, historyBonus);
 
-        // Penalize/decrease history of quiets that failed low
-        for (int i = 0; i < numFailLowQuiets; i++)
-            pointersFailLowQuietsHistoryEntry[i]->updateHistory(board, -historyBonus); 
+        if (isQuietMove)
+        {
+            // This quiet move is a killer move and a countermove
+            killerMoves[plyFromRoot] = move;
+            if (board.getLastMove() != NULL_MOVE)
+                countermoves[stm][board.getLastMove().getMove()] = move;
+
+            // Increase this quiet's history
+            historyTable[stm][pieceType][targetSquare].updateQuietHistory(board, historyBonus);
+
+            // Penalize/decrease history of quiets that failed low
+            for (int i = 0; i < numFailLowQuiets; i++)
+                pointersFailLowsHistoryEntry[i]->updateQuietHistory(board, -historyBonus); 
+        }
+        else if (board.isCapture(move))
+        {
+            // Increase this capture's history
+            historyTable[stm][pieceType][targetSquare].updateCaptureHistory(board, historyBonus);
+
+            // Penalize/decrease history of captures that failed low
+            for (int i = 255, j = 0; j < numFailLowCaptures; i--, j++)
+                pointersFailLowsHistoryEntry[i]->updateCaptureHistory(board, -historyBonus);
+        }
 
         break; // Fail high / Beta cutoff
     }

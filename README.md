@@ -40,9 +40,9 @@ Transposition table
 
 Quiescence search with SEE pruning
 
-Move ordering (TT move > good captures by SEE + MVVLVA > promotions > killer move > countermove > quiet moves by history > bad captures)
+Move ordering (TT move > good captures by SEE + MVV + history > promotions > killer move > countermove > quiet moves by history > bad captures)
 
-History (main history, countermove history, follow-up move history)
+History (main history, countermove history, follow-up move history, capture history)
 
 Aspiration windows
 

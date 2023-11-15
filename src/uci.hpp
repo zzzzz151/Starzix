@@ -22,7 +22,7 @@ namespace uci
     inline void ucinewgame()
     {
         clearTT();
-        memset(historyTable, 0, sizeof(historyTable)); // clear history
+        memset(historyTable, 0, sizeof(historyTable)); // clear histories
         memset(killerMoves, 0, sizeof(killerMoves));   // clear killer moves
         memset(countermoves, 0, sizeof(countermoves)); // clear countermoves
     }
