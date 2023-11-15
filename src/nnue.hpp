@@ -6,7 +6,7 @@ namespace nnue
 {
     const char* NET_FILE = "nn.nnue";
     const uint16_t HIDDEN_LAYER_SIZE = 384;
-    const int32_t Q = 255 * 64;
+    const int32_t SCALE = 400, Q = 255 * 64, NORMALIZATION_K = 1;
 
     struct alignas(64) NN {
         array<int16_t, 768 * HIDDEN_LAYER_SIZE> featureWeights;
@@ -38,7 +38,7 @@ namespace nnue
         }
         #endif
 
-        // Read binary data into the struct
+        // Read binary data (weights and biases) into the struct
         fread(nn.featureWeights.data(), sizeof(int16_t), nn.featureWeights.size(), netFile);
         fread(nn.featureBiases.data(), sizeof(int16_t), nn.featureBiases.size(), netFile);
         fread(nn.outputWeights.data(), sizeof(int8_t), nn.outputWeights.size(), netFile);
@@ -121,26 +121,23 @@ namespace nnue
 
     inline int32_t evaluate(Color color)
     {
-        int16_t *us, *them;
-        if (color == WHITE)
-        {
-            us = currentAccumulator->white;
-            them = currentAccumulator->black;
-        }
-        else
+        int16_t *us = currentAccumulator->white,
+                *them = currentAccumulator->black;
+
+        if (color == BLACK)
         {
             us = currentAccumulator->black;
             them = currentAccumulator->white;
         }
 
-        int32_t sum = nn.outputBias;
+        int32_t sum = 0;
         for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
         {
             sum += crelu(us[i]) * nn.outputWeights[i];
             sum += crelu(them[i]) * nn.outputWeights[HIDDEN_LAYER_SIZE + i];
         }
 
-        return sum * 400 / Q;
+        return (sum / NORMALIZATION_K + nn.outputBias) * SCALE / Q;
     }
 
 }

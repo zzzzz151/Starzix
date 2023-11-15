@@ -117,7 +117,7 @@ inline int16_t qSearch(int plyFromRoot, int16_t alpha, int16_t beta)
 
     // if in check, generate and score all moves, else only captures
     MovesList moves = board.pseudolegalMoves(!board.inCheck()); 
-    array<int32_t, 256> movesScores = scoreMoves(moves, ttMove, killerMoves[plyFromRoot], !board.inCheck());
+    array<int32_t, 256> movesScores = scoreMoves(moves, ttMove, killerMoves[plyFromRoot], board.inCheck());
     
     int legalMovesPlayed = 0;
     int16_t bestScore = eval;
@@ -166,7 +166,8 @@ inline int16_t PVS(int depth, int plyFromRoot, int16_t alpha, int16_t beta, bool
     depth = clamp(depth, 0, (int)MAX_DEPTH);
 
     // Check extension
-    if (plyFromRoot > 0 && depth < MAX_DEPTH) depth += board.inCheck();
+    if (plyFromRoot > 0 && depth < MAX_DEPTH) 
+        depth += board.inCheck();
 
     // Drop into qsearch on terminal nodes
     if (depth <= 0) return qSearch(plyFromRoot, alpha, beta);
@@ -249,9 +250,10 @@ inline int16_t PVS(int depth, int plyFromRoot, int16_t alpha, int16_t beta, bool
         // don't search singular move in singular search
         if (move == singularMove) continue;
 
+        bool isCapture = board.isCapture(move);
+        bool isQuietMove = !isCapture && move.promotionPieceType() == PieceType::NONE;
         bool historyMoveOrLosing = moveScore < COUNTERMOVE_SCORE;
         int lmr = lmrTable[depth][legalMovesPlayed + 1];
-        bool isQuietMove = !board.isCapture(move) && move.promotionPieceType() == PieceType::NONE;
 
         // Moves loop pruning
         if (plyFromRoot > 0 && historyMoveOrLosing && bestScore > -MIN_MATE_SCORE)
@@ -359,7 +361,7 @@ inline int16_t PVS(int depth, int plyFromRoot, int16_t alpha, int16_t beta, bool
             // Fail low quiets at beginning of array, fail low captures at the end
             if (isQuietMove)
                 pointersFailLowsHistoryEntry[numFailLowQuiets++] = &(historyTable[stm][pieceType][targetSquare]);
-            else if (board.isCapture(move))
+            else if (isCapture)
                 pointersFailLowsHistoryEntry[256 - ++numFailLowCaptures] = &(historyTable[stm][pieceType][targetSquare]);
 
             continue;
@@ -397,7 +399,7 @@ inline int16_t PVS(int depth, int plyFromRoot, int16_t alpha, int16_t beta, bool
             for (int i = 0; i < numFailLowQuiets; i++)
                 pointersFailLowsHistoryEntry[i]->updateQuietHistory(board, -historyBonus); 
         }
-        else if (board.isCapture(move))
+        else if (isCapture)
         {
             // Increase this capture's history
             historyTable[stm][pieceType][targetSquare].updateCaptureHistory(board, historyBonus);
