@@ -2,21 +2,21 @@
 
 # How to compile
 
-**Windows**
+### Windows
 
 ```clang++ -O3 -march=native -std=c++20 src/main.cpp -o z5.exe```
 
-**Linux**
+### Linux
 
 ```clang++ -O3 -march=native -std=c++20 src/main.cpp -o z5```
 
 # UCI (Universal Chess Interface)
 
-**Options**
+### Options
 
 - Hash (int, default 64, 1 to 1024) - transposition table size in MB
 
-**Extra commands**
+### Extra commands
 
 - perft \<depth\> - runs perft from current position
 
@@ -24,51 +24,59 @@
 
 # Features
 
-Bitboards
+### Board
+- Bitboards + mailbox
+- Zobrist hashing
+- Pseudolegal move generation (magic bitboards for sliders, lookup tables for pawns, knights and king)
+- Make/undo move
 
-Pseudolegal move generation (magic bitboards for sliders, lookup tables for pawns, knights and king)
+### NNUE evaluation (768->384x2->1)
 
-NNUE evaluation (768->384x2->1)
+### Search framework
+- Iterative deepening
+- Aspiration windows
+- Principal variation search with fail-soft Negamax
+- Quiescence search
+- Transposition table
 
-Principal variation search with Negamax
+### Pruning
+- Alpha-beta pruning
+- Reverse futility pruning
+- Alpha pruning
+- Razoring
+- Null move pruning
+- Late move pruning
+- Futility pruning
+- SEE pruning
 
-Alpha beta pruning
+### Extensions
+- Check extension
+- 7th-rank-pawn extension
+- Singular extensions (double extensions, negative extension)
 
-Iterative deepening
+### Reductions
+- Internal iterative reduction
+- Late move reductions
 
-Transposition table
+### Move ordering
+- TT move
+- Good captures by SEE + MVV + capture history
+- Promotions
+- Killer move
+- Countermove
+- Quiet moves by history
+- Bad captures
 
-Quiescence search with SEE pruning
+### Move history
+- Main history
+- Countermove history
+- Follow-up move history
+- Capture history
 
-Move ordering (TT move > good captures by SEE + MVV + history > promotions > killer move > countermove > quiet moves by history > bad captures)
-
-History (main history, countermove history, follow-up move history, capture history)
-
-Aspiration windows
-
-Check extension
-
-Singular extensions (double extensions, negative extension)
-
-Internal iterative reduction
-
-Late move reductions
-
-Reverse futility pruning
-
-Alpha pruning
-
-Razoring
-
-Null move pruning
-
-Futility pruning
-
-Late move pruning
-
-SEE depth-based pruning
-
-Time management (any time control, soft and hard limits)
+### Time management
+- Any time control
+- Soft and hard limits
+- Soft limit scaling based on best move nodes
 
 # Credits
 

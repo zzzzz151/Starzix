@@ -243,7 +243,7 @@ inline int16_t PVS(int depth, int plyFromRoot, int16_t alpha, int16_t beta, bool
     int16_t originalAlpha = alpha;
 
     // Fail low quiets at beginning of array, fail low captures at the end
-    HistoryEntry *pointersFailLowsHistoryEntry[256]; 
+    HistoryEntry *failLowsHistoryEntry[256]; 
     int numFailLowQuiets = 0, numFailLowCaptures = 0;
 
     for (int i = 0; i < moves.size(); i++)
@@ -277,6 +277,9 @@ inline int16_t PVS(int depth, int plyFromRoot, int16_t alpha, int16_t beta, bool
                 continue;
         }
 
+        int pieceType = (int)board.pieceTypeAt(move.from());
+        int targetSquare = (int)move.to();
+
         // skip illegal moves
         if (!board.makeMove(move)) continue; 
 
@@ -284,8 +287,10 @@ inline int16_t PVS(int depth, int plyFromRoot, int16_t alpha, int16_t beta, bool
         nodes++;
         legalMovesPlayed++;
 
-        // Extensions
         int extension = 0;
+        if (plyFromRoot == 0) goto skipExtensions;
+
+        // Extensions
         // SE (Singular extensions)
         if (trySingular && move == ttEntry->bestMove)
         {
@@ -315,8 +320,13 @@ inline int16_t PVS(int depth, int plyFromRoot, int16_t alpha, int16_t beta, bool
                 extension = -1;
         }
         // Check extension if no singular extensions
-        else if (plyFromRoot > 0 && board.inCheck())
+        else if (board.inCheck())
             extension = 1;
+        // 7th-rank-pawn extension
+        else if (pieceType == (int)PieceType::PAWN && (squareRank(targetSquare) == 1 || squareRank(targetSquare) == 6))
+            extension = 1;
+
+        skipExtensions:
         
         // In PVS (Principal Variation Search), the highest ranked move (TT move if one exists) is searched normally, with a full window
         int16_t score = 0, searchDepth = depth - 1 + extension;
@@ -359,16 +369,14 @@ inline int16_t PVS(int depth, int plyFromRoot, int16_t alpha, int16_t beta, bool
 
         if (score > bestScore) bestScore = score;
 
-        int pieceType = (int)board.pieceTypeAt(move.from());
-        int targetSquare = (int)move.to();
 
         if (score <= alpha) // Fail low
         {
             // Fail low quiets at beginning of array, fail low captures at the end
             if (isQuietMove)
-                pointersFailLowsHistoryEntry[numFailLowQuiets++] = &(historyTable[stm][pieceType][targetSquare]);
+                failLowsHistoryEntry[numFailLowQuiets++] = &(historyTable[stm][pieceType][targetSquare]);
             else if (isCapture)
-                pointersFailLowsHistoryEntry[256 - ++numFailLowCaptures] = &(historyTable[stm][pieceType][targetSquare]);
+                failLowsHistoryEntry[256 - ++numFailLowCaptures] = &(historyTable[stm][pieceType][targetSquare]);
 
             continue;
         }
@@ -403,7 +411,7 @@ inline int16_t PVS(int depth, int plyFromRoot, int16_t alpha, int16_t beta, bool
 
             // Penalize/decrease history of quiets that failed low
             for (int i = 0; i < numFailLowQuiets; i++)
-                pointersFailLowsHistoryEntry[i]->updateQuietHistory(board, -historyBonus); 
+                failLowsHistoryEntry[i]->updateQuietHistory(board, -historyBonus); 
         }
         else if (isCapture)
         {
@@ -412,7 +420,7 @@ inline int16_t PVS(int depth, int plyFromRoot, int16_t alpha, int16_t beta, bool
 
             // Penalize/decrease history of captures that failed low
             for (int i = 255, j = 0; j < numFailLowCaptures; i--, j++)
-                pointersFailLowsHistoryEntry[i]->updateCaptureHistory(board, -historyBonus);
+                failLowsHistoryEntry[i]->updateCaptureHistory(board, -historyBonus);
         }
 
         break; // Fail high / Beta cutoff
