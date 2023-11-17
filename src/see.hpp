@@ -7,39 +7,9 @@
 const int32_t SEE_PIECE_VALUES[7] = {100, 300, 300, 500, 900, 0, 0};
 const uint8_t PAWN_INDEX = 0;
 
-inline int32_t gain(Board &board, Move move)
-{
-    auto moveFlag = move.typeFlag();
+inline int32_t gain(Board &board, Move move);
 
-    if (moveFlag == Move::CASTLING_FLAG)
-        return 0;
-
-    if (moveFlag == Move::EN_PASSANT_FLAG)
-        return SEE_PIECE_VALUES[PAWN_INDEX];
-
-    int32_t score = SEE_PIECE_VALUES[(int)board.pieceTypeAt(move.to())];
-
-    PieceType promotionPieceType = move.promotionPieceType();
-    if (promotionPieceType != PieceType::NONE)
-        score += SEE_PIECE_VALUES[(int)promotionPieceType] - SEE_PIECE_VALUES[PAWN_INDEX]; // gain promotion, lose the pawn
-
-    return score;
-}
-
-inline PieceType popLeastValuable(Board &board, uint64_t &occ, uint64_t attackers, Color color)
-{
-    for (int pt = 0; pt <= 5; pt++)
-    {
-        uint64_t bb = attackers & board.getBitboard((PieceType)pt, color);
-        if (bb > 0)
-        {
-            occ ^= (1ULL << lsb(bb));
-            return (PieceType)pt;
-        }
-    }
-
-    return PieceType::NONE;
-}
+inline PieceType popLeastValuable(Board &board, uint64_t &occ, uint64_t attackers, Color color);
 
 inline bool SEE(Board &board, Move move, int32_t threshold = 0)
 {
@@ -98,5 +68,39 @@ inline bool SEE(Board &board, Move move, int32_t threshold = 0)
     }
 
     return board.sideToMove() != us;
+}
+
+inline int32_t gain(Board &board, Move move)
+{
+    auto moveFlag = move.typeFlag();
+
+    if (moveFlag == Move::CASTLING_FLAG)
+        return 0;
+
+    if (moveFlag == Move::EN_PASSANT_FLAG)
+        return SEE_PIECE_VALUES[PAWN_INDEX];
+
+    int32_t score = SEE_PIECE_VALUES[(int)board.pieceTypeAt(move.to())];
+
+    PieceType promotionPieceType = move.promotionPieceType();
+    if (promotionPieceType != PieceType::NONE)
+        score += SEE_PIECE_VALUES[(int)promotionPieceType] - SEE_PIECE_VALUES[PAWN_INDEX]; // gain promotion, lose the pawn
+
+    return score;
+}
+
+inline PieceType popLeastValuable(Board &board, uint64_t &occ, uint64_t attackers, Color color)
+{
+    for (int pt = 0; pt <= 5; pt++)
+    {
+        uint64_t bb = attackers & board.getBitboard((PieceType)pt, color);
+        if (bb > 0)
+        {
+            occ ^= (1ULL << lsb(bb));
+            return (PieceType)pt;
+        }
+    }
+
+    return PieceType::NONE;
 }
 
