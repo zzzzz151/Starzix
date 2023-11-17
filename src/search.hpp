@@ -5,8 +5,8 @@
 const uint8_t MAX_DEPTH = 100;
 
 const int ASPIRATION_MIN_DEPTH = 6,
-          ASPIRATION_INITIAL_DELTA = 25;
-const double ASPIRATION_DELTA_MULTIPLIER = 1.5;
+          ASPIRATION_INITIAL_DELTA = 15;
+const double ASPIRATION_DELTA_MULTIPLIER = 1.2;
 
 const int IIR_MIN_DEPTH = 4;
 
