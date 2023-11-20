@@ -50,9 +50,9 @@
 - SEE pruning
 
 ### Extensions
+- Singular extensions (double extensions, negative extension)
 - Check extension
 - 7th-rank-pawn extension
-- Singular extensions (double extensions, negative extension)
 
 ### Reductions
 - Internal iterative reduction

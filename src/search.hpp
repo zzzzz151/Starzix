@@ -98,7 +98,8 @@ inline void initSearch()
     // init lmrTable
     for (int depth = 0; depth < MAX_DEPTH+1; depth++)
         for (int move = 0; move < 256; move++)
-            lmrTable[depth][move] = depth == 0 || move == 0 ? 0 : round(LMR_BASE + ln(depth) * ln(move) * LMR_MULTIPLIER);
+            lmrTable[depth][move] = depth == 0 || move == 0 
+                                    ? 0 : round(LMR_BASE + ln(depth) * ln(move) * LMR_MULTIPLIER);
 }
 
 inline Move iterativeDeepening()
@@ -201,7 +202,7 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
                   ? ttEntry->bestMove : MOVE_NONE;
 
     bool pvNode = beta - alpha > 1 || ply == 0;
-    //if (cutNode) assert(!pvNode); // cutNode implies !pvNode
+    if (cutNode) assert(!pvNode); // cutNode implies !pvNode
 
     // We don't use eval in check because it's unreliable, so don't bother calculating it if in check
     // In singular search we already have the eval, passed in the eval arg
@@ -263,7 +264,7 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
     {
         auto [move, moveScore] = incrementalSort(moves, movesScores, i);
 
-        // Don't saerch TT move in singular search
+        // Don't search TT move in singular search
         if (singular && move == ttEntry->bestMove) continue;
 
         bool isCapture = board.isCapture(move);
@@ -343,17 +344,13 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
             extension = 1;
 
         skipExtensions:
+
+        // PVS (Principal variation search)
         
-        // In PVS (Principal Variation Search), the highest ranked move (TT move if one exists) is searched normally, with a full window
         i16 score = 0, searchDepth = depth - 1 + extension;
-        if (legalMovesPlayed == 1)
-        {
-            score = -search(searchDepth, ply + 1, -beta, -alpha, false, doubleExtensionsLeft);
-            goto searchingDone;
-        }
         
         // LMR (Late move reductions)
-        if (depth >= LMR_MIN_DEPTH && historyMoveOrLosing)
+        if (legalMovesPlayed > 1 && depth >= LMR_MIN_DEPTH && historyMoveOrLosing)
         {
             //lmr -= board.inCheck(); // reduce checks less
             lmr -= pvNode; // reduce pv nodes less
@@ -365,15 +362,21 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
             // if lmr is negative, we would have an extension instead of a reduction
             // dont reduce into qsearch
             lmr = clamp(lmr, 0, searchDepth - 1);
-        }
-        else
-            lmr = 0;
 
-        // In PVS, the other moves (not TT move) are searched with a null/zero window
-        // and researched with a full window if they're better than expected (score > alpha)
-        score = -search(searchDepth - lmr, ply + 1, -alpha - 1, -alpha, true, doubleExtensionsLeft);
-        if (score > alpha && (score < beta || lmr > 0))
-            score = -search(searchDepth, ply + 1, -beta, -alpha, score < beta ? false : !cutNode, doubleExtensionsLeft);
+            // Reduced search on null window
+            score = -search(searchDepth - lmr, ply + 1, -alpha-1, -alpha, true, doubleExtensionsLeft);
+
+            // If score is better than expected (score > alpha), do full depth search on null window
+            if (score > alpha && lmr != 1)
+                score = -search(searchDepth, ply + 1, -alpha-1, -alpha, !cutNode, doubleExtensionsLeft);
+        }
+        else if (!pvNode || legalMovesPlayed > 1)
+            // Full depth search on null window
+            score = -search(searchDepth, ply + 1, -alpha-1, -alpha, !cutNode, doubleExtensionsLeft);
+
+        // Full depth search on full window for some pv nodes
+        if (pvNode && (legalMovesPlayed == 1 || score > alpha))
+            score = -search(searchDepth, ply + 1, -beta, -alpha, false, doubleExtensionsLeft);
 
         searchingDone:
 

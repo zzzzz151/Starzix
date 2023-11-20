@@ -11,6 +11,7 @@ inline i32 gain(Board &board, Move move);
 
 inline PieceType popLeastValuable(Board &board, u64 &occ, u64 attackers, Color color);
 
+// SEE (Static exchange evaluation)
 inline bool SEE(Board &board, Move move, i32 threshold = 0)
 {
     i32 score = gain(board, move) - threshold;
