@@ -334,6 +334,9 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
             else if (ttEntry->score >= beta)
                 // some other move is probably better than TT move, so reduce TT move search by 2 plies
                 extension = -2;
+            // Cutnode negative extension
+            else if (cutNode)
+                extension = -1;
         }
         // Check extension if no singular extensions
         else if (board.inCheck())
@@ -526,7 +529,11 @@ inline i16 qSearch(int ply, i16 alpha, i16 beta)
 inline array<i32, 256> scoreMoves(MovesList &moves, Move ttMove, Move killerMove, bool doSEE)
 {
     array<i32, 256> movesScores;
+
     int stm = (int)board.sideToMove();
+    Move countermove = board.getLastMove() == MOVE_NONE
+                       ? MOVE_NONE
+                       : countermoves[stm][board.getLastMove().getMoveEncoded()];
 
     for (int i = 0; i < moves.size(); i++)
     {
@@ -547,7 +554,7 @@ inline array<i32, 256> scoreMoves(MovesList &moves, Move ttMove, Move killerMove
             movesScores[i] = PROMOTION_BASE_SCORE + move.typeFlag();
         else if (move == killerMove)
             movesScores[i] = KILLER_SCORE;
-        else if (board.getLastMove() != MOVE_NONE && move == countermoves[stm][board.getLastMove().getMoveEncoded()])
+        else if (move == countermove)
             movesScores[i] = COUNTERMOVE_SCORE;
         else
         {
