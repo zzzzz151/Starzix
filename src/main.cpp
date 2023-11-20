@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <array>
 #include <cstring> // for memset()
-#include <chrono>
 #include "board.hpp"
 #include "search.hpp"
 #include "uci.hpp"

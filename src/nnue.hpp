@@ -5,14 +5,16 @@
 namespace nnue
 {
     const char* NET_FILE = "nn.nnue";
-    const uint16_t HIDDEN_LAYER_SIZE = 384;
-    const int32_t SCALE = 400, Q = 255 * 64, NORMALIZATION_K = 1;
+    const u16 HIDDEN_LAYER_SIZE = 384;
+    const i32 SCALE = 400, 
+              Q = 255 * 64, 
+              NORMALIZATION_K = 1;
 
     struct alignas(64) NN {
-        array<int16_t, 768 * HIDDEN_LAYER_SIZE> featureWeights;
-        array<int16_t, HIDDEN_LAYER_SIZE> featureBiases;
-        array<int8_t , HIDDEN_LAYER_SIZE * 2> outputWeights;
-        int16_t outputBias;
+        array<i16, 768 * HIDDEN_LAYER_SIZE> featureWeights;
+        array<i16, HIDDEN_LAYER_SIZE> featureBiases;
+        array<i8, HIDDEN_LAYER_SIZE * 2> outputWeights;
+        i16 outputBias;
     };
 
     NN nn;
@@ -39,17 +41,17 @@ namespace nnue
         #endif
 
         // Read binary data (weights and biases) into the struct
-        fread(nn.featureWeights.data(), sizeof(int16_t), nn.featureWeights.size(), netFile);
-        fread(nn.featureBiases.data(), sizeof(int16_t), nn.featureBiases.size(), netFile);
-        fread(nn.outputWeights.data(), sizeof(int8_t), nn.outputWeights.size(), netFile);
-        fread(&nn.outputBias, sizeof(int16_t), 1, netFile);
+        fread(nn.featureWeights.data(), sizeof(i16), nn.featureWeights.size(), netFile);
+        fread(nn.featureBiases.data(), sizeof(i16), nn.featureBiases.size(), netFile);
+        fread(nn.outputWeights.data(), sizeof(i8), nn.outputWeights.size(), netFile);
+        fread(&nn.outputBias, sizeof(i16), 1, netFile);
         fclose(netFile); 
     }
 
     struct Accumulator
     {
-        int16_t white[HIDDEN_LAYER_SIZE];
-        int16_t black[HIDDEN_LAYER_SIZE];
+        i16 white[HIDDEN_LAYER_SIZE];
+        i16 black[HIDDEN_LAYER_SIZE];
 
         inline Accumulator()
         {
@@ -59,8 +61,8 @@ namespace nnue
 
         inline void activate(Color color, Square sq, PieceType pieceType)
         {
-            int whiteIdx = color * 384 + (int)pieceType * 64 + sq;
-            int blackIdx = !color * 384 + (int)pieceType * 64 + (sq ^ 56);
+            int whiteIdx = (int)color * 384 + (int)pieceType * 64 + sq;
+            int blackIdx = !(int)color * 384 + (int)pieceType * 64 + (sq ^ 56);
             int whiteOffset = whiteIdx * HIDDEN_LAYER_SIZE;
             int blackOffset = blackIdx * HIDDEN_LAYER_SIZE;
 
@@ -73,8 +75,8 @@ namespace nnue
 
         inline void deactivate(Color color, Square sq, PieceType pieceType)
         {
-            int whiteIdx = color * 384 + (int)pieceType * 64 + sq;
-            int blackIdx = !color * 384 + (int)pieceType * 64 + (sq ^ 56);
+            int whiteIdx = (int)color * 384 + (int)pieceType * 64 + sq;
+            int blackIdx = !(int)color * 384 + (int)pieceType * 64 + (sq ^ 56);
             int whiteOffset = whiteIdx * HIDDEN_LAYER_SIZE;
             int blackOffset = blackIdx * HIDDEN_LAYER_SIZE;
 
@@ -110,27 +112,23 @@ namespace nnue
         currentAccumulator = &accumulators.back();
     }
 
-    inline int32_t crelu(int32_t x)
+    inline i32 crelu(i32 x)
     {
-        if (x < 0)
-            return 0;
-        if (x > 255)
-            return 255;
-        return x;
+        return clamp(x, 0, 255);
     }
 
-    inline int32_t evaluate(Color color)
+    inline i32 evaluate(Color color)
     {
-        int16_t *us = currentAccumulator->white,
-                *them = currentAccumulator->black;
+        i16 *us = currentAccumulator->white,
+            *them = currentAccumulator->black;
 
-        if (color == BLACK)
+        if (color == Color::BLACK)
         {
             us = currentAccumulator->black;
             them = currentAccumulator->white;
         }
 
-        int32_t sum = 0;
+        i32 sum = 0;
         for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
         {
             sum += crelu(us[i]) * nn.outputWeights[i];

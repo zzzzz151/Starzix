@@ -64,11 +64,8 @@ r4k2/p2P2pp/8/1pb5/1Nn1P1n1/6Q1/PPP4P/R3K1NR w KQ - | d7d8q | -100 | (Q - P) - Q
 1n2kb1r/p1P4p/2qb4/5pP1/4n2Q/8/PP1PPP1P/RNB1KBNR w KQk - | c7b8q | 200 | N + (Q - P) - Q
 rnbqk2r/pp3ppp/2p1pn2/3p4/3P4/N1P1BN2/PPB1PPPb/R2Q1RK1 w kq - | g1h2 | 300 | B
 3N4/2K5/2n5/1k6/8/8/8/8 b - - | c6d8 | 0 | N - N
-3N4/2P5/2n5/1k6/8/8/8/4K3 b - - | c6d8 | -800 | N - (N + Q - P)
-3n3r/2P5/8/1k6/8/8/3Q4/4K3 w - - | d2d8 | 300 | N
 3n3r/2P5/8/1k6/8/8/3Q4/4K3 w - - | c7d8q | 700 | (N + Q - P) - Q + R
 r2n3r/2P1P3/4N3/1k6/8/8/8/4K3 w - - | e6d8 | 300 | N
 8/8/8/1k6/6b1/4N3/2p3K1/3n4 w - - | e3d1 | 0 | N - N
-8/8/1k6/8/8/2N1N3/2p1p1K1/3n4 w - - | c3d1 | -800 | N - (N + Q - P)
 8/8/1k6/8/8/2N1N3/4p1K1/3n4 w - - | c3d1 | 100 | N - (N + Q - P) + Q
 r1bqk1nr/pppp1ppp/2n5/1B2p3/1b2P3/5N2/PPPP1PPP/RNBQK2R w KQkq - | e1g1 | 0

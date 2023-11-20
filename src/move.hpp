@@ -11,19 +11,19 @@ struct Move
     private:
 
     // 16 bits: ffffff tttttt FFFF (f = from, t = to, F = flag)  
-    uint16_t moveEncoded = 0;
+    u16 moveEncoded = 0;
 
     public:
 
-    const static uint16_t NULL_FLAG = 0x0000,
-                          NORMAL_FLAG = 0x0005,
-                          CASTLING_FLAG = 0x0006,
-                          EN_PASSANT_FLAG = 0x0007,
-                          PAWN_TWO_UP_FLAG = 0x0008,
-                          KNIGHT_PROMOTION_FLAG = 0x0001,
-                          BISHOP_PROMOTION_FLAG = 0x0002,
-                          ROOK_PROMOTION_FLAG = 0x0003,
-                          QUEEN_PROMOTION_FLAG = 0x0004;
+    const static u16 NULL_FLAG = 0x0000,
+                     NORMAL_FLAG = 0x0005,
+                     CASTLING_FLAG = 0x0006,
+                     EN_PASSANT_FLAG = 0x0007,
+                     PAWN_TWO_UP_FLAG = 0x0008,
+                     KNIGHT_PROMOTION_FLAG = 0x0001,
+                     BISHOP_PROMOTION_FLAG = 0x0002,
+                     ROOK_PROMOTION_FLAG = 0x0003,
+                     QUEEN_PROMOTION_FLAG = 0x0004;
 
     inline Move() = default;
 
@@ -37,29 +37,27 @@ struct Move
         return moveEncoded != other.moveEncoded;
     }
 
-    inline Move(Square from, Square to, uint16_t typeFlag)
+    inline Move(Square from, Square to, u16 typeFlag)
     {
         // from/to: 00100101
-        // (uint16_t)from/to: 00000000 00100101
+        // (u16)from/to: 00000000 00100101
 
-        moveEncoded = ((uint16_t)from << 10);
-        moveEncoded |= ((uint16_t)to << 4);
+        moveEncoded = ((u16)from << 10);
+        moveEncoded |= ((u16)to << 4);
         moveEncoded |= typeFlag;
     }
 
-    inline Move(string from, string to, uint16_t typeFlag) : Move(strToSquare(from), strToSquare(to), typeFlag) {}
-
-    inline uint16_t getMove() { return moveEncoded; }
+    inline u16 getMoveEncoded() { return moveEncoded; }
 
     inline Square from() { return (moveEncoded >> 10) & 0b111111; }
 
     inline Square to() { return (moveEncoded >> 4) & 0b111111; }
 
-    inline uint16_t typeFlag() { return moveEncoded & 0x000F; }
+    inline u16 typeFlag() { return moveEncoded & 0x000F; }
 
     inline PieceType promotionPieceType()
     {
-        uint16_t flag = typeFlag();
+        u16 flag = typeFlag();
         if (flag < 1 || flag > 4)
             return PieceType::NONE;
         return (PieceType)flag;
@@ -73,7 +71,7 @@ struct Move
         if (uci.size() == 5) // promotion
         {
             char promotionLowerCase = uci.back(); // last char of string
-            uint16_t typeFlag = QUEEN_PROMOTION_FLAG;
+            u16 typeFlag = QUEEN_PROMOTION_FLAG;
 
             if (promotionLowerCase == 'n') 
                 typeFlag = KNIGHT_PROMOTION_FLAG;
@@ -103,8 +101,8 @@ struct Move
 
     inline string toUci()
     {
-        string str = squareToStr[from()] + squareToStr[to()];
-        uint16_t myTypeFlag = typeFlag();
+        string str = SQUARE_TO_STR[from()] + SQUARE_TO_STR[to()];
+        u16 myTypeFlag = typeFlag();
 
         if (myTypeFlag == QUEEN_PROMOTION_FLAG) 
             str += "q";
@@ -120,14 +118,14 @@ struct Move
     
 };
 
-Move NULL_MOVE = Move();
+Move MOVE_NONE = Move();
 
 struct MovesList
 {
     private:
 
     Move moves[256];
-    uint8_t numMoves = 0;
+    u8 numMoves = 0;
 
     public:
 
@@ -138,7 +136,7 @@ struct MovesList
         moves[numMoves++] = move; 
     }
 
-    inline uint8_t size() { return numMoves; }
+    inline u8 size() { return numMoves; }
 
     inline Move operator[](int i) {
         assert(i >= 0 && i < numMoves);

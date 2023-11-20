@@ -7,96 +7,50 @@
 #include <algorithm>
 #include <bitset>
 #include <cassert>
+#include <chrono>
+#include <unordered_map>
 #include "types.hpp"
 using namespace std;
 
-inline uint8_t lsb(uint64_t b);
-
-inline uint8_t msb(uint64_t b);
-
 #if defined(__GNUC__) // GCC, Clang, ICC
-inline uint8_t lsb(uint64_t b)
+inline u8 lsb(u64 b)
 {
     assert(b);
-    return uint8_t(__builtin_ctzll(b));
+    return u8(__builtin_ctzll(b));
 }
-
-inline uint8_t msb(uint64_t b)
+inline u8 msb(u64 b)
 {
     assert(b);
-    return uint8_t(63 ^ __builtin_clzll(b));
+    return u8(63 ^ __builtin_clzll(b));
 }
 
-#elif defined(_MSC_VER) // MSVC
+#else // Assume MSVC Windows 64
 
-#ifdef _WIN64 // MSVC, WIN64
 #include <intrin.h>
-inline uint8_t lsb(uint64_t b)
+inline u8 lsb(u64 b)
 {
     unsigned long idx;
     _BitScanForward64(&idx, b);
-    return (uint8_t)idx;
+    return (u8)idx;
 }
-
-inline uint8_t msb(uint64_t b)
+inline u8 msb(u64 b)
 {
     unsigned long idx;
     _BitScanReverse64(&idx, b);
-    return (uint8_t)idx;
+    return (u8)idx;
 }
-
-#else // MSVC, WIN32
-#include <intrin.h>
-inline uint8_t lsb(uint64_t b)
-{
-    unsigned long idx;
-
-    if (b & 0xffffffff)
-    {
-        _BitScanForward(&idx, int32_t(b));
-        return uint8_t(idx);
-    }
-    else
-    {
-        _BitScanForward(&idx, int32_t(b >> 32));
-        return uint8_t(idx + 32);
-    }
-}
-
-inline uint8_t msb(uint64_t b)
-{
-    unsigned long idx;
-
-    if (b >> 32)
-    {
-        _BitScanReverse(&idx, int32_t(b >> 32));
-        return uint8_t(idx + 32);
-    }
-    else
-    {
-        _BitScanReverse(&idx, int32_t(b));
-        return uint8_t(idx);
-    }
-}
-
 #endif
 
-#else // Compiler is neither GCC nor MSVC compatible
-
-#error "Compiler not supported."
-
-#endif
-
-inline uint8_t poplsb(uint64_t &mask)
+inline u8 poplsb(u64 &mask)
 {
-    uint8_t s = lsb(mask);
-    mask &= mask - 1; // compiler optimizes this to _blsr_uint64_t
-    return uint8_t(s);
+    u8 s = lsb(mask);
+    mask &= mask - 1; // compiler optimizes this to _blsr_u64
+    return u8(s);
 }
 
-inline uint64_t pdep(uint64_t val, uint64_t mask) {
-    uint64_t res = 0;
-    for (uint64_t bb = 1; mask; bb += bb) {
+inline u64 pdep(u64 val, u64 mask) {
+    u64 res = 0;
+    for (u64 bb = 1; mask; bb += bb) {
         if (val & bb)
             res |= mask & -mask;
         mask &= mask - 1;
@@ -104,9 +58,50 @@ inline uint64_t pdep(uint64_t val, uint64_t mask) {
     return res;
 }
 
-inline uint8_t squareFile(Square square) { return square & 7; }
+const string SQUARE_TO_STR[64] = {
+    "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1",
+    "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2",
+    "a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3",
+    "a4", "b4", "c4", "d4", "e4", "f4", "g4", "h4",
+    "a5", "b5", "c5", "d5", "e5", "f5", "g5", "h5",
+    "a6", "b6", "c6", "d6", "e6", "f6", "g6", "h6",
+    "a7", "b7", "c7", "d7", "e7", "f7", "g7", "h7",
+    "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8",
+};
 
-inline uint8_t squareRank(Square square) { return square >> 3; }
+unordered_map<char, Piece> CHAR_TO_PIECE = {
+    {'P', Piece::WHITE_PAWN},
+    {'N', Piece::WHITE_KNIGHT},
+    {'B', Piece::WHITE_BISHOP},
+    {'R', Piece::WHITE_ROOK},
+    {'Q', Piece::WHITE_QUEEN},
+    {'K', Piece::WHITE_KING},
+    {'p', Piece::BLACK_PAWN},
+    {'n', Piece::BLACK_KNIGHT},
+    {'b', Piece::BLACK_BISHOP},
+    {'r', Piece::BLACK_ROOK},
+    {'q', Piece::BLACK_QUEEN},
+    {'k', Piece::BLACK_KING},
+};
+
+unordered_map<Piece, char> PIECE_TO_CHAR = {
+    {Piece::WHITE_PAWN,   'P'},
+    {Piece::WHITE_KNIGHT, 'N'},
+    {Piece::WHITE_BISHOP, 'B'},
+    {Piece::WHITE_ROOK,   'R'},
+    {Piece::WHITE_QUEEN,  'Q'},
+    {Piece::WHITE_KING,   'K'},
+    {Piece::BLACK_PAWN,   'p'},
+    {Piece::BLACK_KNIGHT, 'n'},
+    {Piece::BLACK_BISHOP, 'b'},
+    {Piece::BLACK_ROOK,   'r'},
+    {Piece::BLACK_QUEEN,  'q'},
+    {Piece::BLACK_KING,   'k'}
+};
+
+inline Rank squareRank(Square square) { return (Rank)(square / 8); }
+
+inline File squareFile(Square square) { return (File)(square % 8); }
 
 inline void trim(string &str) {
     size_t first = str.find_first_not_of(" \t\n\r");
@@ -138,7 +133,7 @@ inline vector<string> splitString(string &str, char delimiter)
 }
 
 
-inline void printBitboard(uint64_t bb)
+inline void printBitboard(u64 bb)
 {
     bitset<64> b(bb);
     string str_bitset = b.to_string();
@@ -156,60 +151,48 @@ inline int charToInt(char myChar) { return myChar - '0'; }
 
 inline PieceType pieceToPieceType(Piece piece)
 {
-    if (piece == Piece::NONE) return PieceType::NONE;
-    return (PieceType)((uint8_t)piece % 6);
+    return piece == Piece::NONE ? PieceType::NONE
+                                : (PieceType)((u8)piece % 6);
 }
 
 inline Color pieceColor(Piece piece)
 {
-    if ((uint8_t)piece <= 5) 
-        return WHITE;
-    else if ((uint8_t)piece <= 11) 
-        return BLACK;
-    else 
-        return NULL_COLOR;
+    if ((u8)piece <= 5) return Color::WHITE;
+
+    if ((u8)piece <= 11) return Color::BLACK;
+
+    return Color::NONE;
 }
 
 inline Piece makePiece(PieceType pieceType, Color color)
 {
     int piece = (int)pieceType;
-    if (color == BLACK) 
-        piece += 6;
+    if (color == Color::BLACK) piece += 6;
+
     return (Piece)piece;
 }
 
-inline Square strToSquare(string strSquare)
-{
+inline Square strToSquare(string strSquare) {
     return (strSquare[0] - 'a') + (strSquare[1] - '1') * 8;
-}
-
-inline bool squareIsBackRank(Square square)
-{
-    uint8_t rank = squareRank(square);
-    return rank == 0 || rank == 7;
-}
-
-inline PieceType pieceTypeAt(Square sq, Piece* boardPieces)
-{
-    return pieceToPieceType(boardPieces[sq]);
 }
 
 inline Color oppColor(Color color)
 {
-    return color == WHITE ? BLACK : WHITE;
+    assert(color != Color::NONE);
+    return color == Color::WHITE ? Color::BLACK : Color::WHITE;
 }
 
-inline uint64_t shiftRight(uint64_t bb) {
+inline u64 shiftRight(u64 bb) {
 	return (bb << 1ULL) & 0xfefefefefefefefeULL;
 }
 
-inline uint64_t shiftLeft(uint64_t bb) {
+inline u64 shiftLeft(u64 bb) {
 	return (bb >> 1ULL) & 0x7f7f7f7f7f7f7f7fULL;
 }
 
-inline uint64_t shiftUp(uint64_t bb) { return bb << 8ULL; }
+inline u64 shiftUp(u64 bb) { return bb << 8ULL; }
 
-inline uint64_t shiftDown(uint64_t bb) { return bb >> 8ULL; }
+inline u64 shiftDown(u64 bb) { return bb >> 8ULL; }
 
 inline double ln(int x)
 {
@@ -217,19 +200,22 @@ inline double ln(int x)
     return log(x);
 }
 
-inline int16_t min(int16_t a, int16_t b)
-{
+inline i16 min(i16 a, i16 b) {
     return a < b ? a : b;
 }
 
-inline int16_t max(int16_t a, int16_t b)
-{
+inline i16 max(i16 a, i16 b) {
     return a > b ? a : b;
+}
+
+inline auto millisecondsElapsed(chrono::steady_clock::time_point start)
+{
+    return (chrono::steady_clock::now() - start) / chrono::milliseconds(1);
 }
 
 #include "move.hpp"
 
-inline pair<Move, int32_t> incrementalSort(MovesList &moves, array<int32_t, 256> &movesScores, int i)
+inline pair<Move, i32> incrementalSort(MovesList &moves, array<i32, 256> &movesScores, int i)
 {
     for (int j = i + 1; j < moves.size(); j++)
         if (movesScores[j] > movesScores[i])

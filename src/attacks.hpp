@@ -10,38 +10,38 @@ namespace attacks
     {
         // private stuff
 
-        uint64_t pawnAttacks[2][64], knightAttacks[64], kingAttacks[64];
+        u64 pawnAttacks[2][64], knightAttacks[64], kingAttacks[64];
 
-        inline uint64_t pawnAttacksSlow(Square square, Color color)
+        inline u64 pawnAttacksSlow(Square square, Color color)
         {
-            const int SQUARE_DIAGONAL_LEFT = square + (color == WHITE ? 7 : -9),
-                      SQUARE_DIAGONAL_RIGHT = square + (color == WHITE ? 9 : -7);
+            const int SQUARE_DIAGONAL_LEFT  = square + (color == Color::WHITE ? 7 : -9),
+                      SQUARE_DIAGONAL_RIGHT = square + (color == Color::WHITE ? 9 : -7);
 
-            uint8_t rank = squareRank(square);
-            if ((color == WHITE && rank == 7) || (color == BLACK && rank == 0))
+            Rank rank = squareRank(square);
+            if ((color == Color::WHITE && rank == Rank::RANK_8) || (color == Color::BLACK && rank == Rank::RANK_1))
                 return 0ULL;
 
-            uint8_t file = squareFile(square);
+            File file = squareFile(square);
 
-            if (file == 0)
+            if (file == File::A)
                 return 1ULL << SQUARE_DIAGONAL_RIGHT;
 
-            if (file == 7)
+            if (file == File::H)
                 return 1ULL << SQUARE_DIAGONAL_LEFT;
 
             return (1ULL << SQUARE_DIAGONAL_LEFT) | (1ULL << SQUARE_DIAGONAL_RIGHT);
         }
 
-        inline uint64_t bishopAttacksSlow(Square sq, uint64_t occupied, bool excludeLastSquare = false)
+        inline u64 bishopAttacksSlow(Square sq, u64 occupied, bool excludeLastSquareEachDirection = false)
         {
-            uint64_t attacks = 0ULL;
+            u64 attacks = 0ULL;
             int r, f;
             int br = sq / 8;
             int bf = sq % 8;
 
             for (r = br + 1, f = bf + 1; r >= 0 && r <= 7 && f >= 0 && f <= 7; r++, f++)
             {
-                if (excludeLastSquare && (f == 7 || r == 7))
+                if (excludeLastSquareEachDirection && (f == 7 || r == 7))
                     break;
                 Square s = r * 8 + f;
                 attacks |= (1ULL << s);
@@ -51,7 +51,7 @@ namespace attacks
 
             for (r = br - 1, f = bf + 1; r >= 0 && r <= 7 && f >= 0 && f <= 7; r--, f++)
             {
-                if (excludeLastSquare && (r == 0 || f == 7))
+                if (excludeLastSquareEachDirection && (r == 0 || f == 7))
                     break;
                 Square s = r * 8 + f;
                 attacks |= (1ULL << s);
@@ -61,7 +61,7 @@ namespace attacks
 
             for (r = br + 1, f = bf - 1; r >= 0 && r <= 7 && f >= 0 && f <= 7; r++, f--)
             {
-                if (excludeLastSquare && (r == 7 || f == 0))
+                if (excludeLastSquareEachDirection && (r == 7 || f == 0))
                     break;
                 Square s = r * 8 + f;
                 attacks |= (1ULL << s);
@@ -71,7 +71,7 @@ namespace attacks
 
             for (r = br - 1, f = bf - 1; r >= 0 && r <= 7 && f >= 0 && f <= 7; r--, f--)
             {
-                if (excludeLastSquare && (r == 0 || f == 0))
+                if (excludeLastSquareEachDirection && (r == 0 || f == 0))
                     break;
                 Square s = r * 8 + f;
                 attacks |= (1ULL << s);
@@ -82,16 +82,16 @@ namespace attacks
             return attacks;
         }
 
-        inline uint64_t rookAttacksSlow(Square sq, uint64_t occupied, bool excludeLastSquare = false)
+        inline u64 rookAttacksSlow(Square sq, u64 occupied, bool excludeLastSquareEachDirection = false)
         {
-            uint64_t attacks = 0ULL;
+            u64 attacks = 0ULL;
             int r, f;
             int rr = sq / 8;
             int rf = sq % 8;
 
             for (r = rr + 1; r >= 0 && r <= 7; r++)
             {
-                if (excludeLastSquare && r == 7)
+                if (excludeLastSquareEachDirection && r == 7)
                     break;
                 Square s = r * 8 + rf;
                 attacks |= (1ULL << s);
@@ -101,7 +101,7 @@ namespace attacks
 
             for (r = rr - 1; r >= 0 && r <= 7; r--)
             {
-                if (excludeLastSquare && r == 0)
+                if (excludeLastSquareEachDirection && r == 0)
                     break;
                 Square s = r * 8 + rf;
                 attacks |= (1ULL << s);
@@ -111,7 +111,7 @@ namespace attacks
 
             for (f = rf + 1; f >= 0 && f <= 7; f++)
             {
-                if (excludeLastSquare && f == 7)
+                if (excludeLastSquareEachDirection && f == 7)
                     break;
                 Square s = rr * 8 + f;
                 attacks |= (1ULL << s);
@@ -121,7 +121,7 @@ namespace attacks
 
             for (f = rf - 1; f >= 0 && f <= 7; f--)
             {
-                if (excludeLastSquare && f == 0)
+                if (excludeLastSquareEachDirection && f == 0)
                     break;
                 Square s = rr * 8 + f;
                 attacks |= (1ULL << s);
@@ -132,7 +132,7 @@ namespace attacks
             return attacks;
         }
 
-        const uint64_t BISHOP_SHIFTS[64] = {
+        const u64 BISHOP_SHIFTS[64] = {
             58, 59, 59, 59, 59, 59, 59, 58, 
             59, 59, 59, 59, 59, 59, 59, 59, 
             59, 59, 57, 57, 57, 57, 59, 59, 
@@ -143,7 +143,7 @@ namespace attacks
             58, 59, 59, 59, 59, 59, 59, 58
         };
 
-        const uint64_t ROOK_SHIFTS[64] = {
+        const u64 ROOK_SHIFTS[64] = {
             52, 53, 53, 53, 53, 53, 53, 52, 
             53, 54, 54, 54, 54, 54, 54, 53, 
             53, 54, 54, 54, 54, 54, 54, 53, 
@@ -154,7 +154,7 @@ namespace attacks
             52, 53, 53, 53, 53, 53, 53, 52
         };
 
-        const uint64_t BISHOP_MAGICS[64] = {
+        const u64 BISHOP_MAGICS[64] = {
             0x89a1121896040240ULL, 0x2004844802002010ULL, 0x2068080051921000ULL, 0x62880a0220200808ULL,
             0x4042004000000ULL, 0x100822020200011ULL, 0xc00444222012000aULL, 0x28808801216001ULL,
             0x400492088408100ULL, 0x201c401040c0084ULL, 0x840800910a0010ULL, 0x82080240060ULL,
@@ -173,7 +173,7 @@ namespace attacks
             0x1000042304105ULL, 0x10008830412a00ULL, 0x2520081090008908ULL, 0x40102000a0a60140ULL,
         };
 
-        const uint64_t ROOK_MAGICS[64] = {
+        const u64 ROOK_MAGICS[64] = {
             0xa8002c000108020ULL, 0x6c00049b0002001ULL, 0x100200010090040ULL, 0x2480041000800801ULL, 
             0x280028004000800ULL, 0x900410008040022ULL, 0x280020001001080ULL, 0x2880002041000080ULL,
             0xa000800080400034ULL, 0x4808020004000ULL, 0x2290802004801000ULL, 0x411000d00100020ULL,
@@ -192,8 +192,10 @@ namespace attacks
             0x489a000810200402ULL, 0x1004400080a13ULL, 0x4000011008020084ULL, 0x26002114058042ULL,
         };
 
-        uint64_t bishopAttacksEmptyBoard[64], rookAttacksEmptyBoard[64],
-                 bishopAttacksTable[64][1ULL << 9ULL], rookAttacksTable[64][1ULL << 12ULL];
+        u64 bishopAttacksEmptyBoard[64], 
+            rookAttacksEmptyBoard[64],
+            bishopAttacksTable[64][1ULL << 9ULL], 
+            rookAttacksTable[64][1ULL << 12ULL];
 
     }
 
@@ -202,21 +204,21 @@ namespace attacks
         using namespace internal;
 
         // Init pawn, king and knight attacks
-        uint64_t king = 1;
+        u64 king = 1;
         for (int square = 0; square < 64; square++)
         {
             // Pawn
-            pawnAttacks[WHITE][square] = pawnAttacksSlow(square, WHITE);
-            pawnAttacks[BLACK][square] = pawnAttacksSlow(square, BLACK);
+            pawnAttacks[0][square] = pawnAttacksSlow(square, Color::WHITE);
+            pawnAttacks[1][square] = pawnAttacksSlow(square, Color::BLACK);
 
             // Knight
-            uint64_t n = 1ULL << square;
-            uint64_t h1 = ((n >> 1ULL) & 0x7f7f7f7f7f7f7f7fULL) | ((n << 1ULL) & 0xfefefefefefefefeULL);
-            uint64_t h2 = ((n >> 2ULL) & 0x3f3f3f3f3f3f3f3fULL) | ((n << 2ULL) & 0xfcfcfcfcfcfcfcfcULL);
+            u64 n = 1ULL << square;
+            u64 h1 = ((n >> 1ULL) & 0x7f7f7f7f7f7f7f7fULL) | ((n << 1ULL) & 0xfefefefefefefefeULL);
+            u64 h2 = ((n >> 2ULL) & 0x3f3f3f3f3f3f3f3fULL) | ((n << 2ULL) & 0xfcfcfcfcfcfcfcfcULL);
             knightAttacks[square] = (h1 << 16ULL) | (h1 >> 16ULL) | (h2 << 8ULL) | (h2 >> 8ULL);
 
             // King
-            uint64_t attacks = shiftLeft(king) | shiftRight(king) | king;
+            u64 attacks = shiftLeft(king) | shiftRight(king) | king;
             attacks = (attacks | shiftUp(attacks) | shiftDown(attacks)) ^ king;
             internal::kingAttacks[square] = attacks;
             king <<= 1ULL;
@@ -234,70 +236,70 @@ namespace attacks
         for (Square sq = 0; sq < 64; sq++)
         {
             // Bishop
-            uint64_t numBlockersArrangements = 1ULL << popcount(bishopAttacksEmptyBoard[sq]);
-            for (uint64_t n = 0; n < numBlockersArrangements; n++)
+            u64 numBlockersArrangements = 1ULL << popcount(bishopAttacksEmptyBoard[sq]);
+            for (u64 n = 0; n < numBlockersArrangements; n++)
             {
-                uint64_t blockersArrangement = pdep(n, bishopAttacksEmptyBoard[sq]);
-                uint64_t key = (blockersArrangement * BISHOP_MAGICS[sq]) >> BISHOP_SHIFTS[sq];
+                u64 blockersArrangement = pdep(n, bishopAttacksEmptyBoard[sq]);
+                u64 key = (blockersArrangement * BISHOP_MAGICS[sq]) >> BISHOP_SHIFTS[sq];
                 bishopAttacksTable[sq][key] = bishopAttacksSlow(sq, blockersArrangement);
             }
 
             // Rook
             numBlockersArrangements = 1ULL << popcount(rookAttacksEmptyBoard[sq]);
-            for (uint64_t n = 0; n < numBlockersArrangements; n++)
+            for (u64 n = 0; n < numBlockersArrangements; n++)
             {
-                uint64_t blockersArrangement = pdep(n, rookAttacksEmptyBoard[sq]);
-                uint64_t key = (blockersArrangement * ROOK_MAGICS[sq]) >> ROOK_SHIFTS[sq];
+                u64 blockersArrangement = pdep(n, rookAttacksEmptyBoard[sq]);
+                u64 key = (blockersArrangement * ROOK_MAGICS[sq]) >> ROOK_SHIFTS[sq];
                 rookAttacksTable[sq][key] = rookAttacksSlow(sq, blockersArrangement);
             }
         }
 
     }
 
-    inline uint64_t pawnAttacks(Square square, Color color)
+    inline u64 pawnAttacks(Square square, Color color)
     {
-        return internal::pawnAttacks[color][square];
+        return internal::pawnAttacks[(int)color][square];
     }
 
-    inline uint64_t knightAttacks(Square square) 
+    inline u64 knightAttacks(Square square) 
     { 
         return internal::knightAttacks[square];
      }
 
-    inline uint64_t kingAttacks(Square square) 
+    inline u64 kingAttacks(Square square) 
     {        
         return internal::kingAttacks[square]; 
     }
 
-    inline uint64_t bishopAttacks(Square square, uint64_t occupancy)
+    inline u64 bishopAttacks(Square square, u64 occupancy)
     {
         using namespace internal;
 
         // Mask to only include bits on diagonals
-        uint64_t blockers = occupancy & bishopAttacksEmptyBoard[square];
+        u64 blockers = occupancy & bishopAttacksEmptyBoard[square];
 
         // Generate the key using a multiplication and right shift
-        uint64_t key = (blockers * BISHOP_MAGICS[square]) >> BISHOP_SHIFTS[square];
+        u64 key = (blockers * BISHOP_MAGICS[square]) >> BISHOP_SHIFTS[square];
 
         // Return the preinitialized attack set bitboard from the table
         return bishopAttacksTable[square][key];
     }
 
-    inline uint64_t rookAttacks(Square square, uint64_t occupancy)
+    inline u64 rookAttacks(Square square, u64 occupancy)
     {
         using namespace internal;
 
         // Mask to only include bits on rank and file
-        uint64_t blockers = occupancy & rookAttacksEmptyBoard[square];
+        u64 blockers = occupancy & rookAttacksEmptyBoard[square];
 
         // Generate the key using a multiplication and right shift
-        uint64_t key = (blockers * ROOK_MAGICS[square]) >> ROOK_SHIFTS[square];
+        u64 key = (blockers * ROOK_MAGICS[square]) >> ROOK_SHIFTS[square];
 
         // Return the preinitialized attack set bitboard from the table
         return rookAttacksTable[square][key];
     }
 
-    inline uint64_t queenAttacks(Square square, uint64_t occupancy)
+    inline u64 queenAttacks(Square square, u64 occupancy)
     {
         return bishopAttacks(square, occupancy) | rookAttacks(square, occupancy);
     }

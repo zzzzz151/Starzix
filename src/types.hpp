@@ -3,83 +3,84 @@
 // clang-format off
 #include <cstdint>
 #include <string>
-#include <unordered_map>
 using namespace std;
+
+using u8 = uint8_t;
+using u16 = uint16_t;
+using u32 = uint32_t;
+using u64 = uint64_t;
+using i8 = int8_t;
+using i16 = int16_t;
+using i32 = int32_t;
+using i64 = int64_t;
+
+using Square = u8;
+
+const inline i32 MAX_INT32 = 2147483647;
 
 const string START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-using Square = uint8_t;
-using Color = char;
+const Square SQUARE_NONE = 255;
 
-const string squareToStr[64] = {
-    "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1",
-    "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2",
-    "a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3",
-    "a4", "b4", "c4", "d4", "e4", "f4", "g4", "h4",
-    "a5", "b5", "c5", "d5", "e5", "f5", "g5", "h5",
-    "a6", "b6", "c6", "d6", "e6", "f6", "g6", "h6",
-    "a7", "b7", "c7", "d7", "e7", "f7", "g7", "h7",
-    "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8",
-};
-
-const Color WHITE = 0, BLACK = 1, NULL_COLOR = 2;
-
-enum class PieceType : uint8_t
+enum class Color : i8
 {
-    PAWN,
-    KNIGHT,
-    BISHOP,
-    ROOK,
-    QUEEN,
-    KING,
-    NONE
+    WHITE = 0,
+    BLACK = 1,
+    NONE = -1
 };
 
-enum class Piece : uint8_t
+enum class PieceType : u8
 {
-    WHITE_PAWN,
-    WHITE_KNIGHT,
-    WHITE_BISHOP,
-    WHITE_ROOK,
-    WHITE_QUEEN,
-    WHITE_KING,
-    BLACK_PAWN,
-    BLACK_KNIGHT,
-    BLACK_BISHOP,
-    BLACK_ROOK,
-    BLACK_QUEEN,
-    BLACK_KING,
-    NONE
+    PAWN   = 0,
+    KNIGHT = 1,
+    BISHOP = 2,
+    ROOK   = 3,
+    QUEEN  = 4,
+    KING   = 5,
+    NONE   = 6
 };
 
-unordered_map<char, Piece> charToPiece = {
-    {'P', Piece::WHITE_PAWN},
-    {'N', Piece::WHITE_KNIGHT},
-    {'B', Piece::WHITE_BISHOP},
-    {'R', Piece::WHITE_ROOK},
-    {'Q', Piece::WHITE_QUEEN},
-    {'K', Piece::WHITE_KING},
-    {'p', Piece::BLACK_PAWN},
-    {'n', Piece::BLACK_KNIGHT},
-    {'b', Piece::BLACK_BISHOP},
-    {'r', Piece::BLACK_ROOK},
-    {'q', Piece::BLACK_QUEEN},
-    {'k', Piece::BLACK_KING},
+enum class Piece : u8
+{
+    WHITE_PAWN   = 0,
+    WHITE_KNIGHT = 1,
+    WHITE_BISHOP = 2,
+    WHITE_ROOK   = 3,
+    WHITE_QUEEN  = 4,
+    WHITE_KING   = 5,
+    BLACK_PAWN   = 6,
+    BLACK_KNIGHT = 7,
+    BLACK_BISHOP = 8,
+    BLACK_ROOK   = 9,
+    BLACK_QUEEN  = 10,
+    BLACK_KING   = 11,
+    NONE         = 12
 };
 
-unordered_map<Piece, char> pieceToChar = {
-    {Piece::WHITE_PAWN, 'P'},
-    {Piece::WHITE_KNIGHT, 'N'},
-    {Piece::WHITE_BISHOP, 'B'},
-    {Piece::WHITE_ROOK, 'R'},
-    {Piece::WHITE_QUEEN, 'Q'},
-    {Piece::WHITE_KING, 'K'},
-    {Piece::BLACK_PAWN, 'p'},
-    {Piece::BLACK_KNIGHT, 'n'},
-    {Piece::BLACK_BISHOP, 'b'},
-    {Piece::BLACK_ROOK, 'r'},
-    {Piece::BLACK_QUEEN, 'q'},
-    {Piece::BLACK_KING, 'k'}
+enum class Rank : u8
+{
+    RANK_1 = 0,
+    RANK_2 = 1,
+    RANK_3 = 2,
+    RANK_4 = 3,
+    RANK_5 = 4,
+    RANK_6 = 5,
+    RANK_7 = 6,
+    RANK_8 = 7
 };
 
-const inline int32_t MAX_INT32 = 2147483647;
+enum class File : u8
+{
+    A = 0,
+    B = 1,
+    C = 2,
+    D = 3,
+    E = 4,
+    F = 5,
+    G = 6,
+    H = 7
+};
+
+const i16 POS_INFINITY = 32000, 
+          NEG_INFINITY = -POS_INFINITY, 
+          MIN_MATE_SCORE = POS_INFINITY - 255;

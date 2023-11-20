@@ -16,18 +16,19 @@ struct BoardState
 {
     public:
 
-    uint64_t zobristHash;
+    u64 zobristHash;
     array<array<bool, 2>, 2> castlingRights; // [color][CASTLE_SHORT or CASTLE_LONG]
     Square enPassantSquare;
-    uint16_t pliesSincePawnMoveOrCapture;
+    u16 pliesSincePawnMoveOrCapture;
     Move move;
     PieceType pieceTypeMoved;
     Piece capturedPiece;
-    int8_t inCheckCached;
+    i8 inCheckCached;
 
-    inline BoardState(uint64_t zobristHash, array<array<bool, 2>, 2> castlingRights, 
-                      Square enPassantSquare, uint16_t pliesSincePawnMoveOrCapture, 
-                      Move move, PieceType pieceTypeMoved, Piece capturedPiece, int8_t inCheckCached)
+    inline BoardState(u64 zobristHash, array<array<bool, 2>, 2> castlingRights, 
+                      Square enPassantSquare, u16 pliesSincePawnMoveOrCapture, 
+                      Move move, PieceType pieceTypeMoved, Piece capturedPiece, 
+                      i8 inCheckCached)
     {
         this->zobristHash = zobristHash;
         this->castlingRights = castlingRights;
@@ -45,26 +46,27 @@ class Board
 {
     private:
 
-    array<Piece, 64> pieces;                // [square]
-    array<uint64_t, 2> colorBitboard;       // [color]
-    array<array<uint64_t, 6>, 2> bitboards; // [color][pieceType]
+    array<Piece, 64> pieces; // [square]
+    
+    array<u64, 2> colorBitboard;             // [color]
+    array<array<u64, 6>, 2> piecesBitboards; // [color][pieceType]
 
     array<array<bool, 2>, 2> castlingRights; // [color][CASTLE_SHORT or CASTLE_LONG]
-    const static uint8_t CASTLE_SHORT = 0, CASTLE_LONG = 1;
+    const static u8 CASTLE_SHORT = 0, CASTLE_LONG = 1;
 
     Color colorToMove;
     Square enPassantSquare; // en passant target square
-    uint16_t pliesSincePawnMoveOrCapture, currentMoveCounter;
+    u16 pliesSincePawnMoveOrCapture, currentMoveCounter;
 
     vector<BoardState> states;
 
-    uint64_t zobristHash;
-    static inline uint64_t zobristTable[64][12],
-                           zobristColorToMove,
-                           zobristCastlingRights[2][2],
-                           zobristEnPassantFiles[8];
+    u64 zobristHash;
+    static inline u64 zobristTable[64][12],
+                      zobristColorToMove,
+                      zobristCastlingRights[2][2],
+                      zobristEnPassantFiles[8];
 
-    int8_t inCheckCached = -1; // -1 means invalid (need to calculate inCheck())
+    i8 inCheckCached = -1; // -1 means invalid (need to calculate inCheck())
 
     public:
 
@@ -85,16 +87,16 @@ class Board
         trim(fen);
         vector<string> fenSplit = splitString(fen, ' ');
 
-        colorToMove = fenSplit[1] == "b" ? BLACK : WHITE;
-        zobristHash = colorToMove == WHITE ? 0 : zobristColorToMove;
+        colorToMove = fenSplit[1] == "b" ? Color::BLACK : Color::WHITE;
+        zobristHash = colorToMove == Color::WHITE ? 0 : zobristColorToMove;
 
         parseFenRows(fenSplit[0]);
         parseFenCastlingRights(fenSplit[2]);
 
         string strEnPassantSquare = fenSplit[3];
-        enPassantSquare = strEnPassantSquare == "-" ? 255 : strToSquare(strEnPassantSquare);
-        if (enPassantSquare != 255)
-            zobristHash ^= zobristEnPassantFiles[squareFile(enPassantSquare)];
+        enPassantSquare = strEnPassantSquare == "-" ? SQUARE_NONE : strToSquare(strEnPassantSquare);
+        if (enPassantSquare != SQUARE_NONE)
+            zobristHash ^= zobristEnPassantFiles[(int)squareFile(enPassantSquare)];
 
         pliesSincePawnMoveOrCapture = fenSplit.size() >= 5 ? stoi(fenSplit[4]) : 0;
         currentMoveCounter = fenSplit.size() >= 6 ? stoi(fenSplit[5]) : 1;
@@ -107,10 +109,10 @@ class Board
         for (int sq= 0; sq < 64; sq++)
             pieces[sq] = Piece::NONE;
 
-        colorBitboard[WHITE] = colorBitboard[BLACK] = 0;
+        colorBitboard[(int)Color::WHITE] = colorBitboard[(int)Color::BLACK] = 0;
 
         for (int pt = 0; pt < 6; pt++)
-            bitboards[WHITE][pt] = bitboards[BLACK][pt] = 0;
+            piecesBitboards[(int)Color::WHITE][pt] = piecesBitboards[(int)Color::BLACK][pt] = 0;
 
         int currentRank = 7; // start from top rank
         int currentFile = 0;
@@ -127,7 +129,7 @@ class Board
             else
             {
                 Square sq = currentRank * 8 + currentFile;
-                Piece piece = charToPiece[thisChar];
+                Piece piece = CHAR_TO_PIECE[thisChar];
                 placePiece(sq, piece);
                 if (!perft) 
                     updateZobristAndAccumulator(pieceColor(piece), sq, piece, true);
@@ -138,10 +140,10 @@ class Board
 
     inline void parseFenCastlingRights(string fenCastlingRights)
     {
-        castlingRights[WHITE][CASTLE_SHORT] = false;
-        castlingRights[WHITE][CASTLE_LONG] = false;
-        castlingRights[BLACK][CASTLE_SHORT] = false;
-        castlingRights[BLACK][CASTLE_LONG] = false;
+        castlingRights[(int)Color::WHITE][CASTLE_SHORT] = false;
+        castlingRights[(int)Color::WHITE][CASTLE_LONG] = false;
+        castlingRights[(int)Color::BLACK][CASTLE_SHORT] = false;
+        castlingRights[(int)Color::BLACK][CASTLE_LONG] = false;
 
         if (fenCastlingRights == "-") 
             return;
@@ -149,10 +151,10 @@ class Board
         for (int i = 0; i < fenCastlingRights.length(); i++)
         {
             char thisChar = fenCastlingRights[i];
-            Color color = isupper(thisChar) ? WHITE : BLACK;
+            Color color = isupper(thisChar) ? Color::WHITE : Color::BLACK;
             int castlingRight = thisChar == 'K' || thisChar == 'k' ? CASTLE_SHORT : CASTLE_LONG;
-            castlingRights[color][castlingRight] = true;
-            zobristHash ^= zobristCastlingRights[color][castlingRight];
+            castlingRights[(int)color][castlingRight] = true;
+            zobristHash ^= zobristCastlingRights[(int)color][castlingRight];
         }
     }
 
@@ -162,11 +164,11 @@ class Board
             return;
 
         pieces[square] = piece;
-        Color color = pieceColor(piece);
+        int color = (int)pieceColor(piece);
 
-        uint64_t squareBit = (1ULL << square);
+        u64 squareBit = (1ULL << square);
         colorBitboard[color] |= squareBit;
-        bitboards[color][(uint8_t)pieceToPieceType(piece)] |= squareBit;
+        piecesBitboards[color][(u8)pieceToPieceType(piece)] |= squareBit;
     }
 
     inline void removePiece(Square square)
@@ -175,12 +177,12 @@ class Board
             return;
 
         Piece piece = pieces[square];
-        Color color = pieceColor(piece);
+        int color = (int)pieceColor(piece);
         pieces[square] = Piece::NONE;
 
-        uint64_t squareBit = 1ULL << square;
+        u64 squareBit = 1ULL << square;
         colorBitboard[color] ^= squareBit;
-        bitboards[color][(uint8_t)pieceToPieceType(piece)] ^= squareBit;
+        piecesBitboards[color][(u8)pieceToPieceType(piece)] ^= squareBit;
     }
 
     inline void updateZobristAndAccumulator(Color color, Square square, Piece piece, bool activate)
@@ -207,7 +209,7 @@ class Board
                 Piece piece = pieces[square];
                 if (piece != Piece::NONE) {
                     if (emptySoFar > 0) myFen += to_string(emptySoFar);
-                    myFen += string(1, pieceToChar[piece]);
+                    myFen += string(1, PIECE_TO_CHAR[piece]);
                     emptySoFar = 0;
                 }
                 else
@@ -218,16 +220,16 @@ class Board
         }
         myFen.pop_back(); // remove last '/'
 
-        myFen += colorToMove == BLACK ? " b " : " w ";
+        myFen += colorToMove == Color::BLACK ? " b " : " w ";
 
         string strCastlingRights = "";
-        if (castlingRights[WHITE][CASTLE_SHORT]) 
+        if (castlingRights[(int)Color::WHITE][CASTLE_SHORT]) 
             strCastlingRights += "K";
-        if (castlingRights[WHITE][CASTLE_LONG]) 
+        if (castlingRights[(int)Color::WHITE][CASTLE_LONG]) 
             strCastlingRights += "Q";
-        if (castlingRights[BLACK][CASTLE_SHORT]) 
+        if (castlingRights[(int)Color::BLACK][CASTLE_SHORT]) 
             strCastlingRights += "k";
-        if (castlingRights[BLACK][CASTLE_LONG]) 
+        if (castlingRights[(int)Color::BLACK][CASTLE_LONG]) 
             strCastlingRights += "q";
 
         if (strCastlingRights.size() == 0) 
@@ -235,7 +237,7 @@ class Board
 
         myFen += strCastlingRights;
 
-        string strEnPassantSquare = enPassantSquare == 255 ? "-" : squareToStr[enPassantSquare];
+        string strEnPassantSquare = enPassantSquare == SQUARE_NONE ? "-" : SQUARE_TO_STR[enPassantSquare];
         myFen += " " + strEnPassantSquare;
         
         myFen += " " + to_string(pliesSincePawnMoveOrCapture);
@@ -252,7 +254,7 @@ class Board
             for (Square j = 0; j < 8; j++)
             {
                 int square = i * 8 + j;
-                str += pieces[square] == Piece::NONE ? "." : string(1, pieceToChar[pieces[square]]);
+                str += pieces[square] == Piece::NONE ? "." : string(1, PIECE_TO_CHAR[pieces[square]]);
                 str += " ";
             }
             str += "\n";
@@ -271,34 +273,33 @@ class Board
 
     inline Piece pieceAt(Square square) { return pieces[square]; }
 
-    inline Piece pieceAt(string square) { return pieces[strToSquare(square)]; }
-
-    inline PieceType pieceTypeAt(Square square) { return pieceToPieceType(pieces[square]); }
-
-    inline PieceType pieceTypeAt(string square) { return pieceTypeAt(strToSquare(square)); }
-
-    inline uint64_t occupancy() { return colorBitboard[WHITE] | colorBitboard[BLACK]; }
-
-    inline uint64_t getBitboard(PieceType pieceType)
-    {   
-        return bitboards[WHITE][(int)pieceType] | bitboards[BLACK][(int)pieceType];
+    inline PieceType pieceTypeAt(Square square) { 
+        return pieceToPieceType(pieces[square]); 
     }
 
-    inline uint64_t getBitboard(Color color) { return colorBitboard[color]; }
-
-    inline uint64_t getBitboard(PieceType pieceType, Color color)
-    {
-        return bitboards[color][(int)pieceType];
+    inline u64 occupancy() { 
+        return colorBitboard[(int)Color::WHITE] | colorBitboard[(int)Color::BLACK]; 
     }
 
-    inline uint64_t us() { return colorBitboard[colorToMove]; }
+    inline u64 getBitboard(PieceType pieceType) {   
+        return piecesBitboards[(int)Color::WHITE][(int)pieceType] 
+               | piecesBitboards[(int)Color::BLACK][(int)pieceType];
+    }
 
-    inline uint64_t them() { return colorBitboard[oppSide()]; }
+    inline u64 getBitboard(Color color) { return colorBitboard[(int)color]; }
+
+    inline u64 getBitboard(PieceType pieceType, Color color) {
+        return piecesBitboards[(int)color][(int)pieceType];
+    }
+
+    inline u64 us() { return colorBitboard[(int)colorToMove]; }
+
+    inline u64 them() { return colorBitboard[(int)oppSide()]; }
 
     inline static void initZobrist()
     {
         mt19937_64 gen(12345); // 64 bit Mersenne Twister rng with seed 12345
-        uniform_int_distribution<uint64_t> distribution; // distribution(gen) returns random uint64_t
+        uniform_int_distribution<u64> distribution; // distribution(gen) returns random u64
         
         zobristColorToMove = distribution(gen);
 
@@ -306,16 +307,16 @@ class Board
             for (int pt = 0; pt < 12; pt++)
                 zobristTable[sq][pt] = distribution(gen);
 
-        zobristCastlingRights[WHITE][CASTLE_SHORT] = distribution(gen);
-        zobristCastlingRights[BLACK][CASTLE_SHORT] = distribution(gen);
-        zobristCastlingRights[WHITE][CASTLE_LONG] = distribution(gen);
-        zobristCastlingRights[BLACK][CASTLE_LONG] = distribution(gen);
+        zobristCastlingRights[(int)Color::WHITE][CASTLE_SHORT] = distribution(gen);
+        zobristCastlingRights[(int)Color::BLACK][CASTLE_SHORT] = distribution(gen);
+        zobristCastlingRights[(int)Color::WHITE][CASTLE_LONG] = distribution(gen);
+        zobristCastlingRights[(int)Color::BLACK][CASTLE_LONG] = distribution(gen);
 
         for (int file = 0; file < 8; file++)
             zobristEnPassantFiles[file] = distribution(gen);
     }
 
-    inline uint64_t getZobristHash() { return zobristHash; }
+    inline u64 getZobristHash() { return zobristHash; }
 
     inline bool isRepetition()
     {
@@ -358,19 +359,21 @@ class Board
 
     inline PieceType captured(Move move)
     {
-        if (move == NULL_MOVE) 
-            return PieceType::NONE;
-        return move.typeFlag() == Move::EN_PASSANT_FLAG ? PieceType::PAWN : pieceTypeAt(move.to());
+        return move == MOVE_NONE
+               ? PieceType::NONE
+               : move.typeFlag() == Move::EN_PASSANT_FLAG 
+               ? PieceType::PAWN 
+               : pieceTypeAt(move.to());
     }
 
     private:
 
     inline void disableCastlingRight(Color color, int castlingRight)
     {
-        if (castlingRights[color][castlingRight])
+        if (castlingRights[(int)color][castlingRight])
         {
-            castlingRights[color][castlingRight] = false;
-            zobristHash ^= zobristCastlingRights[color][castlingRight];
+            castlingRights[(int)color][castlingRight] = false;
+            zobristHash ^= zobristCastlingRights[(int)color][castlingRight];
         }
     }
 
@@ -390,10 +393,12 @@ class Board
         Square castlingRookSquareBefore, castlingRookSquareAfter;
         Piece castlingRook;
 
-        // move piece
         removePiece(from); // remove from source square
         removePiece(to); // remove captured piece if any
-        Piece pieceToPlace = move.promotionPieceType() == PieceType::NONE ? pieceMoving : makePiece(move.promotionPieceType(), colorToMove);
+
+        Piece pieceToPlace = move.promotionPieceType() == PieceType::NONE 
+                             ? pieceMoving : makePiece(move.promotionPieceType(), colorToMove);
+                             
         placePiece(to, pieceToPlace); // place on target square
 
         if (moveFlag == Move::CASTLING_FLAG)
@@ -410,7 +415,7 @@ class Board
         {
             // en passant, so remove captured pawn
             capturedPiece = makePiece(PieceType::PAWN, oppositeColor);
-            capturedSquare = colorToMove == WHITE ? to - 8 : to + 8;
+            capturedSquare = colorToMove == Color::WHITE ? to - 8 : to + 8;
             removePiece(capturedSquare);
         }
 
@@ -452,39 +457,39 @@ class Board
             disableCastlingRight(colorToMove, CASTLE_LONG);
         }
         if (pieces[0] != Piece::WHITE_ROOK)
-            disableCastlingRight(WHITE, CASTLE_LONG);
+            disableCastlingRight(Color::WHITE, CASTLE_LONG);
         if (pieces[7] != Piece::WHITE_ROOK)
-            disableCastlingRight(WHITE, CASTLE_SHORT);
+            disableCastlingRight(Color::WHITE, CASTLE_SHORT);
         if (pieces[56] != Piece::BLACK_ROOK)
-            disableCastlingRight(BLACK, CASTLE_LONG);
+            disableCastlingRight(Color::BLACK, CASTLE_LONG);
         if (pieces[63] != Piece::BLACK_ROOK)
-            disableCastlingRight(BLACK, CASTLE_SHORT);
+            disableCastlingRight(Color::BLACK, CASTLE_SHORT);
 
         if (pieceType == PieceType::PAWN || capturedPiece != Piece::NONE)
             pliesSincePawnMoveOrCapture = 0;
         else
             pliesSincePawnMoveOrCapture++;
 
-        if (oppositeColor == WHITE) 
+        if (oppositeColor == Color::WHITE) 
             currentMoveCounter++;
 
         // if en passant square active, XOR it out of zobrist hash, then reset en passant square
-        if (enPassantSquare != 255)
+        if (enPassantSquare != SQUARE_NONE)
         {
-            zobristHash ^= zobristEnPassantFiles[squareFile(enPassantSquare)];
-            enPassantSquare = 255;
+            zobristHash ^= zobristEnPassantFiles[(int)squareFile(enPassantSquare)];
+            enPassantSquare = SQUARE_NONE;
         }
 
         // Check if this move created an en passant square
         if (moveFlag == Move::PAWN_TWO_UP_FLAG)
         { 
-            uint8_t file = squareFile(from);
-            Piece enemyPawn = colorToMove == WHITE ? Piece::BLACK_PAWN : Piece::WHITE_PAWN;
+            File file = squareFile(from);
+            Piece enemyPawn = colorToMove == Color::WHITE ? Piece::BLACK_PAWN : Piece::WHITE_PAWN;
 
-            if ((file != 0 && pieces[to-1] == enemyPawn) || (file != 7 && pieces[to+1] == enemyPawn))
+            if ((file != File::A && pieces[to-1] == enemyPawn) || (file != File::H && pieces[to+1] == enemyPawn))
             {
-                enPassantSquare = colorToMove == WHITE ? to - 8 : to + 8;
-                zobristHash ^= zobristEnPassantFiles[file];
+                enPassantSquare = colorToMove == Color::WHITE ? to - 8 : to + 8;
+                zobristHash ^= zobristEnPassantFiles[(int)file];
             }
         }
 
@@ -501,20 +506,20 @@ class Board
         return makeMove(Move::fromUci(uci, pieces), verifyCheckLegality);
     }
 
-    inline void undoMove(Move illegalMove = NULL_MOVE, Piece illegalyCapturedPiece = Piece::NONE)
+    inline void undoMove(Move illegalMove = MOVE_NONE, Piece illegalyCapturedPiece = Piece::NONE)
     {
         Move move = illegalMove;
         Piece capturedPiece = illegalyCapturedPiece;
 
-        if (illegalMove == NULL_MOVE)
+        if (illegalMove == MOVE_NONE)
         {
             // undoing a legal move
             move = states.back().move;
             colorToMove = oppSide();
             capturedPiece = states.back().capturedPiece;
-            if (colorToMove == BLACK) 
+            if (colorToMove == Color::BLACK) 
                 currentMoveCounter--;
-            pullState(); // restore zobristHash, castlingRights, enPassantSquare, pliesSincePawnMoveOrCapture
+            pullState();
             nnue::pull(); // pull the previous accumulator
         }
 
@@ -522,12 +527,15 @@ class Board
         Square to = move.to();
         auto moveFlag = move.typeFlag();
 
-        Piece pieceMoved = move.promotionPieceType() == PieceType::NONE ? pieces[to] : makePiece(PieceType::PAWN, colorToMove);
+        Piece pieceMoved = move.promotionPieceType() == PieceType::NONE 
+                           ? pieces[to] : makePiece(PieceType::PAWN, colorToMove);
+
         removePiece(to); 
         placePiece(from, pieceMoved);
         if (capturedPiece != Piece::NONE)
         {
-            Square capturedSquare = moveFlag == Move::EN_PASSANT_FLAG ? (colorToMove == WHITE ? to-8 : to+8) : to;
+            Square capturedSquare = moveFlag == Move::EN_PASSANT_FLAG 
+                                    ? (colorToMove == Color::WHITE ? to-8 : to+8) : to;
             placePiece(capturedSquare, capturedPiece);
         }
         else if (moveFlag == move.CASTLING_FLAG)
@@ -549,6 +557,7 @@ class Board
 
     private:
 
+    // Restore zobristHash, castlingRights, enPassantSquare, pliesSincePawnMoveOrCapture, inCheckCached
     inline void pullState()
     {
         assert(states.size() > 0);
@@ -568,9 +577,11 @@ class Board
     // Do not makeNullMove() in check!
     inline void makeNullMove()
     {
+        assert(!inCheckCached);
+        
         // append board state
         BoardState state = BoardState(zobristHash, castlingRights, enPassantSquare, pliesSincePawnMoveOrCapture, 
-                                      NULL_MOVE, PieceType::NONE, Piece::NONE, inCheckCached);
+                                      MOVE_NONE, PieceType::NONE, Piece::NONE, inCheckCached);
         states.push_back(state);
 
         colorToMove = oppSide();
@@ -578,14 +589,14 @@ class Board
 
         pliesSincePawnMoveOrCapture++;
 
-        if (colorToMove == WHITE)
+        if (colorToMove == Color::WHITE)
             currentMoveCounter++;
 
         // if en passant square active, XOR it out of zobrist, then reset en passant square
-        if (enPassantSquare != 255)
+        if (enPassantSquare != SQUARE_NONE)
         {
-            zobristHash ^= zobristEnPassantFiles[squareFile(enPassantSquare)];
-            enPassantSquare = 255;
+            zobristHash ^= zobristEnPassantFiles[(int)squareFile(enPassantSquare)];
+            enPassantSquare = SQUARE_NONE;
         }
 
         inCheckCached = false;
@@ -593,10 +604,10 @@ class Board
 
     inline void undoNullMove()
     {
-        pullState(); // restore zobristHash, castlingRights, enPassantSquare, pliesSincePawnMoveOrCapture
+        pullState();
 
         colorToMove = oppSide();
-        if (colorToMove == BLACK)
+        if (colorToMove == Color::BLACK)
             currentMoveCounter--;
 
         assert(!inCheckCached);
@@ -606,21 +617,21 @@ class Board
     {
         MovesList moves;
         Color enemyColor = oppSide();
-        uint64_t us = this->us(),
+        u64 us = this->us(),
                  them = this->them(),
                  occupied = us | them,
-                 ourPawns = bitboards[colorToMove][(int)PieceType::PAWN],
-                 ourKnights = bitboards[colorToMove][(int)PieceType::KNIGHT],
-                 ourBishops = bitboards[colorToMove][(int)PieceType::BISHOP],
-                 ourRooks = bitboards[colorToMove][(int)PieceType::ROOK],
-                 ourQueens = bitboards[colorToMove][(int)PieceType::QUEEN],
-                 ourKing = bitboards[colorToMove][(int)PieceType::KING];
+                 ourPawns = piecesBitboards[(int)colorToMove][(int)PieceType::PAWN],
+                 ourKnights = piecesBitboards[(int)colorToMove][(int)PieceType::KNIGHT],
+                 ourBishops = piecesBitboards[(int)colorToMove][(int)PieceType::BISHOP],
+                 ourRooks = piecesBitboards[(int)colorToMove][(int)PieceType::ROOK],
+                 ourQueens = piecesBitboards[(int)colorToMove][(int)PieceType::QUEEN],
+                 ourKing = piecesBitboards[(int)colorToMove][(int)PieceType::KING];
 
         // En passant
-        if (enPassantSquare != 255)
+        if (enPassantSquare != SQUARE_NONE)
         {   
-            uint64_t ourEnPassantPawns = attacks::pawnAttacks(enPassantSquare, enemyColor) & ourPawns;
-            Piece ourPawn = makePiece(PieceType::PAWN, WHITE);
+            u64 ourEnPassantPawns = attacks::pawnAttacks(enPassantSquare, enemyColor) & ourPawns;
+            Piece ourPawn = makePiece(PieceType::PAWN, Color::WHITE);
             while (ourEnPassantPawns > 0)
             {
                 Square ourPawnSquare = poplsb(ourEnPassantPawns);
@@ -632,19 +643,19 @@ class Board
         {
             Square sq = poplsb(ourPawns);
             bool pawnHasntMoved = false, willPromote = false;
-            uint8_t rank = squareRank(sq);
-            if (rank == 1)
+            Rank rank = squareRank(sq);
+            if (rank == Rank::RANK_2)
             {
-                pawnHasntMoved = colorToMove == WHITE;
-                willPromote = colorToMove == BLACK;
+                pawnHasntMoved = colorToMove == Color::WHITE;
+                willPromote = colorToMove == Color::BLACK;
             }
-            else if (rank == 6)
+            else if (rank == Rank::RANK_7)
             {
-                pawnHasntMoved = colorToMove == BLACK;
-                willPromote = colorToMove == WHITE;
+                pawnHasntMoved = colorToMove == Color::BLACK;
+                willPromote = colorToMove == Color::WHITE;
             }
 
-            uint64_t pawnAttacks = attacks::pawnAttacks(sq, colorToMove) & them;
+            u64 pawnAttacks = attacks::pawnAttacks(sq, colorToMove) & them;
             while (pawnAttacks > 0)
             {
                 Square targetSquare = poplsb(pawnAttacks);
@@ -658,27 +669,28 @@ class Board
                 continue;
 
             // pawn pushes (1 square up and 2 squares up)
-            Square squareOneUp = colorToMove == WHITE ? sq + 8 : sq - 8;
+
+            Square squareOneUp = colorToMove == Color::WHITE ? sq + 8 : sq - 8;
             if (pieces[squareOneUp] != Piece::NONE)
                 continue;
-            if (!willPromote)
+
+            if (willPromote)
+                addPromotions(moves, sq, squareOneUp);
+            else
             {
                 // pawn 1 square up
                 moves.add(Move(sq, squareOneUp, Move::NORMAL_FLAG));
                 // pawn 2 squares up
-                Square squareTwoUp = colorToMove == WHITE ? sq + 16 : sq - 16;
+                Square squareTwoUp = colorToMove == Color::WHITE ? sq + 16 : sq - 16;
                 if (pawnHasntMoved && pieces[squareTwoUp] == Piece::NONE)
                     moves.add(Move(sq, squareTwoUp, Move::PAWN_TWO_UP_FLAG));
             }
-            else
-                addPromotions(moves, sq, squareOneUp);
-            
         }
 
         while (ourKnights > 0)
         {
             Square sq = poplsb(ourKnights);
-            uint64_t knightMoves = capturesOnly ? attacks::knightAttacks(sq) & them : attacks::knightAttacks(sq) & ~us;
+            u64 knightMoves = capturesOnly ? attacks::knightAttacks(sq) & them : attacks::knightAttacks(sq) & ~us;
             while (knightMoves > 0)
             {
                 Square targetSquare = poplsb(knightMoves);
@@ -687,7 +699,7 @@ class Board
         }
 
         Square kingSquare = poplsb(ourKing);
-        uint64_t kingMoves = capturesOnly ? attacks::kingAttacks(kingSquare) & them : attacks::kingAttacks(kingSquare) & ~us;
+        u64 kingMoves = capturesOnly ? attacks::kingAttacks(kingSquare) & them : attacks::kingAttacks(kingSquare) & ~us;
         while (kingMoves > 0)
         {
             Square targetSquare = poplsb(kingMoves);
@@ -697,7 +709,7 @@ class Board
         // Castling
         if (!capturesOnly)
         {
-            if (castlingRights[colorToMove][CASTLE_SHORT]
+            if (castlingRights[(int)colorToMove][CASTLE_SHORT]
             && pieces[kingSquare+1] == Piece::NONE
             && pieces[kingSquare+2] == Piece::NONE
             && !inCheck()
@@ -705,7 +717,7 @@ class Board
             && !isSquareAttacked(kingSquare+2, enemyColor))
                 moves.add(Move(kingSquare, kingSquare + 2, Move::CASTLING_FLAG));
 
-            if (castlingRights[colorToMove][CASTLE_LONG]
+            if (castlingRights[(int)colorToMove][CASTLE_LONG]
             && pieces[kingSquare-1] == Piece::NONE
             && pieces[kingSquare-2] == Piece::NONE
             && pieces[kingSquare-3] == Piece::NONE
@@ -718,8 +730,8 @@ class Board
         while (ourBishops > 0)
         {
             Square sq = poplsb(ourBishops);
-            uint64_t bishopAttacks = attacks::bishopAttacks(sq, occupied);
-            uint64_t bishopMoves = capturesOnly ? bishopAttacks & them : bishopAttacks & ~us;
+            u64 bishopAttacks = attacks::bishopAttacks(sq, occupied);
+            u64 bishopMoves = capturesOnly ? bishopAttacks & them : bishopAttacks & ~us;
             while (bishopMoves > 0)
             {
                 Square targetSquare = poplsb(bishopMoves);
@@ -730,8 +742,8 @@ class Board
         while (ourRooks > 0)
         {
             Square sq = poplsb(ourRooks);
-            uint64_t rookAttacks = attacks::rookAttacks(sq, occupied);
-            uint64_t rookMoves = capturesOnly ? rookAttacks & them : rookAttacks & ~us;
+            u64 rookAttacks = attacks::rookAttacks(sq, occupied);
+            u64 rookMoves = capturesOnly ? rookAttacks & them : rookAttacks & ~us;
             while (rookMoves > 0)
             {
                 Square targetSquare = poplsb(rookMoves);
@@ -742,8 +754,8 @@ class Board
         while (ourQueens > 0)
         {
             Square sq = poplsb(ourQueens);
-            uint64_t queenAttacks = attacks::bishopAttacks(sq, occupied) | attacks::rookAttacks(sq, occupied);
-            uint64_t queenMoves = capturesOnly ? queenAttacks & them : queenAttacks & ~us;
+            u64 queenAttacks = attacks::bishopAttacks(sq, occupied) | attacks::rookAttacks(sq, occupied);
+            u64 queenMoves = capturesOnly ? queenAttacks & them : queenAttacks & ~us;
             while (queenMoves > 0)
             {
                 Square targetSquare = poplsb(queenMoves);
@@ -770,31 +782,31 @@ class Board
     {
          // Idea: put a super piece in this square and see if its attacks intersect with an enemy piece
 
-        uint64_t occupied = occupancy();
+        u64 occupied = occupancy();
 
         // Get the slider pieces of the attacker
-        uint64_t attackerBishops = bitboards[colorAttacking][(int)PieceType::BISHOP],
-                 attackerRooks = bitboards[colorAttacking][(int)PieceType::ROOK],
-                 attackerQueens =  bitboards[colorAttacking][(int)PieceType::QUEEN];
+        u64 attackerBishops = piecesBitboards[(int)colorAttacking][(int)PieceType::BISHOP],
+                 attackerRooks = piecesBitboards[(int)colorAttacking][(int)PieceType::ROOK],
+                 attackerQueens =  piecesBitboards[(int)colorAttacking][(int)PieceType::QUEEN];
 
-        uint64_t bishopAttacks = attacks::bishopAttacks(square, occupied);
+        u64 bishopAttacks = attacks::bishopAttacks(square, occupied);
         if ((bishopAttacks & (attackerBishops | attackerQueens)) > 0)
             return true;
  
-        uint64_t rookAttacks = attacks::rookAttacks(square, occupied);
+        u64 rookAttacks = attacks::rookAttacks(square, occupied);
         if ((rookAttacks & (attackerRooks | attackerQueens)) > 0)
             return true;
 
-        uint64_t knightAttacks = attacks::knightAttacks(square);
-        if ((knightAttacks & (bitboards[colorAttacking][(int)PieceType::KNIGHT])) > 0) 
+        u64 knightAttacks = attacks::knightAttacks(square);
+        if ((knightAttacks & (piecesBitboards[(int)colorAttacking][(int)PieceType::KNIGHT])) > 0) 
             return true;
 
-        uint64_t kingAttacks = attacks::kingAttacks(square);
-        if ((kingAttacks & bitboards[colorAttacking][(int)PieceType::KING]) > 0) 
+        u64 kingAttacks = attacks::kingAttacks(square);
+        if ((kingAttacks & piecesBitboards[(int)colorAttacking][(int)PieceType::KING]) > 0) 
             return true;
 
-        uint64_t pawnAttacks = attacks::pawnAttacks(square, oppColor(colorAttacking));
-        if ((pawnAttacks & bitboards[colorAttacking][(int)PieceType::PAWN]) > 0)
+        u64 pawnAttacks = attacks::pawnAttacks(square, oppColor(colorAttacking));
+        if ((pawnAttacks & piecesBitboards[(int)colorAttacking][(int)PieceType::PAWN]) > 0)
             return true;
 
         // En passant
@@ -804,16 +816,11 @@ class Board
         return false;
     }   
 
-    inline bool isSquareAttacked(string square, Color colorAttacking)
-    {
-        return isSquareAttacked(strToSquare(square), colorAttacking);
-    }
-
     inline bool inCheck()
     {
         if (inCheckCached != -1) return inCheckCached;
 
-        uint64_t ourKingBitboard = bitboards[colorToMove][(int)PieceType::KING];
+        u64 ourKingBitboard = piecesBitboards[(int)colorToMove][(int)PieceType::KING];
         Square ourKingSquare = lsb(ourKingBitboard);
         return inCheckCached = isSquareAttacked(ourKingSquare, oppSide());
     }
@@ -823,42 +830,39 @@ class Board
     // Used internally in makeMove()
     inline bool inCheckNoCache()
     {
-        uint64_t ourKingBitboard = bitboards[colorToMove][(int)PieceType::KING];
+        u64 ourKingBitboard = piecesBitboards[(int)colorToMove][(int)PieceType::KING];
         Square ourKingSquare = lsb(ourKingBitboard);
         return isSquareAttacked(ourKingSquare, oppSide());
     }
 
     public:
 
-    inline bool hasNonPawnMaterial(Color color = NULL_COLOR)
+    inline bool hasNonPawnMaterial(Color color = Color::NONE)
     {
-        // N, B, R, Q
-        for (int pt = 1; pt <= 4; pt++)
-        {
-            if (color == NULL_COLOR)
-            {
-                if (bitboards[WHITE][pt] > 0 || bitboards[BLACK][pt] > 0)
-                    return true;
-            }
-            else if (bitboards[color][pt] > 0)
-                return true;
-        }
+        if (color == Color::NONE)
+            return getBitboard(PieceType::KNIGHT) > 0
+                   || getBitboard(PieceType::BISHOP) > 0
+                   || getBitboard(PieceType::ROOK) > 0
+                   || getBitboard(PieceType::QUEEN) > 0;
 
-        return false;
+        return piecesBitboards[(int)color][(int)PieceType::KNIGHT] > 0
+               || piecesBitboards[(int)color][(int)PieceType::BISHOP] > 0
+               || piecesBitboards[(int)color][(int)PieceType::ROOK] > 0
+               || piecesBitboards[(int)color][(int)PieceType::QUEEN] > 0;
     }
 
     inline Move getLastMove() 
     { 
-        return states.size() > 0 ? states.back().move : NULL_MOVE; 
+        return states.size() > 0 ? states.back().move : MOVE_NONE; 
     }
 
-    inline Move getNthToLastMove(uint16_t n)
+    inline Move getNthToLastMove(u16 n)
     {
         assert(n >= 1); 
-        return states.size() >= n ? states[states.size() - n].move : NULL_MOVE;
+        return states.size() >= n ? states[states.size() - n].move : MOVE_NONE;
     }
 
-    inline PieceType getNthToLastMovePieceType(uint16_t n)
+    inline PieceType getNthToLastMovePieceType(u16 n)
     {
         assert(n >= 1); 
         return states.size() >= n ? states[states.size() - n].pieceTypeMoved : PieceType::NONE;

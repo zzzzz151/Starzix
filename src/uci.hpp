@@ -7,10 +7,10 @@
 namespace uci
 {
 
-    inline void setoption(vector<string> &words) // e.g. "setoption name Hash value 32"
+    inline void setoption(vector<string> &tokens) // e.g. "setoption name Hash value 32"
     {
-        string optionName = words[2];
-        string optionValue = words[4];
+        string optionName = tokens[2];
+        string optionValue = tokens[4];
 
         if (optionName == "Hash" || optionName == "hash")
         {
@@ -27,41 +27,41 @@ namespace uci
         memset(countermoves, 0, sizeof(countermoves)); // clear countermoves
     }
 
-    inline void position(vector<string> &words)
+    inline void position(vector<string> &tokens)
     {
         int movesTokenIndex = -1;
 
-        if (words[1] == "startpos")
+        if (tokens[1] == "startpos")
         {
             board = Board(START_FEN);
             movesTokenIndex = 2;
         }
-        else if (words[1] == "fen")
+        else if (tokens[1] == "fen")
         {
             string fen = "";
             int i = 0;
-            for (i = 2; i < words.size() && words[i] != "moves"; i++)
-                fen += words[i] + " ";
+            for (i = 2; i < tokens.size() && tokens[i] != "moves"; i++)
+                fen += tokens[i] + " ";
             fen.pop_back(); // remove last whitespace
             board = Board(fen);
             movesTokenIndex = i;
         }
 
-        for (int i = movesTokenIndex + 1; i < words.size(); i++)
-            board.makeMove(words[i]);
+        for (int i = movesTokenIndex + 1; i < tokens.size(); i++)
+            board.makeMove(tokens[i]);
     }
 
-    inline void go(vector<string> &words)
+    inline void go(vector<string> &tokens)
     {
-        setupTime(words, board.sideToMove());
+        setupTime(tokens, board.sideToMove());
         Move bestMove = iterativeDeepening();
         cout << "bestmove " + bestMove.toUci() + "\n";
     }
 
-    inline void info(int depth, int16_t score)
+    inline void info(int depth, i16 score)
     {
-        double millisecondsElapsed = (chrono::steady_clock::now() - start) / chrono::milliseconds(1);
-        uint64_t nps = nodes / (millisecondsElapsed > 0 ? millisecondsElapsed : 1) * 1000;
+        auto millisecondsPassed = millisecondsElapsed(start);
+        u64 nps = nodes / (millisecondsPassed > 0 ? millisecondsPassed : 1) * 1000;
 
         // "score cp <score>" or "score mate <moves>" ?
         bool isMate = abs(score) >= MIN_MATE_SCORE;
@@ -80,7 +80,7 @@ namespace uci
 
         cout << "info depth " << depth
             << " seldepth " << maxPlyReached
-            << " time " << round(millisecondsElapsed)
+            << " time " << round(millisecondsPassed)
             << " nodes " << nodes
             << " nps " << nps
             << (isMate ? " score mate " : " score cp ") << (isMate ? movesToMate : score)
@@ -106,30 +106,30 @@ namespace uci
         {
             getline(cin, received);
             trim(received);
-            vector<string> words = splitString(received, ' ');
-            if (received == "" || words.size() == 0)
+            vector<string> tokens = splitString(received, ' ');
+            if (received == "" || tokens.size() == 0)
                 continue;
 
             try {
 
             if (received == "quit" || !cin.good())
                 break;
-            else if (words[0] == "setoption") // e.g. "setoption name Hash value 32"
-                setoption(words);
+            else if (tokens[0] == "setoption") // e.g. "setoption name Hash value 32"
+                setoption(tokens);
             else if (received == "ucinewgame")
                 ucinewgame();
             else if (received == "isready")
                 cout << "readyok\n";
-            else if (words[0] == "position")
-                position(words);
-            else if (words[0] == "go")
-                go(words);
-            else if (words[0] == "perft")
+            else if (tokens[0] == "position")
+                position(tokens);
+            else if (tokens[0] == "go")
+                go(tokens);
+            else if (tokens[0] == "perft")
             {
-                int depth = stoi(words[1]);
+                int depth = stoi(tokens[1]);
                 perftBench(board, depth);
             }
-            else if (words[0] == "eval")
+            else if (tokens[0] == "eval")
                 cout << "eval " << nnue::evaluate(board.sideToMove()) << " cp" << endl;
 
             } 

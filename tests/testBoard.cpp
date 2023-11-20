@@ -26,6 +26,16 @@ template <typename T> inline void test(string testName, T got, T expected)
     if (expected != got) cout << "Expected: " << expected << endl << "Got: " << got << endl;
 }
 
+inline void test(string testName, File got, File expected)
+{
+    return test(testName, (int)got, int(expected));
+}
+
+inline void test(string testName, Rank got, Rank expected)
+{
+    return test(testName, (int)got, int(expected));
+}
+
 template <typename T> inline void testNotEquals(string testName, T got, T expected)
 {
     if (expected == got)
@@ -47,6 +57,45 @@ int main()
     Board::initZobrist();
     attacks::initAttacks();
     //nnue::loadNetFromFile();
+
+    test("popcount()", popcount((uint64_t)5), 2); // 5 = 101
+    test("lsb()", 1ULL << lsb((uint64_t)12), (uint64_t)4); // 12 = 1100
+
+    test("strToSquare()", strToSquare("b7"), (Square)49);
+
+    test("squareFile() A", squareFile(8), File::A);
+    test("squareFile() B", squareFile(9), File::B);
+    test("squareFile() C", squareFile(10), File::C);
+    test("squareFile() D", squareFile(11), File::D);
+    test("squareFile() E", squareFile(12), File::E);
+    test("squareFile() F", squareFile(13), File::F);
+    test("squareFile() G", squareFile(14), File::G);
+    test("squareFile() H", squareFile(15), File::H);
+
+    test("squareRank() 1", squareRank(7), Rank::RANK_1);
+    test("squareRank() 2", squareRank(1+8*1), Rank::RANK_2);
+    test("squareRank() 3", squareRank(1+8*2), Rank::RANK_3);
+    test("squareRank() 4", squareRank(1+8*3), Rank::RANK_4);
+    test("squareRank() 5", squareRank(1+8*4), Rank::RANK_5);
+    test("squareRank() 6", squareRank(1+8*5), Rank::RANK_6);
+    test("squareRank() 7", squareRank(1+8*6), Rank::RANK_7);
+    test("squareRank() 8", squareRank(1+8*7), Rank::RANK_8);
+
+    test("sizeof(Move)", sizeof(Move), 2ULL); // 2 bytes
+
+    Move move = Move(49, 55, Move::NORMAL_FLAG);
+    test("normal move.from", (int)(move.from()), 49);
+    test("normal move.to", (int)move.to(), 55);
+
+    move = Move(strToSquare("e1"), strToSquare("g1"), Move::CASTLING_FLAG);
+    test("castling move.from", SQUARE_TO_STR[(int)move.from()], (string)"e1");
+    test("castling move.to", SQUARE_TO_STR[(int)move.to()], (string)"g1");
+    test("move.flag=castling", move.typeFlag(), move.CASTLING_FLAG);
+
+    move = Move(strToSquare("b7"), strToSquare("c8"), Move::BISHOP_PROMOTION_FLAG); // b7c8b
+    test("move.toUci()", move.toUci(), (string)"b7c8b");
+    test("move.BISHOP_PROMOTION_FLAG", (int)move.typeFlag(), (int)move.BISHOP_PROMOTION_FLAG);
+    test("move.promotionPieceType() == bishop", (int)move.promotionPieceType(), (int)PieceType::BISHOP);
     
     Board board = Board(START_FEN);
     Board board2 = Board("1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 w Qk f6 0 15");
@@ -56,37 +105,12 @@ int main()
     test("fen2",  board2.fen(), (string)"1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 w Qk f6 0 15");
     test("fen3", board3.fen(), (string)"1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 b Qk f6 0 1");
     
+    // Test occupancy on start pos
     bitset<64> got(board.occupancy());  
     bitset<64> expected(0xffff00000000ffffULL);  
     test("board.occupancy()", got, expected);
-
     test("getBitboard(KING) == 2", popcount(board.getBitboard(PieceType::KING)), 2);
-    test("getBitboard(KING, WHITE) == 1", popcount(board.getBitboard(PieceType::KING, WHITE)), 1);
-    
-    test("squareFile()", (int)squareFile(33), 1);
-    test("squareFile()", (int)squareFile(15), 7);
-
-    test("popcount()", popcount((uint64_t)5), 2); // 5 = 101
-    test("lsb()", 1ULL << lsb((uint64_t)12), (uint64_t)4); // 12 = 1100
-
-    test("strToSquare()", strToSquare("b7"), (Square)49);
-
-    test("sizeof(Move)", sizeof(Move), 2ULL); // 2 bytes
-    
-    Move move = Move(49, 55, Move::NORMAL_FLAG);
-    test("normal move.from", (int)(move.from()), 49);
-    test("normal move.to", (int)move.to(), 55);
-
-    move = Move("e1", "g1", Move::CASTLING_FLAG);
-    test("castling move.from", squareToStr[(int)move.from()], (string)"e1");
-    test("castling move.to", squareToStr[(int)move.to()], (string)"g1");
-    test("move.flag=castling", move.typeFlag(), move.CASTLING_FLAG);
-
-    board = Board("rnb1kbnr/1P1pqppp/4p3/2p5/8/8/P1PPPPPP/RNBQKBNR w KQkq - 1 5");
-    move = Move("b7", "c8", Move::BISHOP_PROMOTION_FLAG); // b7c8b
-    test("move.toUci()", move.toUci(), (string)"b7c8b");
-    test("move.BISHOP_PROMOTION_FLAG", (int)move.typeFlag(), (int)move.BISHOP_PROMOTION_FLAG);
-    test("move.promotionPieceType() == bishop", (int)move.promotionPieceType(), (int)PieceType::BISHOP);
+    test("getBitboard(KING, WHITE) == 1", popcount(board.getBitboard(PieceType::KING, Color::WHITE)), 1);
 
     board = Board("rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/2P2P2/RqBQ1RK1 b kq - 1 10");
     test("move has PAWN_TWO_UP_FLAG flag", Move::fromUci("g7g5", board.getPieces()).typeFlag(), Move::PAWN_TWO_UP_FLAG);
@@ -115,23 +139,26 @@ int main()
     test("isRepetition()", board.isRepetition(), false);
 
     board = Board(POSITION2_KIWIPETE); 
-    test("isSquareAttacked() #1 (empty sq attacked by us)", board.isSquareAttacked("e3", board.sideToMove()), true);
-    test("isSquareAttacked() #2 (empty sq not attacked by us)", board.isSquareAttacked("a5", board.sideToMove()), false);
-    test("isSquareAttacked() #3 (empty sq attacked by enemy)", board.isSquareAttacked("d6", board.oppSide()), true);
-    test("isSquareAttacked() #4 (empty sq not attacked by enemy)", board.isSquareAttacked("b3", board.oppSide()), false);
-    test("isSquareAttacked() #5 (we can capture enemy in this square)", board.isSquareAttacked("d7", board.sideToMove()), true);
-    test("isSquareAttacked() #6 (we cannot capture enemy in this square)", board.isSquareAttacked("b4", board.sideToMove()), false);
-    test("isSquareAttacked() #7 (enemy can capture us in this square)", board.isSquareAttacked("e2", board.oppSide()), true);
-    test("isSquareAttacked() #8 (enemy cannot capture us in this square)", board.isSquareAttacked("h2", board.oppSide()), false);
+    test("isSquareAttacked() #1 (empty sq attacked by us)", board.isSquareAttacked(strToSquare("e3"), board.sideToMove()), true);
+    test("isSquareAttacked() #2 (empty sq not attacked by us)", board.isSquareAttacked(strToSquare("a5"), board.sideToMove()), false);
+    test("isSquareAttacked() #3 (empty sq attacked by enemy)", board.isSquareAttacked(strToSquare("d6"), board.oppSide()), true);
+    test("isSquareAttacked() #4 (empty sq not attacked by enemy)", board.isSquareAttacked(strToSquare("b3"), board.oppSide()), false);
+    test("isSquareAttacked() #5 (we can capture enemy in this square)", board.isSquareAttacked(strToSquare("d7"), board.sideToMove()), true);
+    test("isSquareAttacked() #6 (we cannot capture enemy in this square)", board.isSquareAttacked(strToSquare("b4"), board.sideToMove()), false);
+    test("isSquareAttacked() #7 (enemy can capture us in this square)", board.isSquareAttacked(strToSquare("e2"), board.oppSide()), true);
+    test("isSquareAttacked() #8 (enemy cannot capture us in this square)", board.isSquareAttacked(strToSquare("h2"), board.oppSide()), false);
 
     board = Board("rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/p1P2P2/RNBQK2R b KQkq - 5 9");
     test("inCheck() returns false", board.inCheck(), false);
 
     board = Board("1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 w Qk f6 0 15");
-    board.makeNullMove();
-    test("makeNullMove() fen", board.fen(), (string)"1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 b Qk - 1 15");
-    board.undoNullMove();
-    test("undoNullMove() fen", board.fen(), (string)"1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 w Qk f6 0 15");
+    if (!board.inCheck())
+    {
+        board.makeNullMove();
+        test("makeNullMove() fen", board.fen(), (string)"1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 b Qk - 1 15");
+        board.undoNullMove();
+        test("undoNullMove() fen", board.fen(), (string)"1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 w Qk f6 0 15");
+    }
 
     board = Board("rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/p1P2P2/RNBQK2R b KQkq - 5 9");
     uint64_t zobristHashBefore = board.getZobristHash();
