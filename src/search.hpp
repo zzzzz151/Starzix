@@ -10,18 +10,6 @@
 
 const u8 MAX_DEPTH = 100;
 
-// Move ordering
-const i32 TT_MOVE_SCORE           = MAX_INT32,
-          GOOD_CAPTURE_BASE_SCORE = 1'500'000'000,
-          PROMOTION_BASE_SCORE    = 1'000'000'000,
-          KILLER_SCORE            = 500'000'000,
-          COUNTERMOVE_SCORE       = 250'000'000,
-          HISTORY_MOVE_BASE_SCORE = 0,
-          BAD_CAPTURE_BASE_SCORE  = -500'000'000;
-
-// Most valuable victim    P    N    B    R    Q
-const i32 MVV_VALUES[5] = {100, 300, 320, 500, 900};
-
 const int ASPIRATION_MIN_DEPTH = 6,
           ASPIRATION_INITIAL_DELTA = 15;
 const double ASPIRATION_DELTA_MULTIPLIER = 1.2;
@@ -58,16 +46,29 @@ const int SINGULAR_MIN_DEPTH = 8,
           SINGULAR_DEPTH_MARGIN = 3,
           SINGULAR_BETA_DEPTH_MULTIPLIER = 2,
           SINGULAR_BETA_MARGIN = 24,
-          SINGULAR_MAX_DOUBLE_EXTENSIONS = 5;
+          SINGULAR_MAX_DOUBLE_EXTENSIONS = 10;
 
-const int LMR_MIN_DEPTH = 3;
-const double LMR_BASE = 1,
-             LMR_MULTIPLIER = 0.5;
-const int LMR_HISTORY_DIVISOR = 8192;
+const int LMR_MIN_DEPTH = 2;
+const double LMR_BASE = 0.8,
+             LMR_MULTIPLIER = 0.4;
+const int LMR_HISTORY_DIVISOR = 8192,
+          LMR_CAPTURE_HISTORY_DIVISOR = 4096;
 
 const i32 HISTORY_MIN_BONUS = 1570,
           HISTORY_BONUS_MULTIPLIER = 370,
           HISTORY_MAX = 16384;
+
+// Move ordering
+const i32 TT_MOVE_SCORE           = MAX_INT32,
+          GOOD_CAPTURE_BASE_SCORE = 1'500'000'000,
+          PROMOTION_BASE_SCORE    = 1'000'000'000,
+          KILLER_SCORE            = 500'000'000,
+          COUNTERMOVE_SCORE       = 250'000'000,
+          HISTORY_MOVE_BASE_SCORE = 0,
+          BAD_CAPTURE_BASE_SCORE  = -HISTORY_MAX / 2;
+
+// Most valuable victim    P   N   B   R   Q
+const i32 MVV_VALUES[5] = {10, 30, 32, 50, 90};
 
 Board board;
 u64 nodes;
@@ -351,16 +352,19 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
         // PVS (Principal variation search)
         
         i16 score = 0, searchDepth = depth - 1 + extension;
-        
+        HistoryEntry *historyEntry = &(historyTable[stm][pieceType][targetSquare]);
+
         // LMR (Late move reductions)
         if (legalMovesPlayed > 1 && depth >= LMR_MIN_DEPTH && historyMoveOrLosing)
         {
-            //lmr -= board.inCheck(); // reduce checks less
+            lmr -= board.inCheck(); // reduce checks less
             lmr -= pvNode; // reduce pv nodes less
 
-            // reduce quiets with good history less and vice versa
+            // reduce moves with good history less and vice versa
             if (isQuietMove) 
                 lmr -= round((moveScore - HISTORY_MOVE_BASE_SCORE) / (double)LMR_HISTORY_DIVISOR);
+            else if (isCapture)
+                lmr -= round(historyEntry->captureHistory / (double)LMR_CAPTURE_HISTORY_DIVISOR);
 
             // if lmr is negative, we would have an extension instead of a reduction
             // dont reduce into qsearch
@@ -386,19 +390,17 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
         board.undoMove();
         if (isHardTimeUp(nodes)) return 0;
 
-        if (ply == 0)
-            movesNodes[move.getMoveEncoded()] += nodes - prevNodes;
+        if (ply == 0) movesNodes[move.getMoveEncoded()] += nodes - prevNodes;
 
         if (score > bestScore) bestScore = score;
-
 
         if (score <= alpha) // Fail low
         {
             // Fail low quiets at beginning of array, fail low captures at the end
             if (isQuietMove)
-                failLowsHistoryEntry[numFailLowQuiets++] = &(historyTable[stm][pieceType][targetSquare]);
+                failLowsHistoryEntry[numFailLowQuiets++] = historyEntry;
             else if (isCapture)
-                failLowsHistoryEntry[256 - ++numFailLowCaptures] = &(historyTable[stm][pieceType][targetSquare]);
+                failLowsHistoryEntry[256 - ++numFailLowCaptures] = historyEntry;
 
             continue;
         }
@@ -429,7 +431,7 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
                 countermoves[stm][board.getLastMove().getMoveEncoded()] = move;
 
             // Increase this quiet's history
-            historyTable[stm][pieceType][targetSquare].updateQuietHistory(board, historyBonus, HISTORY_MAX);
+            historyEntry->updateQuietHistory(board, historyBonus, HISTORY_MAX);
 
             // Penalize/decrease history of quiets that failed low
             for (int i = 0; i < numFailLowQuiets; i++)
@@ -438,7 +440,7 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
         else if (isCapture)
         {
             // Increase this capture's history
-            historyTable[stm][pieceType][targetSquare].updateCaptureHistory(board, historyBonus, HISTORY_MAX);
+            historyEntry->updateCaptureHistory(board, historyBonus, HISTORY_MAX);
 
             // Penalize/decrease history of captures that failed low
             for (int i = 255, j = 0; j < numFailLowCaptures; i--, j++)
