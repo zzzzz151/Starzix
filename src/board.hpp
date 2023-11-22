@@ -10,14 +10,13 @@
 #include "move.hpp"
 #include "attacks.hpp"
 #include "nnue.hpp"
-using namespace std;
 
 struct BoardState
 {
     public:
 
     u64 zobristHash;
-    array<array<bool, 2>, 2> castlingRights; // [color][CASTLE_SHORT or CASTLE_LONG]
+    std::array<std::array<bool, 2>, 2> castlingRights; // [color][CASTLE_SHORT or CASTLE_LONG]
     Square enPassantSquare;
     u16 pliesSincePawnMoveOrCapture;
     Move move;
@@ -25,7 +24,7 @@ struct BoardState
     Piece capturedPiece;
     i8 inCheckCached;
 
-    inline BoardState(u64 zobristHash, array<array<bool, 2>, 2> castlingRights, 
+    inline BoardState(u64 zobristHash, std::array<std::array<bool, 2>, 2> castlingRights, 
                       Square enPassantSquare, u16 pliesSincePawnMoveOrCapture, 
                       Move move, PieceType pieceTypeMoved, Piece capturedPiece, 
                       i8 inCheckCached)
@@ -46,19 +45,19 @@ class Board
 {
     private:
 
-    array<Piece, 64> pieces; // [square]
+    std::array<Piece, 64> pieces; // [square]
     
-    array<u64, 2> colorBitboard;             // [color]
-    array<array<u64, 6>, 2> piecesBitboards; // [color][pieceType]
+    std::array<u64, 2> colorBitboard;                  // [color]
+    std::array<std::array<u64, 6>, 2> piecesBitboards; // [color][pieceType]
 
-    array<array<bool, 2>, 2> castlingRights; // [color][CASTLE_SHORT or CASTLE_LONG]
+    std::array<std::array<bool, 2>, 2> castlingRights; // [color][CASTLE_SHORT or CASTLE_LONG]
     const static u8 CASTLE_SHORT = 0, CASTLE_LONG = 1;
 
     Color colorToMove;
     Square enPassantSquare; // en passant target square
     u16 pliesSincePawnMoveOrCapture, currentMoveCounter;
 
-    vector<BoardState> states;
+    std::vector<BoardState> states;
 
     u64 zobristHash;
     static inline u64 zobristTable[64][12],
@@ -74,7 +73,7 @@ class Board
 
     Board() = default;
 
-    inline Board(string fen)
+    inline Board(std::string fen)
     {
         states.clear();
         states.reserve(256);
@@ -85,7 +84,7 @@ class Board
         nnue::reset();
 
         trim(fen);
-        vector<string> fenSplit = splitString(fen, ' ');
+        std::vector<std::string> fenSplit = splitString(fen, ' ');
 
         colorToMove = fenSplit[1] == "b" ? Color::BLACK : Color::WHITE;
         zobristHash = colorToMove == Color::WHITE ? 0 : zobristColorToMove;
@@ -93,7 +92,7 @@ class Board
         parseFenRows(fenSplit[0]);
         parseFenCastlingRights(fenSplit[2]);
 
-        string strEnPassantSquare = fenSplit[3];
+        std::string strEnPassantSquare = fenSplit[3];
         enPassantSquare = strEnPassantSquare == "-" ? SQUARE_NONE : strToSquare(strEnPassantSquare);
         if (enPassantSquare != SQUARE_NONE)
             zobristHash ^= zobristEnPassantFiles[(int)squareFile(enPassantSquare)];
@@ -104,7 +103,7 @@ class Board
 
     private:
 
-    inline void parseFenRows(string fenRows)
+    inline void parseFenRows(std::string fenRows)
     {
         for (int sq= 0; sq < 64; sq++)
             pieces[sq] = Piece::NONE;
@@ -138,7 +137,7 @@ class Board
         }
     }
 
-    inline void parseFenCastlingRights(string fenCastlingRights)
+    inline void parseFenCastlingRights(std::string fenCastlingRights)
     {
         castlingRights[(int)Color::WHITE][CASTLE_SHORT] = false;
         castlingRights[(int)Color::WHITE][CASTLE_LONG] = false;
@@ -196,9 +195,9 @@ class Board
 
     public:
 
-    inline string fen()
+    inline std::string fen()
     {
-        string myFen = "";
+        std::string myFen = "";
 
         for (int rank = 7; rank >= 0; rank--)
         {
@@ -208,21 +207,21 @@ class Board
                 Square square = rank * 8 + file;
                 Piece piece = pieces[square];
                 if (piece != Piece::NONE) {
-                    if (emptySoFar > 0) myFen += to_string(emptySoFar);
-                    myFen += string(1, PIECE_TO_CHAR[piece]);
+                    if (emptySoFar > 0) myFen += std::to_string(emptySoFar);
+                    myFen += std::string(1, PIECE_TO_CHAR[piece]);
                     emptySoFar = 0;
                 }
                 else
                     emptySoFar++;
             }
-            if (emptySoFar > 0) myFen += to_string(emptySoFar);
+            if (emptySoFar > 0) myFen += std::to_string(emptySoFar);
             myFen += "/";
         }
         myFen.pop_back(); // remove last '/'
 
         myFen += colorToMove == Color::BLACK ? " b " : " w ";
 
-        string strCastlingRights = "";
+        std::string strCastlingRights = "";
         if (castlingRights[(int)Color::WHITE][CASTLE_SHORT]) 
             strCastlingRights += "K";
         if (castlingRights[(int)Color::WHITE][CASTLE_LONG]) 
@@ -237,30 +236,30 @@ class Board
 
         myFen += strCastlingRights;
 
-        string strEnPassantSquare = enPassantSquare == SQUARE_NONE ? "-" : SQUARE_TO_STR[enPassantSquare];
+        std::string strEnPassantSquare = enPassantSquare == SQUARE_NONE ? "-" : SQUARE_TO_STR[enPassantSquare];
         myFen += " " + strEnPassantSquare;
         
-        myFen += " " + to_string(pliesSincePawnMoveOrCapture);
-        myFen += " " + to_string(currentMoveCounter);
+        myFen += " " + std::to_string(pliesSincePawnMoveOrCapture);
+        myFen += " " + std::to_string(currentMoveCounter);
 
         return myFen;
     }
 
     inline void printBoard()
     {
-        string str = "";
+        std::string str = "";
         for (int i = 7; i >= 0; i--)
         {
             for (Square j = 0; j < 8; j++)
             {
                 int square = i * 8 + j;
-                str += pieces[square] == Piece::NONE ? "." : string(1, PIECE_TO_CHAR[pieces[square]]);
+                str += pieces[square] == Piece::NONE ? "." : std::string(1, PIECE_TO_CHAR[pieces[square]]);
                 str += " ";
             }
             str += "\n";
         }
 
-        cout << str;
+        std::cout << str;
     }
 
     inline auto getPieces() { 
@@ -298,8 +297,8 @@ class Board
 
     inline static void initZobrist()
     {
-        mt19937_64 gen(12345); // 64 bit Mersenne Twister rng with seed 12345
-        uniform_int_distribution<u64> distribution; // distribution(gen) returns random u64
+        std::mt19937_64 gen(12345); // 64 bit Mersenne Twister rng with seed 12345
+        std::uniform_int_distribution<u64> distribution; // distribution(gen) returns random u64
         
         zobristColorToMove = distribution(gen);
 
@@ -338,7 +337,7 @@ class Board
             return true;
 
         // K vs K
-        int numPieces = popcount(occupancy());
+        int numPieces = std::popcount(occupancy());
         if (numPieces == 2)
             return true;
 
@@ -501,7 +500,7 @@ class Board
         return true; // move is legal
     }
 
-    inline bool makeMove(string uci, bool verifyCheckLegality = true)
+    inline bool makeMove(std::string uci, bool verifyCheckLegality = true)
     {
         return makeMove(Move::fromUci(uci, pieces), verifyCheckLegality);
     }

@@ -10,7 +10,6 @@
 #include <chrono>
 #include <unordered_map>
 #include "types.hpp"
-using namespace std;
 
 #if defined(__GNUC__) // GCC, Clang, ICC
 inline u8 lsb(u64 b)
@@ -58,7 +57,7 @@ inline u64 pdep(u64 val, u64 mask) {
     return res;
 }
 
-const string SQUARE_TO_STR[64] = {
+const std::string SQUARE_TO_STR[64] = {
     "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1",
     "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2",
     "a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3",
@@ -69,7 +68,7 @@ const string SQUARE_TO_STR[64] = {
     "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8",
 };
 
-unordered_map<char, Piece> CHAR_TO_PIECE = {
+std::unordered_map<char, Piece> CHAR_TO_PIECE = {
     {'P', Piece::WHITE_PAWN},
     {'N', Piece::WHITE_KNIGHT},
     {'B', Piece::WHITE_BISHOP},
@@ -84,7 +83,7 @@ unordered_map<char, Piece> CHAR_TO_PIECE = {
     {'k', Piece::BLACK_KING},
 };
 
-unordered_map<Piece, char> PIECE_TO_CHAR = {
+std::unordered_map<Piece, char> PIECE_TO_CHAR = {
     {Piece::WHITE_PAWN,   'P'},
     {Piece::WHITE_KNIGHT, 'N'},
     {Piece::WHITE_BISHOP, 'B'},
@@ -103,11 +102,11 @@ inline Rank squareRank(Square square) { return (Rank)(square / 8); }
 
 inline File squareFile(Square square) { return (File)(square % 8); }
 
-inline void trim(string &str) {
+inline void trim(std::string &str) {
     size_t first = str.find_first_not_of(" \t\n\r");
     size_t last = str.find_last_not_of(" \t\n\r");
     
-    if (first == string::npos) // The string is empty or contains only whitespace characters
+    if (first == std::string::npos) // The string is empty or contains only whitespace characters
     {
         str = "";
         return;
@@ -116,15 +115,15 @@ inline void trim(string &str) {
     str = str.substr(first, (last - first + 1));
 }
 
-inline vector<string> splitString(string &str, char delimiter)
+inline std::vector<std::string> splitString(std::string &str, char delimiter)
 {
     trim(str);
     if (str == "")
-        return vector<string>{};
+        return std::vector<std::string>{};
 
-    vector<string> strSplit;
-    stringstream ss(str);
-    string token;
+    std::vector<std::string> strSplit;
+    std::stringstream ss(str);
+    std::string token;
 
     while (getline(ss, token, delimiter))
         strSplit.push_back(token);
@@ -135,15 +134,15 @@ inline vector<string> splitString(string &str, char delimiter)
 
 inline void printBitboard(u64 bb)
 {
-    bitset<64> b(bb);
-    string str_bitset = b.to_string();
+    std::bitset<64> b(bb);
+    std::string str_bitset = b.to_string(); 
     for (int i = 0; i < 64; i += 8)
     {
-        string x = str_bitset.substr(i, 8);
+        std::string x = str_bitset.substr(i, 8);
         reverse(x.begin(), x.end());
         for (int j = 0; j < x.length(); j++)
-            cout << string(1, x[j]) << " ";
-        cout << endl;
+            std::cout << std::string(1, x[j]) << " ";
+        std::cout << std::endl;
     }
 }
 
@@ -172,7 +171,7 @@ inline Piece makePiece(PieceType pieceType, Color color)
     return (Piece)piece;
 }
 
-inline Square strToSquare(string strSquare) {
+inline Square strToSquare(std::string strSquare) {
     return (strSquare[0] - 'a') + (strSquare[1] - '1') * 8;
 }
 
@@ -208,20 +207,20 @@ inline i16 max(i16 a, i16 b) {
     return a > b ? a : b;
 }
 
-inline auto millisecondsElapsed(chrono::steady_clock::time_point start)
+inline auto millisecondsElapsed(std::chrono::steady_clock::time_point start)
 {
-    return (chrono::steady_clock::now() - start) / chrono::milliseconds(1);
+    return (std::chrono::steady_clock::now() - start) / std::chrono::milliseconds(1);
 }
 
 #include "move.hpp"
 
-inline pair<Move, i32> incrementalSort(MovesList &moves, array<i32, 256> &movesScores, int i)
+inline std::pair<Move, i32> incrementalSort(MovesList &moves, std::array<i32, 256> &movesScores, int i)
 {
     for (int j = i + 1; j < moves.size(); j++)
         if (movesScores[j] > movesScores[i])
         {
             moves.swap(i, j);
-            swap(movesScores[i], movesScores[j]);
+            std::swap(movesScores[i], movesScores[j]);
         }
 
     return { moves[i], movesScores[i] };

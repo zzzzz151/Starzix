@@ -18,9 +18,11 @@
 
 ### Extra commands
 
+- eval - displays current position's evaluation from perspective of side to move
+
 - perft \<depth\> - runs perft from current position
 
-- eval - displays current position's evaluation from perspective of side to move
+- perftsplit \<depth\> - runs split perft from current position
 
 # Features
 

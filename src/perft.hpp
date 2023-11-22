@@ -3,6 +3,9 @@
 #include <chrono>
 #include "board.hpp"
 
+namespace perft
+{
+
 inline u64 perft(Board &board, int depth)
 {
     if (depth == 0) 
@@ -22,71 +25,49 @@ inline u64 perft(Board &board, int depth)
     return nodes;
 }
 
-inline void perftBench(Board &board, int depth)
+inline void perftSplit(Board &board, int depth)
 {
-    bool perftWasEnabled = board.perft;
-    board.perft = true;
+    board.perft = true; // dont update zobrist hash nor NNUE
 
-    chrono::steady_clock::time_point start =  chrono::steady_clock::now();
-    u64 nodes = perft(board, depth);
-    double millisecondsElapsed = (chrono::steady_clock::now() - start) / chrono::milliseconds(1);
-    u64 nps = nodes / (millisecondsElapsed > 0 ? millisecondsElapsed : 1.0) * 1000.0;
-    cout << "perft depth " << depth << " time " << millisecondsElapsed << " nodes " << nodes << " nps " << nps << " fen " << board.fen() << endl;
-
-    board.perft = perftWasEnabled;
-}
-
-
-inline void perftDivide(Board &board, int depth)
-{
     MovesList moves = board.pseudolegalMoves(); 
-
-    if (moves.size() == 0)
-         return;
-
     u64 totalNodes = 0;
+
     for (int i = 0; i < moves.size(); i++) 
     {
         if (!board.makeMove(moves[i])) 
             continue;
         u64 nodes = perft(board, depth - 1);
-        cout << moves[i].toUci() << ": " << nodes << endl;
+        std::cout << moves[i].toUci() << ": " << nodes << std::endl;
         totalNodes += nodes;
         board.undoMove();
     }
 
-    cout << "Total: " << totalNodes << endl;
+    std::cout << "Total: " << totalNodes << std::endl;
+
+    // rebuild board to fix zobrist hash and NNUE
+    board = Board(board.fen()); 
 }
 
-inline u64 perftCaptures(Board &board, int depth)
+inline u64 perftBench(Board &board, int depth)
 {
-    if (depth == 0) 
-        return 0;
+    board.perft = true; // dont update zobrist hash nor NNUE
 
-    u64 legalCaptures = 0;
-    if (depth == 1)
-    {
-        MovesList moves = board.pseudolegalMoves(true); // captures only
-        for (int i = 0; i < moves.size(); i++) 
-        {
-            if (!board.makeMove(moves[i]))
-                continue;
-            legalCaptures++;
-            board.undoMove();
-        }
-        return legalCaptures;
-    }
+    std::chrono::steady_clock::time_point start =  std::chrono::steady_clock::now();
+    u64 nodes = perft(board, depth);
+    double millisecondsElapsed = (std::chrono::steady_clock::now() - start) / std::chrono::milliseconds(1);
+    u64 nps = nodes / (millisecondsElapsed > 0 ? millisecondsElapsed : 1.0) * 1000.0;
 
-    MovesList moves = board.pseudolegalMoves();        
-    u64 nodes = 0;
+    std::cout << "perft depth " << depth 
+              << " time " << millisecondsElapsed 
+              << " nodes " << nodes 
+              << " nps " << nps 
+              << " fen " << board.fen() 
+              << std::endl;
 
-    for (int i = 0; i < moves.size(); i++) 
-    {
-        if (!board.makeMove(moves[i]))
-            continue;
-        nodes += perftCaptures(board, depth - 1);
-        board.undoMove();
-    }
+    // rebuild board to fix zobrist hash and NNUE
+    board = Board(board.fen()); 
 
     return nodes;
+}
+
 }

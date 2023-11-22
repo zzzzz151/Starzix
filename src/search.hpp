@@ -2,11 +2,18 @@
 
 // clang-format off
 
-#include "time_management.hpp"
+#include "time_manager.hpp"
 #include "tt.hpp"
 #include "history_entry.hpp"
 #include "see.hpp"
 #include "nnue.hpp"
+
+namespace uci { 
+    inline void info(int depth, i16 score); 
+}
+
+namespace search
+{
 
 const u8 MAX_DEPTH = 100;
 
@@ -48,10 +55,10 @@ const int SINGULAR_MIN_DEPTH = 8,
           SINGULAR_BETA_MARGIN = 24,
           SINGULAR_MAX_DOUBLE_EXTENSIONS = 10;
 
-const int LMR_MIN_DEPTH = 2;
 const double LMR_BASE = 0.8,
              LMR_MULTIPLIER = 0.4;
-const int LMR_HISTORY_DIVISOR = 8192,
+const int LMR_MIN_DEPTH = 2,
+          LMR_HISTORY_DIVISOR = 8192,
           LMR_CAPTURE_HISTORY_DIVISOR = 4096;
 
 const i32 HISTORY_MIN_BONUS = 1570,
@@ -59,7 +66,7 @@ const i32 HISTORY_MIN_BONUS = 1570,
           HISTORY_MAX = 16384;
 
 // Move ordering
-const i32 TT_MOVE_SCORE           = MAX_INT32,
+const i32 TT_MOVE_SCORE           = I32_MAX,
           GOOD_CAPTURE_BASE_SCORE = 1'500'000'000,
           PROMOTION_BASE_SCORE    = 1'000'000'000,
           KILLER_SCORE            = 500'000'000,
@@ -70,7 +77,7 @@ const i32 TT_MOVE_SCORE           = MAX_INT32,
 // Most valuable victim    P   N   B   R   Q
 const i32 MVV_VALUES[5] = {10, 30, 32, 50, 90};
 
-Board board;
+TimeManager timeManager;
 u64 nodes;
 int maxPlyReached;
 u64 movesNodes[1ULL << 16];             // [moveEncoded]
@@ -81,9 +88,7 @@ Move killerMoves[MAX_DEPTH];            // [ply]
 Move countermoves[2][1ULL << 16];       // [color][moveEncoded]
 HistoryEntry historyTable[2][6][64];    // [color][pieceType][targetSquare]
 
-namespace uci { 
-    inline void info(int depth, i16 score); 
-}
+inline Move iterativeDeepening();
 
 inline i16 aspiration(int maxDepth, i16 score);
 
@@ -92,9 +97,9 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
 
 inline i16 qSearch(int ply, i16 alpha, i16 beta);
 
-inline array<i32, 256> scoreMoves(MovesList &moves, Move ttMove, Move killerMove, bool doSEE = true);
+inline std::array<i32, 256> scoreMoves(MovesList &moves, Move ttMove, Move killerMove, bool doSEE = true);
 
-inline void initSearch()
+inline void init()
 {
     // init lmrTable
     for (int depth = 0; depth < MAX_DEPTH+1; depth++)
@@ -103,15 +108,24 @@ inline void initSearch()
                                     ? 0 : round(LMR_BASE + ln(depth) * ln(move) * LMR_MULTIPLIER);
 }
 
-inline Move iterativeDeepening()
+inline Move search(TimeManager _timeManager)
 {
-    // clear stuff
+    // reset/clear stuff
     nodes = 0;
     memset(movesNodes, 0, sizeof(movesNodes));
     memset(pvLines, 0, sizeof(pvLines));
     memset(pvLengths, 0, sizeof(pvLengths));
+    timeManager = _timeManager;
 
-    // ID (Iterative Deepening)
+    Move bestMove = iterativeDeepening();
+
+    if (tt::age < 63) tt::age++;
+
+    return bestMove;
+}
+
+inline Move iterativeDeepening()
+{
     i16 score = 0;
     for (int iterationDepth = 1; iterationDepth <= MAX_DEPTH; iterationDepth++)
     {
@@ -121,15 +135,13 @@ inline Move iterativeDeepening()
                 ? aspiration(iterationDepth, score) 
                 : search(iterationDepth, 0, NEG_INFINITY, POS_INFINITY, false, SINGULAR_MAX_DOUBLE_EXTENSIONS);
 
-        if (isHardTimeUp(nodes)) break;
+        if (timeManager.isHardTimeUp(nodes)) break;
 
         uci::info(iterationDepth, score);
 
-        double bestMoveNodesFraction = (double)movesNodes[pvLines[0][0].getMoveEncoded()] / (double)nodes;
-        if (isSoftTimeUp(bestMoveNodesFraction)) break;
+        u64 bestMoveNodes = movesNodes[pvLines[0][0].getMoveEncoded()];
+        if (timeManager.isSoftTimeUp(nodes, bestMoveNodes)) break;
     }
-
-    if (ttAge < 63) ttAge++;
 
     return pvLines[0][0]; // return best move
 }
@@ -148,7 +160,7 @@ inline i16 aspiration(int maxDepth, i16 score)
     {
         score = search(depth, 0, alpha, beta, false, SINGULAR_MAX_DOUBLE_EXTENSIONS);
 
-        if (isHardTimeUp(nodes)) return 0;
+        if (timeManager.isHardTimeUp(nodes)) return 0;
 
         if (score >= beta)
         {
@@ -171,13 +183,13 @@ inline i16 aspiration(int maxDepth, i16 score)
 }
 
 inline i16 evaluate() {
-    return clamp(nnue::evaluate(board.sideToMove()), -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
+    return std::clamp(nnue::evaluate(board.sideToMove()), -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
 }
 
 inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode, 
                   int doubleExtensionsLeft, bool singular, i16 eval)
 {
-    if (isHardTimeUp(nodes)) return 0;
+    if (timeManager.isHardTimeUp(nodes)) return 0;
 
     pvLengths[ply] = 0; // Ensure fresh PV
 
@@ -195,7 +207,7 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
     if (depth > MAX_DEPTH) depth = MAX_DEPTH;
 
     // Probe TT
-    auto [ttEntry, shouldCutoff] = probeTT(board.getZobristHash(), depth, ply, alpha, beta);
+    auto [ttEntry, shouldCutoff] = tt::probe(board.getZobristHash(), depth, ply, alpha, beta);
     if (shouldCutoff && !singular) 
         return ttEntry->adjustedScore(ply);
 
@@ -242,7 +254,7 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
 
     bool trySingular = !singular && depth >= SINGULAR_MIN_DEPTH && ply > 0
                        && ttMove != MOVE_NONE && abs(ttEntry->score) < MIN_MATE_SCORE
-                       && ttEntry->depth >= depth - SINGULAR_DEPTH_MARGIN && ttEntry->getBound() != UPPER_BOUND;
+                       && ttEntry->depth >= depth - SINGULAR_DEPTH_MARGIN && ttEntry->getBound() != tt::UPPER_BOUND;
                        
     // IIR (Internal iterative reduction)
     if (ttMove == MOVE_NONE && depth >= IIR_MIN_DEPTH && !board.inCheck())
@@ -288,7 +300,7 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
 
             // SEE pruning
             int threshold = isQuietMove ? depth * SEE_PRUNING_QUIET_THRESHOLD : depth * depth * SEE_PRUNING_NOISY_THRESHOLD;
-            if (depth <= SEE_PRUNING_MAX_DEPTH && !SEE(board, move, threshold))
+            if (depth <= SEE_PRUNING_MAX_DEPTH && !see::SEE(board, move, threshold))
                 continue;
         }
 
@@ -368,7 +380,7 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
 
             // if lmr is negative, we would have an extension instead of a reduction
             // dont reduce into qsearch
-            lmr = clamp(lmr, 0, searchDepth - 1);
+            lmr = std::clamp(lmr, 0, searchDepth - 1);
 
             // Reduced search on null window
             score = -search(searchDepth - lmr, ply + 1, -alpha-1, -alpha, true, doubleExtensionsLeft);
@@ -388,7 +400,7 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
         searchingDone:
 
         board.undoMove();
-        if (isHardTimeUp(nodes)) return 0;
+        if (timeManager.isHardTimeUp(nodes)) return 0;
 
         if (ply == 0) movesNodes[move.getMoveEncoded()] += nodes - prevNodes;
 
@@ -414,7 +426,8 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
             int subPvLineLength = pvLengths[ply + 1];
             pvLengths[ply] = 1 + subPvLineLength;
             pvLines[ply][0] = move;
-            memcpy(&(pvLines[ply][1]), pvLines[ply + 1], subPvLineLength * sizeof(Move)); // dst, src, size
+            // memcpy(dst, src, size)
+            memcpy(&(pvLines[ply][1]), pvLines[ply + 1], subPvLineLength * sizeof(Move));
         }
 
         if (score < beta) continue;
@@ -455,7 +468,7 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
         return board.inCheck() ? NEG_INFINITY + ply : 0;
 
     if (!singular)
-        storeInTT(ttEntry, board.getZobristHash(), depth, bestScore, bestMove, ply, originalAlpha, beta);    
+        tt::store(ttEntry, board.getZobristHash(), depth, bestScore, bestMove, ply, originalAlpha, beta);    
 
     return bestScore;
 }
@@ -481,7 +494,7 @@ inline i16 qSearch(int ply, i16 alpha, i16 beta)
     }
 
     // Probe TT
-    auto [ttEntry, shouldCutoff] = probeTT(board.getZobristHash(), 0, ply, alpha, beta);
+    auto [ttEntry, shouldCutoff] = tt::probe(board.getZobristHash(), 0, ply, alpha, beta);
     if (shouldCutoff) return ttEntry->adjustedScore(ply);
 
     Move ttMove = board.getZobristHash() == ttEntry->zobristHash ? ttEntry->bestMove : MOVE_NONE;
@@ -500,7 +513,7 @@ inline i16 qSearch(int ply, i16 alpha, i16 beta)
         auto [move, moveScore] = incrementalSort(moves, movesScores, i);
 
         // SEE pruning (skip bad captures)
-        if (!board.inCheck() && !SEE(board, move)) continue;
+        if (!board.inCheck() && !see::SEE(board, move)) continue;
 
         // skip illegal moves
         if (!board.makeMove(move)) continue; 
@@ -523,14 +536,14 @@ inline i16 qSearch(int ply, i16 alpha, i16 beta)
         // checkmate
         return NEG_INFINITY + ply; 
 
-    storeInTT(ttEntry, board.getZobristHash(), 0, bestScore, bestMove, ply, originalAlpha, beta);    
+    tt::store(ttEntry, board.getZobristHash(), 0, bestScore, bestMove, ply, originalAlpha, beta);    
 
     return bestScore;
 }
 
-inline array<i32, 256> scoreMoves(MovesList &moves, Move ttMove, Move killerMove, bool doSEE)
+inline std::array<i32, 256> scoreMoves(MovesList &moves, Move ttMove, Move killerMove, bool doSEE)
 {
-    array<i32, 256> movesScores;
+    std::array<i32, 256> movesScores;
 
     int stm = (int)board.sideToMove();
     Move countermove = board.getLastMove() == MOVE_NONE
@@ -550,7 +563,7 @@ inline array<i32, 256> scoreMoves(MovesList &moves, Move ttMove, Move killerMove
         {
             movesScores[i] = MVV_VALUES[(int)pieceTypeCaptured];
             movesScores[i] += historyTable[stm][pieceType][targetSquare].captureHistory;
-            if (doSEE) movesScores[i] += SEE(board, move) ? GOOD_CAPTURE_BASE_SCORE : BAD_CAPTURE_BASE_SCORE;
+            if (doSEE) movesScores[i] += see::SEE(board, move) ? GOOD_CAPTURE_BASE_SCORE : BAD_CAPTURE_BASE_SCORE;
         }
         else if (move.promotionPieceType() != PieceType::NONE)
             movesScores[i] = PROMOTION_BASE_SCORE + move.typeFlag();
@@ -567,3 +580,6 @@ inline array<i32, 256> scoreMoves(MovesList &moves, Move ttMove, Move killerMove
 
     return movesScores;
 }
+
+}
+

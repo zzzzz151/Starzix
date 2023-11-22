@@ -4,7 +4,6 @@
 #include <cassert>
 #include "types.hpp"
 #include "utils.hpp"
-using namespace std;
 
 struct Move
 {
@@ -63,7 +62,7 @@ struct Move
         return (PieceType)flag;
     }
 
-    static inline Move fromUci(string uci, array<Piece, 64> pieces)
+    static inline Move fromUci(std::string uci, std::array<Piece, 64> pieces)
     {
         Square from = strToSquare(uci.substr(0,2));
         Square to = strToSquare(uci.substr(2,4));
@@ -99,9 +98,9 @@ struct Move
         return Move(from, to, NORMAL_FLAG);
     }
 
-    inline string toUci()
+    inline std::string toUci()
     {
-        string str = SQUARE_TO_STR[from()] + SQUARE_TO_STR[to()];
+        std::string str = SQUARE_TO_STR[from()] + SQUARE_TO_STR[to()];
         u16 myTypeFlag = typeFlag();
 
         if (myTypeFlag == QUEEN_PROMOTION_FLAG) 

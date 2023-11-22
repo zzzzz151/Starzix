@@ -7,64 +7,64 @@
 int main()
 {
     Board::initZobrist();
-    attacks::initAttacks();
+    attacks::init();
     nnue::loadNetFromFile();
 
     Board board = Board(START_FEN);
     
-    cout << "Start pos" << endl;
-    cout << "Color::WHITE eval " << nnue::evaluate(Color::WHITE) << endl;
-    cout << "Color::BLACK eval " << nnue::evaluate(Color::BLACK) << endl;
+    std::cout << "Start pos" << std::endl;
+    std::cout << "Color::WHITE eval " << nnue::evaluate(Color::WHITE) << std::endl;
+    std::cout << "Color::BLACK eval " << nnue::evaluate(Color::BLACK) << std::endl;
 
-    cout << endl << "e2e4" << endl;
+    std::cout << std::endl << "e2e4" << std::endl;
     board.makeMove("e2e4");
-    cout << "Color::WHITE eval " << nnue::evaluate(Color::WHITE) << endl;
-    cout << "Color::BLACK eval " << nnue::evaluate(Color::BLACK) << endl;
+    std::cout << "Color::WHITE eval " << nnue::evaluate(Color::WHITE) << std::endl;
+    std::cout << "Color::BLACK eval " << nnue::evaluate(Color::BLACK) << std::endl;
 
-    cout << endl << "a7a5" << endl;
+    std::cout << std::endl << "a7a5" << std::endl;
     board.makeMove("a7a5");
-    cout << "Color::WHITE eval " << nnue::evaluate(Color::WHITE) << endl;
-    cout << "Color::BLACK eval " << nnue::evaluate(Color::BLACK) << endl;
+    std::cout << "Color::WHITE eval " << nnue::evaluate(Color::WHITE) << std::endl;
+    std::cout << "Color::BLACK eval " << nnue::evaluate(Color::BLACK) << std::endl;
 
-    cout << endl << "undo a7a5" << endl;
+    std::cout << std::endl << "undo a7a5" << std::endl;
     board.undoMove();
-    cout << "Color::WHITE eval " << nnue::evaluate(Color::WHITE) << endl;
-    cout << "Color::BLACK eval " << nnue::evaluate(Color::BLACK) << endl;
+    std::cout << "Color::WHITE eval " << nnue::evaluate(Color::WHITE) << std::endl;
+    std::cout << "Color::BLACK eval " << nnue::evaluate(Color::BLACK) << std::endl;
 
-    cout << endl << "Rebuilding start pos..." << endl;
+    std::cout << std::endl << "Rebuilding start pos..." << std::endl;
 
     board = Board(START_FEN);
 
-    cout << endl << "Start pos" << endl;
-    cout << "Color::WHITE eval " << nnue::evaluate(Color::WHITE) << endl;
-    cout << "Color::BLACK eval " << nnue::evaluate(Color::BLACK) << endl;
+    std::cout << std::endl << "Start pos" << std::endl;
+    std::cout << "Color::WHITE eval " << nnue::evaluate(Color::WHITE) << std::endl;
+    std::cout << "Color::BLACK eval " << nnue::evaluate(Color::BLACK) << std::endl;
 
-    cout << endl << "e2e4" << endl;
+    std::cout << std::endl << "e2e4" << std::endl;
     board.makeMove("e2e4");
-    cout << "Color::WHITE eval " << nnue::evaluate(Color::WHITE) << endl;
-    cout << "Color::BLACK eval " << nnue::evaluate(Color::BLACK) << endl;
+    std::cout << "Color::WHITE eval " << nnue::evaluate(Color::WHITE) << std::endl;
+    std::cout << "Color::BLACK eval " << nnue::evaluate(Color::BLACK) << std::endl;
 
     assert(!board.inCheck());
 
-    cout << endl << "null move" << endl;
+    std::cout << std::endl << "null move" << std::endl;
     board.makeNullMove();
-    cout << "Color::WHITE eval " << nnue::evaluate(Color::WHITE) << endl;
-    cout << "Color::BLACK eval " << nnue::evaluate(Color::BLACK) << endl;
+    std::cout << "Color::WHITE eval " << nnue::evaluate(Color::WHITE) << std::endl;
+    std::cout << "Color::BLACK eval " << nnue::evaluate(Color::BLACK) << std::endl;
 
-    cout << endl << "undo null move" << endl;
+    std::cout << std::endl << "undo null move" << std::endl;
     board.undoNullMove();
-    cout << "Color::WHITE eval " << nnue::evaluate(Color::WHITE) << endl;
-    cout << "Color::BLACK eval " << nnue::evaluate(Color::BLACK) << endl;
+    std::cout << "Color::WHITE eval " << nnue::evaluate(Color::WHITE) << std::endl;
+    std::cout << "Color::BLACK eval " << nnue::evaluate(Color::BLACK) << std::endl;
 
-    cout << endl << "Custom sicilian position" << endl;
+    std::cout << std::endl << "Custom sicilian position" << std::endl;
     board = Board("rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2");
-    cout << "Color::WHITE eval " << nnue::evaluate(Color::WHITE) << endl;
-    cout << "Color::BLACK eval " << nnue::evaluate(Color::BLACK) << endl;
+    std::cout << "Color::WHITE eval " << nnue::evaluate(Color::WHITE) << std::endl;
+    std::cout << "Color::BLACK eval " << nnue::evaluate(Color::BLACK) << std::endl;
 
-    cout << endl << "d7d6" << endl;
+    std::cout << std::endl << "d7d6" << std::endl;
     board.makeMove("d7d6");
-    cout << "Color::WHITE eval " << nnue::evaluate(Color::WHITE) << endl;
-    cout << "Color::BLACK eval " << nnue::evaluate(Color::BLACK) << endl;
+    std::cout << "Color::WHITE eval " << nnue::evaluate(Color::WHITE) << std::endl;
+    std::cout << "Color::BLACK eval " << nnue::evaluate(Color::BLACK) << std::endl;
 
     return 0;
 }

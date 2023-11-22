@@ -7,6 +7,10 @@
 
 src-test
 src-test/
+nets
+nets/
+data
+data/
 
 games.txt
 games.pgn
@@ -19,5 +23,3 @@ sprt.py
 openings-8ply-10k.pgn
 openings-10ply-100k.pgn
 
-nets
-nets/

@@ -3,7 +3,6 @@
 // clang-format off
 #include <cstdint>
 #include <string>
-using namespace std;
 
 using u8 = uint8_t;
 using u16 = uint16_t;
@@ -16,9 +15,10 @@ using i64 = int64_t;
 
 using Square = u8;
 
-const inline i32 MAX_INT32 = 2147483647;
+const inline i32 I32_MAX = 2147483647;
+const inline u64 U64_MAX = 9223372036854775807;
 
-const string START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+const std::string START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 const Square SQUARE_NONE = 255;
 

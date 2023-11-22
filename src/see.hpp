@@ -3,6 +3,9 @@
 
 // clang-format off
 
+namespace see
+{
+
                               // P    N    B    R    Q    K  NONE
 const i32 SEE_PIECE_VALUES[7] = {100, 300, 300, 500, 900, 0, 0};
 const u8 PAWN_INDEX = 0;
@@ -100,5 +103,7 @@ inline PieceType popLeastValuable(Board &board, u64 &occ, u64 attackers, Color c
     }
 
     return PieceType::NONE;
+}
+
 }
 

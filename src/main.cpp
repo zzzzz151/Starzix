@@ -1,20 +1,18 @@
 // clang-format off
 
-#include <stdio.h>
-#include <array>
-#include <cstring> // for memset()
 #include "board.hpp"
+
+Board board;
+
 #include "search.hpp"
 #include "uci.hpp"
-
-using namespace std;
 
 int main()
 {
     Board::initZobrist();
-    attacks::initAttacks();
+    attacks::init();
     nnue::loadNetFromFile();
-    initSearch();
+    search::init();
     board = Board(START_FEN);
     uci::uciLoop();
     return 0;

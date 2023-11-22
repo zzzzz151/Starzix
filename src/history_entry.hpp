@@ -12,7 +12,7 @@ struct HistoryEntry
     inline i32 quietHistory(Board &board)
     {
         // add main history
-        i32 totalHist = mainHistory;
+        i32 quietHist = mainHistory;
         
         // add countermove history using last move
         Move lastMove;
@@ -20,7 +20,7 @@ struct HistoryEntry
         {
             int pieceType = (int)board.getNthToLastMovePieceType(1);
             int targetSq = (int)lastMove.to();
-            totalHist += countermoveHistory[pieceType][targetSq];
+            quietHist += countermoveHistory[pieceType][targetSq];
         }
 
         // add follow-up move history using 2nd-to-last move
@@ -29,10 +29,10 @@ struct HistoryEntry
         {
             int pieceType = (int)board.getNthToLastMovePieceType(2);
             int targetSq = (int)lastLastMove.to();
-            totalHist += followupMoveHistory[pieceType][targetSq];
+            quietHist += followupMoveHistory[pieceType][targetSq];
         }
        
-        return totalHist;
+        return quietHist;
     }
 
     inline void updateQuietHistory(Board &board, i32 bonus, i32 maxHistory)
