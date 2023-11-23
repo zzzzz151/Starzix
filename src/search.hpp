@@ -17,9 +17,9 @@ namespace search
 
 const u8 MAX_DEPTH = 100;
 
-const int ASPIRATION_MIN_DEPTH = 6,
+const int ASPIRATION_MIN_DEPTH = 9,
           ASPIRATION_INITIAL_DELTA = 15;
-const double ASPIRATION_DELTA_MULTIPLIER = 1.2;
+const double ASPIRATION_DELTA_MULTIPLIER = 1.4;
 
 const int IIR_MIN_DEPTH = 4;
 
@@ -57,7 +57,7 @@ const int SINGULAR_MIN_DEPTH = 8,
 
 const double LMR_BASE = 0.8,
              LMR_MULTIPLIER = 0.4;
-const int LMR_MIN_DEPTH = 2,
+const int LMR_MIN_DEPTH = 3,
           LMR_HISTORY_DIVISOR = 8192,
           LMR_CAPTURE_HISTORY_DIVISOR = 4096;
 
@@ -325,7 +325,7 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
 
             board.undoMove(); // undo TT move we just made
 
-            i16 singularBeta = ttEntry->score - depth * SINGULAR_BETA_DEPTH_MULTIPLIER;
+            i16 singularBeta = max(NEG_INFINITY, ttEntry->score - depth * SINGULAR_BETA_DEPTH_MULTIPLIER);
             i16 singularScore = search((depth - 1) / 2, ply, singularBeta - 1, singularBeta, 
                                        cutNode, doubleExtensionsLeft, true, eval);
 

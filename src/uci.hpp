@@ -86,7 +86,7 @@ inline void go(std::vector<std::string> &tokens)
 inline void info(int depth, i16 score)
 {
     auto millisecondsElapsed = search::timeManager.millisecondsElapsed();
-    u64 nps = search::nodes / (millisecondsElapsed > 0 ? millisecondsElapsed : 1) * 1000;
+    u64 nps = search::nodes * 1000.0 / (millisecondsElapsed > 0 ? (double)millisecondsElapsed : 1.0);
 
     // "score cp <score>" or "score mate <moves>" ?
     bool isMate = abs(score) >= MIN_MATE_SCORE;
