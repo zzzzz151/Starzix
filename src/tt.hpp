@@ -2,6 +2,8 @@
 
 // clang-format off
 
+#include <cstring> // for memset()
+
 namespace tt // Transposition table
 {
 

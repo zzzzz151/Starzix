@@ -211,8 +211,8 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
     if (shouldCutoff && !singular) 
         return ttEntry->adjustedScore(ply);
 
-    Move ttMove = board.getZobristHash() == ttEntry->zobristHash && !singular
-                  ? ttEntry->bestMove : MOVE_NONE;
+    bool ttHit = board.getZobristHash() == ttEntry->zobristHash;
+    Move ttMove = ttHit && !singular ? ttEntry->bestMove : MOVE_NONE;
 
     bool pvNode = beta - alpha > 1 || ply == 0;
     if (cutNode) assert(!pvNode); // cutNode implies !pvNode
@@ -257,7 +257,7 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
                        && ttEntry->depth >= depth - SINGULAR_DEPTH_MARGIN && ttEntry->getBound() != tt::UPPER_BOUND;
                        
     // IIR (Internal iterative reduction)
-    if (ttMove == MOVE_NONE && depth >= IIR_MIN_DEPTH && !board.inCheck())
+    if (!ttHit && depth >= IIR_MIN_DEPTH && !board.inCheck())
         depth--;
 
     MovesList moves = board.pseudolegalMoves();
@@ -382,22 +382,20 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
             // dont reduce into qsearch
             lmr = std::clamp(lmr, 0, searchDepth - 1);
 
-            // Reduced search on null window
+            // PVS part 1/4: reduced search on null window
             score = -search(searchDepth - lmr, ply + 1, -alpha-1, -alpha, true, doubleExtensionsLeft);
 
-            // If score is better than expected (score > alpha), do full depth search on null window
+            // PVS part 2/4: if score is better than expected (score > alpha), do full depth search on null window
             if (score > alpha && lmr != 1)
                 score = -search(searchDepth, ply + 1, -alpha-1, -alpha, !cutNode, doubleExtensionsLeft);
         }
         else if (!pvNode || legalMovesPlayed > 1)
-            // Full depth search on null window
+            // PVS part 3/4: full depth search on null window
             score = -search(searchDepth, ply + 1, -alpha-1, -alpha, !cutNode, doubleExtensionsLeft);
 
-        // Full depth search on full window for some pv nodes
+        // PVS part 4/4: full depth search on full window for some pv nodes
         if (pvNode && (legalMovesPlayed == 1 || score > alpha))
             score = -search(searchDepth, ply + 1, -beta, -alpha, false, doubleExtensionsLeft);
-
-        searchingDone:
 
         board.undoMove();
         if (timeManager.isHardTimeUp(nodes)) return 0;

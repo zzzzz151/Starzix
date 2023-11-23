@@ -7,10 +7,10 @@
 class TimeManager
 {
     constexpr static u32 OVERHEAD_MILLISECONDS = 10;
-    constexpr static double MOVESTOGO_HARD_TIME_PERCENTAGE = 0.75,
-                            MOVESTOGO_SOFT_TIME_PERCENTAGE = 0.5,
-                            SUDDEN_DEATH_HARD_TIME_PERCENTAGE = 1.0 / 4.0,
-                            SUDDEN_DEATH_SOFT_TIME_PERCENTAGE = 1.0 / 30.0,
+    constexpr static double MOVESTOGO_HARD_TIME_PERCENTAGE = 0.5,
+                            MOVESTOGO_SOFT_TIME_PERCENTAGE = 0.6,
+                            SUDDEN_DEATH_HARD_TIME_PERCENTAGE = 0.5,
+                            SUDDEN_DEATH_SOFT_TIME_PERCENTAGE = 1.0 / 20.0,
                             SOFT_TIME_SCALE_BASE = 0.25,
                             SOFT_TIME_SCALE_MULTIPLIER = 1.75;
 
