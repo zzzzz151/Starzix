@@ -54,7 +54,7 @@ struct Move
 
     inline u16 typeFlag() { return moveEncoded & 0x000F; }
 
-    inline PieceType promotionPieceType()
+    inline PieceType promotion()
     {
         u16 flag = typeFlag();
         if (flag < 1 || flag > 4)

@@ -62,12 +62,11 @@
 
 ### Move ordering
 - TT move
-- Good captures by SEE + MVV + capture history
-- Promotions
+- Good captures and good queen promotion by SEE + MVV + capture history
 - Killer move
 - Countermove
 - Quiet moves by history
-- Bad captures
+- Bad captures and bad queen promotion
 
 ### Move history
 - Main history

@@ -21,7 +21,7 @@ inline bool SEE(Board &board, Move move, i32 threshold = 0)
     if (score < 0)
         return false;
 
-    PieceType promotionPieceType = move.promotionPieceType();
+    PieceType promotionPieceType = move.promotion();
     PieceType next = promotionPieceType != PieceType::NONE ? promotionPieceType : board.pieceTypeAt(move.from());
     score -= SEE_PIECE_VALUES[(int)next];
     if (score >= 0)
@@ -83,7 +83,7 @@ inline i32 gain(Board &board, Move move)
 
     i32 score = SEE_PIECE_VALUES[(int)board.pieceTypeAt(move.to())];
 
-    PieceType promotionPieceType = move.promotionPieceType();
+    PieceType promotionPieceType = move.promotion();
     if (promotionPieceType != PieceType::NONE)
         score += SEE_PIECE_VALUES[(int)promotionPieceType] - SEE_PIECE_VALUES[PAWN_INDEX]; // gain promotion, lose the pawn
 

@@ -395,8 +395,8 @@ class Board
         removePiece(from); // remove from source square
         removePiece(to); // remove captured piece if any
 
-        Piece pieceToPlace = move.promotionPieceType() == PieceType::NONE 
-                             ? pieceMoving : makePiece(move.promotionPieceType(), colorToMove);
+        Piece pieceToPlace = move.promotion() == PieceType::NONE 
+                             ? pieceMoving : makePiece(move.promotion(), colorToMove);
                              
         placePiece(to, pieceToPlace); // place on target square
 
@@ -526,7 +526,7 @@ class Board
         Square to = move.to();
         auto moveFlag = move.typeFlag();
 
-        Piece pieceMoved = move.promotionPieceType() == PieceType::NONE 
+        Piece pieceMoved = move.promotion() == PieceType::NONE 
                            ? pieces[to] : makePiece(PieceType::PAWN, colorToMove);
 
         removePiece(to); 
@@ -612,7 +612,7 @@ class Board
         assert(!inCheckCached);
     }
 
-    inline MovesList pseudolegalMoves(bool capturesOnly = false)
+    inline MovesList pseudolegalMoves(bool noisyOnly = false, bool underpromotions = true)
     {
         MovesList moves;
         Color enemyColor = oppSide();
@@ -654,42 +654,41 @@ class Board
                 willPromote = colorToMove == Color::WHITE;
             }
 
+            // Generate this pawn's captures
             u64 pawnAttacks = attacks::pawnAttacks(sq, colorToMove) & them;
             while (pawnAttacks > 0)
             {
                 Square targetSquare = poplsb(pawnAttacks);
                 if (willPromote) 
-                    addPromotions(moves, sq, targetSquare);
+                    addPromotions(moves, sq, targetSquare, underpromotions);
                 else 
                     moves.add(Move(sq, targetSquare, Move::NORMAL_FLAG));
             }
-
-            if (capturesOnly)
-                continue;
-
-            // pawn pushes (1 square up and 2 squares up)
 
             Square squareOneUp = colorToMove == Color::WHITE ? sq + 8 : sq - 8;
             if (pieces[squareOneUp] != Piece::NONE)
                 continue;
 
             if (willPromote)
-                addPromotions(moves, sq, squareOneUp);
-            else
             {
-                // pawn 1 square up
-                moves.add(Move(sq, squareOneUp, Move::NORMAL_FLAG));
-                // pawn 2 squares up
-                Square squareTwoUp = colorToMove == Color::WHITE ? sq + 16 : sq - 16;
-                if (pawnHasntMoved && pieces[squareTwoUp] == Piece::NONE)
-                    moves.add(Move(sq, squareTwoUp, Move::PAWN_TWO_UP_FLAG));
+                addPromotions(moves, sq, squareOneUp, underpromotions);
+                continue;
             }
+
+            if (noisyOnly) continue;
+
+            // pawn 1 square up
+            moves.add(Move(sq, squareOneUp, Move::NORMAL_FLAG));
+            // pawn 2 squares up
+            Square squareTwoUp = colorToMove == Color::WHITE ? sq + 16 : sq - 16;
+            if (pawnHasntMoved && pieces[squareTwoUp] == Piece::NONE)
+                moves.add(Move(sq, squareTwoUp, Move::PAWN_TWO_UP_FLAG));
         }
 
         while (ourKnights > 0)
         {
             Square sq = poplsb(ourKnights);
-            u64 knightMoves = capturesOnly ? attacks::knightAttacks(sq) & them : attacks::knightAttacks(sq) & ~us;
+            u64 knightMoves = noisyOnly ? attacks::knightAttacks(sq) & them : attacks::knightAttacks(sq) & ~us;
             while (knightMoves > 0)
             {
                 Square targetSquare = poplsb(knightMoves);
@@ -698,7 +697,7 @@ class Board
         }
 
         Square kingSquare = poplsb(ourKing);
-        u64 kingMoves = capturesOnly ? attacks::kingAttacks(kingSquare) & them : attacks::kingAttacks(kingSquare) & ~us;
+        u64 kingMoves = noisyOnly ? attacks::kingAttacks(kingSquare) & them : attacks::kingAttacks(kingSquare) & ~us;
         while (kingMoves > 0)
         {
             Square targetSquare = poplsb(kingMoves);
@@ -706,7 +705,7 @@ class Board
         }
 
         // Castling
-        if (!capturesOnly)
+        if (!noisyOnly)
         {
             if (castlingRights[(int)colorToMove][CASTLE_SHORT]
             && pieces[kingSquare+1] == Piece::NONE
@@ -730,7 +729,7 @@ class Board
         {
             Square sq = poplsb(ourBishops);
             u64 bishopAttacks = attacks::bishopAttacks(sq, occupied);
-            u64 bishopMoves = capturesOnly ? bishopAttacks & them : bishopAttacks & ~us;
+            u64 bishopMoves = noisyOnly ? bishopAttacks & them : bishopAttacks & ~us;
             while (bishopMoves > 0)
             {
                 Square targetSquare = poplsb(bishopMoves);
@@ -742,7 +741,7 @@ class Board
         {
             Square sq = poplsb(ourRooks);
             u64 rookAttacks = attacks::rookAttacks(sq, occupied);
-            u64 rookMoves = capturesOnly ? rookAttacks & them : rookAttacks & ~us;
+            u64 rookMoves = noisyOnly ? rookAttacks & them : rookAttacks & ~us;
             while (rookMoves > 0)
             {
                 Square targetSquare = poplsb(rookMoves);
@@ -754,7 +753,7 @@ class Board
         {
             Square sq = poplsb(ourQueens);
             u64 queenAttacks = attacks::bishopAttacks(sq, occupied) | attacks::rookAttacks(sq, occupied);
-            u64 queenMoves = capturesOnly ? queenAttacks & them : queenAttacks & ~us;
+            u64 queenMoves = noisyOnly ? queenAttacks & them : queenAttacks & ~us;
             while (queenMoves > 0)
             {
                 Square targetSquare = poplsb(queenMoves);
@@ -767,12 +766,15 @@ class Board
 
     private:
 
-    inline void addPromotions(MovesList &moves, Square sq, Square targetSquare)
+    inline void addPromotions(MovesList &moves, Square sq, Square targetSquare, bool underpromotions)
     {
         moves.add(Move(sq, targetSquare, Move::QUEEN_PROMOTION_FLAG));
-        moves.add(Move(sq, targetSquare, Move::ROOK_PROMOTION_FLAG));
-        moves.add(Move(sq, targetSquare, Move::BISHOP_PROMOTION_FLAG));
-        moves.add(Move(sq, targetSquare, Move::KNIGHT_PROMOTION_FLAG));
+        if (underpromotions)
+        {
+            moves.add(Move(sq, targetSquare, Move::ROOK_PROMOTION_FLAG));
+            moves.add(Move(sq, targetSquare, Move::BISHOP_PROMOTION_FLAG));
+            moves.add(Move(sq, targetSquare, Move::KNIGHT_PROMOTION_FLAG));
+        }
     }
 
     public:

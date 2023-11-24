@@ -7,7 +7,7 @@ struct HistoryEntry
     i32 mainHistory = 0;
     i32 countermoveHistory[6][64];  // [lastMovePieceType][lastMoveTargetSquare]
     i32 followupMoveHistory[6][64]; // [lastLastMovePieceType][lastLastMoveTargetSquare]
-    i32 captureHistory = 0;
+    i32 noisyHistory = 0;
 
     inline i32 quietHistory(Board &board)
     {
@@ -61,9 +61,9 @@ struct HistoryEntry
         }
     }
 
-    inline void updateCaptureHistory(Board &board, i32 bonus, i32 maxHistory)
+    inline void updateNoisyHistory(Board &board, i32 bonus, i32 maxHistory)
     {
-        captureHistory += bonus - captureHistory * abs(bonus) / maxHistory;
+        noisyHistory += bonus - noisyHistory * abs(bonus) / maxHistory;
     }
 
 };

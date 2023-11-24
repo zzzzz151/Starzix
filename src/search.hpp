@@ -59,7 +59,7 @@ const double LMR_BASE = 0.8,
              LMR_MULTIPLIER = 0.4;
 const int LMR_MIN_DEPTH = 3,
           LMR_HISTORY_DIVISOR = 8192,
-          LMR_CAPTURE_HISTORY_DIVISOR = 4096;
+          LMR_NOISY_HISTORY_DIVISOR = 4096;
 
 const i32 HISTORY_MIN_BONUS = 1570,
           HISTORY_BONUS_MULTIPLIER = 370,
@@ -67,15 +67,14 @@ const i32 HISTORY_MIN_BONUS = 1570,
 
 // Move ordering
 const i32 TT_MOVE_SCORE           = I32_MAX,
-          GOOD_CAPTURE_BASE_SCORE = 1'500'000'000,
-          PROMOTION_BASE_SCORE    = 1'000'000'000,
-          KILLER_SCORE            = 500'000'000,
-          COUNTERMOVE_SCORE       = 250'000'000,
+          GOOD_NOISY_BASE_SCORE = 1'500'000'000,
+          KILLER_SCORE            = 1'000'000'000,
+          COUNTERMOVE_SCORE       = 500'000'000,
           HISTORY_MOVE_BASE_SCORE = 0,
-          BAD_CAPTURE_BASE_SCORE  = -HISTORY_MAX / 2;
+          BAD_NOISY_BASE_SCORE  = -HISTORY_MAX / 2;
 
-// Most valuable victim    P   N   B   R   Q
-const i32 MVV_VALUES[5] = {10, 30, 32, 50, 90};
+// Most valuable victim    P   N   B   R   Q   K  NONE
+const i32 MVV_VALUES[7] = {10, 30, 32, 50, 90, 0, 0};
 
 TimeManager timeManager;
 u64 nodes;
@@ -97,7 +96,7 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
 
 inline i16 qSearch(int ply, i16 alpha, i16 beta);
 
-inline std::array<i32, 256> scoreMoves(MovesList &moves, Move ttMove, Move killerMove, bool doSEE = true);
+inline std::array<i32, 256> scoreMoves(MovesList &moves, Move ttMove, Move killerMove);
 
 inline void init()
 {
@@ -260,7 +259,8 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
     if (!ttHit && depth >= IIR_MIN_DEPTH && !board.inCheck())
         depth--;
 
-    MovesList moves = board.pseudolegalMoves();
+    // generate all moves except underpromotions
+    MovesList moves = board.pseudolegalMoves(false, false); 
     auto movesScores = scoreMoves(moves, ttMove, killerMoves[ply]);
 
     int stm = (int)board.sideToMove();
@@ -269,9 +269,9 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
     Move bestMove = MOVE_NONE;
     i16 originalAlpha = alpha;
 
-    // Fail low quiets at beginning of array, fail low captures at the end
+    // Fail low quiets at beginning of array, fail low noisy moves at the end
     HistoryEntry *failLowsHistoryEntry[256]; 
-    int numFailLowQuiets = 0, numFailLowCaptures = 0;
+    int numFailLowQuiets = 0, numFailLowNoisies = 0;
 
     for (int i = 0; i < moves.size(); i++)
     {
@@ -280,8 +280,7 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
         // Don't search TT move in singular search
         if (singular && move == ttEntry->bestMove) continue;
 
-        bool isCapture = board.isCapture(move);
-        bool isQuietMove = !isCapture && move.promotionPieceType() == PieceType::NONE;
+        bool isQuietMove = !board.isCapture(move) && move.promotion() == PieceType::NONE;
         bool historyMoveOrLosing = moveScore < COUNTERMOVE_SCORE;
         int lmr = lmrTable[depth][legalMovesPlayed + 1];
 
@@ -375,8 +374,8 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
             // reduce moves with good history less and vice versa
             if (isQuietMove) 
                 lmr -= round((moveScore - HISTORY_MOVE_BASE_SCORE) / (double)LMR_HISTORY_DIVISOR);
-            else if (isCapture)
-                lmr -= round(historyEntry->captureHistory / (double)LMR_CAPTURE_HISTORY_DIVISOR);
+            else
+                lmr -= round(historyEntry->noisyHistory / (double)LMR_NOISY_HISTORY_DIVISOR);
 
             // if lmr is negative, we would have an extension instead of a reduction
             // dont reduce into qsearch
@@ -406,11 +405,11 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
 
         if (score <= alpha) // Fail low
         {
-            // Fail low quiets at beginning of array, fail low captures at the end
+            // Fail low quiets at beginning of array, fail low noisy moves at the end
             if (isQuietMove)
                 failLowsHistoryEntry[numFailLowQuiets++] = historyEntry;
-            else if (isCapture)
-                failLowsHistoryEntry[256 - ++numFailLowCaptures] = historyEntry;
+            else
+                failLowsHistoryEntry[256 - ++numFailLowNoisies] = historyEntry;
 
             continue;
         }
@@ -448,14 +447,14 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
             for (int i = 0; i < numFailLowQuiets; i++)
                 failLowsHistoryEntry[i]->updateQuietHistory(board, -historyBonus, HISTORY_MAX); 
         }
-        else if (isCapture)
+        else
         {
-            // Increase this capture's history
-            historyEntry->updateCaptureHistory(board, historyBonus, HISTORY_MAX);
+            // Increase history of this noisy move
+            historyEntry->updateNoisyHistory(board, historyBonus, HISTORY_MAX);
 
-            // Penalize/decrease history of captures that failed low
-            for (int i = 255, j = 0; j < numFailLowCaptures; i--, j++)
-                failLowsHistoryEntry[i]->updateCaptureHistory(board, -historyBonus, HISTORY_MAX);
+            // Penalize/decrease history of noisy moves that failed low
+            for (int i = 255, j = 0; j < numFailLowNoisies; i--, j++)
+                failLowsHistoryEntry[i]->updateNoisyHistory(board, -historyBonus, HISTORY_MAX);
         }
 
         break; // Fail high / Beta cutoff
@@ -473,7 +472,7 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
 
 inline i16 qSearch(int ply, i16 alpha, i16 beta)
 {
-    // Quiescence search: search captures until a 'quiet' position is reached
+    // Quiescence search: search noisy moves until a 'quiet' position is reached
 
     // Update seldepth
     if (ply > maxPlyReached) maxPlyReached = ply;
@@ -497,9 +496,10 @@ inline i16 qSearch(int ply, i16 alpha, i16 beta)
 
     Move ttMove = board.getZobristHash() == ttEntry->zobristHash ? ttEntry->bestMove : MOVE_NONE;
 
-    // if in check, generate and score all moves, else only captures
-    MovesList moves = board.pseudolegalMoves(!board.inCheck()); 
-    auto movesScores = scoreMoves(moves, ttMove, killerMoves[ply], board.inCheck());
+    // if in check, generate all moves, else only noisy moves
+    // never generate underpromotions
+    MovesList moves = board.pseudolegalMoves(!board.inCheck(), false); 
+    auto movesScores = scoreMoves(moves, ttMove, killerMoves[ply]);
     
     int legalMovesPlayed = 0;
     i16 bestScore = eval;
@@ -510,8 +510,9 @@ inline i16 qSearch(int ply, i16 alpha, i16 beta)
     {
         auto [move, moveScore] = incrementalSort(moves, movesScores, i);
 
-        // SEE pruning (skip bad captures)
-        if (!board.inCheck() && !see::SEE(board, move)) continue;
+        // SEE pruning (skip bad noisy moves)
+        if (!board.inCheck() && moveScore < BAD_NOISY_BASE_SCORE + 100'000) 
+            continue;
 
         // skip illegal moves
         if (!board.makeMove(move)) continue; 
@@ -539,7 +540,7 @@ inline i16 qSearch(int ply, i16 alpha, i16 beta)
     return bestScore;
 }
 
-inline std::array<i32, 256> scoreMoves(MovesList &moves, Move ttMove, Move killerMove, bool doSEE)
+inline std::array<i32, 256> scoreMoves(MovesList &moves, Move ttMove, Move killerMove)
 {
     std::array<i32, 256> movesScores;
 
@@ -551,20 +552,20 @@ inline std::array<i32, 256> scoreMoves(MovesList &moves, Move ttMove, Move kille
     for (int i = 0; i < moves.size(); i++)
     {
         Move move = moves[i];
+        PieceType captured = board.captured(move);
+        PieceType promotion = move.promotion();
         int pieceType = (int)board.pieceTypeAt(move.from());
         int targetSquare = (int)move.to();
-        PieceType pieceTypeCaptured = board.captured(move);
+        HistoryEntry *historyEntry = &(historyTable[stm][pieceType][targetSquare]);
 
         if (move == ttMove)
             movesScores[i] = TT_MOVE_SCORE;
-        else if (pieceTypeCaptured != PieceType::NONE)
+        else if (captured != PieceType::NONE || promotion != PieceType::NONE)
         {
-            movesScores[i] = MVV_VALUES[(int)pieceTypeCaptured];
-            movesScores[i] += historyTable[stm][pieceType][targetSquare].captureHistory;
-            if (doSEE) movesScores[i] += see::SEE(board, move) ? GOOD_CAPTURE_BASE_SCORE : BAD_CAPTURE_BASE_SCORE;
+            movesScores[i] = see::SEE(board, move) ? GOOD_NOISY_BASE_SCORE : BAD_NOISY_BASE_SCORE;
+            movesScores[i] += MVV_VALUES[(int)captured];
+            movesScores[i] += historyEntry->noisyHistory;
         }
-        else if (move.promotionPieceType() != PieceType::NONE)
-            movesScores[i] = PROMOTION_BASE_SCORE + move.typeFlag();
         else if (move == killerMove)
             movesScores[i] = KILLER_SCORE;
         else if (move == countermove)
@@ -572,7 +573,7 @@ inline std::array<i32, 256> scoreMoves(MovesList &moves, Move ttMove, Move kille
         else
         {
             movesScores[i] = HISTORY_MOVE_BASE_SCORE;
-            movesScores[i] += historyTable[stm][pieceType][targetSquare].quietHistory(board);
+            movesScores[i] += historyEntry->quietHistory(board);
         }
     }
 
