@@ -62,17 +62,17 @@
 
 ### Move ordering
 - TT move
-- Good captures and good queen promotion by SEE + MVV + capture history
+- Good noisy moves by SEE + MVV + noisy history
 - Killer move
 - Countermove
 - Quiet moves by history
-- Bad captures and bad queen promotion
+- Bad noisy moves
 
 ### Move history
 - Main history
 - Countermove history
 - Follow-up move history
-- Capture history
+- Noisy history
 
 ### Time management
 - Any time control

@@ -67,11 +67,11 @@ const i32 HISTORY_MIN_BONUS = 1570,
 
 // Move ordering
 const i32 TT_MOVE_SCORE           = I32_MAX,
-          GOOD_NOISY_BASE_SCORE = 1'500'000'000,
+          GOOD_NOISY_BASE_SCORE   = 1'500'000'000,
           KILLER_SCORE            = 1'000'000'000,
           COUNTERMOVE_SCORE       = 500'000'000,
           HISTORY_MOVE_BASE_SCORE = 0,
-          BAD_NOISY_BASE_SCORE  = -HISTORY_MAX / 2;
+          BAD_NOISY_BASE_SCORE    = -HISTORY_MAX / 2;
 
 // Most valuable victim    P   N   B   R   Q   K  NONE
 const i32 MVV_VALUES[7] = {10, 30, 32, 50, 90, 0, 0};
@@ -281,11 +281,10 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
         if (singular && move == ttEntry->bestMove) continue;
 
         bool isQuietMove = !board.isCapture(move) && move.promotion() == PieceType::NONE;
-        bool historyMoveOrLosing = moveScore < COUNTERMOVE_SCORE;
         int lmr = lmrTable[depth][legalMovesPlayed + 1];
 
         // Moves loop pruning
-        if (ply > 0 && historyMoveOrLosing && bestScore > -MIN_MATE_SCORE)
+        if (ply > 0 && moveScore < COUNTERMOVE_SCORE && bestScore > -MIN_MATE_SCORE)
         {
             // LMP (Late move pruning)
             if (depth <= LMP_MAX_DEPTH 
@@ -366,15 +365,18 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
         HistoryEntry *historyEntry = &(historyTable[stm][pieceType][targetSquare]);
 
         // LMR (Late move reductions)
-        if (legalMovesPlayed > 1 && depth >= LMR_MIN_DEPTH && historyMoveOrLosing)
+        if (legalMovesPlayed > 1 && depth >= LMR_MIN_DEPTH && moveScore <= KILLER_SCORE)
         {
             lmr -= board.inCheck(); // reduce checks less
             lmr -= pvNode; // reduce pv nodes less
 
+            // reduce killers and countermoves less
+            if (moveScore == KILLER_SCORE || moveScore == COUNTERMOVE_SCORE)
+                lmr--;
             // reduce moves with good history less and vice versa
-            if (isQuietMove) 
+            else if (isQuietMove)
                 lmr -= round((moveScore - HISTORY_MOVE_BASE_SCORE) / (double)LMR_HISTORY_DIVISOR);
-            else
+            else 
                 lmr -= round(historyEntry->noisyHistory / (double)LMR_NOISY_HISTORY_DIVISOR);
 
             // if lmr is negative, we would have an extension instead of a reduction
