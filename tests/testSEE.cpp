@@ -9,7 +9,6 @@
 int failed = 0, passed = 0;
 
 int main() {
-    Board::initZobrist();
     attacks::init();
     //nnue::loadNetFromFile();
 
@@ -26,16 +25,7 @@ int main() {
     while (std::getline(inputFile, line))
     {
         std::stringstream iss(line);
-        std::vector<std::string> tokens;
-
-        // Split the line by " | " delimiter
-        std::string part;
-        while (std::getline(iss, part, '|')) {
-            part.erase(0, part.find_first_not_of(" \t"));
-            part.erase(part.find_last_not_of(" \t") + 1);
-            trim(part);
-            tokens.push_back(part);
-        }
+        std::vector<std::string> tokens = splitString(line, '|');
 
         std::string fen = tokens[0];
         std::string uciMove = tokens[1];
@@ -44,9 +34,9 @@ int main() {
 
         Board board = Board(fen);
         Move move = Move::fromUci(uciMove, board.getPieces());
-        bool res = see::SEE(board, move);
+        bool result = see::SEE(board, move);
 
-        if (res == expected)
+        if (result == expected)
             passed++;
         else
         {
@@ -56,11 +46,10 @@ int main() {
 
     }
 
-    // Close the file
     inputFile.close();
 
     std::cout << "Passed: " << passed << std::endl;
     std::cout << "Failed: " << failed << std::endl;
 
-    return 0; // Return 0 to indicate success
+    return 0;
 }

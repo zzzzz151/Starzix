@@ -53,7 +53,6 @@ template <typename T> inline void testNotEquals(std::string testName, T got, T e
 
 int main()
 {   
-    Board::initZobrist();
     attacks::init();
     //nnue::loadNetFromFile();
 
@@ -109,18 +108,22 @@ int main()
     std::bitset<64> expected(0xffff00000000ffffULL);  
     test("board.occupancy()", got, expected);
     test("getBitboard(KING) == 2", std::popcount(board.getBitboard(PieceType::KING)), 2);
-    test("getBitboard(KING, WHITE) == 1", std::popcount(board.getBitboard(PieceType::KING, Color::WHITE)), 1);
+    test("getBitboard(KING, WHITE) == 1", std::popcount(board.getBitboard(Color::WHITE, PieceType::KING)), 1);
 
     // Test pawn 2 up and en passant
     board = Board("rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/2P2P2/RqBQ1RK1 b kq - 1 10");
     test("move has PAWN_TWO_UP_FLAG flag", Move::fromUci("g7g5", board.getPieces()).typeFlag(), Move::PAWN_TWO_UP_FLAG);
     board.makeMove("g7g5");
-    test("makeMove() creates en passant", board.fen(), (std::string)"rnbqkb1r/4pp1p/1p1p1n2/2p3pP/2BP2P1/4PN2/2P2P2/RqBQ1RK1 w kq g6 0 11");
+    test("makeMove() creates en passant", 
+         board.fen(), 
+         (std::string)"rnbqkb1r/4pp1p/1p1p1n2/2p3pP/2BP2P1/4PN2/2P2P2/RqBQ1RK1 w kq g6 0 11");
 
     // Test en passant
     board = Board("rnbqkbnr/pppppp1p/8/8/1P4pP/3P4/P1P1PPP1/RNBQKBNR b KQkq h3 0 3");
     board.makeMove("g4h3");
-    test("fen is correct after taking en passant", board.fen(), (std::string)"rnbqkbnr/pppppp1p/8/8/1P6/3P3p/P1P1PPP1/RNBQKBNR w KQkq - 0 4");
+    test("fen is correct after taking en passant", 
+         board.fen(), 
+         (std::string)"rnbqkbnr/pppppp1p/8/8/1P6/3P3p/P1P1PPP1/RNBQKBNR w KQkq - 0 4");
     
     // Test position repetition
     board = Board(START_FEN);
@@ -159,27 +162,39 @@ int main()
     if (!board.inCheck())
     {
         board.makeNullMove();
-        test("makeNullMove() fen", board.fen(), (std::string)"1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 b Qk - 1 15");
+        test("makeNullMove() fen", 
+             board.fen(), 
+             (std::string)"1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 b Qk - 1 15");
         board.undoNullMove();
-        test("undoNullMove() fen", board.fen(), (std::string)"1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 w Qk f6 0 15");
+        test("undoNullMove() fen", 
+             board.fen(), 
+             (std::string)"1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 w Qk f6 0 15");
     }
 
     // Test making moves and zobrist hash
+
     board = Board("rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/p1P2P2/RNBQK2R b KQkq - 5 9");
     uint64_t zobristHashBefore = board.getZobristHash();
-    board.makeMove("a2b1q");  // black promotes to queen | rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/2P2P2/RqBQK2R w KQkq - 0 10
-    board.makeMove("e1g1"); // white castles short | rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/2P2P2/RqBQ1RK1 b kq - 1 10
-    board.makeMove("g7g5"); // black allows enpassant | rnbqkb1r/4pp1p/1p1p1n2/2p3pP/2BP2P1/4PN2/2P2P2/RqBQ1RK1 w kq g6 0 11
-    board.makeMove("h5g6"); // white takes on passant | rnbqkb1r/4pp1p/1p1p1nP1/2p5/2BP2P1/4PN2/2P2P2/RqBQ1RK1 b kq - 0 11
+
+    board.makeMove("a2b1q"); // black promotes to queen | rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/2P2P2/RqBQK2R w KQkq - 0 10
+    board.makeMove("e1g1");  // white castles short | rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/2P2P2/RqBQ1RK1 b kq - 1 10
+    board.makeMove("g7g5");  // black allows enpassant | rnbqkb1r/4pp1p/1p1p1n2/2p3pP/2BP2P1/4PN2/2P2P2/RqBQ1RK1 w kq g6 0 11
+    board.makeMove("h5g6");  // white takes on passant | rnbqkb1r/4pp1p/1p1p1nP1/2p5/2BP2P1/4PN2/2P2P2/RqBQ1RK1 b kq - 0 11
     board.makeMove("f6g4");  // black captures white pawn with black knight | rnbqkb1r/4pp1p/1p1p2P1/2p5/2BP2n1/4PN2/2P2P2/RqBQ1RK1 w kq - 0 12
-    board.makeMove("a1a2"); // white moves rook up (test 50move counter) | rnbqkb1r/4pp1p/1p1p2P1/2p5/2BP2n1/4PN2/R1P2P2/1qBQ1RK1 b kq - 1 12
-    test("fen is what we expect after 6x makeMove()", board.fen(), (std::string)"rnbqkb1r/4pp1p/1p1p2P1/2p5/2BP2n1/4PN2/R1P2P2/1qBQ1RK1 b kq - 1 12");
-    test("zobristHash is what we expect after making moves", board.getZobristHash(), Board("rnbqkb1r/4pp1p/1p1p2P1/2p5/2BP2n1/4PN2/R1P2P2/1qBQ1RK1 b kq - 1 12").getZobristHash());
+    board.makeMove("a1a2");  // white moves rook up (test 50move counter) | rnbqkb1r/4pp1p/1p1p2P1/2p5/2BP2n1/4PN2/R1P2P2/1qBQ1RK1 b kq - 1 12
+
+    std::string expectedFen = "rnbqkb1r/4pp1p/1p1p2P1/2p5/2BP2n1/4PN2/R1P2P2/1qBQ1RK1 b kq - 1 12";
+    test("fen is what we expect after making moves", board.fen(), expectedFen);
+    test("zobristHash is what we expect after making moves", 
+         board.getZobristHash(), 
+         Board(expectedFen).getZobristHash());
 
     // Test undoing moves and zobrist hash
     for (int i = 5; i >= 0; i--)
         board.undoMove();
-    test("fen is what we expect after 6x undoMove()", board.fen(), (std::string)"rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/p1P2P2/RNBQK2R b KQkq - 5 9");
+    test("fen is what we expect after 6x undoMove()", 
+         board.fen(), 
+         (std::string)"rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/p1P2P2/RNBQK2R b KQkq - 5 9");
     test("zobristHash is same after making and undoing moves", board.getZobristHash(), zobristHashBefore);
 
     // Test zobrist hash
@@ -206,13 +221,17 @@ int main()
     board.makeMove("a8b8");
     board.makeMove("e1e2");
     board.makeMove("d7d5");
-    test("Zobrist hash equals (making 3 moves vs from fen)", board.getZobristHash(), Board("1r2k2r/ppp1pppp/8/2PpP2P/8/8/4K3/R6R w k d6 0 3").getZobristHash());
+    test("Zobrist hash equals (making 3 moves vs from fen)", 
+        board.getZobristHash(), 
+        Board("1r2k2r/ppp1pppp/8/2PpP2P/8/8/4K3/R6R w k d6 0 3").getZobristHash());
 
     // Test illegal move
     board = Board("rnb1kbnr/pppp1ppp/8/4p1q1/3P4/1P6/P1P1PPPP/RNBQKBNR w KQkq - 1 3");
     zobHash = board.getZobristHash();
     board.makeMove("e1d2"); // illegal
     test("Zobrist hash equals after illegal move", zobHash, board.getZobristHash());
+
+    // Perft's
 
     board = Board(START_FEN);
     Board boardPos2 = Board(POSITION2_KIWIPETE);

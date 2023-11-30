@@ -18,14 +18,12 @@ inline PieceType popLeastValuable(Board &board, u64 &occ, u64 attackers, Color c
 inline bool SEE(Board &board, Move move, i32 threshold = 0)
 {
     i32 score = gain(board, move) - threshold;
-    if (score < 0)
-        return false;
+    if (score < 0) return false;
 
-    PieceType promotionPieceType = move.promotion();
-    PieceType next = promotionPieceType != PieceType::NONE ? promotionPieceType : board.pieceTypeAt(move.from());
+    PieceType promotion = move.promotion();
+    PieceType next = promotion != PieceType::NONE ? promotion : board.pieceTypeAt(move.from());
     score -= SEE_PIECE_VALUES[(int)next];
-    if (score >= 0)
-        return true;
+    if (score >= 0) return true;
 
     Square from = move.from();
     Square square = move.to();
@@ -38,8 +36,8 @@ inline bool SEE(Board &board, Move move, i32 threshold = 0)
     u64 attackers = 0;
     attackers |= (rooks & attacks::rookAttacks(square, occupancy));
     attackers |= (bishops & attacks::bishopAttacks(square, occupancy));
-    attackers |= (board.getBitboard(PieceType::PAWN, Color::BLACK) & attacks::pawnAttacks(square, Color::WHITE));
-    attackers |= (board.getBitboard(PieceType::PAWN, Color::WHITE) & attacks::pawnAttacks(square, Color::BLACK));
+    attackers |= (board.getBitboard(Color::BLACK, PieceType::PAWN) & attacks::pawnAttacks(square, Color::WHITE));
+    attackers |= (board.getBitboard(Color::WHITE, PieceType::PAWN) & attacks::pawnAttacks(square, Color::BLACK));
     attackers |= (board.getBitboard(PieceType::KNIGHT) & attacks::knightAttacks(square));
     attackers |= (board.getBitboard(PieceType::KING) & attacks::kingAttacks(square));
 
@@ -62,7 +60,8 @@ inline bool SEE(Board &board, Move move, i32 threshold = 0)
         us = oppColor(us);
 
         // if our only attacker is our king, but the opponent still has defenders
-        if (score >= 0 && next == PieceType::KING && (attackers & board.getBitboard(us)) > 0)
+        if (score >= 0 && next == PieceType::KING 
+        && (attackers & board.getBitboard(us)) > 0)
             us = oppColor(us);
 
         if (score >= 0) break;
@@ -83,9 +82,10 @@ inline i32 gain(Board &board, Move move)
 
     i32 score = SEE_PIECE_VALUES[(int)board.pieceTypeAt(move.to())];
 
-    PieceType promotionPieceType = move.promotion();
-    if (promotionPieceType != PieceType::NONE)
-        score += SEE_PIECE_VALUES[(int)promotionPieceType] - SEE_PIECE_VALUES[PAWN_INDEX]; // gain promotion, lose the pawn
+    PieceType promotion = move.promotion();
+    if (promotion != PieceType::NONE)
+        // gain promotion, lose the pawn
+        score += SEE_PIECE_VALUES[(int)promotion] - SEE_PIECE_VALUES[PAWN_INDEX]; 
 
     return score;
 }
@@ -94,7 +94,7 @@ inline PieceType popLeastValuable(Board &board, u64 &occ, u64 attackers, Color c
 {
     for (int pt = 0; pt <= 5; pt++)
     {
-        u64 bb = attackers & board.getBitboard((PieceType)pt, color);
+        u64 bb = attackers & board.getBitboard(color, (PieceType)pt);
         if (bb > 0)
         {
             occ ^= (1ULL << lsb(bb));

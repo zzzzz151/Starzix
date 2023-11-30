@@ -60,7 +60,7 @@ struct Accumulator
             white[i] = black[i] = nn.featureBiases[i];
     }
 
-    inline void activate(Color color, Square sq, PieceType pieceType)
+    inline void update(Color color, PieceType pieceType, Square sq, bool activate)
     {
         int whiteIdx = (int)color * 384 + (int)pieceType * 64 + sq;
         int blackIdx = !(int)color * 384 + (int)pieceType * 64 + (sq ^ 56);
@@ -69,24 +69,18 @@ struct Accumulator
 
         for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
         {
-            white[i] += nn.featureWeights[whiteOffset + i];
-            black[i] += nn.featureWeights[blackOffset + i];
+            if (activate)
+            {
+                white[i] += nn.featureWeights[whiteOffset + i];
+                black[i] += nn.featureWeights[blackOffset + i];
+            }
+            else
+            {
+                white[i] -= nn.featureWeights[whiteOffset + i];
+                black[i] -= nn.featureWeights[blackOffset + i];
+            }
         }
     }   
-
-    inline void deactivate(Color color, Square sq, PieceType pieceType)
-    {
-        int whiteIdx = (int)color * 384 + (int)pieceType * 64 + sq;
-        int blackIdx = !(int)color * 384 + (int)pieceType * 64 + (sq ^ 56);
-        int whiteOffset = whiteIdx * HIDDEN_LAYER_SIZE;
-        int blackOffset = blackIdx * HIDDEN_LAYER_SIZE;
-
-        for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
-        {
-            white[i] -= nn.featureWeights[whiteOffset + i];
-            black[i] -= nn.featureWeights[blackOffset + i];
-        }
-    }
 };
 
 std::vector<Accumulator> accumulators;
@@ -113,8 +107,7 @@ inline void pull()
     currentAccumulator = &accumulators.back();
 }
 
-inline i32 crelu(i32 x)
-{
+inline i32 crelu(i32 x) {
     return std::clamp(x, 0, 255);
 }
 

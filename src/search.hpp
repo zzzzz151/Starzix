@@ -87,6 +87,8 @@ Move killerMoves[MAX_DEPTH];            // [ply]
 Move countermoves[2][1ULL << 16];       // [color][moveEncoded]
 HistoryEntry historyTable[2][6][64];    // [color][pieceType][targetSquare]
 
+namespace internal
+{
 inline Move iterativeDeepening();
 
 inline i16 aspiration(int maxDepth, i16 score);
@@ -97,9 +99,12 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
 inline i16 qSearch(int ply, i16 alpha, i16 beta);
 
 inline std::array<i32, 256> scoreMoves(MovesList &moves, Move ttMove, Move killerMove);
+}
 
 inline void init()
 {
+    tt::resize(tt::DEFAULT_SIZE_MB);
+
     // init lmrTable
     for (int depth = 0; depth < MAX_DEPTH+1; depth++)
         for (int move = 0; move < 256; move++)
@@ -116,12 +121,15 @@ inline Move search(TimeManager _timeManager)
     memset(pvLengths, 0, sizeof(pvLengths));
     timeManager = _timeManager;
 
-    Move bestMove = iterativeDeepening();
+    Move bestMove = internal::iterativeDeepening();
 
     if (tt::age < 63) tt::age++;
 
     return bestMove;
 }
+
+namespace internal
+{
 
 inline Move iterativeDeepening()
 {
@@ -211,7 +219,7 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
         return ttEntry->adjustedScore(ply);
 
     bool ttHit = board.getZobristHash() == ttEntry->zobristHash;
-    Move ttMove = ttHit && !singular ? ttEntry->bestMove : MOVE_NONE;
+    Move ttMove = ttHit ? ttEntry->bestMove : MOVE_NONE;
 
     bool pvNode = beta - alpha > 1 || ply == 0;
     if (cutNode) assert(!pvNode); // cutNode implies !pvNode
@@ -251,9 +259,10 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
         }
     }
 
-    bool trySingular = !singular && depth >= SINGULAR_MIN_DEPTH && ply > 0
-                       && ttMove != MOVE_NONE && abs(ttEntry->score) < MIN_MATE_SCORE
-                       && ttEntry->depth >= depth - SINGULAR_DEPTH_MARGIN && ttEntry->getBound() != tt::UPPER_BOUND;
+    bool trySingular = !singular && depth >= SINGULAR_MIN_DEPTH
+                       && abs(ttEntry->score) < MIN_MATE_SCORE
+                       && ttEntry->depth >= depth - SINGULAR_DEPTH_MARGIN 
+                       && ttEntry->getBound() != tt::UPPER_BOUND;
                        
     // IIR (Internal iterative reduction)
     if (!ttHit && depth >= IIR_MIN_DEPTH && !board.inCheck())
@@ -278,7 +287,7 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
         auto [move, moveScore] = incrementalSort(moves, movesScores, i);
 
         // Don't search TT move in singular search
-        if (singular && move == ttEntry->bestMove) continue;
+        if (singular && move == ttMove) continue;
 
         bool isQuietMove = !board.isCapture(move) && move.promotion() == PieceType::NONE;
         int lmr = lmrTable[depth][legalMovesPlayed + 1];
@@ -317,7 +326,7 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
 
         // Extensions
         // SE (Singular extensions)
-        if (trySingular && move == ttEntry->bestMove)
+        if (trySingular && move == ttMove)
         {
             // Singular search: before searching any move, search this node at a shallower depth with TT move excluded
 
@@ -526,6 +535,7 @@ inline i16 qSearch(int ply, i16 alpha, i16 beta)
         board.undoMove();
 
         if (score <= bestScore) continue;
+
         bestScore = score;
         bestMove = move;
 
@@ -554,15 +564,20 @@ inline std::array<i32, 256> scoreMoves(MovesList &moves, Move ttMove, Move kille
     for (int i = 0; i < moves.size(); i++)
     {
         Move move = moves[i];
+
+        if (move == ttMove)
+        {
+            movesScores[i] = TT_MOVE_SCORE;
+            continue;
+        }
+
         PieceType captured = board.captured(move);
         PieceType promotion = move.promotion();
         int pieceType = (int)board.pieceTypeAt(move.from());
         int targetSquare = (int)move.to();
         HistoryEntry *historyEntry = &(historyTable[stm][pieceType][targetSquare]);
 
-        if (move == ttMove)
-            movesScores[i] = TT_MOVE_SCORE;
-        else if (captured != PieceType::NONE || promotion != PieceType::NONE)
+        if (captured != PieceType::NONE || promotion != PieceType::NONE)
         {
             movesScores[i] = see::SEE(board, move) ? GOOD_NOISY_BASE_SCORE : BAD_NOISY_BASE_SCORE;
             movesScores[i] += MVV_VALUES[(int)captured];
@@ -580,6 +595,8 @@ inline std::array<i32, 256> scoreMoves(MovesList &moves, Move ttMove, Move kille
     }
 
     return movesScores;
+}
+
 }
 
 }

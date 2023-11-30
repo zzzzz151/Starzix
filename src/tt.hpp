@@ -51,13 +51,14 @@ struct Entry
 
 } __attribute__((packed)); 
 
-std::vector<Entry> tt(DEFAULT_SIZE_MB * 1024 * 1024 / sizeof(Entry)); // initializes the elements
+std::vector<Entry> tt;
 
 inline void resize(u16 sizeMB)
 {
     tt.clear();
     u32 numEntries = sizeMB * 1024 * 1024 / sizeof(Entry);
     tt.resize(numEntries);
+    std::cout << "TT size: " << sizeMB << " MB (" << numEntries << " entries)" << std::endl;
 }
 
 inline void reset()

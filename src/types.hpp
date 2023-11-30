@@ -81,6 +81,8 @@ enum class File : u8
     H = 7
 };
 
+const u8 CASTLE_SHORT = 0, CASTLE_LONG = 1;
+
 const i16 POS_INFINITY = 32000, 
           NEG_INFINITY = -POS_INFINITY, 
           MIN_MATE_SCORE = POS_INFINITY - 255;

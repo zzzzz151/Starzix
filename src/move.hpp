@@ -26,12 +26,10 @@ struct Move
 
     inline Move() = default;
 
-    // Custom == operator
     inline bool operator==(const Move &other) const {
         return moveEncoded == other.moveEncoded;
     }
 
-    // Custom != operator
     inline bool operator!=(const Move &other) const {
         return moveEncoded != other.moveEncoded;
     }
@@ -66,6 +64,7 @@ struct Move
     {
         Square from = strToSquare(uci.substr(0,2));
         Square to = strToSquare(uci.substr(2,4));
+        PieceType pieceType = pieceToPieceType(pieces[from]);
 
         if (uci.size() == 5) // promotion
         {
@@ -81,12 +80,12 @@ struct Move
 
             return Move(from, to, typeFlag);
         }
-        else if (pieceToPieceType(pieces[from]) == PieceType::KING)
+        else if (pieceType == PieceType::KING)
         {
             if (abs((int)to - (int)from) == 2)
                 return Move(from, to, Move::CASTLING_FLAG);
         }
-        else if (pieceToPieceType(pieces[from]) == PieceType::PAWN)
+        else if (pieceType == PieceType::PAWN)
         { 
             int bitboardSquaresTraveled = abs((int)to - (int)from);
             if (bitboardSquaresTraveled == 16)

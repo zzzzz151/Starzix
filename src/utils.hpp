@@ -57,6 +57,16 @@ inline u64 pdep(u64 val, u64 mask) {
     return res;
 }
 
+inline Color oppColor(Color color)
+{
+    assert(color != Color::NONE);
+    return color == Color::WHITE ? Color::BLACK : Color::WHITE;
+}
+
+inline Rank squareRank(Square square) { return (Rank)(square / 8); }
+
+inline File squareFile(Square square) { return (File)(square % 8); }
+
 const std::string SQUARE_TO_STR[64] = {
     "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1",
     "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2",
@@ -67,6 +77,10 @@ const std::string SQUARE_TO_STR[64] = {
     "a7", "b7", "c7", "d7", "e7", "f7", "g7", "h7",
     "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8",
 };
+
+inline Square strToSquare(std::string strSquare) {
+    return (strSquare[0] - 'a') + (strSquare[1] - '1') * 8;
+}
 
 std::unordered_map<char, Piece> CHAR_TO_PIECE = {
     {'P', Piece::WHITE_PAWN},
@@ -98,9 +112,56 @@ std::unordered_map<Piece, char> PIECE_TO_CHAR = {
     {Piece::BLACK_KING,   'k'}
 };
 
-inline Rank squareRank(Square square) { return (Rank)(square / 8); }
+inline PieceType pieceToPieceType(Piece piece)
+{
+    if (piece == Piece::NONE) return PieceType::NONE;
 
-inline File squareFile(Square square) { return (File)(square % 8); }
+    int intPiece = (int)piece;
+    return intPiece <= 5 ? (PieceType)intPiece : (PieceType)(intPiece - 6);
+}
+
+inline Color pieceColor(Piece piece)
+{
+    if ((u8)piece <= 5) return Color::WHITE;
+
+    if ((u8)piece <= 11) return Color::BLACK;
+
+    return Color::NONE;
+}
+
+inline Piece makePiece(PieceType pieceType, Color color)
+{
+    assert(pieceType != PieceType::NONE);
+    int pt = (int)pieceType;
+    return color == Color::WHITE ? (Piece)pt : (Piece)(pt+6);
+}
+
+// [color][CASTLE_SHORT or CASTLE_LONG or isLongCastle]
+const static std::array<std::array<u64, 2>, 2> CASTLING_MASKS = {
+    1ULL << 7,  // White short castle       
+    1ULL,       // White long castle
+    1ULL << 63, // Black short castle
+    1ULL << 56  // Black long castle
+};
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc99-designator"
+
+// [kingTargetSquare]
+std::pair<Square, Square> CASTLING_ROOK_FROM_TO[64] = {
+    [6] = {7, 5},    // White short castle
+    [2] = {0, 3},    // White long castle
+    [62] = {63, 61}, // Black short castle
+    [58] = {56, 59}  // Black long castle
+};
+
+#pragma clang diagnostic pop
+
+// [color][targetFile]
+Square EN_PASSANT_CAPTURED_SQUARE[2][8] = {
+    {32, 33, 34, 35, 36, 37, 38, 39}, // white to move
+    {24, 25, 26, 27, 28, 29, 30, 31}  // black to move
+};
 
 inline void trim(std::string &str) {
     size_t first = str.find_first_not_of(" \t\n\r");
@@ -118,15 +179,17 @@ inline void trim(std::string &str) {
 inline std::vector<std::string> splitString(std::string &str, char delimiter)
 {
     trim(str);
-    if (str == "")
-        return std::vector<std::string>{};
+    if (str == "") return std::vector<std::string>{};
 
     std::vector<std::string> strSplit;
     std::stringstream ss(str);
     std::string token;
 
     while (getline(ss, token, delimiter))
+    {
+        trim(token);
         strSplit.push_back(token);
+    }
 
     return strSplit;
 }
@@ -147,39 +210,6 @@ inline void printBitboard(u64 bb)
 }
 
 inline int charToInt(char myChar) { return myChar - '0'; }
-
-inline PieceType pieceToPieceType(Piece piece)
-{
-    return piece == Piece::NONE ? PieceType::NONE
-                                : (PieceType)((u8)piece % 6);
-}
-
-inline Color pieceColor(Piece piece)
-{
-    if ((u8)piece <= 5) return Color::WHITE;
-
-    if ((u8)piece <= 11) return Color::BLACK;
-
-    return Color::NONE;
-}
-
-inline Piece makePiece(PieceType pieceType, Color color)
-{
-    int piece = (int)pieceType;
-    if (color == Color::BLACK) piece += 6;
-
-    return (Piece)piece;
-}
-
-inline Square strToSquare(std::string strSquare) {
-    return (strSquare[0] - 'a') + (strSquare[1] - '1') * 8;
-}
-
-inline Color oppColor(Color color)
-{
-    assert(color != Color::NONE);
-    return color == Color::WHITE ? Color::BLACK : Color::WHITE;
-}
 
 inline u64 shiftRight(u64 bb) {
 	return (bb << 1ULL) & 0xfefefefefefefefeULL;

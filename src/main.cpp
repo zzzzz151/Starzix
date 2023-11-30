@@ -9,7 +9,7 @@ Board board;
 
 int main()
 {
-    Board::initZobrist();
+    std::cout << "z5 by zzzzz" << std::endl;
     attacks::init();
     nnue::loadNetFromFile();
     search::init();

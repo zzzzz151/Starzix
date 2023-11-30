@@ -6,7 +6,6 @@
 
 int main()
 {
-    Board::initZobrist();
     attacks::init();
     nnue::loadNetFromFile();
 
