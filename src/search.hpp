@@ -8,8 +8,9 @@
 #include "see.hpp"
 #include "nnue.hpp"
 
-namespace uci { 
-    inline void info(int depth, i16 score); 
+namespace uci 
+{ 
+inline void info(int depth, i16 score); 
 }
 
 namespace search
@@ -89,16 +90,7 @@ HistoryEntry historyTable[2][6][64];    // [color][pieceType][targetSquare]
 
 namespace internal
 {
-inline Move iterativeDeepening();
-
-inline i16 aspiration(int maxDepth, i16 score);
-
-inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode, 
-                  int doubleExtensionsLeft, bool singular = false, i16 eval = 0);
-
-inline i16 qSearch(int ply, i16 alpha, i16 beta);
-
-inline std::array<i32, 256> scoreMoves(MovesList &moves, Move ttMove, Move killerMove);
+inline Move iterativeDeepening(u8 maxDepth = MAX_DEPTH);
 }
 
 inline void init()
@@ -112,7 +104,7 @@ inline void init()
                                     ? 0 : round(LMR_BASE + ln(depth) * ln(move) * LMR_MULTIPLIER);
 }
 
-inline Move search(TimeManager _timeManager)
+inline Move search(TimeManager _timeManager, u8 maxDepth = MAX_DEPTH)
 {
     // reset/clear stuff
     nodes = 0;
@@ -121,7 +113,7 @@ inline Move search(TimeManager _timeManager)
     memset(pvLengths, 0, sizeof(pvLengths));
     timeManager = _timeManager;
 
-    Move bestMove = internal::iterativeDeepening();
+    Move bestMove = internal::iterativeDeepening(maxDepth);
 
     if (tt::age < 63) tt::age++;
 
@@ -131,10 +123,19 @@ inline Move search(TimeManager _timeManager)
 namespace internal
 {
 
-inline Move iterativeDeepening()
+inline i16 aspiration(int maxDepth, i16 score);
+
+inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode, 
+                  int doubleExtensionsLeft, bool singular = false, i16 eval = 0);
+
+inline i16 qSearch(int ply, i16 alpha, i16 beta);
+
+inline std::array<i32, 256> scoreMoves(MovesList &moves, Move ttMove, Move killerMove);
+
+inline Move iterativeDeepening(u8 maxDepth)
 {
     i16 score = 0;
-    for (int iterationDepth = 1; iterationDepth <= MAX_DEPTH; iterationDepth++)
+    for (int iterationDepth = 1; iterationDepth <= maxDepth; iterationDepth++)
     {
         maxPlyReached = -1;
 

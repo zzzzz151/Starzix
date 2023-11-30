@@ -14,7 +14,7 @@
 
 ### Options
 
-- Hash (int, default 64, 1 to 1024) - transposition table size in MB
+- Hash (int, default 32, 1 to 1024) - transposition table size in MB
 
 ### Extra commands
 
@@ -23,6 +23,8 @@
 - perft \<depth\> - runs perft from current position
 
 - perftsplit \<depth\> - runs split perft from current position
+
+- bench \<depth\> - run benchmark, default depth 14
 
 # Features
 

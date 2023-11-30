@@ -7,7 +7,7 @@
 namespace tt // Transposition table
 {
 
-const u16 DEFAULT_SIZE_MB = 64;
+const u16 DEFAULT_SIZE_MB = 32;
 const u8 INVALID_BOUND = 0, EXACT_BOUND = 1, LOWER_BOUND = 2, UPPER_BOUND = 3;
 u8 age = 0;
 

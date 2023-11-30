@@ -19,18 +19,17 @@ class TimeManager
     std::chrono::time_point<std::chrono::steady_clock> start;
     u64 softMilliseconds, hardMilliseconds;
     bool hardTimeUp;
-    bool isMoveTime, isNodesTime;
     u64 softNodes, hardNodes;
 
     public:
 
-    inline TimeManager(i64 milliseconds = -1, i64 incrementMilliseconds = 0, i64 movesToGo = -1, bool isMoveTime = false)
+    inline TimeManager(i64 milliseconds = -1, i64 incrementMilliseconds = 0, i64 movesToGo = -1, 
+                       i64 isMoveTime = false, u64 softNodes = U64_MAX, u64 hardNodes = U64_MAX)
     {
         start = std::chrono::steady_clock::now();
-
+        this->softNodes = softNodes;
+        this->hardNodes = hardNodes;
         hardTimeUp = false;
-        this->isMoveTime = isMoveTime;
-        isNodesTime = false;
 
         if (isMoveTime)
             softMilliseconds = hardMilliseconds = milliseconds - min(OVERHEAD_MILLISECONDS, milliseconds / 2); 
@@ -40,7 +39,8 @@ class TimeManager
                                ? milliseconds - min(OVERHEAD_MILLISECONDS, milliseconds / 2)
                                : milliseconds * MOVESTOGO_HARD_TIME_PERCENTAGE;
 
-            softMilliseconds = min(MOVESTOGO_SOFT_TIME_PERCENTAGE * milliseconds / movesToGo, (double)hardMilliseconds);
+            softMilliseconds = min(MOVESTOGO_SOFT_TIME_PERCENTAGE * milliseconds / movesToGo, 
+                                   (double)hardMilliseconds);
         }
         else if (milliseconds != -1)
         {
@@ -49,31 +49,17 @@ class TimeManager
             softMilliseconds = milliseconds * SUDDEN_DEATH_SOFT_TIME_PERCENTAGE;
         }
         else
-        {
             // received just 'go' or 'go infinite'
-            this->isMoveTime = true;
             softMilliseconds = hardMilliseconds = U64_MAX;
-        }
     }
 
-    inline TimeManager(u64 softNodes, u64 hardNodes)
-    {
-        start = std::chrono::steady_clock::now();
-        this->isNodesTime = true;
-        this->softNodes = softNodes;
-        this->hardNodes = hardNodes;
-    }
-
-    inline auto millisecondsElapsed()
-    {
+    inline auto millisecondsElapsed() {
         return (std::chrono::steady_clock::now() - start) / std::chrono::milliseconds(1);
     }
 
     inline bool isHardTimeUp(u64 nodes)
     {
-        if (isNodesTime) return nodes >= hardNodes;
-
-        if (hardTimeUp) return true;
+        if (hardTimeUp || nodes >= hardNodes) return true;
 
         // Check time every 1024 nodes
         if ((nodes % 1024) != 0) return false;
@@ -83,9 +69,7 @@ class TimeManager
 
     inline bool isSoftTimeUp(u64 nodes, u64 bestMoveNodes)
     {
-        if (isNodesTime) return nodes >= softNodes;
-
-        if (isMoveTime) return millisecondsElapsed() >= softMilliseconds;
+        if (nodes >= softNodes) return true;
 
         double bestMoveNodesFraction = (double)bestMoveNodes / (double)nodes;
         double softTimeScale = (SOFT_TIME_SCALE_BASE + 1 - bestMoveNodesFraction) * SOFT_TIME_SCALE_MULTIPLIER;

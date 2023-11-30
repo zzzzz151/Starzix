@@ -3,7 +3,7 @@
 
 // clang-format off
 
-namespace see
+namespace see // SEE (Static exchange evaluation)
 {
 
                               // P    N    B    R    Q    K  NONE

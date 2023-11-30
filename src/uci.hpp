@@ -2,6 +2,7 @@
 
 // clang-format-off
 
+#include "bench.hpp"
 #include "perft.hpp"
 
 namespace uci // Universal chess interface
@@ -54,32 +55,41 @@ inline void position(std::vector<std::string> &tokens)
 inline void go(std::vector<std::string> &tokens)
 {
     i64 milliseconds = -1,
-        incrementMilliseconds = -1,
+        incrementMilliseconds = 0,
         movesToGo = -1;
     bool isMoveTime = false;
+    u64 softNodes = U64_MAX, hardNodes = U64_MAX;
+    u8 maxDepth = search::MAX_DEPTH;
 
-    for (int i = 0; i < tokens.size(); i++)
+    for (int i = 1; i < tokens.size() - 1; i += 2)
     {
+        i64 value = stoi(tokens[i + 1]);
+
         if ((tokens[i] == "wtime" && board.sideToMove() == Color::WHITE) 
         ||  (tokens[i] == "btime" && board.sideToMove() == Color::BLACK))
-            milliseconds = stoi(tokens[i + 1]);
+            milliseconds = value;
 
         else if ((tokens[i] == "winc" && board.sideToMove() == Color::WHITE) 
         ||       (tokens[i] == "binc" && board.sideToMove() == Color::BLACK))
-            incrementMilliseconds = stoi(tokens[i+1]);
+            incrementMilliseconds = value;
 
         else if (tokens[i] == "movestogo")
-            movesToGo = stoi(tokens[i + 1]);
-
+            movesToGo = value;
         else if (tokens[i] == "movetime")
         {
+            milliseconds = value;
             isMoveTime = true;
-            milliseconds = stoi(tokens[i + 1]);
         }
+        else if (tokens[i] == "depth")
+            maxDepth = min(value, 255);
+        else if (tokens[i] == "nodes")
+            softNodes = hardNodes = value;
+
     }
 
-    TimeManager timeManager = TimeManager(milliseconds, incrementMilliseconds, movesToGo, isMoveTime);
-    Move bestMove = search::search(timeManager);
+    TimeManager timeManager = TimeManager(milliseconds, incrementMilliseconds, movesToGo, 
+                                          isMoveTime, softNodes, hardNodes);
+    Move bestMove = search::search(timeManager, maxDepth);
     std::cout << "bestmove " + bestMove.toUci() + "\n";
 }
 
@@ -151,6 +161,11 @@ inline void uciLoop()
             go(tokens);
         else if (tokens[0] == "eval")
             std::cout << "eval " << nnue::evaluate(board.sideToMove()) << " cp" << std::endl;
+        else if (tokens[0] == "bench")
+        {
+            u8 depth = tokens.size() > 1 ? stoi(tokens[1]) : bench::DEFAULT_DEPTH;
+            bench::bench(depth);
+        }
         else if (tokens[0] == "perft")
         {
             int depth = stoi(tokens[1]);

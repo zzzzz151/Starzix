@@ -70,14 +70,14 @@ class Board
 
     Board() = default;
 
-    inline Board(std::string fen, bool _perft = false)
+    inline Board(std::string fen, bool perft = false)
     {
         if (!zobristInitialized) initZobrist();
 
         states.clear();
         states.reserve(256);
 
-        perft = _perft;
+        this->perft = perft;
         inCheckCached = -1;
 
         nnue::reset();
@@ -783,7 +783,7 @@ class Board
             return true;
 
         u64 knightAttacks = attacks::knightAttacks(square);
-        if ((knightAttacks & (piecesBitboards[(int)colorAttacking][(int)PieceType::KNIGHT])) > 0) 
+        if ((knightAttacks & piecesBitboards[(int)colorAttacking][(int)PieceType::KNIGHT]) > 0) 
             return true;
 
         u64 occupied = occupancy();

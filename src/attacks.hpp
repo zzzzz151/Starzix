@@ -221,7 +221,7 @@ inline void init()
         // King
         u64 attacks = shiftLeft(king) | shiftRight(king) | king;
         attacks = (attacks | shiftUp(attacks) | shiftDown(attacks)) ^ king;
-        internal::kingAttacks[square] = attacks;
+        kingAttacks[square] = attacks;
         king <<= 1ULL;
     }
 
