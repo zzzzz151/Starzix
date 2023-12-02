@@ -5,8 +5,9 @@
 #include "bench.hpp"
 #include "perft.hpp"
 
-namespace uci // Universal chess interface
-{
+namespace uci { // Universal chess interface
+
+bool outputSearchInfo = true;
 
 inline void setoption(std::vector<std::string> &tokens) // e.g. "setoption name Hash value 32"
 {
@@ -89,14 +90,16 @@ inline void go(std::vector<std::string> &tokens)
 
     TimeManager timeManager = TimeManager(milliseconds, incrementMilliseconds, movesToGo, 
                                           isMoveTime, softNodes, hardNodes);
-    Move bestMove = search::search(timeManager, maxDepth);
+    auto [bestMove, score] = search::search(timeManager, maxDepth);
     std::cout << "bestmove " + bestMove.toUci() + "\n";
 }
 
 inline void info(int depth, i16 score)
 {
+    if (!outputSearchInfo) return;
+
     auto millisecondsElapsed = search::timeManager.millisecondsElapsed();
-    u64 nps = search::nodes * 1000.0 / (millisecondsElapsed > 0 ? (double)millisecondsElapsed : 1.0);
+    u64 nps = search::nodes * 1000 / (millisecondsElapsed > 0 ? millisecondsElapsed : 1);
 
     // "score cp <score>" or "score mate <moves>" ?
     bool isMate = abs(score) >= MIN_MATE_SCORE;

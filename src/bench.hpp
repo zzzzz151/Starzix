@@ -2,13 +2,13 @@
 
 namespace uci
 {
+extern bool outputSearchInfo;
 inline void ucinewgame();
 }
 
-namespace bench
-{
+namespace bench {
 
-const u8 DEFAULT_DEPTH = 14;
+extern const u8 DEFAULT_DEPTH = 14;
 
 const std::array FENS {
     "r3k2r/2pb1ppp/2pp1q2/p7/1nP1B3/1P2P3/P2N1PPP/R2QK2R w KQkq a6 0 14",
@@ -65,30 +65,31 @@ const std::array FENS {
 
 inline void bench(u8 depth = DEFAULT_DEPTH)
 {
+    uci::outputSearchInfo = false;
     std::string originalFen = board.fen();
     u64 totalNodes = 0;
-    TimeManager timeManager = TimeManager();
     std::chrono::steady_clock::time_point start =  std::chrono::steady_clock::now();
 
     uci::ucinewgame();
     for (int i = 0; i < FENS.size(); i++)
     {
         board = Board(FENS[i]);
-        search::search(timeManager, depth);
+        search::search(depth);
         totalNodes += search::nodes;
         uci::ucinewgame();
     }
 
-    double millisecondsElapsed = (std::chrono::steady_clock::now() - start) / std::chrono::milliseconds(1);
-    u64 nps = totalNodes / (millisecondsElapsed > 0 ? millisecondsElapsed : 1.0) * 1000.0;
+    double milliseconds= millisecondsElapsed(start);
+    u64 nps = totalNodes * 1000 / (milliseconds > 0 ? milliseconds : 1);
 
     std::cout << "bench depth " << (int)depth
               << " nodes " << totalNodes
               << " nps " << nps
-              << " time " << millisecondsElapsed
+              << " time " << milliseconds
               << std::endl;
 
     board = Board(originalFen);
+    uci::outputSearchInfo = true;
 }
 
 }

@@ -19,9 +19,10 @@ class TimeManager
     std::chrono::time_point<std::chrono::steady_clock> start;
     u64 softMilliseconds, hardMilliseconds;
     bool hardTimeUp;
-    u64 softNodes, hardNodes;
 
     public:
+    
+    u64 softNodes, hardNodes;
 
     inline TimeManager(i64 milliseconds = -1, i64 incrementMilliseconds = 0, i64 movesToGo = -1, 
                        i64 isMoveTime = false, u64 softNodes = U64_MAX, u64 hardNodes = U64_MAX)
@@ -51,6 +52,11 @@ class TimeManager
         else
             // received just 'go' or 'go infinite'
             softMilliseconds = hardMilliseconds = U64_MAX;
+    }
+
+    inline void restart() {
+        start = std::chrono::steady_clock::now();
+        hardTimeUp = false;
     }
 
     inline auto millisecondsElapsed() {

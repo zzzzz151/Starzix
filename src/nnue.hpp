@@ -2,8 +2,7 @@
 
 // clang-format off
 
-namespace nnue
-{
+namespace nnue {
 
 const char* NET_FILE = "nn.nnue";
 const u16 HIDDEN_LAYER_SIZE = 384;

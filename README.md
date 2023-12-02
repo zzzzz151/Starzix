@@ -4,11 +4,11 @@
 
 ### Windows
 
-```clang++ -O3 -march=native -std=c++20 src/main.cpp -o z5.exe```
+```clang++ -std=c++20 -march=native -O3 src/main.cpp -o z5.exe```
 
 ### Linux
 
-```clang++ -O3 -march=native -std=c++20 src/main.cpp -o z5```
+```clang++ -std=c++20 -march=native -O3 src/main.cpp -o z5```
 
 # UCI (Universal Chess Interface)
 
@@ -20,9 +20,9 @@
 
 - eval - displays current position's evaluation from perspective of side to move
 
-- perft \<depth\> - runs perft from current position
+- perft \<depth\> - run perft from current position
 
-- perftsplit \<depth\> - runs split perft from current position
+- perftsplit \<depth\> - run split perft from current position
 
 - bench \<depth\> - run benchmark, default depth 14
 
@@ -80,6 +80,14 @@
 - Any time control
 - Soft and hard limits
 - Soft limit scaling based on best move nodes
+
+# Datagen
+
+```clang++ -std=c++20 -march=native -O3 src/datagen.cpp -o datagen.exe```
+
+```src\datagen.bat <numThreads>```
+
+Each thread will create its own randomly named output file in the `data` folder and write generated data to it
 
 # Credits
 

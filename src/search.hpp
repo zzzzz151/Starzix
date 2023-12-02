@@ -13,8 +13,7 @@ namespace uci
 inline void info(int depth, i16 score); 
 }
 
-namespace search
-{
+namespace search {
 
 const u8 MAX_DEPTH = 100;
 
@@ -90,7 +89,7 @@ HistoryEntry historyTable[2][6][64];    // [color][pieceType][targetSquare]
 
 namespace internal
 {
-inline Move iterativeDeepening(u8 maxDepth = MAX_DEPTH);
+inline i16 iterativeDeepening(u8 maxDepth);
 }
 
 inline void init()
@@ -104,7 +103,7 @@ inline void init()
                                     ? 0 : round(LMR_BASE + ln(depth) * ln(move) * LMR_MULTIPLIER);
 }
 
-inline Move search(TimeManager _timeManager, u8 maxDepth = MAX_DEPTH)
+inline std::pair<Move, i16> search(TimeManager _timeManager, u8 maxDepth = MAX_DEPTH)
 {
     // reset/clear stuff
     nodes = 0;
@@ -113,15 +112,19 @@ inline Move search(TimeManager _timeManager, u8 maxDepth = MAX_DEPTH)
     memset(pvLengths, 0, sizeof(pvLengths));
     timeManager = _timeManager;
 
-    Move bestMove = internal::iterativeDeepening(maxDepth);
+    i16 score = internal::iterativeDeepening(maxDepth);
 
     if (tt::age < 63) tt::age++;
 
-    return bestMove;
+    // return best move and score
+    return { pvLines[0][0], score };
 }
 
-namespace internal
-{
+inline std::pair<Move, i16> search(u8 maxDepth = MAX_DEPTH) {
+    return search(TimeManager(), maxDepth);
+}
+
+namespace internal {
 
 inline i16 aspiration(int maxDepth, i16 score);
 
@@ -132,9 +135,10 @@ inline i16 qSearch(int ply, i16 alpha, i16 beta);
 
 inline std::array<i32, 256> scoreMoves(MovesList &moves, Move ttMove, Move killerMove);
 
-inline Move iterativeDeepening(u8 maxDepth)
+inline i16 iterativeDeepening(u8 maxDepth)
 {
-    i16 score = 0;
+    i16 score = 0, lastScore = 0;
+
     for (int iterationDepth = 1; iterationDepth <= maxDepth; iterationDepth++)
     {
         maxPlyReached = -1;
@@ -143,15 +147,17 @@ inline Move iterativeDeepening(u8 maxDepth)
                 ? aspiration(iterationDepth, score) 
                 : search(iterationDepth, 0, NEG_INFINITY, POS_INFINITY, false, SINGULAR_MAX_DOUBLE_EXTENSIONS);
 
-        if (timeManager.isHardTimeUp(nodes)) break;
+        if (timeManager.isHardTimeUp(nodes)) return lastScore;
 
         uci::info(iterationDepth, score);
 
         u64 bestMoveNodes = movesNodes[pvLines[0][0].getMoveEncoded()];
         if (timeManager.isSoftTimeUp(nodes, bestMoveNodes)) break;
+
+        lastScore = score;
     }
 
-    return pvLines[0][0]; // return best move
+    return score;
 }
 
 inline i16 aspiration(int maxDepth, i16 score)

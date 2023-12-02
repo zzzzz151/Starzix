@@ -3,8 +3,7 @@
 
 // clang-format off
 
-namespace see // SEE (Static exchange evaluation)
-{
+namespace see { // SEE (Static exchange evaluation) 
 
                               // P    N    B    R    Q    K  NONE
 const i32 SEE_PIECE_VALUES[7] = {100, 300, 300, 500, 900, 0, 0};

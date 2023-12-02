@@ -3,8 +3,7 @@
 #include <chrono>
 #include "board.hpp"
 
-namespace perft
-{
+namespace perft {
 
 inline u64 perft(Board &board, int depth)
 {

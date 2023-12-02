@@ -148,5 +148,22 @@ struct MovesList
         moves[i] = moves[j];
         moves[j] = temp;
     }
+
+    inline void shuffle()
+    {
+        if (numMoves <= 1) return;
+
+        // Use the current time as a seed
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<> dis(0, numMoves-1); // both inclusive
+
+        // Fisher-Yates shuffle algorithm 
+        for (int i = 0; i < numMoves; i++)
+        {
+            int randomIndex = dis(gen);
+            swap(i, randomIndex);
+        }
+    }
 };
 

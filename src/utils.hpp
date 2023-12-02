@@ -242,6 +242,32 @@ inline auto millisecondsElapsed(std::chrono::steady_clock::time_point start)
     return (std::chrono::steady_clock::now() - start) / std::chrono::milliseconds(1);
 }
 
+inline bool isNumber(std::string &s)
+{
+    std::string::const_iterator it = s.begin();
+    while (it != s.end() && std::isdigit(*it)) ++it;
+    return !s.empty() && it == s.end();
+}
+
+std::string getRandomString(int length) {
+    const std::string characters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    const int charactersLength = characters.length();
+
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> distribution(0, charactersLength - 1);
+
+    std::string randomString;
+    randomString.reserve(length);
+
+    for (int i = 0; i < length; ++i) {
+        int randomIndex = distribution(gen);
+        randomString.push_back(characters[randomIndex]);
+    }
+
+    return randomString;
+}
+
 #include "move.hpp"
 
 inline std::pair<Move, i32> incrementalSort(MovesList &moves, std::array<i32, 256> &movesScores, int i)

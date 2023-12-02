@@ -4,11 +4,10 @@
 #include "types.hpp"
 #include "utils.hpp"
 
-namespace attacks
-{
+namespace attacks {
 
-namespace internal
-{
+namespace internal {
+    
     // private stuff
 
     u64 pawnAttacks[2][64], knightAttacks[64], kingAttacks[64];
