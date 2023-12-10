@@ -1,5 +1,13 @@
 # z5 - C++ chess engine
 
+# Elo (version 3.0)
+
+[CCRL Blitz](https://computerchess.org.uk/ccrl/404/): 3488
+
+[CCRL Rapid](https://computerchess.org.uk/ccrl/4040/): 3335
+
+[Ipman Bullet](https://ipmanchess.yolasite.com/r9-7945hx.php): 3309
+
 # How to compile
 
 ### Windows
@@ -94,3 +102,4 @@ Each thread will create its own randomly named output file in the `data` folder 
 [Chess Programming Wiki](https://www.chessprogramming.org/)
 
 [Cutechess](https://github.com/cutechess/cutechess) for engine testing
+
