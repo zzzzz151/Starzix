@@ -23,8 +23,8 @@ const i32 TT_MOVE_SCORE           = I32_MAX,
           GOOD_NOISY_BASE_SCORE   = 1'500'000'000,
           KILLER_SCORE            = 1'000'000'000,
           COUNTERMOVE_SCORE       = 500'000'000,
-          HISTORY_MOVE_BASE_SCORE = 0,
-          BAD_NOISY_BASE_SCORE    = -historyMax.value / 2;
+          HISTORY_MOVE_BASE_SCORE = 0;
+i32       BAD_NOISY_BASE_SCORE    = -historyMax.value / 2;
 
 // Most valuable victim    P    N    B    R    Q    K  NONE
 const i32 MVV_VALUES[7] = {100, 300, 320, 500, 900, 0, 0};

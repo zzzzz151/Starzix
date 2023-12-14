@@ -30,7 +30,12 @@ inline void setoption(std::vector<std::string> &tokens) // e.g. "setoption name 
             {
                 if ((found = optionName == tunableParam->name))
                     tunableParam->value = std::is_same<decltype(tunableParam->value), double>::value
-                                         ? stoi(optionValue) / 100.0 : stoi(optionValue);
+                                          ? stoi(optionValue) / 100.0 : stoi(optionValue);
+                    if (tunableParam->name == search::historyMax.name)
+                        search::BAD_NOISY_BASE_SCORE = -search::historyMax.value / 2;
+                    else if (tunableParam->name == search::lmrBase.name 
+                    || tunableParam->name == search::lmrMultiplier.name)
+                        search::init();
             }, myTunableParam);
 
             if (found) break;
