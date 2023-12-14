@@ -12,12 +12,29 @@ bool outputSearchInfo = true;
 inline void setoption(std::vector<std::string> &tokens) // e.g. "setoption name Hash value 32"
 {
     std::string optionName = tokens[2];
+    trim(optionName);
     std::string optionValue = tokens[4];
+    trim(optionValue);
 
     if (optionName == "Hash" || optionName == "hash")
     {
         int ttSizeMB = stoi(optionValue);
         tt::resize(ttSizeMB);
+    }
+    else
+    {
+        bool found = false;
+        for (auto &myTunableParam : search::tunableParams) 
+        {
+            std::visit([optionName, optionValue, &found](auto &tunableParam) 
+            {
+                if ((found = optionName == tunableParam->name))
+                    tunableParam->value = std::is_same<decltype(tunableParam->value), double>::value
+                                         ? stoi(optionValue) / 100.0 : stoi(optionValue);
+            }, myTunableParam);
+
+            if (found) break;
+        }
     }
 }
 
@@ -138,6 +155,30 @@ inline void uciLoop()
     std::cout << "id name z5\n";
     std::cout << "id author zzzzz\n";
     std::cout << "option name Hash type spin default " << tt::DEFAULT_SIZE_MB << " min 1 max 1024\n";
+
+    
+    for (auto &myTunableParam : search::tunableParams) 
+    {
+        std::visit([](auto &tunableParam) 
+        {
+            std::cout << "option name " << tunableParam->name;
+            if (std::is_same<decltype(tunableParam->value), double>::value)
+            {
+                std::cout << " type spin default " << (i32)(tunableParam->value * 100)
+                          << " min " << (i32)(tunableParam->min * 100)
+                          << " max " << (i32)(tunableParam->max * 100);
+            }
+            else
+            {
+                std::cout << " type spin default " << (i32)tunableParam->value
+                          << " min " << (i32)tunableParam->min
+                          << " max " << (i32)tunableParam->max;
+            }
+            std::cout << "\n";
+        }, myTunableParam);
+    }
+    
+
     std::cout << "uciok\n";
 
     while (true)

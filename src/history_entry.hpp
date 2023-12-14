@@ -35,10 +35,10 @@ struct HistoryEntry
         return quietHist;
     }
 
-    inline void updateQuietHistory(Board &board, i32 bonus, i32 maxHistory)
+    inline void updateQuietHistory(Board &board, i32 bonus)
     {
         // Update main history
-        mainHistory += bonus - mainHistory * abs(bonus) / maxHistory;
+        mainHistory += bonus - mainHistory * abs(bonus) / search::historyMax.value;
 
         // Update countermove history using last move
         Move lastMove;
@@ -46,7 +46,7 @@ struct HistoryEntry
         {
             int pieceType = (int)board.getNthToLastMovePieceType(1);
             int targetSq = (int)lastMove.to();
-            i32 countermoveHistDelta = bonus - countermoveHistory[pieceType][targetSq] * abs(bonus) / maxHistory;
+            i32 countermoveHistDelta = bonus - countermoveHistory[pieceType][targetSq] * abs(bonus) / search::historyMax.value;
             countermoveHistory[pieceType][targetSq] += countermoveHistDelta;
         }
 
@@ -56,14 +56,14 @@ struct HistoryEntry
         {
             int pieceType = (int)board.getNthToLastMovePieceType(2);
             int targetSq = (int)lastLastMove.to();
-            i32 followupHistDelta = bonus - followupMoveHistory[pieceType][targetSq] * abs(bonus) / maxHistory;
+            i32 followupHistDelta = bonus - followupMoveHistory[pieceType][targetSq] * abs(bonus) / search::historyMax.value;
             followupMoveHistory[pieceType][targetSq] += followupHistDelta;
         }
     }
 
-    inline void updateNoisyHistory(Board &board, i32 bonus, i32 maxHistory)
+    inline void updateNoisyHistory(Board &board, i32 bonus)
     {
-        noisyHistory += bonus - noisyHistory * abs(bonus) / maxHistory;
+        noisyHistory += bonus - noisyHistory * abs(bonus) / search::historyMax.value;
     }
 
 };

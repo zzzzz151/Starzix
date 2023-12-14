@@ -2,6 +2,7 @@
 
 // clang-format off
 
+#include "tunable_params.hpp"
 #include "time_manager.hpp"
 #include "tt.hpp"
 #include "history_entry.hpp"
@@ -17,65 +18,18 @@ namespace search {
 
 const u8 MAX_DEPTH = 100;
 
-const int ASPIRATION_MIN_DEPTH = 9,
-          ASPIRATION_INITIAL_DELTA = 15;
-const double ASPIRATION_DELTA_MULTIPLIER = 1.4;
-
-const int IIR_MIN_DEPTH = 4;
-
-const int RFP_MAX_DEPTH = 8,
-          RFP_DEPTH_MULTIPLIER = 75;
-
-// Alpha pruning
-const int AP_MAX_DEPTH = 4,
-          AP_MARGIN = 1750;
-
-const int RAZORING_MAX_DEPTH = 6,
-          RAZORING_DEPTH_MULTIPLIER = 252;
-
-const int NMP_MIN_DEPTH = 3,
-          NMP_BASE_REDUCTION = 3,
-          NMP_REDUCTION_DIVISOR = 3;
-
-const int LMP_MAX_DEPTH = 8,
-          LMP_MIN_MOVES_BASE = 3;
-const double LMP_DEPTH_MULTIPLIER = 0.75;
-
-const int FP_MAX_DEPTH = 7,
-          FP_BASE = 120,
-          FP_MULTIPLIER = 65;
-
-const int SEE_PRUNING_MAX_DEPTH = 9,
-          SEE_PRUNING_NOISY_THRESHOLD = -20,
-          SEE_PRUNING_QUIET_THRESHOLD = -65;
-
-const int SINGULAR_MIN_DEPTH = 8,
-          SINGULAR_DEPTH_MARGIN = 3,
-          SINGULAR_BETA_DEPTH_MULTIPLIER = 2,
-          SINGULAR_BETA_MARGIN = 24,
-          SINGULAR_MAX_DOUBLE_EXTENSIONS = 10;
-
-const double LMR_BASE = 0.8,
-             LMR_MULTIPLIER = 0.4;
-const int LMR_MIN_DEPTH = 3,
-          LMR_HISTORY_DIVISOR = 8192,
-          LMR_NOISY_HISTORY_DIVISOR = 4096;
-
-const i32 HISTORY_MIN_BONUS = 1570,
-          HISTORY_BONUS_MULTIPLIER = 370,
-          HISTORY_MAX = 16384;
-
 // Move ordering
 const i32 TT_MOVE_SCORE           = I32_MAX,
           GOOD_NOISY_BASE_SCORE   = 1'500'000'000,
           KILLER_SCORE            = 1'000'000'000,
           COUNTERMOVE_SCORE       = 500'000'000,
           HISTORY_MOVE_BASE_SCORE = 0,
-          BAD_NOISY_BASE_SCORE    = -HISTORY_MAX / 2;
+          BAD_NOISY_BASE_SCORE    = -historyMax.value / 2;
 
-// Most valuable victim    P   N   B   R   Q   K  NONE
-const i32 MVV_VALUES[7] = {10, 30, 32, 50, 90, 0, 0};
+// Most valuable victim    P    N    B    R    Q    K  NONE
+const i32 MVV_VALUES[7] = {100, 300, 320, 500, 900, 0, 0};
 
+u8 maxDepth;
 TimeManager timeManager;
 u64 nodes;
 int maxPlyReached;
@@ -89,7 +43,7 @@ HistoryEntry historyTable[2][6][64];    // [color][pieceType][targetSquare]
 
 namespace internal
 {
-inline i16 iterativeDeepening(u8 maxDepth);
+inline i16 iterativeDeepening();
 }
 
 inline void init()
@@ -100,19 +54,20 @@ inline void init()
     for (int depth = 0; depth < MAX_DEPTH+1; depth++)
         for (int move = 0; move < 256; move++)
             lmrTable[depth][move] = depth == 0 || move == 0 
-                                    ? 0 : round(LMR_BASE + ln(depth) * ln(move) * LMR_MULTIPLIER);
+                                    ? 0 : round(lmrBase.value + ln(depth) * ln(move) * lmrMultiplier.value);
 }
 
-inline std::pair<Move, i16> search(TimeManager _timeManager, u8 maxDepth = MAX_DEPTH)
+inline std::pair<Move, i16> search(TimeManager _timeManager, u8 _maxDepth = MAX_DEPTH)
 {
-    // reset/clear stuff
+    // reset and initialize stuff
     nodes = 0;
     memset(movesNodes, 0, sizeof(movesNodes));
     memset(pvLines, 0, sizeof(pvLines));
     memset(pvLengths, 0, sizeof(pvLengths));
+    maxDepth = min(_maxDepth, MAX_DEPTH);
     timeManager = _timeManager;
 
-    i16 score = internal::iterativeDeepening(maxDepth);
+    i16 score = internal::iterativeDeepening();
 
     if (tt::age < 63) tt::age++;
 
@@ -120,32 +75,32 @@ inline std::pair<Move, i16> search(TimeManager _timeManager, u8 maxDepth = MAX_D
     return { pvLines[0][0], score };
 }
 
-inline std::pair<Move, i16> search(u8 maxDepth = MAX_DEPTH) {
-    return search(TimeManager(), maxDepth);
+inline std::pair<Move, i16> search(u8 _maxDepth = MAX_DEPTH) {
+    return search(TimeManager(), _maxDepth);
 }
 
 namespace internal {
 
-inline i16 aspiration(int maxDepth, i16 score);
+inline i16 aspiration(u8 iterationDepth, i16 score);
 
-inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode, 
-                  int doubleExtensionsLeft, bool singular = false, i16 eval = 0);
+inline i16 search(i16 depth, u16 ply, i16 alpha, i16 beta, bool cutNode, 
+                  i8 doubleExtensionsLeft, bool singular = false, i16 eval = 0);
 
 inline i16 qSearch(int ply, i16 alpha, i16 beta);
 
 inline std::array<i32, 256> scoreMoves(MovesList &moves, Move ttMove, Move killerMove);
 
-inline i16 iterativeDeepening(u8 maxDepth)
+inline i16 iterativeDeepening()
 {
     i16 score = 0, lastScore = 0;
 
-    for (int iterationDepth = 1; iterationDepth <= maxDepth; iterationDepth++)
+    for (u16 iterationDepth = 1; iterationDepth <= maxDepth; iterationDepth++)
     {
         maxPlyReached = -1;
 
-        score = iterationDepth >= ASPIRATION_MIN_DEPTH 
+        score = iterationDepth >= aspMinDepth.value
                 ? aspiration(iterationDepth, score) 
-                : search(iterationDepth, 0, NEG_INFINITY, POS_INFINITY, false, SINGULAR_MAX_DOUBLE_EXTENSIONS);
+                : search(iterationDepth, 0, NEG_INFINITY, POS_INFINITY, false, maxDoubleExtensions.value);
 
         if (timeManager.isHardTimeUp(nodes)) return lastScore;
 
@@ -160,19 +115,19 @@ inline i16 iterativeDeepening(u8 maxDepth)
     return score;
 }
 
-inline i16 aspiration(int maxDepth, i16 score)
+inline i16 aspiration(u8 iterationDepth, i16 score)
 {
     // Aspiration Windows
     // Search with a small window, adjusting it and researching until the score is inside the window
 
-    i16 delta = ASPIRATION_INITIAL_DELTA;
+    i16 delta = aspInitialDelta.value;
     i16 alpha = max(NEG_INFINITY, score - delta);
     i16 beta = min(POS_INFINITY, score + delta);
-    int depth = maxDepth;
+    i16 depth = iterationDepth;
 
     while (true)
     {
-        score = search(depth, 0, alpha, beta, false, SINGULAR_MAX_DOUBLE_EXTENSIONS);
+        score = search(depth, 0, alpha, beta, false, maxDoubleExtensions.value);
 
         if (timeManager.isHardTimeUp(nodes)) return 0;
 
@@ -185,12 +140,12 @@ inline i16 aspiration(int maxDepth, i16 score)
         {
             beta = (alpha + beta) / 2;
             alpha = max(alpha - delta, NEG_INFINITY);
-            depth = maxDepth;
+            depth = iterationDepth;
         }
         else
             break;
 
-        delta *= ASPIRATION_DELTA_MULTIPLIER;
+        delta *= aspDeltaMultiplier.value;
     }
 
     return score;
@@ -200,8 +155,8 @@ inline i16 evaluate() {
     return std::clamp(nnue::evaluate(board.sideToMove()), -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
 }
 
-inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode, 
-                  int doubleExtensionsLeft, bool singular, i16 eval)
+inline i16 search(i16 depth, u16 ply, i16 alpha, i16 beta, bool cutNode, 
+                  i8 doubleExtensionsLeft, bool singular, i16 eval)
 {
     if (timeManager.isHardTimeUp(nodes)) return 0;
 
@@ -215,10 +170,10 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
 
     if (ply > 0 && board.isDraw()) return 0;
 
-    if (ply >= MAX_DEPTH) 
+    if (ply >= maxDepth) 
         return board.inCheck() ? 0 : evaluate();
 
-    if (depth > MAX_DEPTH) depth = MAX_DEPTH;
+    if (depth > maxDepth) depth = maxDepth;
 
     // Probe TT
     auto [ttEntry, shouldCutoff] = tt::probe(board.getZobristHash(), depth, ply, alpha, beta);
@@ -239,25 +194,25 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
     if (!pvNode && !board.inCheck() && !singular)
     {
         // RFP (Reverse futility pruning) / Static NMP
-        if (depth <= RFP_MAX_DEPTH && eval >= beta + depth * RFP_DEPTH_MULTIPLIER)
+        if (depth <= rfpMaxDepth.value && eval >= beta + depth * rfpDepthMultiplier.value)
             return eval;
 
         // AP (Alpha pruning)
-        if (depth <= AP_MAX_DEPTH && eval + AP_MARGIN <= alpha)
+        if (depth <= apMaxDepth.value && eval + apMargin.value <= alpha)
             return eval; 
 
         // Razoring
-        if (depth <= RAZORING_MAX_DEPTH && alpha > eval + depth * RAZORING_DEPTH_MULTIPLIER) {
+        if (depth <= razoringMaxDepth.value && alpha > eval + depth * razoringDepthMultiplier.value) {
             i16 score = qSearch(ply, alpha, beta);
             if (score <= alpha) return score;
         }
 
         // NMP (Null move pruning)
-        if (depth >= NMP_MIN_DEPTH && board.getLastMove() != MOVE_NONE
+        if (depth >= nmpMinDepth.value && board.getLastMove() != MOVE_NONE
         && board.hasNonPawnMaterial(board.sideToMove()) && eval >= beta)
         {
             board.makeNullMove();
-            int nmpDepth = depth - NMP_BASE_REDUCTION - depth / NMP_REDUCTION_DIVISOR - min((eval - beta)/200, 3);
+            int nmpDepth = depth - nmpBaseReduction.value - depth / nmpReductionDivisor.value - min((eval - beta)/200, 3);
             i16 score = -search(nmpDepth, ply + 1, -beta, -alpha, !cutNode, doubleExtensionsLeft);
             board.undoNullMove();
 
@@ -266,13 +221,13 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
         }
     }
 
-    bool trySingular = !singular && depth >= SINGULAR_MIN_DEPTH
+    bool trySingular = !singular && depth >= singularMinDepth.value
                        && abs(ttEntry->score) < MIN_MATE_SCORE
-                       && ttEntry->depth >= depth - SINGULAR_DEPTH_MARGIN 
+                       && ttEntry->depth >= depth - singularDepthMargin.value
                        && ttEntry->getBound() != tt::UPPER_BOUND;
                        
     // IIR (Internal iterative reduction)
-    if (!ttHit && depth >= IIR_MIN_DEPTH && !board.inCheck())
+    if (!ttHit && depth >= iirMinDepth.value && !board.inCheck())
         depth--;
 
     // generate all moves except underpromotions
@@ -303,18 +258,18 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
         if (ply > 0 && moveScore < COUNTERMOVE_SCORE && bestScore > -MIN_MATE_SCORE)
         {
             // LMP (Late move pruning)
-            if (depth <= LMP_MAX_DEPTH 
-            && legalMovesPlayed >= LMP_MIN_MOVES_BASE + pvNode + board.inCheck() + depth * depth * LMP_DEPTH_MULTIPLIER)
+            if (depth <= lmpMaxDepth.value
+            && legalMovesPlayed >= lmpMinMoves.value + pvNode + board.inCheck() + depth * depth * lmpDepthMultiplier.value)
                 break;
 
             // FP (Futility pruning)
-            if (depth <= FP_MAX_DEPTH && !board.inCheck() && alpha < MIN_MATE_SCORE 
-            && eval + FP_BASE + max(depth - lmr, 0) * FP_MULTIPLIER <= alpha)
+            if (depth <= fpMaxDepth.value && !board.inCheck() && alpha < MIN_MATE_SCORE 
+            && eval + fpBase.value + max(depth - lmr, 0) * fpMultiplier.value <= alpha)
                 break;
 
             // SEE pruning
-            int threshold = isQuietMove ? depth * SEE_PRUNING_QUIET_THRESHOLD : depth * depth * SEE_PRUNING_NOISY_THRESHOLD;
-            if (depth <= SEE_PRUNING_MAX_DEPTH && !see::SEE(board, move, threshold))
+            int threshold = isQuietMove ? depth * seeQuietThreshold.value : depth * depth * seeNoisyThreshold.value;
+            if (depth <= seePruningMaxDepth.value && !see::SEE(board, move, threshold))
                 continue;
         }
 
@@ -339,14 +294,14 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
 
             board.undoMove(); // undo TT move we just made
 
-            i16 singularBeta = max(NEG_INFINITY, ttEntry->score - depth * SINGULAR_BETA_DEPTH_MULTIPLIER);
+            i16 singularBeta = max(NEG_INFINITY, ttEntry->score - depth * singularBetaMultiplier.value);
             i16 singularScore = search((depth - 1) / 2, ply, singularBeta - 1, singularBeta, 
                                        cutNode, doubleExtensionsLeft, true, eval);
 
             board.makeMove(move, false); // second arg = false => don't check legality (we already verified it's a legal move)
 
             // Double extension
-            if (!pvNode && doubleExtensionsLeft > 0 && singularScore < singularBeta - SINGULAR_BETA_MARGIN)
+            if (!pvNode && doubleExtensionsLeft > 0 && singularScore < singularBeta - singularBetaMargin.value)
             {
                 // singularScore is way lower than TT score
                 // TT move is probably MUCH better than all others, so extend its search by 2 plies
@@ -381,7 +336,7 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
         HistoryEntry *historyEntry = &(historyTable[stm][pieceType][targetSquare]);
 
         // LMR (Late move reductions)
-        if (legalMovesPlayed > 1 && depth >= LMR_MIN_DEPTH && moveScore <= KILLER_SCORE)
+        if (legalMovesPlayed > 1 && depth >= 3 && moveScore <= KILLER_SCORE)
         {
             lmr -= board.inCheck(); // reduce checks less
             lmr -= pvNode; // reduce pv nodes less
@@ -391,9 +346,9 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
                 lmr--;
             // reduce moves with good history less and vice versa
             else if (isQuietMove)
-                lmr -= round((moveScore - HISTORY_MOVE_BASE_SCORE) / (double)LMR_HISTORY_DIVISOR);
+                lmr -= round((moveScore - HISTORY_MOVE_BASE_SCORE) / (double)lmrHistoryDivisor.value);
             else 
-                lmr -= round(historyEntry->noisyHistory / (double)LMR_NOISY_HISTORY_DIVISOR);
+                lmr -= round(historyEntry->noisyHistory / (double)lmrNoisyHistoryDivisor.value);
 
             // if lmr is negative, we would have an extension instead of a reduction
             // dont reduce into qsearch
@@ -449,7 +404,7 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
 
         // Fail high / Beta cutoff
 
-        i32 historyBonus = min(HISTORY_MIN_BONUS, HISTORY_BONUS_MULTIPLIER * (depth - 1));
+        i32 historyBonus = min(historyMinBonus.value, historyBonusMultiplier.value * (depth-1));
 
         if (isQuietMove)
         {
@@ -459,20 +414,20 @@ inline i16 search(int depth, int ply, i16 alpha, i16 beta, bool cutNode,
                 countermoves[stm][board.getLastMove().getMoveEncoded()] = move;
 
             // Increase this quiet's history
-            historyEntry->updateQuietHistory(board, historyBonus, HISTORY_MAX);
+            historyEntry->updateQuietHistory(board, historyBonus);
 
             // Penalize/decrease history of quiets that failed low
             for (int i = 0; i < numFailLowQuiets; i++)
-                failLowsHistoryEntry[i]->updateQuietHistory(board, -historyBonus, HISTORY_MAX); 
+                failLowsHistoryEntry[i]->updateQuietHistory(board, -historyBonus); 
         }
         else
         {
             // Increase history of this noisy move
-            historyEntry->updateNoisyHistory(board, historyBonus, HISTORY_MAX);
+            historyEntry->updateNoisyHistory(board, historyBonus);
 
             // Penalize/decrease history of noisy moves that failed low
             for (int i = 255, j = 0; j < numFailLowNoisies; i--, j++)
-                failLowsHistoryEntry[i]->updateNoisyHistory(board, -historyBonus, HISTORY_MAX);
+                failLowsHistoryEntry[i]->updateNoisyHistory(board, -historyBonus);
         }
 
         break; // Fail high / Beta cutoff
@@ -497,7 +452,7 @@ inline i16 qSearch(int ply, i16 alpha, i16 beta)
 
     if (board.isDraw()) return 0;
 
-    if (ply >= MAX_DEPTH) 
+    if (ply >= maxDepth) 
         return board.inCheck() ? 0 : evaluate();
 
     i16 eval = NEG_INFINITY; // eval is NEG_INFINITY in check

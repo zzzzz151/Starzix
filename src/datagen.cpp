@@ -73,6 +73,7 @@ int main(int argc, char* argv[])
 
         for (int i = 0; i < numRandomPlies; i++)
         {
+            std::cout << "opening" << std::endl;
             MovesList moves = board.pseudolegalMoves();
             moves.shuffle();
 
@@ -81,14 +82,22 @@ int main(int argc, char* argv[])
                 if (board.makeMove(moves[j])) break;
 
             // if no legal move, its stalemate or checkmate, so generate another random opening
-            if (j == moves.size()) goto runNewGame;
+            if (j == moves.size()) 
+            { 
+                std::cout << "goto runnewGame 1" << std::endl;
+                goto runNewGame;
+            }
         }
 
         uci::ucinewgame();
 
+        std::cout << "d10 search" << std::endl;
+
         // If the random opening is too bad, generate another random opening
         auto [bestMove, score] = search::search(10);
         if (abs(score) >= MAX_OPENING_SCORE) goto runNewGame;
+
+        std::cout << "finish d10 search" << std::endl;
 
         uci::ucinewgame();
 
@@ -98,8 +107,12 @@ int main(int argc, char* argv[])
         // Play the game out
         while (true)
         {
+            std::cout << "play out game, start search" << std::endl;
+
             timeManager.restart();
             auto [bestMove, score] = search::search(timeManager);
+
+            std::cout << "play out game, search for this move finished " << bestMove.toUci() << std::endl;
 
             if (abs(score) >= ADJUDICATION_SCORE)
             {
@@ -135,6 +148,8 @@ int main(int argc, char* argv[])
                 break;
             }
         }
+
+        std::cout << "write to file" << std::endl;
         
         // Write the game we just played to the output file
         for(int i = 0; i < numLines; i++)

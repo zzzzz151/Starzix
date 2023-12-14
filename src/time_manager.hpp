@@ -7,12 +7,6 @@
 class TimeManager
 {
     constexpr static u32 OVERHEAD_MILLISECONDS = 10;
-    constexpr static double MOVESTOGO_HARD_TIME_PERCENTAGE = 0.5,
-                            MOVESTOGO_SOFT_TIME_PERCENTAGE = 0.6,
-                            SUDDEN_DEATH_HARD_TIME_PERCENTAGE = 0.5,
-                            SUDDEN_DEATH_SOFT_TIME_PERCENTAGE = 1.0 / 20.0,
-                            SOFT_TIME_SCALE_BASE = 0.25,
-                            SOFT_TIME_SCALE_MULTIPLIER = 1.75;
 
     private:
 
@@ -38,16 +32,16 @@ class TimeManager
         {
             hardMilliseconds = movesToGo == 1 
                                ? milliseconds - min(OVERHEAD_MILLISECONDS, milliseconds / 2)
-                               : milliseconds * MOVESTOGO_HARD_TIME_PERCENTAGE;
+                               : milliseconds * search::movesToGoHardTimePercentage.value;
 
-            softMilliseconds = min(MOVESTOGO_SOFT_TIME_PERCENTAGE * milliseconds / movesToGo, 
+            softMilliseconds = min(search::movesToGoSoftTimePercentage.value * milliseconds / movesToGo, 
                                    (double)hardMilliseconds);
         }
         else if (milliseconds != -1)
         {
             // "go wtime 10000 btime 10000 winc 100 binc 100"
-            hardMilliseconds = milliseconds * SUDDEN_DEATH_HARD_TIME_PERCENTAGE;
-            softMilliseconds = milliseconds * SUDDEN_DEATH_SOFT_TIME_PERCENTAGE;
+            hardMilliseconds = milliseconds * search::suddenDeathHardTimePercentage.value;
+            softMilliseconds = milliseconds * search::suddenDeathSoftTimePercentage.value;
         }
         else
             // received just 'go' or 'go infinite'
@@ -78,7 +72,8 @@ class TimeManager
         if (nodes >= softNodes) return true;
 
         double bestMoveNodesFraction = (double)bestMoveNodes / (double)nodes;
-        double softTimeScale = (SOFT_TIME_SCALE_BASE + 1 - bestMoveNodesFraction) * SOFT_TIME_SCALE_MULTIPLIER;
+        double softTimeScale = (search::softTimeScaleBase.value + 1 - bestMoveNodesFraction) 
+                               * search::softTimeScaleMultiplier.value;
         return millisecondsElapsed() >= (softMilliseconds * softTimeScale);
     }
 
