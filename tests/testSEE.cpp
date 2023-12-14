@@ -3,17 +3,16 @@
 #include <string>
 #include <sstream>
 #include <vector>
-#include "../src-test/board.hpp"
-#include "../src-test/see.hpp"
+#include "../src/board.hpp"
+#include "../src/see.hpp"
 
 int failed = 0, passed = 0;
 
 int main() {
     attacks::init();
-    //nnue::loadNetFromFile();
 
     // Open the file for reading
-    std::ifstream inputFile("tests/SEE.epd");
+    std::ifstream inputFile("tests/SEE.txt");
 
     // Check if the file is open
     if (!inputFile.is_open()) {

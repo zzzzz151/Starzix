@@ -1,10 +1,16 @@
 #pragma once
 
+#ifdef _MSC_VER
+#define Z5_MSVC
+#pragma push_macro("_MSC_VER")
+#undef _MSC_VER
+#endif
+#include "incbin.h"
+
 // clang-format off
 
 namespace nnue {
 
-const char* NET_FILE = "nn.nnue";
 const u16 HIDDEN_LAYER_SIZE = 384;
 const i32 SCALE = 400, 
           Q = 255 * 64, 
@@ -17,36 +23,8 @@ struct alignas(64) NN {
     i16 outputBias;
 };
 
-NN nn;
-
-inline void loadNetFromFile()
-{        
-    FILE *netFile;
-
-    #if defined(_WIN32) // windows 32 or 64
-    int error = fopen_s(&netFile, NET_FILE, "rb");
-    if (error != 0)
-    {
-        std::cout << "Error opening net file " << NET_FILE << std::endl;
-        exit(0);
-    }
-
-    #elif defined(__unix__) // linux
-    netFile = fopen(NET_FILE, "rb");
-    if (netFile == NULL)
-    {
-        std::cout << "Error opening net file " << NET_FILE << std::endl;
-        exit(0);
-    }
-    #endif
-
-    // Read binary data (weights and biases) into the struct
-    fread(nn.featureWeights.data(), sizeof(i16), nn.featureWeights.size(), netFile);
-    fread(nn.featureBiases.data(), sizeof(i16), nn.featureBiases.size(), netFile);
-    fread(nn.outputWeights.data(), sizeof(i8), nn.outputWeights.size(), netFile);
-    fread(&nn.outputBias, sizeof(i16), 1, netFile);
-    fclose(netFile); 
-}
+INCBIN(NetFile, "src/net.nnue");
+const NN *nn = reinterpret_cast<const NN*>(gNetFileData);
 
 struct Accumulator
 {
@@ -56,7 +34,7 @@ struct Accumulator
     inline Accumulator()
     {
         for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
-            white[i] = black[i] = nn.featureBiases[i];
+            white[i] = black[i] = nn->featureBiases[i];
     }
 
     inline void update(Color color, PieceType pieceType, Square sq, bool activate)
@@ -70,13 +48,13 @@ struct Accumulator
         {
             if (activate)
             {
-                white[i] += nn.featureWeights[whiteOffset + i];
-                black[i] += nn.featureWeights[blackOffset + i];
+                white[i] += nn->featureWeights[whiteOffset + i];
+                black[i] += nn->featureWeights[blackOffset + i];
             }
             else
             {
-                white[i] -= nn.featureWeights[whiteOffset + i];
-                black[i] -= nn.featureWeights[blackOffset + i];
+                white[i] -= nn->featureWeights[whiteOffset + i];
+                black[i] -= nn->featureWeights[blackOffset + i];
             }
         }
     }   
@@ -124,11 +102,11 @@ inline i32 evaluate(Color color)
     i32 sum = 0;
     for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
     {
-        sum += crelu(us[i]) * nn.outputWeights[i];
-        sum += crelu(them[i]) * nn.outputWeights[HIDDEN_LAYER_SIZE + i];
+        sum += crelu(us[i]) * nn->outputWeights[i];
+        sum += crelu(them[i]) * nn->outputWeights[HIDDEN_LAYER_SIZE + i];
     }
 
-    return (sum / NORMALIZATION_K + nn.outputBias) * SCALE / Q;
+    return (sum / NORMALIZATION_K + nn->outputBias) * SCALE / Q;
 }
 
 }

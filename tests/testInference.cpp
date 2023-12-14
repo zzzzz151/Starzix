@@ -1,13 +1,12 @@
 #include <iostream>
 #include <cstdint>
 #include <string>
-#include "../src-test/board.hpp"
-#include "../src-test/nnue.hpp"
+#include "../src/board.hpp"
+#include "../src/nnue.hpp"
 
 int main()
 {
     attacks::init();
-    nnue::loadNetFromFile();
 
     Board board = Board(START_FEN);
     

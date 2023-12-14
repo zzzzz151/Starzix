@@ -1,6 +1,6 @@
 // clang-format off
-#include "../src-test/board.hpp"
-#include "../src-test/perft.hpp"
+#include "../src/board.hpp"
+#include "../src/perft.hpp"
 
 int failed = 0, passed = 0;
 const std::string POSITION2_KIWIPETE = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ";
@@ -54,7 +54,6 @@ template <typename T> inline void testNotEquals(std::string testName, T got, T e
 int main()
 {   
     attacks::init();
-    //nnue::loadNetFromFile();
 
     test("std::popcount()", std::popcount((uint64_t)5), 2); // 5 = 101
     test("lsb()", 1ULL << lsb((uint64_t)12), (uint64_t)4); // 12 = 1100

@@ -11,7 +11,6 @@ int main()
 {
     std::cout << "z5 by zzzzz" << std::endl;
     attacks::init();
-    nnue::loadNetFromFile();
     search::init();
     board = Board(START_FEN);
     uci::uciLoop();

@@ -25,7 +25,7 @@ TunableParam<u8> apMaxDepth = TunableParam<u8>("apMaxDepth", 4, 2, 8); // step =
 TunableParam<u16> apMargin = TunableParam<u16>("apMargin", 2000, 1000, 5000); // step = 500
 
 // Razoring
-TunableParam<u8> razoringMaxDepth = TunableParam<u8>("razoringMaxDepth", 6, 2, 8); // step = 2
+TunableParam<u8> razoringMaxDepth = TunableParam<u8>("razoringMaxDepth", 6, 2, 6); // step = 2
 TunableParam<u16> razoringDepthMultiplier = TunableParam<u16>("razoringDepthMultiplier", 300, 200, 400); // step = 100
 
 // NMP (Null move pruning)
