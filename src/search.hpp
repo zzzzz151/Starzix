@@ -404,7 +404,7 @@ inline i16 search(i16 depth, u16 ply, i16 alpha, i16 beta, bool cutNode,
 
         // Fail high / Beta cutoff
 
-        i32 historyBonus = min(historyMinBonus.value, historyBonusMultiplier.value * (depth-1));
+        i32 historyBonus = min(historyMaxBonus.value, historyBonusMultiplier.value * (depth-1));
 
         if (isQuietMove)
         {
