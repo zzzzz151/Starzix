@@ -4,13 +4,17 @@
 
 #include <cstring> // for memset()
 
-namespace tt { // Transposition table
+const u16 TT_DEFAULT_SIZE_MB = 32;
+u16 ttSizeMB = TT_DEFAULT_SIZE_MB;
 
-const u16 DEFAULT_SIZE_MB = 32;
-const u8 INVALID_BOUND = 0, EXACT_BOUND = 1, LOWER_BOUND = 2, UPPER_BOUND = 3;
-u8 age = 0;
+enum class Bound {
+    INVALID = 0,
+    EXACT = 1,
+    LOWER = 2,
+    UPPER = 3
+};
 
-struct Entry
+struct TTEntry
 {
     u64 zobristHash = 0;
     i16 score = 0;
@@ -18,21 +22,21 @@ struct Entry
     u8 depth = 0; 
     u8 boundAndAge = 0; // lowest 2 bits for bound, highest 6 bits for age
 
-    inline i16 adjustedScore(int plyFromRoot)
+    inline i16 adjustedScore(u16 ply)
     {
         if (score >= MIN_MATE_SCORE)
-            return score - plyFromRoot;
+            return score - ply;
         if (score <= -MIN_MATE_SCORE)
-            return score + plyFromRoot;
+            return score + ply;
         return score;
     }
 
-    inline u8 getBound() {
-         return boundAndAge & 0b0000'0011; 
+    inline Bound getBound() {
+         return (Bound)(boundAndAge & 0b0000'0011); 
     }
 
-    inline void setBound(u8 newBound) { 
-        boundAndAge = (boundAndAge & 0b1111'1100) | newBound; 
+    inline void setBound(Bound newBound) { 
+        boundAndAge = (boundAndAge & 0b1111'1100) | (u8)newBound; 
     }
 
     inline u8 getAge() { 
@@ -44,70 +48,74 @@ struct Entry
         boundAndAge |= (newAge << 2);
     }
 
-    inline void setBoundAndAge(u8 bound, u8 age) {
-        boundAndAge = (age << 2) | bound;
+    inline void setBoundAndAge(Bound bound, u8 age) {
+        boundAndAge = (age << 2) | (u8)bound;
     }
 
 } __attribute__((packed)); 
 
-std::vector<Entry> tt;
-
-inline void resize(u16 sizeMB)
+struct TT
 {
-    tt.clear();
-    u32 numEntries = sizeMB * 1024 * 1024 / sizeof(Entry);
-    tt.resize(numEntries);
-    std::cout << "TT size: " << sizeMB << " MB (" << numEntries << " entries)" << std::endl;
-}
+    std::vector<TTEntry> tt = {};
+    u8 age = 0;
 
-inline void reset()
-{
-    memset(tt.data(), 0, sizeof(Entry) * tt.size());
-    age = 0;
-}
+    inline TT() = default;
 
-inline std::pair<Entry*, bool> probe(u64 zobristHash, int depth, int plyFromRoot, i16 alpha, i16 beta)
-{
-    Entry *ttEntry = &(tt[zobristHash % tt.size()]);
-    u8 ttEntryBound = ttEntry->getBound();
+    inline TT(bool init) {
+        if (init) resize();
+    }
 
-    bool shouldCutoff = plyFromRoot > 0 
-                        && ttEntry->zobristHash == zobristHash
-                        && ttEntry->depth >= depth 
-                        && (ttEntryBound == EXACT_BOUND 
-                        || (ttEntryBound == LOWER_BOUND && ttEntry->score >= beta) 
-                        || (ttEntryBound == UPPER_BOUND && ttEntry->score <= alpha));
+    inline void resize()
+    {
+        tt.clear();
+        u32 numEntries = ttSizeMB * 1024 * 1024 / sizeof(TTEntry);
+        tt.resize(numEntries);
+        std::cout << "TT size: " << ttSizeMB << " MB (" << numEntries << " entries)" << std::endl;
+    }
 
-    return { ttEntry, shouldCutoff };
-}
+    inline void reset()
+    {
+        memset(tt.data(), 0, sizeof(TTEntry) * tt.size());
+        age = 0;
+    }
 
-inline void store(Entry *ttEntry, u64 zobristHash, int depth, i16 score, Move bestMove, int plyFromRoot, i16 originalAlpha, i16 beta)
-{
-    u8 bound = EXACT_BOUND;
-    if (score <= originalAlpha) 
-        bound = UPPER_BOUND;
-    else if (score >= beta) 
-        bound = LOWER_BOUND;
+    inline std::pair<TTEntry*, bool> probe(u64 zobristHash, int depth, u16 ply, i16 alpha, i16 beta)
+    {
+        TTEntry *ttEntry = &(tt[zobristHash % tt.size()]);
+        Bound ttEntryBound = ttEntry->getBound();
 
-    // replacement scheme
-    if (ttEntry->zobristHash != 0  // always replace empty entries
-    && bound != EXACT_BOUND        // always replace if new bound is exact
-    && ttEntry->depth >= depth + 3 // keep entry if its depth is much higher
-    && ttEntry->getAge() == age)   // always replace entries from previous searches ('go' commands)
-        return;
+        bool cutoff = ply > 0 
+                      && ttEntry->zobristHash == zobristHash
+                      && ttEntry->depth >= depth 
+                      && (ttEntryBound == Bound::EXACT
+                      || (ttEntryBound == Bound::LOWER && ttEntry->score >= beta) 
+                      || (ttEntryBound == Bound::UPPER && ttEntry->score <= alpha));
 
-    ttEntry->zobristHash = zobristHash;
-    ttEntry->depth = depth;
-    ttEntry->score = score;
-    ttEntry->setBoundAndAge(bound, age);
-    if (bestMove != MOVE_NONE) ttEntry->bestMove = bestMove;
+        return { ttEntry, cutoff };
+    }
 
-    // Adjust mate scores based on ply
-    if (ttEntry->score >= MIN_MATE_SCORE)
-        ttEntry->score += plyFromRoot;
-    else if (ttEntry->score <= -MIN_MATE_SCORE)
-        ttEntry->score -= plyFromRoot;
+    inline void store(TTEntry *ttEntry, u64 zobristHash, i32 depth, u16 ply, i16 score, Move bestMove, i16 originalAlpha, i16 beta)
+    {
+        assert(depth >= 0);
 
-}
+        Bound bound = Bound::EXACT;
+        if (score <= originalAlpha) 
+            bound = Bound::UPPER;
+        else if (score >= beta) 
+            bound = Bound::LOWER;
 
-}
+        ttEntry->zobristHash = zobristHash;
+        ttEntry->depth = depth;
+        ttEntry->score = score;
+        ttEntry->setBoundAndAge(bound, age);
+        if (bestMove != MOVE_NONE) ttEntry->bestMove = bestMove;
+
+        // Adjust mate scores based on ply
+        if (ttEntry->score >= MIN_MATE_SCORE)
+            ttEntry->score += ply;
+        else if (ttEntry->score <= -MIN_MATE_SCORE)
+            ttEntry->score -= ply;
+
+    }
+};
+

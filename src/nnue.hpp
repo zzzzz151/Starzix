@@ -12,9 +12,7 @@
 namespace nnue {
 
 const u16 HIDDEN_LAYER_SIZE = 384;
-const i32 SCALE = 400, 
-          Q = 255 * 64, 
-          NORMALIZATION_K = 1;
+const i32 SCALE = 400, QA = 255, QB = 64;
 
 struct alignas(64) NN {
     std::array<i16, 768 * HIDDEN_LAYER_SIZE> featureWeights;
@@ -41,62 +39,36 @@ struct Accumulator
     {
         int whiteIdx = (int)color * 384 + (int)pieceType * 64 + sq;
         int blackIdx = !(int)color * 384 + (int)pieceType * 64 + (sq ^ 56);
-        int whiteOffset = whiteIdx * HIDDEN_LAYER_SIZE;
-        int blackOffset = blackIdx * HIDDEN_LAYER_SIZE;
 
         for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
         {
             if (activate)
             {
-                white[i] += nn->featureWeights[whiteOffset + i];
-                black[i] += nn->featureWeights[blackOffset + i];
+                white[i] += nn->featureWeights[whiteIdx * HIDDEN_LAYER_SIZE + i];
+                black[i] += nn->featureWeights[blackIdx * HIDDEN_LAYER_SIZE + i];
             }
             else
             {
-                white[i] -= nn->featureWeights[whiteOffset + i];
-                black[i] -= nn->featureWeights[blackOffset + i];
+                white[i] -= nn->featureWeights[whiteIdx * HIDDEN_LAYER_SIZE + i];
+                black[i] -= nn->featureWeights[blackIdx * HIDDEN_LAYER_SIZE + i];
             }
         }
     }   
 };
 
-std::vector<Accumulator> accumulators;
-Accumulator *currentAccumulator;
-
-inline void reset()
-{
-    accumulators.clear();
-    accumulators.reserve(256);
-    accumulators.push_back(Accumulator());
-    currentAccumulator = &accumulators.back();
+inline i32 crelu(i16 x) {
+    return x < 0 ? 0 : x > 255 ? 255 : x;
 }
 
-inline void push()
+inline i16 evaluate(Accumulator &accumulator, Color color)
 {
-    assert(currentAccumulator == &accumulators.back());
-    accumulators.push_back(*currentAccumulator);
-    currentAccumulator = &accumulators.back();
-}
-
-inline void pull()
-{
-    accumulators.pop_back();
-    currentAccumulator = &accumulators.back();
-}
-
-inline i32 crelu(i32 x) {
-    return std::clamp(x, 0, 255);
-}
-
-inline i32 evaluate(Color color)
-{
-    i16 *us = currentAccumulator->white,
-        *them = currentAccumulator->black;
+    i16 *us = accumulator.white,
+        *them = accumulator.black;
 
     if (color == Color::BLACK)
     {
-        us = currentAccumulator->black;
-        them = currentAccumulator->white;
+        us = accumulator.black;
+        them = accumulator.white;
     }
 
     i32 sum = 0;
@@ -106,8 +78,10 @@ inline i32 evaluate(Color color)
         sum += crelu(them[i]) * nn->outputWeights[HIDDEN_LAYER_SIZE + i];
     }
 
-    return (sum / NORMALIZATION_K + nn->outputBias) * SCALE / Q;
+    i32 eval = (sum + nn->outputBias) * SCALE / (QA * QB);
+    return std::clamp(eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
 }
 
 }
 
+using Accumulator = nnue::Accumulator;

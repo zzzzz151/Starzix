@@ -97,6 +97,21 @@ std::unordered_map<char, Piece> CHAR_TO_PIECE = {
     {'k', Piece::BLACK_KING},
 };
 
+std::unordered_map<char, PieceType> CHAR_TO_PIECE_TYPE = {
+    {'P', PieceType::PAWN},
+    {'N', PieceType::KNIGHT},
+    {'B', PieceType::BISHOP},
+    {'R', PieceType::ROOK},
+    {'Q', PieceType::QUEEN},
+    {'K', PieceType::KING},
+    {'p', PieceType::PAWN},
+    {'n', PieceType::KNIGHT},
+    {'b', PieceType::BISHOP},
+    {'r', PieceType::ROOK},
+    {'q', PieceType::QUEEN},
+    {'k', PieceType::KING},
+};
+
 std::unordered_map<Piece, char> PIECE_TO_CHAR = {
     {Piece::WHITE_PAWN,   'P'},
     {Piece::WHITE_KNIGHT, 'N'},
@@ -156,12 +171,6 @@ std::pair<Square, Square> CASTLING_ROOK_FROM_TO[64] = {
 };
 
 #pragma clang diagnostic pop
-
-// [color][targetFile]
-Square EN_PASSANT_CAPTURED_SQUARE[2][8] = {
-    {32, 33, 34, 35, 36, 37, 38, 39}, // white to move
-    {24, 25, 26, 27, 28, 29, 30, 31}  // black to move
-};
 
 inline void trim(std::string &str) {
     size_t first = str.find_first_not_of(" \t\n\r");
@@ -223,17 +232,18 @@ inline u64 shiftUp(u64 bb) { return bb << 8ULL; }
 
 inline u64 shiftDown(u64 bb) { return bb >> 8ULL; }
 
-inline double ln(int x)
-{
+inline double ln(u64 x) {
     assert(x > 0);
     return log(x);
 }
 
-inline i16 min(i16 a, i16 b) {
+template <typename T>
+inline T min(T a, T b) {
     return a < b ? a : b;
 }
 
-inline i16 max(i16 a, i16 b) {
+template <typename T>
+inline T max(T a, T b) {
     return a > b ? a : b;
 }
 

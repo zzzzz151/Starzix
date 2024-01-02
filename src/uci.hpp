@@ -7,162 +7,96 @@
 
 namespace uci { // Universal chess interface
 
-bool outputSearchInfo = true;
+inline void uci();
+inline void setoption(Searcher &searcher, std::vector<std::string> &tokens);
+inline void ucinewgame(Searcher &searcher);
+inline void position(Searcher &searcher, std::vector<std::string> &tokens);
+inline void go(Searcher &searcher, std::vector<std::string> &tokens);
 
-inline void setoption(std::vector<std::string> &tokens) // e.g. "setoption name Hash value 32"
+inline void uciLoop(Searcher &searcher)
 {
-    std::string optionName = tokens[2];
-    trim(optionName);
-    std::string optionValue = tokens[4];
-    trim(optionValue);
-
-    if (optionName == "Hash" || optionName == "hash")
+    while (true)
     {
-        int ttSizeMB = stoi(optionValue);
-        tt::resize(ttSizeMB);
-    }
-    else
-    {
-        bool found = false;
-        for (auto &myTunableParam : search::tunableParams) 
-        {
-            std::visit([optionName, optionValue, &found](auto &tunableParam) 
-            {
-                if ((found = optionName == tunableParam->name))
-                    tunableParam->value = std::is_same<decltype(tunableParam->value), double>::value
-                                          ? stoi(optionValue) / 100.0 : stoi(optionValue);
-                    if (tunableParam->name == search::historyMax.name)
-                        search::BAD_NOISY_BASE_SCORE = -search::historyMax.value / 2;
-                    else if (tunableParam->name == search::lmrBase.name 
-                    || tunableParam->name == search::lmrMultiplier.name)
-                        search::init();
-            }, myTunableParam);
+        searcher.resetLimits();
 
-            if (found) break;
-        }
-    }
-}
-
-inline void ucinewgame()
-{
-    tt::reset();
-    memset(search::historyTable, 0, sizeof(search::historyTable)); // reset/clear histories
-    memset(search::killerMoves, 0, sizeof(search::killerMoves));   // reset/clear killer moves
-    memset(search::countermoves, 0, sizeof(search::countermoves)); // reset/clear countermoves
-}
-
-inline void position(std::vector<std::string> &tokens)
-{
-    int movesTokenIndex = -1;
-
-    if (tokens[1] == "startpos")
-    {
-        board = Board(START_FEN);
-        movesTokenIndex = 2;
-    }
-    else if (tokens[1] == "fen")
-    {
-        std::string fen = "";
-        int i = 0;
-        for (i = 2; i < tokens.size() && tokens[i] != "moves"; i++)
-            fen += tokens[i] + " ";
-        fen.pop_back(); // remove last whitespace
-        board = Board(fen);
-        movesTokenIndex = i;
-    }
-
-    for (int i = movesTokenIndex + 1; i < tokens.size(); i++)
-        board.makeMove(tokens[i]);
-}
-
-inline void go(std::vector<std::string> &tokens)
-{
-    i64 milliseconds = -1,
-        incrementMilliseconds = 0,
-        movesToGo = -1;
-    bool isMoveTime = false;
-    u64 softNodes = U64_MAX, hardNodes = U64_MAX;
-    u8 maxDepth = search::MAX_DEPTH;
-
-    for (int i = 1; i < tokens.size() - 1; i += 2)
-    {
-        i64 value = stoi(tokens[i + 1]);
-
-        if ((tokens[i] == "wtime" && board.sideToMove() == Color::WHITE) 
-        ||  (tokens[i] == "btime" && board.sideToMove() == Color::BLACK))
-            milliseconds = value;
-
-        else if ((tokens[i] == "winc" && board.sideToMove() == Color::WHITE) 
-        ||       (tokens[i] == "binc" && board.sideToMove() == Color::BLACK))
-            incrementMilliseconds = value;
-
-        else if (tokens[i] == "movestogo")
-            movesToGo = value;
-        else if (tokens[i] == "movetime")
-        {
-            milliseconds = value;
-            isMoveTime = true;
-        }
-        else if (tokens[i] == "depth")
-            maxDepth = min(value, 255);
-        else if (tokens[i] == "nodes")
-            softNodes = hardNodes = value;
-
-    }
-
-    TimeManager timeManager = TimeManager(milliseconds, incrementMilliseconds, movesToGo, 
-                                          isMoveTime, softNodes, hardNodes);
-    auto [bestMove, score] = search::search(timeManager, maxDepth);
-    std::cout << "bestmove " + bestMove.toUci() + "\n";
-}
-
-inline void info(int depth, i16 score)
-{
-    if (!outputSearchInfo) return;
-
-    auto millisecondsElapsed = search::timeManager.millisecondsElapsed();
-    u64 nps = search::nodes * 1000 / (millisecondsElapsed > 0 ? millisecondsElapsed : 1);
-
-    // "score cp <score>" or "score mate <moves>" ?
-    bool isMate = abs(score) >= MIN_MATE_SCORE;
-    int movesToMate = 0;
-    if (isMate)
-    {
-        int pliesToMate = POS_INFINITY - abs(score);
-        movesToMate = round(pliesToMate / 2.0);
-        if (score < 0) movesToMate *= -1; // we are getting mated
-    }
-
-    // Collect PV
-    std::string strPv = search::pvLines[0][0].toUci();
-    for (int i = 1; i < search::pvLengths[0]; i++)
-        strPv += " " + search::pvLines[0][i].toUci();
-
-    std::cout << "info depth " << depth
-        << " seldepth " << search::maxPlyReached
-        << " time " << round(millisecondsElapsed)
-        << " nodes " << search::nodes
-        << " nps " << nps
-        << (isMate ? " score mate " : " score cp ") << (isMate ? movesToMate : score)
-        << " pv " << strPv
-        << std::endl;
-}
-
-inline void uciLoop()
-{
-    std::string received = "";
-    while (received != "uci")
-    {
+        std::string received = "";
         getline(std::cin, received);
         trim(received);
-    }
+        std::vector<std::string> tokens = splitString(received, ' ');
+        if (received == "" || tokens.size() == 0)
+            continue;
 
+        try {
+
+        if (received == "quit" || !std::cin.good())
+            break;
+        else if (received == "uci")
+            uci();
+        else if (tokens[0] == "setoption") // e.g. "setoption name Hash value 32"
+            setoption(searcher, tokens);
+        else if (received == "ucinewgame")
+            ucinewgame(searcher);
+        else if (received == "isready")
+            std::cout << "readyok\n";
+        else if (tokens[0] == "position")
+            position(searcher, tokens);
+        else if (tokens[0] == "go")
+            go(searcher, tokens);
+        else if (tokens[0] == "print" || tokens[0] == "d"
+        || tokens[0] == "display" || tokens[0] == "show")
+            searcher.board.print();
+        else if (tokens[0] == "eval")
+            std::cout << "eval " << searcher.board.evaluate() << " cp" << std::endl;
+        else if (tokens[0] == "bench")
+        {
+            if (tokens.size() == 1)
+                bench::bench(searcher);
+            else
+            {
+                u8 depth = stoi(tokens[1]);
+                bench::bench(searcher, depth);
+            }
+        }
+        else if (tokens[0] == "perft")
+        {
+            int depth = stoi(tokens[1]);
+            perft::perftBench(searcher.board, depth);
+        }
+        else if (tokens[0] == "perftsplit" || tokens[0] == "splitperft" 
+        || tokens[0] == "perftdivide")
+        {
+            int depth = stoi(tokens[1]);
+            perft::perftSplit(searcher.board, depth);
+        }
+        else if (tokens[0] == "makemove")
+        {
+            if (tokens[1] == "0000" || tokens[1] == "null" || tokens[1] == "none")
+            {
+                assert(!searcher.board.inCheck());
+                searcher.board.makeMove(MOVE_NONE);
+            }
+            else
+                searcher.board.makeMove(tokens[1]);
+        }
+        else if (tokens[0] == "undomove")
+            searcher.board.undoMove();
+
+        } 
+        catch (const char* errorMessage)
+        {
+
+        }
+        
+    }
+}
+
+inline void uci()
+{
     std::cout << "id name z5\n";
     std::cout << "id author zzzzz\n";
-    std::cout << "option name Hash type spin default " << tt::DEFAULT_SIZE_MB << " min 1 max 1024\n";
+    std::cout << "option name Hash type spin default " << TT_DEFAULT_SIZE_MB << " min 1 max 1024\n";
 
-    
-    for (auto &myTunableParam : search::tunableParams) 
+    for (auto &myTunableParam : tunableParams) 
     {
         std::visit([](auto &tunableParam) 
         {
@@ -182,57 +116,118 @@ inline void uciLoop()
             std::cout << "\n";
         }, myTunableParam);
     }
-    
 
-    std::cout << "uciok\n";
+    std::cout << "uciok" << std::endl;
+}
 
-    while (true)
+inline void setoption(Searcher &searcher, std::vector<std::string> &tokens)
+{
+    std::string optionName = tokens[2];
+    trim(optionName);
+    std::string optionValue = tokens[4];
+    trim(optionValue);
+
+    if (optionName == "Hash" || optionName == "hash")
     {
-        getline(std::cin, received);
-        trim(received);
-        std::vector<std::string> tokens = splitString(received, ' ');
-        if (received == "" || tokens.size() == 0)
-            continue;
-
-        try {
-
-        if (received == "quit" || !std::cin.good())
-            break;
-        else if (tokens[0] == "setoption") // e.g. "setoption name Hash value 32"
-            setoption(tokens);
-        else if (received == "ucinewgame")
-            ucinewgame();
-        else if (received == "isready")
-            std::cout << "readyok\n";
-        else if (tokens[0] == "position")
-            position(tokens);
-        else if (tokens[0] == "go")
-            go(tokens);
-        else if (tokens[0] == "eval")
-            std::cout << "eval " << nnue::evaluate(board.sideToMove()) << " cp" << std::endl;
-        else if (tokens[0] == "bench")
-        {
-            u8 depth = tokens.size() > 1 ? stoi(tokens[1]) : bench::DEFAULT_DEPTH;
-            bench::bench(depth);
-        }
-        else if (tokens[0] == "perft")
-        {
-            int depth = stoi(tokens[1]);
-            perft::perftBench(board, depth);
-        }
-        else if (tokens[0] == "perftsplit")
-        {
-            int depth = stoi(tokens[1]);
-            perft::perftSplit(board, depth);
-        }
-
-        } 
-        catch (const char* errorMessage)
-        {
-
-        }
-        
+        ttSizeMB = stoi(optionValue);
+        searcher.tt.resize();
     }
+    else
+    {
+        bool found = false;
+        for (auto &myTunableParam : tunableParams) 
+        {
+            std::visit([optionName, optionValue, &found](auto &tunableParam) 
+            {
+                if ((found = optionName == tunableParam->name))
+                    tunableParam->value = std::is_same<decltype(tunableParam->value), double>::value
+                                          ? stoi(optionValue) / 100.0 : stoi(optionValue);
+                    if (tunableParam->name == historyMax.name)
+                        BAD_NOISY_BASE_SCORE = -historyMax.value / 2;
+                    else if (tunableParam->name == lmrBase.name 
+                    || tunableParam->name == lmrMultiplier.name)
+                        initLmrTable();
+            }, myTunableParam);
+
+            if (found) break;
+        }
+    }
+}
+
+inline void ucinewgame(Searcher &searcher)
+{
+    searcher.tt.reset();
+    memset(searcher.historyTable, 0, sizeof(searcher.historyTable)); // reset/clear histories
+    memset(searcher.killerMoves, 0, sizeof(searcher.killerMoves));   // reset/clear killer moves
+    memset(searcher.countermoves, 0, sizeof(searcher.countermoves)); // reset/clear countermoves
+}
+
+inline void position(Searcher &searcher, std::vector<std::string> &tokens)
+{
+    int movesTokenIndex = -1;
+
+    if (tokens[1] == "startpos")
+    {
+        searcher.board = START_BOARD;
+        movesTokenIndex = 2;
+    }
+    else if (tokens[1] == "fen")
+    {
+        std::string fen = "";
+        int i = 0;
+        for (i = 2; i < tokens.size() && tokens[i] != "moves"; i++)
+            fen += tokens[i] + " ";
+        fen.pop_back(); // remove last whitespace
+        searcher.board = Board(fen);
+        movesTokenIndex = i;
+    }
+
+    for (int i = movesTokenIndex + 1; i < tokens.size(); i++)
+        searcher.board.makeMove(tokens[i]);
+}
+
+inline void go(Searcher &searcher, std::vector<std::string> &tokens)
+{
+    u64 milliseconds = U64_MAX;
+    u64 incrementMilliseconds = U64_MAX;
+    u16 movesToGo = 0;
+    bool isMoveTime = false;
+
+    for (int i = 1; i < tokens.size() - 1; i += 2)
+    {
+        i64 value = stoi(tokens[i + 1]);
+
+        if ((tokens[i] == "wtime" && searcher.board.sideToMove() == Color::WHITE) 
+        ||  (tokens[i] == "btime" && searcher.board.sideToMove() == Color::BLACK))
+            milliseconds = value;
+
+        else if ((tokens[i] == "winc" && searcher.board.sideToMove() == Color::WHITE) 
+        ||       (tokens[i] == "binc" && searcher.board.sideToMove() == Color::BLACK))
+            incrementMilliseconds = value;
+
+        else if (tokens[i] == "movestogo")
+            movesToGo = value;
+        else if (tokens[i] == "movetime")
+        {
+            milliseconds = value;
+            isMoveTime = true;
+        }
+        else if (tokens[i] == "depth")
+            searcher.maxDepth = value;
+        else if (tokens[i] == "nodes")
+            searcher.softNodes = searcher.hardNodes = value;
+    }
+
+    if (isMoveTime)
+        searcher.setMoveTime(milliseconds);
+    else if (movesToGo != 0)
+        searcher.setCyclicTime(milliseconds, movesToGo);
+    else
+        searcher.setSuddenDeathTime(milliseconds);
+
+    auto [bestMove, score] = searcher.search();
+    assert(bestMove != MOVE_NONE);
+    std::cout << "bestmove " + bestMove.toUci() + "\n";
 }
 
 }
