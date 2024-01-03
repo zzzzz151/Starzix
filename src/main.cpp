@@ -9,7 +9,7 @@ Board board;
 
 int main()
 {
-    std::cout << "z5 by zzzzz" << std::endl;
+    std::cout << "Starzix by zzzzz" << std::endl;
     attacks::init();
     search::init();
     board = Board(START_FEN);

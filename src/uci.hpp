@@ -29,6 +29,7 @@ inline void setoption(std::vector<std::string> &tokens) // e.g. "setoption name 
             std::visit([optionName, optionValue, &found](auto &tunableParam) 
             {
                 if ((found = optionName == tunableParam->name))
+                {
                     tunableParam->value = std::is_same<decltype(tunableParam->value), double>::value
                                           ? stoi(optionValue) / 100.0 : stoi(optionValue);
                     if (tunableParam->name == search::historyMax.name)
@@ -36,6 +37,7 @@ inline void setoption(std::vector<std::string> &tokens) // e.g. "setoption name 
                     else if (tunableParam->name == search::lmrBase.name 
                     || tunableParam->name == search::lmrMultiplier.name)
                         search::init();
+                }
             }, myTunableParam);
 
             if (found) break;
@@ -157,7 +159,7 @@ inline void uciLoop()
         trim(received);
     }
 
-    std::cout << "id name z5\n";
+    std::cout << "id name Starzix\n";
     std::cout << "id author zzzzz\n";
     std::cout << "option name Hash type spin default " << tt::DEFAULT_SIZE_MB << " min 1 max 1024\n";
 

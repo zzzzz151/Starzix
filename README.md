@@ -1,22 +1,22 @@
-# z5 - C++ chess engine
+# Starzix - C++ chess engine
 
 # Elo (version 3.0)
 
-[CCRL Blitz](https://computerchess.org.uk/ccrl/404/): 3488
+[CCRL Blitz](https://computerchess.org.uk/ccrl/404/): 3489
 
-[CCRL Rapid](https://computerchess.org.uk/ccrl/4040/): 3335
+[CCRL Rapid](https://computerchess.org.uk/ccrl/4040/): 3346
 
-[Ipman Bullet](https://ipmanchess.yolasite.com/r9-7945hx.php): 3309
+[Ipman Bullet](https://ipmanchess.yolasite.com/r9-7945hx.php): 3308
 
 # How to compile
 
 ### Windows
 
-```clang++ -std=c++20 -march=native -O3 src/main.cpp -o z5.exe```
+```clang++ -std=c++20 -march=native -O3 src/main.cpp -o Starzix.exe```
 
 ### Linux
 
-```clang++ -std=c++20 -march=native -O3 src/main.cpp -o z5```
+```clang++ -std=c++20 -march=native -O3 src/main.cpp -o starzix```
 
 # UCI (Universal Chess Interface)
 
@@ -88,14 +88,6 @@
 - Any time control
 - Soft and hard limits
 - Soft limit scaling based on best move nodes
-
-# Datagen
-
-```clang++ -std=c++20 -march=native -O3 src/datagen.cpp -o datagen.exe```
-
-```src\datagen.bat <numThreads>```
-
-Each thread will create its own randomly named output file in the `data` folder and write generated data to it
 
 # Credits
 
