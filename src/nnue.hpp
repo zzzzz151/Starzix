@@ -60,6 +60,10 @@ inline i32 crelu(i16 x) {
     return x < 0 ? 0 : x > 255 ? 255 : x;
 }
 
+inline i32 screlu(i32 x) {
+    return x < 0 ? 0 : x > 255 ? 255 * 255 : x * x;
+}
+
 inline i16 evaluate(Accumulator &accumulator, Color color)
 {
     i16 *us = accumulator.white,

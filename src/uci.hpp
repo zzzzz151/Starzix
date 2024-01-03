@@ -139,14 +139,17 @@ inline void setoption(Searcher &searcher, std::vector<std::string> &tokens)
         {
             std::visit([optionName, optionValue, &found](auto &tunableParam) 
             {
-                if ((found = optionName == tunableParam->name))
+                if (optionName == tunableParam->name)
+                {
                     tunableParam->value = std::is_same<decltype(tunableParam->value), double>::value
                                           ? stoi(optionValue) / 100.0 : stoi(optionValue);
-                    if (tunableParam->name == historyMax.name)
-                        BAD_NOISY_BASE_SCORE = -historyMax.value / 2;
-                    else if (tunableParam->name == lmrBase.name 
+
+                    if (tunableParam->name == lmrBase.name 
                     || tunableParam->name == lmrMultiplier.name)
                         initLmrTable();
+
+                    found = true;
+                }
             }, myTunableParam);
 
             if (found) break;

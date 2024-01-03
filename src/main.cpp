@@ -9,7 +9,7 @@ int main()
     std::cout << "z5 by zzzzz" << std::endl;
     attacks::init();
     initLmrTable();
-    Searcher searcher = Searcher(Board(START_FEN, true));
+    Searcher searcher = Searcher(START_BOARD);
     uci::uciLoop(searcher);
     return 0;
 }

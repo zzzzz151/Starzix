@@ -64,7 +64,7 @@ class Searcher {
 
     inline void setSuddenDeathTime(u64 milliseconds)
     {
-        hardMilliseconds = milliseconds * suddenDeathHardTimePercentage.value;
+        hardMilliseconds = milliseconds / 24;
         softMilliseconds = milliseconds * suddenDeathSoftTimePercentage.value;
     }
 
@@ -93,7 +93,7 @@ class Searcher {
         return hardTimeUp = (millisecondsElapsed(startTime) >= hardMilliseconds);
     }
 
-    inline std::pair<Move, i16> search(bool printInfo = true)
+    inline std::pair<Move, i32> search(bool printInfo = true)
     {
         // reset and initialize stuff
         //startTime = std::chrono::steady_clock::now();
@@ -104,16 +104,196 @@ class Searcher {
         memset(pvLines, 0, sizeof(pvLines));
         memset(pvLengths, 0, sizeof(pvLengths));
 
-        MovesList moves = MovesList();
-        board.pseudolegalMoves(moves);
-        moves.shuffle();
-        for (int i = 0; i < moves.size(); i++)
-            if (board.makeMove(moves[i]))
-                return { moves[i], 0 };
+        // ID (Iterative deepening)
+        i32 score = 0;
+        Move bestMove = MOVE_NONE;
+        for (i32 iterationDepth = 1; iterationDepth <= maxDepth; iterationDepth++)
+        {
+            maxPlyReached = 0;
+            i32 iterationScore = search(iterationDepth, 0, -INF, INF);
 
-        return { MOVE_NONE, 0 };
+            if (isHardTimeUp()) break;
+
+            bestMove = bestMoveRoot();
+            score = iterationScore;
+
+            if (printInfo)
+            {
+                std::cout << "info depth " << iterationDepth
+                          << " seldepth " << (int)maxPlyReached
+                          << " time " << millisecondsElapsed(startTime)
+                          << " nodes " << nodes
+                          << " nps " << nodes * 1000 / max((u64)millisecondsElapsed(startTime), (u64)1);
+                if (abs(score) < MIN_MATE_SCORE)
+                    std::cout << " score cp " << score;
+                else
+                {
+                    i32 pliesToMate = INF - abs(score);
+                    i32 movesTillMate = round(pliesToMate / 2.0);
+                    std::cout << " score mate " << (score > 0 ? movesTillMate : -movesTillMate);
+                }
+                std::cout << " pv " << pvLines[0][0].toUci();
+                for (int i = 1; i < pvLengths[0]; i++)
+                    std::cout << " " << pvLines[0][i].toUci();
+                std::cout << std::endl;
+            }
+
+        }
+
+        return { bestMove, score };
     }
 
     private:
+
+    inline i32 search(i32 depth, u8 ply, i32 alpha, i32 beta)
+    { 
+        if (depth <= 0) return qSearch(ply, alpha, beta);
+
+        if (isHardTimeUp()) return 0;
+
+        // Update seldepth
+        if (ply > maxPlyReached) maxPlyReached = ply;
+
+        if (ply > 0 && board.isDraw()) return 0;
+
+        if (depth > maxDepth) depth = maxDepth;
+
+        auto [ttEntry, cutoff] = tt.probe(board.zobristHash(), depth, ply, alpha, beta);
+        if (cutoff) return ttEntry->adjustedScore(ply);
+
+        Move ttMove = board.zobristHash() == ttEntry->zobristHash
+                      ? ttEntry->bestMove : MOVE_NONE;
+
+        MovesList moves = MovesList();
+        board.pseudolegalMoves(moves, false, false);
+        std::array<i32, 256> movesScores;
+        scoreMoves(moves, movesScores, ttMove, MOVE_NONE);
+
+        u8 legalMovesPlayed = 0;
+        i32 bestScore = -INF;
+        Move bestMove = MOVE_NONE;
+        i32 originalAlpha = alpha;
+
+        for (int i = 0; i < moves.size(); i++)
+        {
+            auto [move, moveScore] = incrementalSort(moves, movesScores, i);
+
+            // skip illegal moves
+            if (!board.makeMove(move)) continue;
+
+            legalMovesPlayed++;
+            nodes++;
+
+            i32 score = -search(depth - 1, ply + 1, -beta, -alpha);
+            board.undoMove();
+            if (isHardTimeUp()) return 0;
+
+            if (score > bestScore) bestScore = score;
+
+            if (score <= alpha) continue; // Fail low
+
+            alpha = score;
+            bestMove = move;
+            if (ply == 0) pvLines[0][0] = move;
+
+            if (score < beta) continue;
+
+            // Fail high / beta cutoff
+
+            break; // Fail high / beta cutoff
+        }
+
+        if (legalMovesPlayed == 0) return board.inCheck() ? -INF + ply : 0;
+
+        tt.store(ttEntry, board.zobristHash(), depth, ply, bestScore, bestMove, originalAlpha, beta);    
+
+        return bestScore;
+    }
+
+    inline i32 qSearch(u8 ply, i32 alpha, i32 beta)
+    {
+        // Quiescence search: search noisy moves until a 'quiet' position is reached
+
+        if (isHardTimeUp()) return 0;
+
+        // Update seldepth
+        if (ply > maxPlyReached) maxPlyReached = ply;
+
+        if (board.isDraw()) return 0;
+
+        if (ply >= maxDepth) return board.inCheck() ? 0 : board.evaluate();
+
+        i32 eval = -INF; // eval is -INF in check
+        if (!board.inCheck())
+        {
+            eval = board.evaluate();
+            if (eval >= beta) return eval;
+            if (eval > alpha) alpha = eval;
+        }
+
+        // if in check, generate all moves, else only noisy moves
+        // never generate underpromotions
+        MovesList moves = MovesList();
+        board.pseudolegalMoves(moves, !board.inCheck(), false); 
+        std::array<i32, 256> movesScores;
+        scoreMoves(moves, movesScores, MOVE_NONE, MOVE_NONE);
+        
+        u8 legalMovesPlayed = 0;
+        i32 bestScore = eval;
+        Move bestMove = MOVE_NONE;
+
+        for (int i = 0; i < moves.size(); i++)
+        {
+            auto [move, moveScore] = incrementalSort(moves, movesScores, i);
+
+            // skip illegal moves
+            if (!board.makeMove(move)) continue; 
+
+            legalMovesPlayed++;
+            nodes++;
+
+            i32 score = -qSearch(ply + 1, -beta, -alpha);
+            board.undoMove();
+            if (isHardTimeUp()) return 0;
+
+            if (score <= bestScore) continue;
+
+            bestScore = score;
+            bestMove = move;
+
+            if (bestScore >= beta) break;
+            if (bestScore > alpha) alpha = bestScore;
+        }
+
+        if (legalMovesPlayed == 0 && board.inCheck()) 
+            // checkmate
+            return -INF + ply; 
+
+        return bestScore;
+    }
+
+    inline void scoreMoves(MovesList &moves, std::array<i32, 256> &scores, Move ttMove, Move killer)
+    {
+        for (int i = 0; i < moves.size(); i++)
+        {
+            Move move = moves[i];
+            if (move == ttMove)
+            {
+                scores[i] = TT_MOVE_SCORE;
+                continue;
+            }
+
+            scores[i] = 0;
+            PieceType captured = board.captured(move);
+
+            if (captured != PieceType::NONE)
+                scores[i] += 100 * (i32)captured - (i32)move.pieceType();
+            if (move.promotion() != PieceType::NONE)
+                scores[i] += see::SEE(board, move) ? GOOD_NOISY_SCORE + 100'000'000
+                                                    : -GOOD_NOISY_SCORE;
+            else if (captured != PieceType::NONE)
+                scores[i] += see::SEE(board, move) ? GOOD_NOISY_SCORE : -GOOD_NOISY_SCORE;
+        }
+    }
 
 };

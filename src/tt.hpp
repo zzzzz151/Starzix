@@ -79,7 +79,7 @@ struct TT
         age = 0;
     }
 
-    inline std::pair<TTEntry*, bool> probe(u64 zobristHash, int depth, u16 ply, i16 alpha, i16 beta)
+    inline std::pair<TTEntry*, bool> probe(u64 zobristHash, i32 depth, u8 ply, i16 alpha, i16 beta)
     {
         TTEntry *ttEntry = &(tt[zobristHash % tt.size()]);
         Bound ttEntryBound = ttEntry->getBound();
@@ -94,7 +94,7 @@ struct TT
         return { ttEntry, cutoff };
     }
 
-    inline void store(TTEntry *ttEntry, u64 zobristHash, i32 depth, u16 ply, i16 score, Move bestMove, i16 originalAlpha, i16 beta)
+    inline void store(TTEntry *ttEntry, u64 zobristHash, i32 depth, u8 ply, i16 score, Move bestMove, i16 originalAlpha, i16 beta)
     {
         assert(depth >= 0);
 
