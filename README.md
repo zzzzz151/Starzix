@@ -1,8 +1,8 @@
-# z5 - C++ chess engine
+# Starzix - C++ chess engine
 
 # How to compile
 
-```clang++ -O3 -march=native -std=c++20 src/main.cpp -o z5.exe```
+```clang++ -O3 -march=native -std=c++20 src/main.cpp -o Starzix.exe```
 
 # UCI (Universal Chess Interface)
 
