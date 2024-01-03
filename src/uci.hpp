@@ -122,7 +122,7 @@ inline void uciLoop()
         trim(received);
     }
 
-    std::cout << "id name z5\n";
+    std::cout << "id name Starzix 3.0\n";
     std::cout << "id author zzzzz\n";
     std::cout << "option name Hash type spin default " << tt::DEFAULT_SIZE_MB << " min 1 max 1024\n";
     std::cout << "uciok\n";
