@@ -1,10 +1,10 @@
-# z5 - C++ chess engine
+# Starzix - C++ chess engine
 
 Currently ~3150 elo (tested against [amoeba](https://github.com/abulmo/amoeba) 3.4).
 
 # How to build
 
-```g++ -O3 -march=native -std=c++17 src/main.cpp -o z5.exe```
+```g++ -O3 -march=native -std=c++20 src/main.cpp -o Starzix.exe```
 
 # UCI options
 
