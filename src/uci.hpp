@@ -92,7 +92,7 @@ inline void uciLoop(Searcher &searcher)
 
 inline void uci()
 {
-    std::cout << "id name z5\n";
+    std::cout << "id name Starzix\n";
     std::cout << "id author zzzzz\n";
     std::cout << "option name Hash type spin default " << TT_DEFAULT_SIZE_MB << " min 1 max 1024\n";
 

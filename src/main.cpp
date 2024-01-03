@@ -6,7 +6,7 @@
 
 int main()
 {
-    std::cout << "z5 by zzzzz" << std::endl;
+    std::cout << "Starzix by zzzzz" << std::endl;
     attacks::init();
     initLmrTable();
     Searcher searcher = Searcher(START_BOARD);

@@ -1,7 +1,7 @@
 #pragma once
 
 #ifdef _MSC_VER
-#define Z5_MSVC
+#define STARZIX_MSVC
 #pragma push_macro("_MSC_VER")
 #undef _MSC_VER
 #endif

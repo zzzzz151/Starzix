@@ -1,4 +1,4 @@
-# z5 - C++ chess engine
+# Starzix - C++ chess engine
 
 # Elo (version 3.0)
 
@@ -12,11 +12,11 @@
 
 ### Windows
 
-```clang++ -std=c++20 -march=native -O3 src/main.cpp -o z5.exe```
+```clang++ -std=c++20 -march=native -O3 -Wl,/STACK:16777216 src/main.cpp -o Starzix.exe```
 
 ### Linux
 
-```clang++ -std=c++20 -march=native -O3 src/main.cpp -o z5```
+```clang++ -std=c++20 -march=native -O3 src/main.cpp -o starzix```
 
 # UCI (Universal Chess Interface)
 
