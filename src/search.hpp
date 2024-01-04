@@ -211,12 +211,14 @@ class Searcher {
         MovesList moves = MovesList();
         board.pseudolegalMoves(moves, false, false);
         std::array<i32, 256> movesScores;
-        scoreMoves(moves, movesScores, ttMove, MOVE_NONE);
+        scoreMoves(moves, movesScores, ttMove, killerMoves[ply]);
 
         u8 legalMovesPlayed = 0;
         i32 bestScore = -INF;
         Move bestMove = MOVE_NONE;
         i32 originalAlpha = alpha;
+        std::array<HistoryEntry*, 256> failLowQuietsHistoryEntry;
+        u8 failLowQuiets = 0;
 
         for (int i = 0; i < moves.size(); i++)
         {
@@ -250,6 +252,7 @@ class Searcher {
                 {
                     lmr = LMR_TABLE[depth][legalMovesPlayed];
                     lmr -= pvNode;
+                    lmr -= moveScore == KILLER_SCORE || moveScore == COUNTERMOVE_SCORE;
                     lmr = std::clamp(lmr, 0, depth - 2);
                 }
 
@@ -265,7 +268,13 @@ class Searcher {
 
             if (score > bestScore) bestScore = score;
 
-            if (score <= alpha) continue; // Fail low
+            if (score <= alpha) // Fail low
+            {
+                u8 pt = (u8)move.pieceType();
+                failLowQuietsHistoryEntry[failLowQuiets++] 
+                    = &historyTable[(i8)stm][pt][move.to()];
+                continue;
+            }
 
             alpha = score;
             bestMove = move;
@@ -277,10 +286,18 @@ class Searcher {
 
             if (isQuiet)
             {
+                killerMoves[ply] = move;
+
                 i32 historyBonus = min(historyMaxBonus.value, 
                                        historyBonusMultiplier.value * (depth-1));
+
+                // Increase history of this fail high quiet move
                 u8 pt = (u8)move.pieceType();
                 historyTable[(i8)stm][pt][move.to()].updateQuietHistory(board, historyBonus);
+
+                // History malus: if this fail high is a quiet, decrease history of fail low quiets
+                for  (int i = 0; i < failLowQuiets; i++)
+                    failLowQuietsHistoryEntry[i]->updateQuietHistory(board, -historyBonus);
             }
 
             break; // Fail high / beta cutoff
@@ -319,7 +336,7 @@ class Searcher {
         MovesList moves = MovesList();
         board.pseudolegalMoves(moves, !board.inCheck(), false); 
         std::array<i32, 256> movesScores;
-        scoreMoves(moves, movesScores, MOVE_NONE, MOVE_NONE);
+        scoreMoves(moves, movesScores, MOVE_NONE, killerMoves[ply]);
         
         u8 legalMovesPlayed = 0;
         i32 bestScore = eval;
@@ -386,11 +403,14 @@ class Searcher {
                                               : -GOOD_NOISY_SCORE;
             else if (captured != PieceType::NONE)
                 scores[i] += SEE(board, move) ? GOOD_NOISY_SCORE : -GOOD_NOISY_SCORE;
+            else if (move == killer)
+                scores[i] = KILLER_SCORE;
             else
             {
                 u8 pt = (u8)move.pieceType();
                 scores[i] = historyTable[stm][pt][move.to()].quietHistory(board);
             }
+            
         }
     }
 
