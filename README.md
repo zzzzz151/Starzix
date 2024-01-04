@@ -37,10 +37,10 @@
 # Features
 
 ### Board
-- Bitboards + mailbox
+- Bitboards
 - Zobrist hashing
 - Pseudolegal move generation (magic bitboards for sliders, lookup tables for pawns, knights and king)
-- Make/undo move
+- Copymake make/undo move
 
 ### NNUE evaluation (768->384x2->1)
 
@@ -88,14 +88,6 @@
 - Any time control
 - Soft and hard limits
 - Soft limit scaling based on best move nodes
-
-# Datagen
-
-```clang++ -std=c++20 -march=native -O3 src/datagen.cpp -o datagen.exe```
-
-```src\datagen.bat <numThreads>```
-
-Each thread will create its own randomly named output file in the `data` folder and write generated data to it
 
 # Credits
 

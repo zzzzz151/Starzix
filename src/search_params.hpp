@@ -16,7 +16,7 @@ TunableParam<double> aspDeltaMultiplier = TunableParam<double>("aspDeltaMultipli
 
 // RFP (Reverse futility pruning) / Static NMP
 TunableParam<i32> rfpMaxDepth = TunableParam<i32>("rfpMaxDepth", 7, 6, 10); // step = 2
-TunableParam<i32> rfpDepthMultiplier = TunableParam<i32>("rfpDepthMultiplier", 76, 50, 150); // step = 25
+TunableParam<i32> rfpDepthMultiplier = TunableParam<i32>("rfpDepthMultiplier", 75, 50, 150); // step = 25
 
 // AP (Alpha pruning)
 TunableParam<i32> apMaxDepth = TunableParam<i32>("apMaxDepth", 6, 2, 8); // step = 2
@@ -27,8 +27,8 @@ TunableParam<i32> razoringMaxDepth = TunableParam<i32>("razoringMaxDepth", 4, 2,
 TunableParam<i32> razoringDepthMultiplier = TunableParam<i32>("razoringDepthMultiplier", 297, 200, 400); // step = 100
 
 // NMP (Null move pruning)
-TunableParam<i32> nmpMinDepth = TunableParam<i32>("nmpMinDepth", 2, 2, 4); // step = 1
-TunableParam<i32> nmpBaseReduction = TunableParam<i32>("nmpBaseReduction", 4, 2, 4); // step = 1
+TunableParam<i32> nmpMinDepth = TunableParam<i32>("nmpMinDepth", 3, 2, 4); // step = 1
+TunableParam<i32> nmpBaseReduction = TunableParam<i32>("nmpBaseReduction", 3, 2, 4); // step = 1
 TunableParam<i32> nmpReductionDivisor = TunableParam<i32>("nmpReductionDivisor", 3, 2, 4); // step = 1
 
 // IIR (Internal iterative reduction)
@@ -57,15 +57,15 @@ TunableParam<i32> singularBetaMargin = TunableParam<i32>("singularBetaMargin", 2
 TunableParam<i32> maxDoubleExtensions = TunableParam<i32>("maxDoubleExtensions", 6, 4, 10); // step = 3
 
 // LMR (Late move reductions)
-TunableParam<double> lmrBase = TunableParam<double>("lmrBase", 0.83, 0.6, 1.0); // step = 0.1
+TunableParam<double> lmrBase = TunableParam<double>("lmrBase", 0.8, 0.6, 1.0); // step = 0.1
 TunableParam<double> lmrMultiplier = TunableParam<double>("lmrMultiplier", 0.4, 0.3, 0.6); // step = 0.1
 TunableParam<i32> lmrHistoryDivisor = TunableParam<i32>("lmrHistoryDivisor", 14620, 4096, 16384); // step = 4096
 TunableParam<i32> lmrNoisyHistoryDivisor = TunableParam<i32>("lmrNoisyHistoryDivisor", 6689, 2048, 8192); // step = 2048
 
 // History
-TunableParam<i32> historyMaxBonus = TunableParam<i32>("historyMaxBonus", 1747, 1300, 1800); // step = 250
-TunableParam<i32> historyBonusMultiplier = TunableParam<i32>("historyBonusMultiplier", 432, 270, 470); // step = 100
-TunableParam<i32> historyMax = TunableParam<i32>("historyMax", 17360, 16384, 32768); // step = 16384
+TunableParam<i32> historyMaxBonus = TunableParam<i32>("historyMaxBonus", 1570, 1300, 1800); // step = 250
+TunableParam<i32> historyBonusMultiplier = TunableParam<i32>("historyBonusMultiplier", 370, 270, 470); // step = 100
+TunableParam<i32> historyMax = TunableParam<i32>("historyMax", 16384, 16384, 32768); // step = 16384
 
 // Time management
 TunableParam<double> suddenDeathHardTimePercentage = TunableParam<double>("suddenDeathHardTimePercentage", 0.45, 0.35, 0.65); // step = 0.15
@@ -104,9 +104,6 @@ i32 TT_MOVE_SCORE      = 2'000'000'000,
     KILLER_SCORE       = 1'000'000'000,
     COUNTERMOVE_SCORE  = 500'000'000,
     HISTORY_MOVE_SCORE = 0;
-
-// Most valuable victim    P    N    B    R    Q    K  NONE
-const i32 MVV_VALUES[7] = {100, 300, 320, 500, 900, 0, 0};
 
 
 

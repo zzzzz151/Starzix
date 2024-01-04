@@ -25,8 +25,8 @@ struct HistoryEntry
         Move lastMove;
         if ((lastMove = board.getNthToLastMove(1)) != MOVE_NONE)
         {
-            int pieceType = (int)lastMove.pieceType();
-            int targetSq = (int)lastMove.to();
+            u8 pieceType = (u8)lastMove.pieceType();
+            u8 targetSq = (u8)lastMove.to();
             quietHist += countermoveHistory[pieceType][targetSq];
         }
 
@@ -34,8 +34,8 @@ struct HistoryEntry
         Move lastLastMove;
         if ((lastLastMove = board.getNthToLastMove(2)) != MOVE_NONE)
         {
-            int pieceType = (int)lastLastMove.pieceType();
-            int targetSq = (int)lastLastMove.to();
+            u8 pieceType = (u8)lastLastMove.pieceType();
+            u8 targetSq = (u8)lastLastMove.to();
             quietHist += followupMoveHistory[pieceType][targetSq];
         }
        
@@ -45,31 +45,32 @@ struct HistoryEntry
     inline void updateQuietHistory(Board &board, i32 bonus)
     {
         // Update main history
-        mainHistory += bonus - mainHistory * abs(bonus) / historyMax.value;
+        mainHistory += bonus - abs(bonus) * mainHistory / historyMax.value;
 
         // Update countermove history using last move
         Move lastMove;
         if ((lastMove = board.getNthToLastMove(1)) != MOVE_NONE)
         {
-            int pieceType = (int)lastMove.pieceType();
-            int targetSq = (int)lastMove.to();
-            i32 countermoveHistDelta = bonus - countermoveHistory[pieceType][targetSq] * abs(bonus) / historyMax.value;
-            countermoveHistory[pieceType][targetSq] += countermoveHistDelta;
+            u8 pt = (u8)lastMove.pieceType();
+            u8 targetSq = (u8)lastMove.to();
+
+            countermoveHistory[pt][targetSq] 
+                += bonus - abs(bonus) * countermoveHistory[pt][targetSq] / historyMax.value;
         }
 
         // Update follow-up move history using 2nd-to-last move
         Move lastLastMove;
         if ((lastLastMove = board.getNthToLastMove(2)) != MOVE_NONE)
         {
-            int pieceType = (int)lastLastMove.pieceType();
-            int targetSq = (int)lastLastMove.to();
-            i32 followupHistDelta = bonus - followupMoveHistory[pieceType][targetSq] * abs(bonus) / historyMax.value;
-            followupMoveHistory[pieceType][targetSq] += followupHistDelta;
+            u8 pt = (u8)lastLastMove.pieceType();
+            u8 targetSq = (u8)lastLastMove.to();
+            followupMoveHistory[pt][targetSq] 
+                += bonus - abs(bonus) * followupMoveHistory[pt][targetSq] / historyMax.value;
         }
     }
 
     inline void updateNoisyHistory(Board &board, i32 bonus) {
-        noisyHistory += bonus - noisyHistory * abs(bonus) / historyMax.value;
+        noisyHistory += bonus - abs(bonus) * noisyHistory / historyMax.value;
     }
 
 };

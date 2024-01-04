@@ -147,6 +147,9 @@ class Searcher {
 
     inline i32 search(i32 depth, u8 ply, i32 alpha, i32 beta)
     { 
+        // Check extension
+        if (board.inCheck()) depth = depth < 0 ? 1 : depth + 1;
+
         if (depth <= 0) return qSearch(ply, alpha, beta);
 
         if (isHardTimeUp()) return 0;
@@ -163,6 +166,34 @@ class Searcher {
 
         Move ttMove = board.zobristHash() == ttEntry->zobristHash
                       ? ttEntry->bestMove : MOVE_NONE;
+
+        Color stm = board.sideToMove();
+        bool pvNode = beta > alpha + 1;
+        i32 eval = board.evaluate();
+
+        if (!pvNode && !board.inCheck())
+        {
+            // RFP (Reverse futility pruning) / Static NMP
+            if (depth <= rfpMaxDepth.value && eval >= beta + depth * rfpDepthMultiplier.value)
+                return eval;
+
+            // NMP (Null move pruning)
+            if (depth >= nmpMinDepth.value && eval >= beta
+            && board.lastMove() != MOVE_NONE && board.hasNonPawnMaterial(stm))
+            {
+                board.makeMove(MOVE_NONE);
+                i32 nmpDepth = depth - nmpBaseReduction.value - depth / nmpReductionDivisor.value;
+                i32 score = -search(nmpDepth, ply + 1, -beta, -alpha);
+                board.undoMove();
+
+                if (score >= MIN_MATE_SCORE) return beta;
+                if (score >= beta) return score;
+            }
+        }
+
+        // IIR (Internal iterative reduction)
+        if (depth >= iirMinDepth.value && ttMove == MOVE_NONE)
+            depth--;
 
         MovesList moves = MovesList();
         board.pseudolegalMoves(moves, false, false);
@@ -184,7 +215,25 @@ class Searcher {
             legalMovesPlayed++;
             nodes++;
 
-            i32 score = -search(depth - 1, ply + 1, -beta, -alpha);
+    	    // PVS (Principal variation search)
+            i32 score = 0;
+            if (legalMovesPlayed == 1)
+                score = -search(depth - 1, ply + 1, -beta, -alpha);
+            else
+            {
+                i32 lmr = 0;
+                if (depth >= 3 && moveScore <= KILLER_SCORE)
+                {
+                    lmr = LMR_TABLE[depth][legalMovesPlayed];
+                    lmr -= pvNode;
+                    lmr = std::clamp(lmr, 0, depth - 2);
+                }
+
+                score = -search(depth - 1 - lmr, ply + 1, -alpha-1, -alpha);
+                if (score > alpha && (score < beta || lmr > 0))
+                    score = -search(depth - 1, ply + 1, -beta, -alpha);     
+            }
+
             board.undoMove();
             if (isHardTimeUp()) return 0;
 
@@ -199,6 +248,14 @@ class Searcher {
             if (score < beta) continue;
 
             // Fail high / beta cutoff
+
+            if (!board.isCapture(move) && move.promotion() == PieceType::NONE)
+            {
+                i32 historyBonus = min(historyMaxBonus.value, 
+                                       historyBonusMultiplier.value * (depth-1));
+                u8 pt = (u8)move.pieceType();
+                historyTable[(i8)stm][pt][move.to()].updateQuietHistory(board, historyBonus);
+            }
 
             break; // Fail high / beta cutoff
         }
@@ -246,6 +303,10 @@ class Searcher {
         {
             auto [move, moveScore] = incrementalSort(moves, movesScores, i);
 
+            // SEE pruning (skip bad captures)
+            if (!board.inCheck() && moveScore <= -GOOD_NOISY_SCORE + 1000) 
+                continue;
+
             // skip illegal moves
             if (!board.makeMove(move)) continue; 
 
@@ -272,14 +333,20 @@ class Searcher {
         return bestScore;
     }
 
+    const i32 GOOD_NOISY_SCORE  = 1'500'000'000,
+              KILLER_SCORE      = 1'000'000'000,
+              COUNTERMOVE_SCORE = 500'000'000;
+
     inline void scoreMoves(MovesList &moves, std::array<i32, 256> &scores, Move ttMove, Move killer)
     {
+        i8 stm = (i8)board.sideToMove();
+
         for (int i = 0; i < moves.size(); i++)
         {
             Move move = moves[i];
             if (move == ttMove)
             {
-                scores[i] = TT_MOVE_SCORE;
+                scores[i] = 2'000'000'000;
                 continue;
             }
 
@@ -290,9 +357,14 @@ class Searcher {
                 scores[i] += 100 * (i32)captured - (i32)move.pieceType();
             if (move.promotion() != PieceType::NONE)
                 scores[i] += see::SEE(board, move) ? GOOD_NOISY_SCORE + 100'000'000
-                                                    : -GOOD_NOISY_SCORE;
+                                                   : -GOOD_NOISY_SCORE;
             else if (captured != PieceType::NONE)
                 scores[i] += see::SEE(board, move) ? GOOD_NOISY_SCORE : -GOOD_NOISY_SCORE;
+            else
+            {
+                u8 pt = (u8)move.pieceType();
+                scores[i] = historyTable[stm][pt][move.to()].quietHistory(board);
+            }
         }
     }
 
