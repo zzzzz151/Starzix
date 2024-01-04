@@ -96,17 +96,3 @@ std::vector<TunableParamVariant> tunableParams
     &softTimeScaleBase, &softTimeScaleMultiplier
 };
 
-const u64 OVERHEAD_MILLISECONDS = 10;
-
-// Move ordering
-i32 TT_MOVE_SCORE      = 2'000'000'000,
-    GOOD_NOISY_SCORE   = 1'500'000'000,
-    KILLER_SCORE       = 1'000'000'000,
-    COUNTERMOVE_SCORE  = 500'000'000,
-    HISTORY_MOVE_SCORE = 0;
-
-
-
-
-
-

@@ -31,6 +31,7 @@ class Searcher {
     Move killerMoves[256];               // [ply]
     Move countermoves[2][1ULL << 16];    // [color][moveEncoded]
     HistoryEntry historyTable[2][6][64]; // [color][pieceType][targetSquare]
+    const u64 OVERHEAD_MILLISECONDS = 10;
 
     inline Searcher(Board board)
     {
@@ -106,7 +107,6 @@ class Searcher {
 
         // ID (Iterative deepening)
         i32 score = 0;
-        Move bestMove = MOVE_NONE;
         for (i32 iterationDepth = 1; iterationDepth <= maxDepth; iterationDepth++)
         {
             maxPlyReached = 0;
@@ -114,7 +114,6 @@ class Searcher {
 
             if (isHardTimeUp()) break;
 
-            bestMove = bestMoveRoot();
             score = iterationScore;
 
             if (printInfo)
@@ -140,7 +139,7 @@ class Searcher {
 
         }
 
-        return { bestMove, score };
+        return { bestMoveRoot(), score };
     }
 
     private:

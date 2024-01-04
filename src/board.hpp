@@ -364,7 +364,6 @@ class Board
 
     inline bool makeMove(Move move, bool verifyLegality = true)
     {
-        //std::cout << "Making move " << move.toUci() << " with flag " << move.flag() << std::endl;
         states.push_back(*state);
         state = &states.back();
 

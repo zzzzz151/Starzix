@@ -40,15 +40,17 @@ struct TTEntry
     }
 
     inline u8 getAge() { 
-        return boundAndAge & 0b1111'1100;
+        return boundAndAge >> 2;
     }
 
     inline void setAge(u8 newAge) { 
+        assert(newAge < 63);
         boundAndAge &= 0b0000'0011;
         boundAndAge |= (newAge << 2);
     }
 
     inline void setBoundAndAge(Bound bound, u8 age) {
+        assert(age < 63);
         boundAndAge = (age << 2) | (u8)bound;
     }
 
@@ -81,7 +83,7 @@ struct TT
 
     inline std::pair<TTEntry*, bool> probe(u64 zobristHash, i32 depth, u8 ply, i16 alpha, i16 beta)
     {
-        TTEntry *ttEntry = &(tt[zobristHash % tt.size()]);
+        TTEntry *ttEntry = &tt[zobristHash % tt.size()];
         Bound ttEntryBound = ttEntry->getBound();
 
         bool cutoff = ply > 0 
@@ -96,19 +98,17 @@ struct TT
 
     inline void store(TTEntry *ttEntry, u64 zobristHash, i32 depth, u8 ply, i16 score, Move bestMove, i16 originalAlpha, i16 beta)
     {
-        assert(depth >= 0);
-
-        Bound bound = Bound::EXACT;
-        if (score <= originalAlpha) 
-            bound = Bound::UPPER;
-        else if (score >= beta) 
-            bound = Bound::LOWER;
-
         ttEntry->zobristHash = zobristHash;
         ttEntry->depth = depth;
         ttEntry->score = score;
-        ttEntry->setBoundAndAge(bound, age);
         if (bestMove != MOVE_NONE) ttEntry->bestMove = bestMove;
+
+        if (score <= originalAlpha)
+            ttEntry->setBound(Bound::UPPER);
+        else if (score >= beta)
+            ttEntry->setBound(Bound::LOWER);
+        else 
+            ttEntry->setBound(Bound::EXACT);
 
         // Adjust mate scores based on ply
         if (ttEntry->score >= MIN_MATE_SCORE)
