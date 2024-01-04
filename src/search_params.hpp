@@ -45,9 +45,9 @@ TunableParam<i32> fpBase = TunableParam<i32>("fpBase", 124, 60, 180); // step = 
 TunableParam<i32> fpMultiplier = TunableParam<i32>("fpMultiplier", 82, 50, 150); // step = 20
 
 // SEE pruning
-TunableParam<i32> seePruningMaxDepth = TunableParam<i32>("seePruningMaxDepth", 10, 7, 11); // step = 2
-TunableParam<i32> seeNoisyThreshold = TunableParam<i32>("seeNoisyThreshold", -14, -30, -10); // step = 10
-TunableParam<i32> seeQuietThreshold = TunableParam<i32>("seeQuietThreshold", -53, -80, -50); // step = 15
+TunableParam<i32> seePruningMaxDepth = TunableParam<i32>("seePruningMaxDepth", 9, 7, 11); // step = 2
+TunableParam<i32> seeNoisyThreshold = TunableParam<i32>("seeNoisyThreshold", -20, -30, -10); // step = 10
+TunableParam<i32> seeQuietThreshold = TunableParam<i32>("seeQuietThreshold", -65, -80, -50); // step = 15
 
 // SE (Singular extensions)
 TunableParam<i32> singularMinDepth = TunableParam<i32>("singularMinDepth", 7, 6, 10); // step = 2
@@ -70,6 +70,9 @@ TunableParam<i32> historyMax = TunableParam<i32>("historyMax", 16384, 16384, 327
 // Time Management
 TunableParam<u16> defaultMovesToGo = TunableParam<u16>("defaultMovesToGo", 25, 20, 30); // step = 5
 TunableParam<double> softMillisecondsPercentage = TunableParam<double>("softMillisecondsPercentage", 0.6, 0.5, 0.6); // step = 0.1
+TunableParam<i32> softTimeMoveNodesScalingMinDepth = TunableParam<i32>("softTimeMoveNodesScalingMinDepth", 9, 7, 11); // step = 2
+TunableParam<double> softTimeMoveNodesScalingBase = TunableParam<double>("softTimeMoveNodesScalingBase", 1.5, 1.25, 1.75); // step = 0.25
+TunableParam<double> softTimeMoveNodesScalingMultiplier = TunableParam<double>("softTimeMoveNodesScalingMultiplier", 1.35, 1.15, 1.55); // step = 0.2
 
 using TunableParamVariant = std::variant<TunableParam<i32>*, TunableParam<double>*, TunableParam<u16>*>;
 
@@ -87,6 +90,7 @@ std::vector<TunableParamVariant> tunableParams
     &singularMinDepth, &singularDepthMargin, &singularBetaMultiplier, &singularBetaMargin, &maxDoubleExtensions,
     &lmrBase, &lmrMultiplier, &lmrHistoryDivisor, &lmrNoisyHistoryDivisor,
     &historyMaxBonus, &historyBonusMultiplier, &historyMax,
-    &defaultMovesToGo, &softMillisecondsPercentage
+    &defaultMovesToGo, &softMillisecondsPercentage,
+    &softTimeMoveNodesScalingMinDepth, &softTimeMoveNodesScalingBase, &softTimeMoveNodesScalingMultiplier
 };
 

@@ -65,6 +65,7 @@ class Searcher {
 
     inline void setTimeLimits(u64 milliseconds, u64 incrementMilliseconds, u64 movesToGo, bool isMoveTime)
     {
+        assert(milliseconds > 0 && movesToGo > 0);
         u64 maxHardMs = max((i64)1, (i64)milliseconds - (i64)OVERHEAD_MILLISECONDS);
 
         if (isMoveTime)
@@ -87,6 +88,12 @@ class Searcher {
         if ((nodes % 1024) != 0) return false;
 
         return hardTimeUp = (millisecondsElapsed(startTime) >= hardMilliseconds);
+    }
+
+    inline double bestMoveNodesFraction() 
+    {
+        assert(bestMoveRoot() != MOVE_NONE);
+        return (double)movesNodes[bestMoveRoot().getMoveEncoded()] / (double)nodes;
     }
 
     inline std::pair<Move, i32> search(bool printInfo = true)
@@ -133,10 +140,14 @@ class Searcher {
                 std::cout << std::endl;
             }
 
-            // Check soft time limit
+            // Check soft limits
             if (nodes >= softNodes)
                 break;
-            if (msElapsed >= softMilliseconds)
+            if (msElapsed >= (iterationDepth >= softTimeMoveNodesScalingMinDepth.value
+                              ? softMilliseconds 
+                                * (softTimeMoveNodesScalingBase.value - bestMoveNodesFraction()) 
+                                * softTimeMoveNodesScalingMultiplier.value
+                              : softMilliseconds))
                 break;
         }
 
@@ -166,7 +177,7 @@ class Searcher {
 
         Color stm = board.sideToMove();
         bool pvNode = beta > alpha + 1;
-        i32 eval = board.evaluate();
+        i32 eval = board.inCheck() ? 0 : board.evaluate();
 
         if (!pvNode && !board.inCheck())
         {
@@ -208,11 +219,22 @@ class Searcher {
         for (int i = 0; i < moves.size(); i++)
         {
             auto [move, moveScore] = incrementalSort(moves, movesScores, i);
+            bool isQuiet = !board.isCapture(move) && move.promotion() == PieceType::NONE;
+
+            if (bestScore > -MIN_MATE_SCORE && !pvNode && !board.inCheck() && moveScore < COUNTERMOVE_SCORE)
+            {
+                // SEE pruning
+                if (depth <= seePruningMaxDepth.value 
+                && !SEE(board, move, 
+                        depth * (isQuiet ? seeQuietThreshold.value : depth * seeNoisyThreshold.value)))
+                    continue;
+            }
 
             // skip illegal moves
             if (!board.makeMove(move)) continue;
 
             legalMovesPlayed++;
+            u64 nodesBefore = nodes;
             nodes++;
 
     	    // PVS (Principal variation search)
@@ -237,6 +259,8 @@ class Searcher {
             board.undoMove();
             if (isHardTimeUp()) return 0;
 
+            if (ply == 0) movesNodes[move.getMoveEncoded()] += nodes - nodesBefore;
+
             if (score > bestScore) bestScore = score;
 
             if (score <= alpha) continue; // Fail low
@@ -249,7 +273,7 @@ class Searcher {
 
             // Fail high / beta cutoff
 
-            if (!board.isCapture(move) && move.promotion() == PieceType::NONE)
+            if (isQuiet)
             {
                 i32 historyBonus = min(historyMaxBonus.value, 
                                        historyBonusMultiplier.value * (depth-1));
