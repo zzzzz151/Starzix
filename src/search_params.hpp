@@ -59,7 +59,7 @@ TunableParam<i32> maxDoubleExtensions = TunableParam<i32>("maxDoubleExtensions",
 // LMR (Late move reductions)
 TunableParam<double> lmrBase = TunableParam<double>("lmrBase", 0.8, 0.6, 1.0); // step = 0.1
 TunableParam<double> lmrMultiplier = TunableParam<double>("lmrMultiplier", 0.4, 0.3, 0.6); // step = 0.1
-TunableParam<i32> lmrHistoryDivisor = TunableParam<i32>("lmrHistoryDivisor", 14620, 4096, 16384); // step = 4096
+TunableParam<i32> lmrHistoryDivisor = TunableParam<i32>("lmrHistoryDivisor", 8192, 4096, 16384); // step = 4096
 TunableParam<i32> lmrNoisyHistoryDivisor = TunableParam<i32>("lmrNoisyHistoryDivisor", 6689, 2048, 8192); // step = 2048
 
 // History

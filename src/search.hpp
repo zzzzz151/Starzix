@@ -245,27 +245,44 @@ class Searcher {
             legalMovesPlayed++;
             u64 nodesBefore = nodes;
             nodes++;
+            u8 pt = (u8)move.pieceType();
 
     	    // PVS (Principal variation search)
-            i32 score = 0;
-            if (legalMovesPlayed == 1)
-                score = -search(depth - 1, ply + 1, -beta, -alpha);
-            else
-            {
-                i32 lmr = 0;
-                if (depth >= 3 && moveScore <= KILLER_SCORE)
-                {
-                    lmr = LMR_TABLE[depth][legalMovesPlayed];
-                    lmr -= pvNode;
-                    lmr -= moveScore == KILLER_SCORE || moveScore == COUNTERMOVE_SCORE;
-                    lmr = std::clamp(lmr, 0, depth - 2);
-                }
 
-                score = -search(depth - 1 - lmr, ply + 1, -alpha-1, -alpha);
-                if (score > alpha && (score < beta || lmr > 0))
-                    score = -search(depth - 1, ply + 1, -beta, -alpha);     
+            i32 score = 0, lmr = 0;
+            if (legalMovesPlayed == 1)
+            {
+                score = -search(depth - 1, ply + 1, -beta, -alpha);
+                goto moveSearched;
             }
 
+            if (depth >= 3 && moveScore <= KILLER_SCORE)
+            {
+                lmr = LMR_TABLE[depth][legalMovesPlayed];
+                lmr -= pvNode;
+
+                double quietHist = 0;
+                if (!isQuiet) goto lmrAdjusted;
+
+                if (moveScore == KILLER_SCORE || moveScore == COUNTERMOVE_SCORE)
+                {
+                    lmr--;
+                    quietHist = historyTable[(i8)stm][pt][move.to()].quietHistory(board);
+                }
+                else
+                    quietHist = moveScore;
+                lmr -= round(quietHist / (double)lmrHistoryDivisor.value);
+
+                lmrAdjusted:
+                lmr = std::clamp(lmr, 0, depth - 2);
+            }
+
+            
+            score = -search(depth - 1 - lmr, ply + 1, -alpha-1, -alpha);
+            if (score > alpha && (score < beta || lmr > 0))
+                score = -search(depth - 1, ply + 1, -beta, -alpha); 
+
+            moveSearched:
             board.undoMove();
             if (isHardTimeUp()) return 0;
 
@@ -275,7 +292,6 @@ class Searcher {
 
             if (score <= alpha) // Fail low
             {
-                u8 pt = (u8)move.pieceType();
                 failLowQuietsHistoryEntry[failLowQuiets++] 
                     = &historyTable[(i8)stm][pt][move.to()];
                 continue;
@@ -297,7 +313,6 @@ class Searcher {
                                        historyBonusMultiplier.value * (depth-1));
 
                 // Increase history of this fail high quiet move
-                u8 pt = (u8)move.pieceType();
                 historyTable[(i8)stm][pt][move.to()].updateQuietHistory(board, historyBonus);
 
                 // History malus: if this fail high is a quiet, decrease history of fail low quiets
