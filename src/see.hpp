@@ -3,15 +3,13 @@
 
 // clang-format off
 
-namespace see { // SEE (Static exchange evaluation) 
+inline i32 gain(Board &board, Move move);
+
+inline PieceType popLeastValuable(Board &board, u64 &occ, u64 attackers, Color color);
 
                               // P    N    B    R    Q    K  NONE
 const i32 SEE_PIECE_VALUES[7] = {100, 300, 300, 500, 900, 0, 0};
 const u8 PAWN_INDEX = 0;
-
-inline i32 gain(Board &board, Move move);
-
-inline PieceType popLeastValuable(Board &board, u64 &occ, u64 attackers, Color color);
 
 // SEE (Static exchange evaluation)
 inline bool SEE(Board &board, Move move, i32 threshold = 0)
@@ -104,5 +102,4 @@ inline PieceType popLeastValuable(Board &board, u64 &occ, u64 attackers, Color c
     return PieceType::NONE;
 }
 
-}
 

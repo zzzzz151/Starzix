@@ -67,15 +67,11 @@ TunableParam<i32> historyMaxBonus = TunableParam<i32>("historyMaxBonus", 1570, 1
 TunableParam<i32> historyBonusMultiplier = TunableParam<i32>("historyBonusMultiplier", 370, 270, 470); // step = 100
 TunableParam<i32> historyMax = TunableParam<i32>("historyMax", 16384, 16384, 32768); // step = 16384
 
-// Time management
-TunableParam<double> suddenDeathHardTimePercentage = TunableParam<double>("suddenDeathHardTimePercentage", 0.45, 0.35, 0.65); // step = 0.15
-TunableParam<double> suddenDeathSoftTimePercentage = TunableParam<double>("suddenDeathSoftTimePercentage", 0.05, 0.03, 0.07); // step = 0.02
-TunableParam<double> movesToGoHardTimePercentage = TunableParam<double>("movesToGoHardTimePercentage", 0.5, 0.3, 0.7); // step = 0.2
-TunableParam<double> movesToGoSoftTimePercentage = TunableParam<double>("movesToGoSoftTimePercentage", 0.6, 0.5, 0.6); // step = 0.1
-TunableParam<double> softTimeScaleBase = TunableParam<double>("softTimeScaleBase", 0.25, 0.25, 0.75); // step = 0.25
-TunableParam<double> softTimeScaleMultiplier = TunableParam<double>("softTimeScaleMultiplier", 1.72, 1.25, 1.75); // step = 0.25
+// Time Management
+TunableParam<u16> defaultMovesToGo = TunableParam<u16>("defaultMovesToGo", 25, 20, 30); // step = 5
+TunableParam<double> softMillisecondsPercentage = TunableParam<double>("softMillisecondsPercentage", 0.6, 0.5, 0.6); // step = 0.1
 
-using TunableParamVariant = std::variant<TunableParam<i32>*, TunableParam<double>*>;
+using TunableParamVariant = std::variant<TunableParam<i32>*, TunableParam<double>*, TunableParam<u16>*>;
 
 std::vector<TunableParamVariant> tunableParams 
 {
@@ -91,8 +87,6 @@ std::vector<TunableParamVariant> tunableParams
     &singularMinDepth, &singularDepthMargin, &singularBetaMultiplier, &singularBetaMargin, &maxDoubleExtensions,
     &lmrBase, &lmrMultiplier, &lmrHistoryDivisor, &lmrNoisyHistoryDivisor,
     &historyMaxBonus, &historyBonusMultiplier, &historyMax,
-    &suddenDeathHardTimePercentage, &suddenDeathSoftTimePercentage,
-    &movesToGoHardTimePercentage, &movesToGoSoftTimePercentage,
-    &softTimeScaleBase, &softTimeScaleMultiplier
+    &defaultMovesToGo, &softMillisecondsPercentage
 };
 

@@ -31,7 +31,7 @@ class Searcher {
     Move killerMoves[256];               // [ply]
     Move countermoves[2][1ULL << 16];    // [color][moveEncoded]
     HistoryEntry historyTable[2][6][64]; // [color][pieceType][targetSquare]
-    const u64 OVERHEAD_MILLISECONDS = 10;
+    const u16 OVERHEAD_MILLISECONDS = 10;
 
     inline Searcher(Board board)
     {
@@ -63,25 +63,20 @@ class Searcher {
                          = U64_MAX;
     }
 
-    inline void setSuddenDeathTime(u64 milliseconds)
+    inline void setTimeLimits(u64 milliseconds, u64 incrementMilliseconds, u64 movesToGo, bool isMoveTime)
     {
-        hardMilliseconds = milliseconds / 24;
-        softMilliseconds = milliseconds * suddenDeathSoftTimePercentage.value;
-    }
+        u64 maxHardMs = max((i64)1, (i64)milliseconds - (i64)OVERHEAD_MILLISECONDS);
 
-    inline void setCyclicTime(u64 milliseconds, u16 movesToGo)
-    {
-        hardMilliseconds = movesToGo == 1 
-                           ? milliseconds - min(OVERHEAD_MILLISECONDS, milliseconds / 2)
-                           : milliseconds * movesToGoHardTimePercentage.value;
+        if (isMoveTime)
+        {
+            softMilliseconds = U64_MAX;
+            hardMilliseconds = std::clamp(milliseconds, (u64)1, maxHardMs);
+            return;
+        }
 
-        softMilliseconds = min(movesToGoSoftTimePercentage.value * milliseconds / movesToGo, 
-                               (double)hardMilliseconds);
-    }
-
-    inline void setMoveTime(u64 milliseconds) {
-        softMilliseconds = hardMilliseconds 
-                         = milliseconds - min(OVERHEAD_MILLISECONDS, milliseconds / 2); 
+        u64 alloc = min((u64)(milliseconds / movesToGo + incrementMilliseconds * 2.0/3.0), milliseconds);
+        hardMilliseconds = std::clamp(alloc * 2, (u64)1, maxHardMs);
+        softMilliseconds = movesToGo == 1 ? alloc : alloc * softMillisecondsPercentage.value;
     }
 
     inline bool isHardTimeUp()
@@ -115,14 +110,15 @@ class Searcher {
             if (isHardTimeUp()) break;
 
             score = iterationScore;
+            u64 msElapsed = millisecondsElapsed(startTime);
 
             if (printInfo)
             {
                 std::cout << "info depth " << iterationDepth
                           << " seldepth " << (int)maxPlyReached
-                          << " time " << millisecondsElapsed(startTime)
+                          << " time " << msElapsed
                           << " nodes " << nodes
-                          << " nps " << nodes * 1000 / max((u64)millisecondsElapsed(startTime), (u64)1);
+                          << " nps " << nodes * 1000 / max(msElapsed, (u64)1);
                 if (abs(score) < MIN_MATE_SCORE)
                     std::cout << " score cp " << score;
                 else
@@ -137,6 +133,11 @@ class Searcher {
                 std::cout << std::endl;
             }
 
+            // Check soft time limit
+            if (nodes >= softNodes)
+                break;
+            if (msElapsed >= softMilliseconds)
+                break;
         }
 
         return { bestMoveRoot(), score };
@@ -163,9 +164,6 @@ class Searcher {
         auto [ttEntry, cutoff] = tt.probe(board.zobristHash(), depth, ply, alpha, beta);
         if (cutoff) return ttEntry->adjustedScore(ply);
 
-        Move ttMove = board.zobristHash() == ttEntry->zobristHash
-                      ? ttEntry->bestMove : MOVE_NONE;
-
         Color stm = board.sideToMove();
         bool pvNode = beta > alpha + 1;
         i32 eval = board.evaluate();
@@ -189,6 +187,9 @@ class Searcher {
                 if (score >= beta) return score;
             }
         }
+
+        Move ttMove = board.zobristHash() == ttEntry->zobristHash
+                      ? ttEntry->bestMove : MOVE_NONE;
 
         // IIR (Internal iterative reduction)
         if (depth >= iirMinDepth.value && ttMove == MOVE_NONE)
@@ -355,10 +356,10 @@ class Searcher {
             if (captured != PieceType::NONE)
                 scores[i] += 100 * (i32)captured - (i32)move.pieceType();
             if (move.promotion() != PieceType::NONE)
-                scores[i] += see::SEE(board, move) ? GOOD_NOISY_SCORE + 100'000'000
+                scores[i] += SEE(board, move) ? GOOD_NOISY_SCORE + 100'000'000
                                                    : -GOOD_NOISY_SCORE;
             else if (captured != PieceType::NONE)
-                scores[i] += see::SEE(board, move) ? GOOD_NOISY_SCORE : -GOOD_NOISY_SCORE;
+                scores[i] += SEE(board, move) ? GOOD_NOISY_SCORE : -GOOD_NOISY_SCORE;
             else
             {
                 u8 pt = (u8)move.pieceType();

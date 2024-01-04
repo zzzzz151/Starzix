@@ -192,8 +192,8 @@ inline void position(Searcher &searcher, std::vector<std::string> &tokens)
 inline void go(Searcher &searcher, std::vector<std::string> &tokens)
 {
     u64 milliseconds = U64_MAX;
-    u64 incrementMilliseconds = U64_MAX;
-    u16 movesToGo = 0;
+    u64 incrementMilliseconds = 0;
+    u16 movesToGo = defaultMovesToGo.value;
     bool isMoveTime = false;
 
     for (int i = 1; i < tokens.size() - 1; i += 2)
@@ -221,13 +221,7 @@ inline void go(Searcher &searcher, std::vector<std::string> &tokens)
             searcher.softNodes = searcher.hardNodes = value;
     }
 
-    if (isMoveTime)
-        searcher.setMoveTime(milliseconds);
-    else if (movesToGo != 0)
-        searcher.setCyclicTime(milliseconds, movesToGo);
-    else
-        searcher.setSuddenDeathTime(milliseconds);
-
+    searcher.setTimeLimits(milliseconds, incrementMilliseconds, movesToGo, isMoveTime);
     auto [bestMove, score] = searcher.search();
     assert(bestMove != MOVE_NONE);
     std::cout << "bestmove " + bestMove.toUci() + "\n";

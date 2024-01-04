@@ -3,8 +3,8 @@
 #include <string>
 #include <sstream>
 #include <vector>
-#include "../src-test/board.hpp"
-#include "../src-test/see.hpp"
+#include "../src/board.hpp"
+#include "../src/see.hpp"
 
 int failed = 0, passed = 0;
 
@@ -32,7 +32,7 @@ int main() {
         bool expected = gain >= 0;
 
         Board board = Board(fen);
-        bool result = see::SEE(board, board.uciToMove(uciMove));
+        bool result = SEE(board, board.uciToMove(uciMove));
 
         if (result == expected)
             passed++;

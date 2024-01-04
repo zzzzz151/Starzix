@@ -1,6 +1,6 @@
 // clang-format off
-#include "../src-test/board.hpp"
-#include "../src-test/perft.hpp"
+#include "../src/board.hpp"
+#include "../src/perft.hpp"
 
 int failed = 0, passed = 0;
 const std::string POSITION2_KIWIPETE = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ";
