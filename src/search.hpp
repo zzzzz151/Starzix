@@ -170,6 +170,8 @@ class Searcher {
 
         if (ply > 0 && board.isDraw()) return 0;
 
+        if (ply >= maxDepth) return board.inCheck() ? 0 : board.evaluate();
+
         if (depth > maxDepth) depth = maxDepth;
 
         auto [ttEntry, cutoff] = tt.probe(board.zobristHash(), depth, ply, alpha, beta);
@@ -381,7 +383,7 @@ class Searcher {
                 scores[i] += 100 * (i32)captured - (i32)move.pieceType();
             if (move.promotion() != PieceType::NONE)
                 scores[i] += SEE(board, move) ? GOOD_NOISY_SCORE + 100'000'000
-                                                   : -GOOD_NOISY_SCORE;
+                                              : -GOOD_NOISY_SCORE;
             else if (captured != PieceType::NONE)
                 scores[i] += SEE(board, move) ? GOOD_NOISY_SCORE : -GOOD_NOISY_SCORE;
             else
