@@ -112,7 +112,9 @@ class Searcher {
         for (i32 iterationDepth = 1; iterationDepth <= maxDepth; iterationDepth++)
         {
             maxPlyReached = 0;
-            i32 iterationScore = search(iterationDepth, 0, -INF, INF);
+            i32 iterationScore = iterationDepth >= aspMinDepth.value 
+                                 ? aspiration(iterationDepth, score)
+                                 : search(iterationDepth, 0, -INF, INF);
 
             if (isHardTimeUp()) break;
 
@@ -155,6 +157,42 @@ class Searcher {
     }
 
     private:
+
+    inline i32 aspiration(i32 iterationDepth, i32 score)
+    {
+        // Aspiration Windows
+        // Search with a small window, adjusting it and researching until the score is inside the window
+
+        i32 delta = aspInitialDelta.value;
+        i32 alpha = max(-INF, score - delta);
+        i32 beta = min(INF, score + delta);
+        i32 depth = iterationDepth;
+
+        while (true)
+        {
+            score = search(depth, 0, alpha, beta);
+
+            if (isHardTimeUp()) return 0;
+
+            if (score >= beta)
+            {
+                beta = min(beta + delta, INF);
+                depth--;
+            }
+            else if (score <= alpha)
+            {
+                beta = (alpha + beta) / 2;
+                alpha = max(alpha - delta, -INF);
+                depth = iterationDepth;
+            }
+            else
+                break;
+
+            delta *= aspDeltaMultiplier.value;
+        }
+
+        return score;
+    }
 
     inline i32 search(i32 depth, u8 ply, i32 alpha, i32 beta)
     { 

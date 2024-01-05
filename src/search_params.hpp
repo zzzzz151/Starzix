@@ -11,8 +11,8 @@ template <typename T> struct TunableParam {
 
 // Aspiration windows
 TunableParam<i32> aspMinDepth = TunableParam<i32>("aspMinDepth", 7, 6, 10); // step = 2
-TunableParam<i32> aspInitialDelta = TunableParam<i32>("aspInitialDelta", 10, 10, 20); // step = 5
-TunableParam<double> aspDeltaMultiplier = TunableParam<double>("aspDeltaMultiplier", 1.32, 1.2, 2.0); // step = 0.2
+TunableParam<i32> aspInitialDelta = TunableParam<i32>("aspInitialDelta", 15, 10, 20); // step = 5
+TunableParam<double> aspDeltaMultiplier = TunableParam<double>("aspDeltaMultiplier", 1.5, 1.2, 2.0); // step = 0.2
 
 // RFP (Reverse futility pruning) / Static NMP
 TunableParam<i32> rfpMaxDepth = TunableParam<i32>("rfpMaxDepth", 7, 6, 10); // step = 2
