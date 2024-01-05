@@ -40,9 +40,9 @@ TunableParam<i32> lmpMinMoves = TunableParam<i32>("lmpMinMoves", 3, 2, 4); // st
 TunableParam<double> lmpDepthMultiplier = TunableParam<double>("lmpDepthMultiplier", 0.75, 0.5, 1.5); // step = 0.25
 
 // FP (Futility pruning)
-TunableParam<i32> fpMaxDepth = TunableParam<i32>("fpMaxDepth", 9, 6, 10); // step = 2
-TunableParam<i32> fpBase = TunableParam<i32>("fpBase", 124, 60, 180); // step = 30
-TunableParam<i32> fpMultiplier = TunableParam<i32>("fpMultiplier", 82, 50, 150); // step = 20
+TunableParam<i32> fpMaxDepth = TunableParam<i32>("fpMaxDepth", 8, 6, 10); // step = 2
+TunableParam<i32> fpBase = TunableParam<i32>("fpBase", 180, 100, 200); // step = 25
+TunableParam<i32> fpMultiplier = TunableParam<i32>("fpMultiplier", 120, 60, 180); // step = 30
 
 // SEE pruning
 TunableParam<i32> seePruningMaxDepth = TunableParam<i32>("seePruningMaxDepth", 9, 7, 11); // step = 2

@@ -265,9 +265,17 @@ class Searcher {
 
             if (bestScore > -MIN_MATE_SCORE && !pvNode && !board.inCheck() && moveScore < COUNTERMOVE_SCORE)
             {
+
                 // LMP (Late move pruning)
                 if (depth <= lmpMaxDepth.value
                 && legalMovesPlayed >= lmpMinMoves.value + depth * depth * lmpDepthMultiplier.value)
+                    break;
+
+                i32 lmrDepth = max(0, depth - LMR_TABLE[depth][legalMovesPlayed+1]);
+
+                // FP (Futility pruning)
+                if (lmrDepth <= fpMaxDepth.value && alpha < MIN_MATE_SCORE
+                && alpha > eval + fpBase.value + lmrDepth * fpMultiplier.value)
                     break;
 
                 // SEE pruning
