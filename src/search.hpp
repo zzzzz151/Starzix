@@ -29,7 +29,7 @@ class Searcher {
     Move pvLines[256][256];              // [ply][ply]
     u8 pvLengths[256];                   // [pvLineIndex]
     Move killerMoves[256];               // [ply]
-    Move countermoves[2][1ULL << 16];    // [color][moveEncoded]
+    Move countermoves[2][6][64];         // [color][pieceType][targetSquare]
     HistoryEntry historyTable[2][6][64]; // [color][pieceType][targetSquare]
     const u16 OVERHEAD_MILLISECONDS = 10;
 
@@ -246,6 +246,7 @@ class Searcher {
             u64 nodesBefore = nodes;
             nodes++;
             u8 pt = (u8)move.pieceType();
+            Square targetSq = move.to();
 
     	    // PVS (Principal variation search)
 
@@ -267,7 +268,7 @@ class Searcher {
                 if (moveScore == KILLER_SCORE || moveScore == COUNTERMOVE_SCORE)
                 {
                     lmr--;
-                    quietHist = historyTable[(i8)stm][pt][move.to()].quietHistory(board);
+                    quietHist = historyTable[(i8)stm][pt][targetSq].quietHistory(board);
                 }
                 else
                     quietHist = moveScore;
@@ -293,7 +294,7 @@ class Searcher {
             if (score <= alpha) // Fail low
             {
                 failLowQuietsHistoryEntry[failLowQuiets++] 
-                    = &historyTable[(i8)stm][pt][move.to()];
+                    = &historyTable[(i8)stm][pt][targetSq];
                 continue;
             }
 
@@ -309,11 +310,15 @@ class Searcher {
             {
                 killerMoves[ply] = move;
 
+                Move lastMove = MOVE_NONE;
+                if ((lastMove = board.lastMove()) != MOVE_NONE)
+                    countermoves[(i8)stm][(u8)lastMove.pieceType()][lastMove.to()] = move;
+
                 i32 historyBonus = min(historyMaxBonus.value, 
                                        historyBonusMultiplier.value * (depth-1));
 
                 // Increase history of this fail high quiet move
-                historyTable[(i8)stm][pt][move.to()].updateQuietHistory(board, historyBonus);
+                historyTable[(i8)stm][pt][targetSq].updateQuietHistory(board, historyBonus);
 
                 // History malus: if this fail high is a quiet, decrease history of fail low quiets
                 for  (int i = 0; i < failLowQuiets; i++)
@@ -403,6 +408,10 @@ class Searcher {
     inline void scoreMoves(MovesList &moves, std::array<i32, 256> &scores, Move ttMove, Move killer)
     {
         i8 stm = (i8)board.sideToMove();
+        Move lastMove = MOVE_NONE;
+        Move countermove = (lastMove = board.lastMove()) == MOVE_NONE
+                           ? MOVE_NONE
+                           : countermoves[stm][(u8)lastMove.pieceType()][lastMove.to()];
 
         for (int i = 0; i < moves.size(); i++)
         {
@@ -415,6 +424,7 @@ class Searcher {
 
             scores[i] = 0;
             PieceType captured = board.captured(move);
+            u8 pt = (u8)move.pieceType();
 
             if (captured != PieceType::NONE)
                 scores[i] += 100 * (i32)captured - (i32)move.pieceType();
@@ -425,11 +435,10 @@ class Searcher {
                 scores[i] += SEE(board, move) ? GOOD_NOISY_SCORE : -GOOD_NOISY_SCORE;
             else if (move == killer)
                 scores[i] = KILLER_SCORE;
+            else if (move == countermove)
+                scores[i] = COUNTERMOVE_SCORE;
             else
-            {
-                u8 pt = (u8)move.pieceType();
                 scores[i] = historyTable[stm][pt][move.to()].quietHistory(board);
-            }
             
         }
     }
