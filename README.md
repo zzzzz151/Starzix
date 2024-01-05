@@ -42,7 +42,7 @@
 - Pseudolegal move generation (magic bitboards for sliders, lookup tables for pawns, knights and king)
 - Copymake make/undo move
 
-### NNUE evaluation (768->384x2->1)
+### NNUE evaluation (768->512)x2->1
 
 ### Search framework
 - Iterative deepening

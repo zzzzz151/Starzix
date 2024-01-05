@@ -11,17 +11,17 @@
 
 namespace nnue {
 
-const u16 HIDDEN_LAYER_SIZE = 384;
+const u16 HIDDEN_LAYER_SIZE = 512;
 const i32 SCALE = 400, QA = 255, QB = 64;
 
 struct alignas(64) NN {
     std::array<i16, 768 * HIDDEN_LAYER_SIZE> featureWeights;
     std::array<i16, HIDDEN_LAYER_SIZE> featureBiases;
-    std::array<i8, HIDDEN_LAYER_SIZE * 2> outputWeights;
+    std::array<i16, HIDDEN_LAYER_SIZE * 2> outputWeights;
     i16 outputBias;
 };
 
-INCBIN(NetFile, "src/net.nnue");
+INCBIN(NetFile, "src/net6.nnue");
 const NN *nn = reinterpret_cast<const NN*>(gNetFileData);
 
 struct Accumulator
@@ -57,11 +57,12 @@ struct Accumulator
 };
 
 inline i32 crelu(i16 x) {
-    return x < 0 ? 0 : x > 255 ? 255 : x;
+    return x < 0 ? 0 : x > QA ? QA : x;
 }
 
 inline i32 screlu(i32 x) {
-    return x < 0 ? 0 : x > 255 ? 255 * 255 : x * x;
+    i32 clamped = std::clamp(x, 0, QA);
+    return clamped * clamped;
 }
 
 inline i16 evaluate(Accumulator &accumulator, Color color)
@@ -78,11 +79,11 @@ inline i16 evaluate(Accumulator &accumulator, Color color)
     i32 sum = 0;
     for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
     {
-        sum += crelu(us[i]) * nn->outputWeights[i];
-        sum += crelu(them[i]) * nn->outputWeights[HIDDEN_LAYER_SIZE + i];
+        sum += screlu(us[i]) * nn->outputWeights[i];
+        sum += screlu(them[i]) * nn->outputWeights[HIDDEN_LAYER_SIZE + i];
     }
 
-    i32 eval = (sum + nn->outputBias) * SCALE / (QA * QB);
+    i32 eval = (sum / QA + nn->outputBias) * SCALE / (QA * QB);
     return std::clamp(eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
 }
 
