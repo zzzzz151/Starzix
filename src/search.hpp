@@ -194,11 +194,8 @@ class Searcher {
         return score;
     }
 
-    inline i32 search(i32 depth, u8 ply, i32 alpha, i32 beta)
+    inline i32 search(i32 depth, u8 ply, i32 alpha, i32 beta, bool singular = false, i32 eval = EVAL_NONE)
     { 
-        // Check extension
-        if (board.inCheck()) depth = depth < 0 ? 1 : depth + 1;
-
         if (depth <= 0) return qSearch(ply, alpha, beta);
 
         if (isHardTimeUp()) return 0;
@@ -206,20 +203,21 @@ class Searcher {
         // Update seldepth
         if (ply > maxPlyReached) maxPlyReached = ply;
 
-        if (ply > 0 && board.isDraw()) return 0;
+        if (ply > 0 && !singular && board.isDraw()) return 0;
 
         if (ply >= maxDepth) return board.inCheck() ? 0 : board.evaluate();
 
         if (depth > maxDepth) depth = maxDepth;
 
         auto [ttEntry, cutoff] = tt.probe(board.zobristHash(), depth, ply, alpha, beta);
-        if (cutoff) return ttEntry->adjustedScore(ply);
+        if (cutoff && !singular) return ttEntry->adjustedScore(ply);
 
         Color stm = board.sideToMove();
         bool pvNode = beta > alpha + 1;
-        i32 eval = board.inCheck() ? 0 : board.evaluate();
+        if (eval == EVAL_NONE)
+            eval = board.inCheck() ? EVAL_NONE : board.evaluate();
 
-        if (!pvNode && !board.inCheck())
+        if (!pvNode && !board.inCheck() && !singular)
         {
             // RFP (Reverse futility pruning) / Static NMP
             if (depth <= rfpMaxDepth.value && eval >= beta + depth * rfpDepthMultiplier.value)
@@ -261,6 +259,10 @@ class Searcher {
         for (int i = 0; i < moves.size(); i++)
         {
             auto [move, moveScore] = incrementalSort(moves, movesScores, i);
+
+            // Don't search TT move in singular search
+            if (move == ttMove && singular) continue;
+
             bool isQuiet = !board.isCapture(move) && move.promotion() == PieceType::NONE;
 
             if (bestScore > -MIN_MATE_SCORE && !pvNode && !board.inCheck() && moveScore < COUNTERMOVE_SCORE)
@@ -288,6 +290,40 @@ class Searcher {
             // skip illegal moves
             if (!board.makeMove(move)) continue;
 
+            i32 extension = 0;
+            if (ply == 0) goto skipExtensions;
+
+            // SE (Singular extensions)
+            if (move == ttMove
+            && depth >= singularMinDepth.value
+            && abs(ttEntry->score) < MIN_MATE_SCORE
+            && ttEntry->depth >= depth - singularDepthMargin.value
+            && ttEntry->getBound() != Bound::UPPER)
+            {
+                // Singular search: before searching any move, search this node at a shallower depth with TT move excluded
+
+                // Undo TT move we just made
+                BoardState boardState = board.getBoardState();
+                Accumulator accumulator = board.getAccumulator();
+                board.undoMove();
+
+                i32 singularBeta = max(-INF, ttEntry->score - depth * singularBetaMultiplier.value);
+                i32 singularScore = search((depth - 1) / 2, ply, singularBeta - 1, singularBeta, true, eval);
+
+                // Make the TT move again
+                board.pushBoardState(boardState);
+                board.pushAccumulator(accumulator);
+
+                if (singularScore < singularBeta)
+                    // TT move is probably better than all others, so extend its search by 1 ply
+                    extension = 1;
+            }
+            // Check extension if no singular extensions
+            else if (board.inCheck())
+                extension = 1;
+
+            skipExtensions:
+
             legalMovesPlayed++;
             u64 nodesBefore = nodes;
             nodes++;
@@ -299,7 +335,7 @@ class Searcher {
             i32 score = 0, lmr = 0;
             if (legalMovesPlayed == 1)
             {
-                score = -search(depth - 1, ply + 1, -beta, -alpha);
+                score = -search(depth - 1 + extension, ply + 1, -beta, -alpha);
                 goto moveSearched;
             }
 
@@ -325,9 +361,9 @@ class Searcher {
             }
 
             
-            score = -search(depth - 1 - lmr, ply + 1, -alpha-1, -alpha);
+            score = -search(depth - 1 - lmr + extension, ply + 1, -alpha-1, -alpha);
             if (score > alpha && (score < beta || lmr > 0))
-                score = -search(depth - 1, ply + 1, -beta, -alpha); 
+                score = -search(depth - 1 + extension, ply + 1, -beta, -alpha); 
 
             moveSearched:
             board.undoMove();
@@ -376,7 +412,8 @@ class Searcher {
 
         if (legalMovesPlayed == 0) return board.inCheck() ? -INF + ply : 0;
 
-        tt.store(ttEntry, board.zobristHash(), depth, ply, bestScore, bestMove, originalAlpha, beta);    
+        if (!singular)
+            tt.store(ttEntry, board.zobristHash(), depth, ply, bestScore, bestMove, originalAlpha, beta);    
 
         return bestScore;
     }

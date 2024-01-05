@@ -50,11 +50,11 @@ TunableParam<i32> seeNoisyThreshold = TunableParam<i32>("seeNoisyThreshold", -20
 TunableParam<i32> seeQuietThreshold = TunableParam<i32>("seeQuietThreshold", -65, -80, -50); // step = 15
 
 // SE (Singular extensions)
-TunableParam<i32> singularMinDepth = TunableParam<i32>("singularMinDepth", 7, 6, 10); // step = 2
+TunableParam<i32> singularMinDepth = TunableParam<i32>("singularMinDepth", 8, 6, 10); // step = 2
 TunableParam<i32> singularDepthMargin = TunableParam<i32>("singularDepthMargin", 3, 1, 5); // step = 2
 TunableParam<i32> singularBetaMultiplier = TunableParam<i32>("singularBetaMultiplier", 2, 1, 3); // step = 1
-TunableParam<i32> singularBetaMargin = TunableParam<i32>("singularBetaMargin", 23, 12, 48); // step = 12
-TunableParam<i32> maxDoubleExtensions = TunableParam<i32>("maxDoubleExtensions", 6, 4, 10); // step = 3
+TunableParam<i32> singularBetaMargin = TunableParam<i32>("singularBetaMargin", 20, 12, 36); // step = 8
+TunableParam<i32> maxDoubleExtensions = TunableParam<i32>("maxDoubleExtensions", 5, 3, 7); // step = 2
 
 // LMR (Late move reductions)
 TunableParam<double> lmrBase = TunableParam<double>("lmrBase", 0.8, 0.6, 1.0); // step = 0.1

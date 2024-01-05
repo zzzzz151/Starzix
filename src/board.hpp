@@ -796,6 +796,22 @@ class Board
     inline auto evaluate() {
         return nnue::evaluate(*accumulator, state->colorToMove);
     }
+
+    inline BoardState getBoardState() { return *state; }
+
+    inline Accumulator getAccumulator() { return *accumulator; }
+
+    inline void pushBoardState(BoardState &newState)
+    {
+        states.push_back(newState);
+        state = &states.back();
+    }
+
+    inline void pushAccumulator(Accumulator &newAccumulator)
+    {
+        accumulators.push_back(newAccumulator);
+        accumulator = &accumulators.back();
+    }
     
 };
 
