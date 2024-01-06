@@ -21,7 +21,7 @@ struct alignas(64) NN {
     i16 outputBias;
 };
 
-INCBIN(NetFile, "src/net6.nnue");
+INCBIN(NetFile, "src/net9.nnue");
 const NN *nn = reinterpret_cast<const NN*>(gNetFileData);
 
 struct Accumulator
