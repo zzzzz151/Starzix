@@ -339,6 +339,7 @@ class Searcher {
                 goto moveSearched;
             }
 
+            // LMR (Late move reductions)
             if (depth >= 3 && moveScore <= KILLER_SCORE)
             {
                 lmr = LMR_TABLE[depth][legalMovesPlayed];

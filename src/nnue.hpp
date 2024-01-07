@@ -1,8 +1,5 @@
 #pragma once
 
-#include <immintrin.h> // Intrinsics
-#include <algorithm>
-
 #ifdef _MSC_VER
 #define STARZIX_MSVC
 #pragma push_macro("_MSC_VER")
@@ -24,7 +21,7 @@ struct alignas(64) NN {
     i16 outputBias;
 };
 
-INCBIN(NetFile, "src-test/net9.nnue");
+INCBIN(NetFile, "src/net9.nnue");
 const NN *nn = reinterpret_cast<const NN*>(gNetFileData);
 
 struct Accumulator
