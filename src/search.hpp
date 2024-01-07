@@ -209,8 +209,9 @@ class Searcher {
 
         if (depth > maxDepth) depth = maxDepth;
 
-        auto [ttEntry, cutoff] = tt.probe(board.zobristHash(), depth, ply, alpha, beta);
-        if (cutoff && !singular) return ttEntry->adjustedScore(ply);
+        TTEntry *ttEntry = tt.probe(board.zobristHash());
+        if (tt.cutoff(ttEntry, board.zobristHash(), depth, ply, alpha, beta) && !singular) 
+            return ttEntry->adjustedScore(ply);
 
         Color stm = board.sideToMove();
         bool pvNode = beta > alpha + 1;

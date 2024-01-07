@@ -81,22 +81,20 @@ struct TT
         age = 0;
     }
 
-    inline std::pair<TTEntry*, bool> probe(u64 zobristHash, i32 depth, u8 ply, i16 alpha, i16 beta)
-    {
-        TTEntry *ttEntry = &tt[zobristHash % tt.size()];
-        Bound ttEntryBound = ttEntry->getBound();
-
-        bool cutoff = ply > 0 
-                      && ttEntry->zobristHash == zobristHash
-                      && ttEntry->depth >= depth 
-                      && (ttEntryBound == Bound::EXACT
-                      || (ttEntryBound == Bound::LOWER && ttEntry->score >= beta) 
-                      || (ttEntryBound == Bound::UPPER && ttEntry->score <= alpha));
-
-        return { ttEntry, cutoff };
+    inline TTEntry* probe(u64 zobristHash) {
+        return &tt[zobristHash % tt.size()];
     }
 
-    inline void store(TTEntry *ttEntry, u64 zobristHash, i32 depth, u8 ply, i16 score, Move bestMove, i16 originalAlpha, i16 beta)
+    inline bool cutoff(TTEntry *ttEntry, u64 zobristHash, u8 depth, u8 ply, i16 alpha, i16 beta) {
+        return ply > 0 
+               && ttEntry->zobristHash == zobristHash
+               && ttEntry->depth >= depth 
+               && (ttEntry->getBound() == Bound::EXACT
+               || (ttEntry->getBound() == Bound::LOWER && ttEntry->score >= beta) 
+               || (ttEntry->getBound() == Bound::UPPER && ttEntry->score <= alpha));
+    }
+
+    inline void store(TTEntry *ttEntry, u64 zobristHash, u8 depth, u8 ply, i16 score, Move bestMove, i16 originalAlpha, i16 beta)
     {
         ttEntry->zobristHash = zobristHash;
         ttEntry->depth = depth;
