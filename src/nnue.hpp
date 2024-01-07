@@ -41,10 +41,10 @@ struct Accumulator
         int blackIdx = !(int)color * 384 + (int)pieceType * 64 + (sq ^ 56);
 
         for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
-        {
             white[i] += nn->featureWeights[whiteIdx * HIDDEN_LAYER_SIZE + i];
+
+        for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
             black[i] += nn->featureWeights[blackIdx * HIDDEN_LAYER_SIZE + i];
-        }
     }
 
     inline void deactivate(Color color, PieceType pieceType, Square sq)
@@ -53,10 +53,10 @@ struct Accumulator
         int blackIdx = !(int)color * 384 + (int)pieceType * 64 + (sq ^ 56);
 
         for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
-        {
             white[i] -= nn->featureWeights[whiteIdx * HIDDEN_LAYER_SIZE + i];
+
+        for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
             black[i] -= nn->featureWeights[blackIdx * HIDDEN_LAYER_SIZE + i];
-        }
     }
 };
 
