@@ -1,5 +1,8 @@
 #pragma once
 
+#include <immintrin.h> // Intrinsics
+#include <algorithm>
+
 #ifdef _MSC_VER
 #define STARZIX_MSVC
 #pragma push_macro("_MSC_VER")
@@ -12,7 +15,7 @@
 namespace nnue {
 
 const u16 HIDDEN_LAYER_SIZE = 512;
-const i32 SCALE = 400, QA = 255, QB = 64;
+const i32 SCALE = 400, QA = 181, QB = 64;
 
 struct alignas(64) NN {
     std::array<i16, 768 * HIDDEN_LAYER_SIZE> featureWeights;
@@ -21,7 +24,7 @@ struct alignas(64) NN {
     i16 outputBias;
 };
 
-INCBIN(NetFile, "src/net9.nnue");
+INCBIN(NetFile, "src-test/net9.nnue");
 const NN *nn = reinterpret_cast<const NN*>(gNetFileData);
 
 struct Accumulator
@@ -69,25 +72,77 @@ inline i32 screlu(i32 x) {
     return clamped * clamped;
 }
 
-inline i16 evaluate(Accumulator &accumulator, Color color)
+inline i32 vecHaddEpi32(__m256i vec) {
+    __m128i xmm0;
+    __m128i xmm1;
+
+    // Get the lower and upper half of the register:
+    xmm0 = _mm256_castsi256_si128(vec);
+    xmm1 = _mm256_extracti128_si256(vec, 1);
+
+    // Add the lower and upper half vertically:
+    xmm0 = _mm_add_epi32(xmm0, xmm1);
+
+    // Get the upper half of the result:
+    xmm1 = _mm_unpackhi_epi64(xmm0, xmm0);
+
+    // Add the lower and upper half vertically:
+    xmm0 = _mm_add_epi32(xmm0, xmm1);
+
+    // Shuffle the result so that the lower 32-bits are directly above the second-lower 32-bits:
+    xmm1 = _mm_shuffle_epi32(xmm0, _MM_SHUFFLE(2, 3, 0, 1));
+
+    // Add the lower 32-bits to the second-lower 32-bits vertically:
+    xmm0 = _mm_add_epi32(xmm0, xmm1);
+
+    // Cast the result to the 32-bit integer type and return it:
+    return _mm_cvtsi128_si32(xmm0);
+}
+
+
+inline i32 evaluate(Accumulator &accumulator, Color color)
 {
-    i16 *us = accumulator.white,
-        *them = accumulator.black;
+    __m256i* stmAccumulator;
+    __m256i* oppAccumulator;
 
-    if (color == Color::BLACK)
+    if (color == Color::WHITE)
     {
-        us = accumulator.black;
-        them = accumulator.white;
+        stmAccumulator = (__m256i*)accumulator.white;
+        oppAccumulator = (__m256i*)accumulator.black;
+    }
+    else
+    {
+        stmAccumulator = (__m256i*)accumulator.black;
+        oppAccumulator = (__m256i*)accumulator.white;
+    }
+    
+    __m256i* stmWeights = (__m256i*)&nn->outputWeights[0];
+    __m256i* oppWeights = (__m256i*)&nn->outputWeights[HIDDEN_LAYER_SIZE];
+
+    const __m256i reluClipMin = _mm256_setzero_si256();
+    const __m256i reluClipMax = _mm256_set1_epi16(QA);
+
+    __m256i sum = _mm256_setzero_si256();
+    __m256i reg;
+
+    for (int i = 0; i < HIDDEN_LAYER_SIZE / 16; ++i) 
+    {
+      // Side to move
+      reg = _mm256_max_epi16(stmAccumulator[i], reluClipMin); // clip
+      reg = _mm256_min_epi16(reg, reluClipMax); // clip
+      reg = _mm256_mullo_epi16(reg, reg); // square
+      reg = _mm256_madd_epi16(reg, stmWeights[i]); // multiply with output layer
+      sum = _mm256_add_epi32(sum, reg); // collect the result
+
+      // Non side to move
+      reg = _mm256_max_epi16(oppAccumulator[i], reluClipMin);
+      reg = _mm256_min_epi16(reg, reluClipMax);
+      reg = _mm256_mullo_epi16(reg, reg);
+      reg = _mm256_madd_epi16(reg, oppWeights[i]);
+      sum = _mm256_add_epi32(sum, reg);
     }
 
-    i32 sum = 0;
-    for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
-    {
-        sum += screlu(us[i]) * nn->outputWeights[i];
-        sum += screlu(them[i]) * nn->outputWeights[HIDDEN_LAYER_SIZE + i];
-    }
-
-    i32 eval = (sum / QA + nn->outputBias) * SCALE / (QA * QB);
+    i32 eval = (vecHaddEpi32(sum) / QA + nn->outputBias) * SCALE / (QA * QB);
     return std::clamp(eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
 }
 
