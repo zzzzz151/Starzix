@@ -75,6 +75,8 @@ inline void bench(Searcher &searcher, u8 depth = 14)
     for (int i = 0; i < FENS.size(); i++)
     {
         searcher.board = Board(FENS[i]);
+        searcher.resetLimits();
+        searcher.maxDepth = depth;
         searcher.search(false);
         totalMilliseconds += millisecondsElapsed(searcher.startTime);
         totalNodes += searcher.nodes;

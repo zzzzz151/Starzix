@@ -116,7 +116,7 @@ class Board
                 Square sq = currentRank * 8 + currentFile;
                 placePiece(color, pt, sq);
                 if (!perft)
-                    accumulator->update(color, pt, sq, true);
+                    accumulator->activate(color, pt, sq);
                 currentFile++;
             }
         }
@@ -437,15 +437,15 @@ class Board
         {
             accumulators.push_back(*accumulator);
             accumulator = &accumulators.back();
-            accumulator->update(state->colorToMove, pieceType, from, false);
+            accumulator->deactivate(state->colorToMove, pieceType, from);
             if (captured != PieceType::NONE)
-                accumulator->update(oppSide, captured, capturedPieceSquare, false);
-            accumulator->update(state->colorToMove, promotion != PieceType::NONE ? promotion : pieceType, to, true);
+                accumulator->deactivate(oppSide, captured, capturedPieceSquare);
+            accumulator->activate(state->colorToMove, promotion != PieceType::NONE ? promotion : pieceType, to);
             if (moveFlag == Move::CASTLING_FLAG)
             {
                 auto [rookFrom, rookTo] = CASTLING_ROOK_FROM_TO[to];
-                accumulator->update(state->colorToMove, PieceType::ROOK, rookFrom, false);
-                accumulator->update(state->colorToMove, PieceType::ROOK, rookTo, true);
+                accumulator->deactivate(state->colorToMove, PieceType::ROOK, rookFrom);
+                accumulator->activate(state->colorToMove, PieceType::ROOK, rookTo);
             }
         }
 
