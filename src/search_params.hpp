@@ -49,14 +49,14 @@ TunableParam<i32> fpMultiplier = TunableParam<i32>("fpMultiplier", 120, 60, 180)
 // SEE pruning
 TunableParam<i32> seePruningMaxDepth = TunableParam<i32>("seePruningMaxDepth", 9, 7, 11); // step = 2
 TunableParam<i32> seeNoisyThreshold = TunableParam<i32>("seeNoisyThreshold", -20, -30, -10); // step = 10
-TunableParam<i32> seeQuietThreshold = TunableParam<i32>("seeQuietThreshold", -65, -80, -50); // step = 15
+TunableParam<i32> seeQuietThreshold = TunableParam<i32>("seeQuietThreshold", -65, -85, -45); // step = 20
 
 // SE (Singular extensions)
 TunableParam<i32> singularMinDepth = TunableParam<i32>("singularMinDepth", 8, 6, 10); // step = 2
 TunableParam<i32> singularDepthMargin = TunableParam<i32>("singularDepthMargin", 3, 1, 5); // step = 2
 TunableParam<i32> singularBetaMultiplier = TunableParam<i32>("singularBetaMultiplier", 2, 1, 3); // step = 1
-TunableParam<i32> singularBetaMargin = TunableParam<i32>("singularBetaMargin", 20, 12, 36); // step = 8
-TunableParam<i32> maxDoubleExtensions = TunableParam<i32>("maxDoubleExtensions", 5, 3, 7); // step = 2
+TunableParam<i32> doubleExtensionMargin = TunableParam<i32>("doubleExtensionMargin", 20, 12, 28); // step = 8
+TunableParam<u8> maxDoubleExtensions = TunableParam<u8>("maxDoubleExtensions", 5, 2, 8); // step = 3
 
 // LMR (Late move reductions)
 TunableParam<double> lmrBase = TunableParam<double>("lmrBase", 0.8, 0.6, 1.0); // step = 0.1
@@ -76,23 +76,9 @@ TunableParam<i32> softTimeMoveNodesScalingMinDepth = TunableParam<i32>("softTime
 TunableParam<double> softTimeMoveNodesScalingBase = TunableParam<double>("softTimeMoveNodesScalingBase", 1.5, 1.25, 1.75); // step = 0.25
 TunableParam<double> softTimeMoveNodesScalingMultiplier = TunableParam<double>("softTimeMoveNodesScalingMultiplier", 1.35, 1.15, 1.55); // step = 0.2
 
-using TunableParamVariant = std::variant<TunableParam<i32>*, TunableParam<double>*, TunableParam<u16>*>;
+using TunableParamVariant = std::variant<TunableParam<i32>*, TunableParam<double>*, TunableParam<u16>*, TunableParam<u8>*>;
 
 std::vector<TunableParamVariant> tunableParams 
 {
-    &aspMinDepth, &aspInitialDelta, &aspDeltaMultiplier,
-    &rfpMaxDepth, &rfpDepthMultiplier,
-    &apMaxDepth, &apMargin,
-    &razoringMaxDepth, &razoringDepthMultiplier,
-    &nmpMinDepth, &nmpBaseReduction, &nmpReductionDivisor,
-    &iirMinDepth,
-    &lmpMaxDepth, &lmpMinMoves, &lmpDepthMultiplier,
-    &fpMaxDepth, &fpBase, &fpMultiplier,
-    &seePruningMaxDepth, &seeNoisyThreshold, &seeQuietThreshold,
-    &singularMinDepth, &singularDepthMargin, &singularBetaMultiplier, &singularBetaMargin, &maxDoubleExtensions,
-    &lmrBase, &lmrMultiplier, &lmrHistoryDivisor, &lmrNoisyHistoryDivisor,
-    &historyMaxBonus, &historyBonusMultiplier, &historyMax,
-    &defaultMovesToGo, &softMillisecondsPercentage,
-    &softTimeMoveNodesScalingMinDepth, &softTimeMoveNodesScalingBase, &softTimeMoveNodesScalingMultiplier
 };
 

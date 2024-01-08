@@ -114,7 +114,7 @@ class Searcher {
             maxPlyReached = 0;
             i32 iterationScore = iterationDepth >= aspMinDepth.value 
                                  ? aspiration(iterationDepth, score)
-                                 : search(iterationDepth, 0, -INF, INF);
+                                 : search(iterationDepth, 0, -INF, INF, maxDoubleExtensions.value);
 
             if (isHardTimeUp()) break;
 
@@ -170,7 +170,7 @@ class Searcher {
 
         while (true)
         {
-            score = search(depth, 0, alpha, beta);
+            score = search(depth, 0, alpha, beta, maxDoubleExtensions.value);
 
             if (isHardTimeUp()) return 0;
 
@@ -194,7 +194,8 @@ class Searcher {
         return score;
     }
 
-    inline i32 search(i32 depth, u8 ply, i32 alpha, i32 beta, bool singular = false, i32 eval = EVAL_NONE)
+    inline i32 search(i32 depth, u8 ply, i32 alpha, i32 beta, 
+                      u8 doubleExtensionsLeft, bool singular = false, i32 eval = EVAL_NONE)
     { 
         if (depth <= 0) return qSearch(ply, alpha, beta);
 
@@ -232,7 +233,7 @@ class Searcher {
 
                 i32 nmpDepth = depth - nmpBaseReduction.value - depth / nmpReductionDivisor.value
                                - min((eval-beta) / nmpEvalBetaDivisor.value, nmpEvalBetaMax.value);
-                i32 score = -search(nmpDepth, ply + 1, -beta, -alpha);
+                i32 score = -search(nmpDepth, ply + 1, -beta, -alpha, doubleExtensionsLeft);
 
                 board.undoMove();
 
@@ -303,7 +304,8 @@ class Searcher {
             && ttEntry->depth >= depth - singularDepthMargin.value
             && ttEntry->getBound() != Bound::UPPER)
             {
-                // Singular search: before searching any move, search this node at a shallower depth with TT move excluded
+                // Singular search: before searching any move, 
+                // search this node at a shallower depth with TT move excluded
 
                 // Undo TT move we just made
                 BoardState boardState = board.getBoardState();
@@ -311,13 +313,24 @@ class Searcher {
                 board.undoMove();
 
                 i32 singularBeta = max(-INF, ttEntry->score - depth * singularBetaMultiplier.value);
-                i32 singularScore = search((depth - 1) / 2, ply, singularBeta - 1, singularBeta, true, eval);
+                i32 singularScore = search((depth - 1) / 2, ply, singularBeta - 1, singularBeta, 
+                                           doubleExtensionsLeft, true, eval);
 
                 // Make the TT move again
                 board.pushBoardState(boardState);
                 board.pushAccumulator(accumulator);
 
-                if (singularScore < singularBeta)
+                // Double extension
+                if (singularScore < singularBeta - doubleExtensionMargin.value 
+                && !pvNode && doubleExtensionsLeft > 0)
+                {
+                    // singularScore is way lower than TT score
+                    // TT move is probably MUCH better than all others, so extend its search by 2 plies
+                    extension = 2;
+                    doubleExtensionsLeft--;
+                }
+                // Normal singular extension
+                else if (singularScore < singularBeta)
                     // TT move is probably better than all others, so extend its search by 1 ply
                     extension = 1;
             }
@@ -338,7 +351,7 @@ class Searcher {
             i32 score = 0, lmr = 0;
             if (legalMovesPlayed == 1)
             {
-                score = -search(depth - 1 + extension, ply + 1, -beta, -alpha);
+                score = -search(depth - 1 + extension, ply + 1, -beta, -alpha, doubleExtensionsLeft);
                 goto moveSearched;
             }
 
@@ -364,9 +377,10 @@ class Searcher {
                 lmr = std::clamp(lmr, 0, depth - 2);
             }
 
-            score = -search(depth - 1 - lmr + extension, ply + 1, -alpha-1, -alpha);
+            score = -search(depth - 1 - lmr + extension, ply + 1, -alpha-1, -alpha, doubleExtensionsLeft);
+
             if (score > alpha && (score < beta || lmr > 0))
-                score = -search(depth - 1 + extension, ply + 1, -beta, -alpha); 
+                score = -search(depth - 1 + extension, ply + 1, -beta, -alpha, doubleExtensionsLeft); 
 
             moveSearched:
             board.undoMove();
