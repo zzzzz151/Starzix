@@ -249,8 +249,9 @@ class Searcher {
         if (depth >= iirMinDepth.value && ttMove == MOVE_NONE)
             depth--;
 
+        // genenerate all moves except underpromotions
         MovesList moves = MovesList();
-        board.pseudolegalMoves(moves, false, false);
+        board.pseudolegalMoves(moves, false, false); 
         std::array<i32, 256> movesScores;
         scoreMoves(moves, movesScores, ttMove, killerMoves[ply]);
 
@@ -258,8 +259,8 @@ class Searcher {
         i32 bestScore = -INF;
         Move bestMove = MOVE_NONE;
         i32 originalAlpha = alpha;
-        std::array<HistoryEntry*, 256> failLowQuietsHistoryEntry;
-        u8 failLowQuiets = 0;
+        std::array<HistoryEntry*, 256> failLowsHistoryEntry;
+        u8 failLowQuiets = 0, failLowNoisies = 0;
 
         for (int i = 0; i < moves.size(); i++)
         {
@@ -347,8 +348,7 @@ class Searcher {
             legalMovesPlayed++;
             u64 nodesBefore = nodes;
             nodes++;
-            u8 pt = (u8)move.pieceType();
-            Square targetSq = move.to();
+            HistoryEntry *historyEntry = &historyTable[(i8)stm][(u8)move.pieceType()][move.to()];
 
     	    // PVS (Principal variation search)
 
@@ -371,7 +371,7 @@ class Searcher {
                 if (moveScore == KILLER_SCORE || moveScore == COUNTERMOVE_SCORE)
                 {
                     lmr--;
-                    quietHist = historyTable[(i8)stm][pt][targetSq].quietHistory(board);
+                    quietHist = historyEntry->quietHistory(board);
                 }
                 else
                     quietHist = moveScore;
@@ -396,8 +396,8 @@ class Searcher {
 
             if (score <= alpha) // Fail low
             {
-                failLowQuietsHistoryEntry[failLowQuiets++] 
-                    = &historyTable[(i8)stm][pt][targetSq];
+                int index = isQuiet ? failLowQuiets++ : 256 - ++failLowNoisies;
+                failLowsHistoryEntry[index] = historyEntry;
                 continue;
             }
 
@@ -409,6 +409,9 @@ class Searcher {
 
             // Fail high / beta cutoff
 
+            i32 historyBonus = min(historyMaxBonus.value, 
+                                   historyBonusMultiplier.value * (depth-1));
+
             if (isQuiet)
             {
                 killerMoves[ply] = move;
@@ -417,16 +420,20 @@ class Searcher {
                 if ((lastMove = board.lastMove()) != MOVE_NONE)
                     countermoves[(i8)stm][(u8)lastMove.pieceType()][lastMove.to()] = move;
 
-                i32 historyBonus = min(historyMaxBonus.value, 
-                                       historyBonusMultiplier.value * (depth-1));
-
                 // Increase history of this fail high quiet move
-                historyTable[(i8)stm][pt][targetSq].updateQuietHistory(board, historyBonus);
+                historyEntry->updateQuietHistory(board, historyBonus);
 
                 // History malus: if this fail high is a quiet, decrease history of fail low quiets
                 for  (int i = 0; i < failLowQuiets; i++)
-                    failLowQuietsHistoryEntry[i]->updateQuietHistory(board, -historyBonus);
+                    failLowsHistoryEntry[i]->updateQuietHistory(board, -historyBonus);
             }
+            else
+                // Increaes history of this fail high noisy move
+                historyEntry->updateNoisyHistory(board, historyBonus);
+
+            // History malus: always decrease history of fail low noisy moves
+            for (int i = 255, j = 0; j < failLowNoisies; j++, i--)
+                failLowsHistoryEntry[i]->updateNoisyHistory(board, -historyBonus);
 
             break; // Fail high / beta cutoff
         }
@@ -476,7 +483,7 @@ class Searcher {
             auto [move, moveScore] = incrementalSort(moves, movesScores, i);
 
             // SEE pruning (skip bad captures)
-            if (!board.inCheck() && moveScore <= -GOOD_NOISY_SCORE + 1000) 
+            if (!board.inCheck() && moveScore < 0) 
                 continue;
 
             // skip illegal moves
@@ -505,9 +512,13 @@ class Searcher {
         return bestScore;
     }
 
-    const i32 GOOD_NOISY_SCORE  = 1'500'000'000,
-              KILLER_SCORE      = 1'000'000'000,
-              COUNTERMOVE_SCORE = 500'000'000;
+    const i32 GOOD_QUEEN_PROMO_SCORE = 1'600'000'000,
+              GOOD_NOISY_SCORE       = 1'500'000'000,
+              KILLER_SCORE           = 1'000'000'000,
+              COUNTERMOVE_SCORE      = 500'000'000;
+
+    // Most valuable victim     P    N    B    R    Q    K  NONE
+    const i32 MVV_VALUES[7] = { 100, 300, 320, 500, 900, 0, 0 };
 
     inline void scoreMoves(MovesList &moves, std::array<i32, 256> &scores, Move ttMove, Move killer)
     {
@@ -522,27 +533,31 @@ class Searcher {
             Move move = moves[i];
             if (move == ttMove)
             {
-                scores[i] = 2'000'000'000;
+                scores[i] = I32_MAX;
                 continue;
             }
 
-            scores[i] = 0;
             PieceType captured = board.captured(move);
-            u8 pt = (u8)move.pieceType();
+            PieceType promotion = move.promotion();
+            HistoryEntry *historyEntry = &historyTable[stm][(u8)move.pieceType()][move.to()];
 
-            if (captured != PieceType::NONE)
-                scores[i] += 100 * (i32)captured - (i32)move.pieceType();
-            if (move.promotion() != PieceType::NONE)
-                scores[i] += SEE(board, move) ? GOOD_NOISY_SCORE + 100'000'000
-                                              : -GOOD_NOISY_SCORE;
-            else if (captured != PieceType::NONE)
-                scores[i] += SEE(board, move) ? GOOD_NOISY_SCORE : -GOOD_NOISY_SCORE;
+            // Starzix doesn't generate underpromotions in search
+
+            if (captured != PieceType::NONE || promotion == PieceType::QUEEN)
+            {
+                scores[i] = SEE(board, move) ? (promotion == PieceType::QUEEN
+                                                ? GOOD_QUEEN_PROMO_SCORE : GOOD_NOISY_SCORE)
+                                             : -GOOD_NOISY_SCORE;
+
+                scores[i] += MVV_VALUES[(u8)captured];
+                scores[i] += historyEntry->noisyHistory;
+            }
             else if (move == killer)
                 scores[i] = KILLER_SCORE;
             else if (move == countermove)
                 scores[i] = COUNTERMOVE_SCORE;
             else
-                scores[i] = historyTable[stm][pt][move.to()].quietHistory(board);
+                scores[i] = historyEntry->quietHistory(board);
             
         }
     }
