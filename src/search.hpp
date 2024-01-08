@@ -229,8 +229,11 @@ class Searcher {
             && board.lastMove() != MOVE_NONE && board.hasNonPawnMaterial(stm))
             {
                 board.makeMove(MOVE_NONE);
-                i32 nmpDepth = depth - nmpBaseReduction.value - depth / nmpReductionDivisor.value;
+
+                i32 nmpDepth = depth - nmpBaseReduction.value - depth / nmpReductionDivisor.value
+                               - min((eval-beta) / nmpEvalBetaDivisor.value, nmpEvalBetaMax.value);
                 i32 score = -search(nmpDepth, ply + 1, -beta, -alpha);
+
                 board.undoMove();
 
                 if (score >= MIN_MATE_SCORE) return beta;
@@ -268,7 +271,6 @@ class Searcher {
 
             if (bestScore > -MIN_MATE_SCORE && !pvNode && !board.inCheck() && moveScore < COUNTERMOVE_SCORE)
             {
-
                 // LMP (Late move pruning)
                 if (depth <= lmpMaxDepth.value
                 && legalMovesPlayed >= lmpMinMoves.value + depth * depth * lmpDepthMultiplier.value)
@@ -362,7 +364,6 @@ class Searcher {
                 lmr = std::clamp(lmr, 0, depth - 2);
             }
 
-            
             score = -search(depth - 1 - lmr + extension, ply + 1, -alpha-1, -alpha);
             if (score > alpha && (score < beta || lmr > 0))
                 score = -search(depth - 1 + extension, ply + 1, -beta, -alpha); 

@@ -30,6 +30,8 @@ TunableParam<i32> razoringDepthMultiplier = TunableParam<i32>("razoringDepthMult
 TunableParam<i32> nmpMinDepth = TunableParam<i32>("nmpMinDepth", 3, 2, 4); // step = 1
 TunableParam<i32> nmpBaseReduction = TunableParam<i32>("nmpBaseReduction", 3, 2, 4); // step = 1
 TunableParam<i32> nmpReductionDivisor = TunableParam<i32>("nmpReductionDivisor", 3, 2, 4); // step = 1
+TunableParam<i32> nmpEvalBetaDivisor = TunableParam<i32>("nmpEvalBetaDivisor", 200, 150, 250); // step = 50
+TunableParam<i32> nmpEvalBetaMax = TunableParam<i32>("nmpEvalBetaMax", 3, 2, 4); // step = 1
 
 // IIR (Internal iterative reduction)
 TunableParam<i32> iirMinDepth = TunableParam<i32>("iirMinDepth", 4, 4, 6); // step = 2
