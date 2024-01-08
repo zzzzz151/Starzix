@@ -208,7 +208,6 @@ class Board
     }
 
     inline void placePiece(Color color, PieceType pieceType, Square square) {
-        assert(!isOccupied(square));
         u64 sqBitboard = 1ULL << square;
         state->colorBitboard[(int)color] |= sqBitboard;
         state->piecesBitboards[(int)pieceType] |= sqBitboard;
