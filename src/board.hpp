@@ -56,11 +56,11 @@ struct BoardState
 
 class Board
 {
-    bool perft = false;
     BoardState *state = nullptr;
     std::vector<BoardState> states = {};
     Accumulator *accumulator = nullptr;
     std::vector<Accumulator> accumulators = {};
+    bool perft = false;
 
     public:
 
@@ -70,7 +70,7 @@ class Board
     {
         if (!zobristInitialiazed) initZobrist();
 
-        perft = _perft;
+        this->perft = perft;
 
         accumulators = {};
         if (!perft)
