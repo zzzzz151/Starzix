@@ -80,6 +80,8 @@ inline void uciLoop(Searcher &searcher)
         }
         else if (tokens[0] == "undomove")
             searcher.board.undoMove();
+        else if (received == "paramsjson")
+            printParamsAsJson();
 
         } 
         catch (const char* errorMessage)
@@ -103,15 +105,15 @@ inline void uci()
             std::cout << "option name " << tunableParam->name;
             if (std::is_same<decltype(tunableParam->value), double>::value)
             {
-                std::cout << " type spin default " << (i32)(tunableParam->value * 100)
-                          << " min " << (i32)(tunableParam->min * 100)
-                          << " max " << (i32)(tunableParam->max * 100);
+                std::cout << " type spin default " << (tunableParam->value * 100.0)
+                          << " min " << (tunableParam->min * 100.0)
+                          << " max " << (tunableParam->max * 100.0);
             }
             else
             {
-                std::cout << " type spin default " << (i32)tunableParam->value
-                          << " min " << (i32)tunableParam->min
-                          << " max " << (i32)tunableParam->max;
+                std::cout << " type spin default " << (i64)tunableParam->value
+                          << " min " << (i64)tunableParam->min
+                          << " max " << (i64)tunableParam->max;
             }
             std::cout << "\n";
         }, myTunableParam);

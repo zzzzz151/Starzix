@@ -114,7 +114,7 @@ class Searcher {
             maxPlyReached = 0;
             i32 iterationScore = iterationDepth >= aspMinDepth.value 
                                  ? aspiration(iterationDepth, score)
-                                 : search(iterationDepth, 0, -INF, INF, maxDoubleExtensions.value);
+                                 : search(iterationDepth, 0, -INF, INF, doubleExtensionsMax.value);
 
             if (isHardTimeUp()) break;
 
@@ -170,7 +170,7 @@ class Searcher {
 
         while (true)
         {
-            score = search(depth, 0, alpha, beta, maxDoubleExtensions.value);
+            score = search(depth, 0, alpha, beta, doubleExtensionsMax.value);
 
             if (isHardTimeUp()) return 0;
 
