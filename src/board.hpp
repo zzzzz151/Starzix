@@ -66,7 +66,7 @@ class Board
 
     inline Board() = default;
 
-    inline Board(std::string fen, bool _perft = false)
+    inline Board(std::string fen, bool perft = false)
     {
         if (!zobristInitialiazed) initZobrist();
 
