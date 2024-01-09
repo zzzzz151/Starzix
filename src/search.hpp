@@ -364,20 +364,17 @@ class Searcher {
             {
                 lmr = LMR_TABLE[depth][legalMovesPlayed];
                 lmr -= pvNode;
-
-                double quietHist = 0;
-                if (!isQuiet) goto lmrAdjusted;
+                double moveHistory = moveScore;
 
                 if (moveScore == KILLER_SCORE || moveScore == COUNTERMOVE_SCORE)
                 {
                     lmr--;
-                    quietHist = historyEntry->quietHistory(board);
+                    moveHistory = historyEntry->quietHistory(board);
                 }
-                else
-                    quietHist = moveScore;
-                lmr -= round(quietHist / (double)lmrHistoryDivisor.value);
+                else if (!isQuiet)
+                    moveHistory = historyEntry->noisyHistory;
 
-                lmrAdjusted:
+                lmr -= round(moveHistory / (double)lmrHistoryDivisor.value);
                 lmr = std::clamp(lmr, 0, depth - 2);
             }
 
