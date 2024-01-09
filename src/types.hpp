@@ -83,6 +83,6 @@ enum class File : u8
 
 const u8 CASTLE_SHORT = 0, CASTLE_LONG = 1;
 
-const i16 POS_INFINITY = 32000, 
-          NEG_INFINITY = -POS_INFINITY, 
-          MIN_MATE_SCORE = POS_INFINITY - 255;
+const i32 INF = 32000, 
+          MIN_MATE_SCORE = INF - 256,
+          EVAL_NONE = INF;

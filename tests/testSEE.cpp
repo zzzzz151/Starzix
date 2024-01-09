@@ -32,8 +32,7 @@ int main() {
         bool expected = gain >= 0;
 
         Board board = Board(fen);
-        Move move = Move::fromUci(uciMove, board.getPieces());
-        bool result = see::SEE(board, move);
+        bool result = SEE(board, board.uciToMove(uciMove));
 
         if (result == expected)
             passed++;

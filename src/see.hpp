@@ -3,15 +3,13 @@
 
 // clang-format off
 
-namespace see { // SEE (Static exchange evaluation) 
+inline i32 gain(Board &board, Move move);
+
+inline PieceType popLeastValuable(Board &board, u64 &occ, u64 attackers, Color color);
 
                               // P    N    B    R    Q    K  NONE
 const i32 SEE_PIECE_VALUES[7] = {100, 300, 300, 500, 900, 0, 0};
 const u8 PAWN_INDEX = 0;
-
-inline i32 gain(Board &board, Move move);
-
-inline PieceType popLeastValuable(Board &board, u64 &occ, u64 attackers, Color color);
 
 // SEE (Static exchange evaluation)
 inline bool SEE(Board &board, Move move, i32 threshold = 0)
@@ -28,22 +26,22 @@ inline bool SEE(Board &board, Move move, i32 threshold = 0)
     Square square = move.to();
 
     u64 occupancy = board.occupancy() ^ (1ULL << from) ^ (1ULL << square);
-    u64 queens = board.getBitboard(PieceType::QUEEN);
-    u64 bishops = queens | board.getBitboard(PieceType::BISHOP);
-    u64 rooks = queens | board.getBitboard(PieceType::ROOK);
+    u64 queens = board.bitboard(PieceType::QUEEN);
+    u64 bishops = queens | board.bitboard(PieceType::BISHOP);
+    u64 rooks = queens | board.bitboard(PieceType::ROOK);
 
     u64 attackers = 0;
     attackers |= (rooks & attacks::rookAttacks(square, occupancy));
     attackers |= (bishops & attacks::bishopAttacks(square, occupancy));
-    attackers |= (board.getBitboard(Color::BLACK, PieceType::PAWN) & attacks::pawnAttacks(square, Color::WHITE));
-    attackers |= (board.getBitboard(Color::WHITE, PieceType::PAWN) & attacks::pawnAttacks(square, Color::BLACK));
-    attackers |= (board.getBitboard(PieceType::KNIGHT) & attacks::knightAttacks(square));
-    attackers |= (board.getBitboard(PieceType::KING) & attacks::kingAttacks(square));
+    attackers |= (board.bitboard(Color::BLACK, PieceType::PAWN) & attacks::pawnAttacks(square, Color::WHITE));
+    attackers |= (board.bitboard(Color::WHITE, PieceType::PAWN) & attacks::pawnAttacks(square, Color::BLACK));
+    attackers |= (board.bitboard(PieceType::KNIGHT) & attacks::knightAttacks(square));
+    attackers |= (board.bitboard(PieceType::KING) & attacks::kingAttacks(square));
 
     Color us = board.oppSide();
     while (true)
     {
-        u64 ourAttackers = attackers & board.getBitboard(us);
+        u64 ourAttackers = attackers & board.bitboard(us);
         if (ourAttackers == 0) break;
 
         next = popLeastValuable(board, occupancy, ourAttackers, us);
@@ -60,7 +58,7 @@ inline bool SEE(Board &board, Move move, i32 threshold = 0)
 
         // if our only attacker is our king, but the opponent still has defenders
         if (score >= 0 && next == PieceType::KING 
-        && (attackers & board.getBitboard(us)) > 0)
+        && (attackers & board.bitboard(us)) > 0)
             us = oppColor(us);
 
         if (score >= 0) break;
@@ -71,7 +69,7 @@ inline bool SEE(Board &board, Move move, i32 threshold = 0)
 
 inline i32 gain(Board &board, Move move)
 {
-    auto moveFlag = move.typeFlag();
+    auto moveFlag = move.flag();
 
     if (moveFlag == Move::CASTLING_FLAG)
         return 0;
@@ -93,7 +91,7 @@ inline PieceType popLeastValuable(Board &board, u64 &occ, u64 attackers, Color c
 {
     for (int pt = 0; pt <= 5; pt++)
     {
-        u64 bb = attackers & board.getBitboard(color, (PieceType)pt);
+        u64 bb = attackers & board.bitboard(color, (PieceType)pt);
         if (bb > 0)
         {
             occ ^= (1ULL << lsb(bb));
@@ -104,5 +102,4 @@ inline PieceType popLeastValuable(Board &board, u64 &occ, u64 attackers, Color c
     return PieceType::NONE;
 }
 
-}
 

@@ -9,7 +9,8 @@ inline u64 perft(Board &board, int depth)
 {
     if (depth == 0) return 1;
 
-    MovesList moves = board.pseudolegalMoves();
+    MovesList moves = MovesList();
+    board.pseudolegalMoves(moves);
     u64 nodes = 0;
 
     for (int i = 0; i < moves.size(); i++) 
@@ -24,12 +25,16 @@ inline u64 perft(Board &board, int depth)
     return nodes;
 }
 
-inline void perftSplit(Board &board, int depth)
+inline void perftSplit(Board board, int depth)
 {
     std::string fen = board.fen();
-    board = Board(fen, true); // second arg = true => don't update zobrist hash nor NNUE in perft
+    std::cout << "Running split perft depth " << depth << " on " << fen << std::endl;
 
-    MovesList moves = board.pseudolegalMoves(); 
+    // rebuild board with perft=true (no NNUE accumulator stuff)
+    board = Board(fen, true); 
+
+    MovesList moves = MovesList();
+    board.pseudolegalMoves(moves);
     u64 totalNodes = 0;
 
     for (int i = 0; i < moves.size(); i++) 
@@ -44,30 +49,25 @@ inline void perftSplit(Board &board, int depth)
     }
 
     std::cout << "Total: " << totalNodes << std::endl;
-
-    // rebuild board to fix zobrist hash and NNUE
-    board = Board(fen); 
 }
 
-inline u64 perftBench(Board &board, int depth)
+inline u64 perftBench(Board board, int depth)
 {
     std::string fen = board.fen();
-    board = Board(fen, true); // second arg = true => don't update zobrist hash nor NNUE in perft
+    std::cout << "Running perft depth " << depth << " on " << fen << std::endl;
+
+    // rebuild board with perft=true (no NNUE accumulator stuff)
+    board = Board(fen, true); 
 
     std::chrono::steady_clock::time_point start =  std::chrono::steady_clock::now();
     u64 nodes = perft(board, depth);
-    double millisecondsElapsed = (std::chrono::steady_clock::now() - start) / std::chrono::milliseconds(1);
-    u64 nps = nodes / (millisecondsElapsed > 0 ? millisecondsElapsed : 1.0) * 1000.0;
 
     std::cout << "perft depth " << depth 
               << " nodes " << nodes 
-              << " nps " << nps 
-              << " time " << millisecondsElapsed 
+              << " nps " << nodes * 1000 / max((u64)millisecondsElapsed(start), (u64)1)
+              << " time " << millisecondsElapsed(start)
               << " fen " << fen
               << std::endl;
-
-    // rebuild board to fix zobrist hash and NNUE
-    board = Board(fen); 
 
     return nodes;
 }

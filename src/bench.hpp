@@ -3,12 +3,10 @@
 namespace uci
 {
 extern bool outputSearchInfo;
-inline void ucinewgame();
+inline void ucinewgame(Searcher &searcher);
 }
 
 namespace bench {
-
-extern const u8 DEFAULT_DEPTH = 14;
 
 const std::array FENS {
     "r3k2r/2pb1ppp/2pp1q2/p7/1nP1B3/1P2P3/P2N1PPP/R2QK2R w KQkq a6 0 14",
@@ -63,33 +61,35 @@ const std::array FENS {
     "2r2b2/5p2/5k2/p1r1pP2/P2pB3/1P3P2/K1P3R1/7R w - - 23 93"
 };
 
-inline void bench(u8 depth = DEFAULT_DEPTH)
+inline void bench(Searcher &searcher, u8 depth = 14)
 {
-    uci::outputSearchInfo = false;
-    std::string originalFen = board.fen();
-    u64 totalNodes = 0;
-    std::chrono::steady_clock::time_point start =  std::chrono::steady_clock::now();
+    std::cout << "Running bench depth " << (int)depth 
+              << " on " << FENS.size() << " positions" << std::endl;
 
-    uci::ucinewgame();
+    Board originalBoard = searcher.board;
+    searcher.maxDepth = depth;
+    u64 totalNodes = 0;
+    u64 totalMilliseconds = 0;
+
+    uci::ucinewgame(searcher);
     for (int i = 0; i < FENS.size(); i++)
     {
-        board = Board(FENS[i]);
-        search::search(depth);
-        totalNodes += search::nodes;
-        uci::ucinewgame();
+        searcher.board = Board(FENS[i]);
+        searcher.resetLimits();
+        searcher.maxDepth = depth;
+        searcher.search(false);
+        totalMilliseconds += millisecondsElapsed(searcher.startTime);
+        totalNodes += searcher.nodes;
+        uci::ucinewgame(searcher);
     }
-
-    double milliseconds= millisecondsElapsed(start);
-    u64 nps = totalNodes * 1000 / (milliseconds > 0 ? milliseconds : 1);
 
     std::cout << "bench depth " << (int)depth
               << " nodes " << totalNodes
-              << " nps " << nps
-              << " time " << milliseconds
+              << " nps " << totalNodes * 1000 / max((u64)totalMilliseconds, (u64)1)
+              << " time " << totalMilliseconds
               << std::endl;
 
-    board = Board(originalFen);
-    uci::outputSearchInfo = true;
+    searcher.board = originalBoard;
 }
 
 }

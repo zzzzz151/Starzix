@@ -15,14 +15,19 @@ struct Move
     public:
 
     const static u16 NULL_FLAG = 0x0000,
-                     NORMAL_FLAG = 0x0005,
-                     CASTLING_FLAG = 0x0006,
-                     EN_PASSANT_FLAG = 0x0007,
-                     PAWN_TWO_UP_FLAG = 0x0008,
-                     KNIGHT_PROMOTION_FLAG = 0x0001,
-                     BISHOP_PROMOTION_FLAG = 0x0002,
-                     ROOK_PROMOTION_FLAG = 0x0003,
-                     QUEEN_PROMOTION_FLAG = 0x0004;
+                     PAWN_FLAG = 0x0001,
+                     KNIGHT_FLAG = 0x0002,
+                     BISHOP_FLAG = 0x0003,
+                     ROOK_FLAG = 0x0004,
+                     QUEEN_FLAG = 0x0005,
+                     KING_FLAG = 0x0006,
+                     CASTLING_FLAG = 0x0007,
+                     KNIGHT_PROMOTION_FLAG = 0x000A,
+                     BISHOP_PROMOTION_FLAG = 0x000B,
+                     ROOK_PROMOTION_FLAG = 0x000C,
+                     QUEEN_PROMOTION_FLAG = 0x000D,
+                     EN_PASSANT_FLAG = 0x000E,
+                     PAWN_TWO_UP_FLAG = 0x000F;
 
     inline Move() = default;
 
@@ -34,14 +39,14 @@ struct Move
         return moveEncoded != other.moveEncoded;
     }
 
-    inline Move(Square from, Square to, u16 typeFlag)
+    inline Move(Square from, Square to, u16 flag)
     {
         // from/to: 00100101
         // (u16)from/to: 00000000 00100101
 
         moveEncoded = ((u16)from << 10);
         moveEncoded |= ((u16)to << 4);
-        moveEncoded |= typeFlag;
+        moveEncoded |= flag;
     }
 
     inline u16 getMoveEncoded() { return moveEncoded; }
@@ -50,65 +55,40 @@ struct Move
 
     inline Square to() { return (moveEncoded >> 4) & 0b111111; }
 
-    inline u16 typeFlag() { return moveEncoded & 0x000F; }
+    inline u16 flag() { return moveEncoded & 0x000F; }
+
+    inline PieceType pieceType()
+    {
+        auto flag = this->flag();
+        if (flag == NULL_FLAG)
+            return PieceType::NONE;
+        if (flag <= KING_FLAG)
+            return (PieceType)(flag - 1);
+        if (flag == CASTLING_FLAG)
+            return PieceType::KING;
+        return PieceType::PAWN;
+    }
 
     inline PieceType promotion()
     {
-        u16 flag = typeFlag();
-        if (flag < 1 || flag > 4)
-            return PieceType::NONE;
-        return (PieceType)flag;
-    }
-
-    static inline Move fromUci(std::string uci, std::array<Piece, 64> pieces)
-    {
-        Square from = strToSquare(uci.substr(0,2));
-        Square to = strToSquare(uci.substr(2,4));
-        PieceType pieceType = pieceToPieceType(pieces[from]);
-
-        if (uci.size() == 5) // promotion
-        {
-            char promotionLowerCase = uci.back(); // last char of string
-            u16 typeFlag = QUEEN_PROMOTION_FLAG;
-
-            if (promotionLowerCase == 'n') 
-                typeFlag = KNIGHT_PROMOTION_FLAG;
-            else if (promotionLowerCase == 'b') 
-                typeFlag = BISHOP_PROMOTION_FLAG;
-            else if (promotionLowerCase == 'r') 
-                typeFlag = ROOK_PROMOTION_FLAG;
-
-            return Move(from, to, typeFlag);
-        }
-        else if (pieceType == PieceType::KING)
-        {
-            if (abs((int)to - (int)from) == 2)
-                return Move(from, to, Move::CASTLING_FLAG);
-        }
-        else if (pieceType == PieceType::PAWN)
-        { 
-            int bitboardSquaresTraveled = abs((int)to - (int)from);
-            if (bitboardSquaresTraveled == 16)
-                return Move(from, to, PAWN_TWO_UP_FLAG);
-            if (bitboardSquaresTraveled != 8 && pieces[to] == Piece::NONE)
-                return Move(from, to, EN_PASSANT_FLAG);
-        }
-
-        return Move(from, to, NORMAL_FLAG);
+        u16 flag = this->flag();
+        if (flag >= KNIGHT_PROMOTION_FLAG && flag <= QUEEN_PROMOTION_FLAG)
+            return (PieceType)(flag - KNIGHT_PROMOTION_FLAG + 1);
+        return PieceType::NONE;
     }
 
     inline std::string toUci()
     {
         std::string str = SQUARE_TO_STR[from()] + SQUARE_TO_STR[to()];
-        u16 myTypeFlag = typeFlag();
+        u16 flag = this->flag();
 
-        if (myTypeFlag == QUEEN_PROMOTION_FLAG) 
+        if (flag == QUEEN_PROMOTION_FLAG) 
             str += "q";
-        else if (myTypeFlag == KNIGHT_PROMOTION_FLAG) 
+        else if (flag == KNIGHT_PROMOTION_FLAG) 
             str += "n";
-        else if (myTypeFlag == BISHOP_PROMOTION_FLAG) 
+        else if (flag == BISHOP_PROMOTION_FLAG) 
             str += "b";
-        else if (myTypeFlag == ROOK_PROMOTION_FLAG) 
+        else if (flag == ROOK_PROMOTION_FLAG) 
             str += "r";
 
         return str;
@@ -134,12 +114,14 @@ struct MovesList
         moves[numMoves++] = move; 
     }
 
-    inline u8 size() { return numMoves; }
-
     inline Move operator[](int i) {
         assert(i >= 0 && i < numMoves);
         return moves[i];
     }
+
+    inline u8 size() { return numMoves; }
+
+    inline void clear() { numMoves = 0; }
 
     inline void swap(int i, int j)
     {

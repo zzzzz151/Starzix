@@ -1,565 +1,562 @@
-#pragma once
-
-// clang-format off
-
-#include "tunable_params.hpp"
-#include "time_manager.hpp"
+#include "search_params.hpp"
 #include "tt.hpp"
-#include "history_entry.hpp"
 #include "see.hpp"
-#include "nnue.hpp"
+#include "history_entry.hpp"
 
-namespace uci 
-{ 
-inline void info(int depth, i16 score); 
-}
+u8 LMR_TABLE[256][256]; // [depth][moveIndex]
 
-namespace search {
-
-const u8 MAX_DEPTH = 100;
-
-// Move ordering
-const i32 TT_MOVE_SCORE           = I32_MAX,
-          GOOD_NOISY_BASE_SCORE   = 1'500'000'000,
-          KILLER_SCORE            = 1'000'000'000,
-          COUNTERMOVE_SCORE       = 500'000'000,
-          HISTORY_MOVE_BASE_SCORE = 0;
-i32       BAD_NOISY_BASE_SCORE    = -historyMax.value / 2;
-
-// Most valuable victim    P    N    B    R    Q    K  NONE
-const i32 MVV_VALUES[7] = {100, 300, 320, 500, 900, 0, 0};
-
-u8 maxDepth;
-TimeManager timeManager;
-u64 nodes;
-int maxPlyReached;
-u64 movesNodes[1ULL << 16];             // [moveEncoded]
-Move pvLines[MAX_DEPTH+1][MAX_DEPTH+1]; // [ply][ply]
-int pvLengths[MAX_DEPTH+1];             // [pvLineIndex]
-int lmrTable[MAX_DEPTH+1][256];         // [depth][moveIndex]
-Move killerMoves[MAX_DEPTH];            // [ply]
-Move countermoves[2][1ULL << 16];       // [color][moveEncoded]
-HistoryEntry historyTable[2][6][64];    // [color][pieceType][targetSquare]
-
-namespace internal
+inline void initLmrTable()
 {
-inline i16 iterativeDeepening();
+    memset(LMR_TABLE, 0, sizeof(LMR_TABLE));
+    for (int depth = 1; depth < 256; depth++)
+        for (int move = 1; move < 256; move++)
+            LMR_TABLE[depth][move] = round(lmrBase.value + ln(depth) * ln(move) * lmrMultiplier.value);
 }
 
-inline void init()
-{
-    tt::resize(tt::DEFAULT_SIZE_MB);
+class Searcher {
+    public:
 
-    // init lmrTable
-    for (int depth = 0; depth < MAX_DEPTH+1; depth++)
-        for (int move = 0; move < 256; move++)
-            lmrTable[depth][move] = depth == 0 || move == 0 
-                                    ? 0 : round(lmrBase.value + ln(depth) * ln(move) * lmrMultiplier.value);
-}
+    Board board;
+    u8 maxDepth;
+    u64 nodes;
+    u8 maxPlyReached;
+    TT tt;
+    std::chrono::time_point<std::chrono::steady_clock> startTime;
+    bool hardTimeUp;
+    u64 softMilliseconds, hardMilliseconds;
+    u64 softNodes, hardNodes;
+    u64 movesNodes[1ULL << 16];          // [moveEncoded]
+    Move pvLines[256][256];              // [ply][ply]
+    u8 pvLengths[256];                   // [pvLineIndex]
+    Move killerMoves[256];               // [ply]
+    Move countermoves[2][6][64];         // [color][pieceType][targetSquare]
+    HistoryEntry historyTable[2][6][64]; // [color][pieceType][targetSquare]
+    const u16 OVERHEAD_MILLISECONDS = 10;
 
-inline std::pair<Move, i16> search(TimeManager _timeManager, u8 _maxDepth = MAX_DEPTH)
-{
-    // reset and initialize stuff
-    nodes = 0;
-    memset(movesNodes, 0, sizeof(movesNodes));
-    memset(pvLines, 0, sizeof(pvLines));
-    memset(pvLengths, 0, sizeof(pvLengths));
-    maxDepth = min(_maxDepth, MAX_DEPTH);
-    timeManager = _timeManager;
-
-    i16 score = internal::iterativeDeepening();
-
-    if (tt::age < 63) tt::age++;
-
-    // return best move and score
-    return { pvLines[0][0], score };
-}
-
-inline std::pair<Move, i16> search(u8 _maxDepth = MAX_DEPTH) {
-    return search(TimeManager(), _maxDepth);
-}
-
-namespace internal {
-
-inline i16 aspiration(u8 iterationDepth, i16 score);
-
-inline i16 search(i16 depth, u16 ply, i16 alpha, i16 beta, bool cutNode, 
-                  i8 doubleExtensionsLeft, bool singular = false, i16 eval = 0);
-
-inline i16 qSearch(int ply, i16 alpha, i16 beta);
-
-inline std::array<i32, 256> scoreMoves(MovesList &moves, Move ttMove, Move killerMove);
-
-inline i16 iterativeDeepening()
-{
-    i16 score = 0, lastScore = 0;
-
-    for (u16 iterationDepth = 1; iterationDepth <= maxDepth; iterationDepth++)
+    inline Searcher(Board board)
     {
-        maxPlyReached = -1;
-
-        score = iterationDepth >= aspMinDepth.value
-                ? aspiration(iterationDepth, score) 
-                : search(iterationDepth, 0, NEG_INFINITY, POS_INFINITY, false, maxDoubleExtensions.value);
-
-        if (timeManager.isHardTimeUp(nodes)) return lastScore;
-
-        uci::info(iterationDepth, score);
-
-        u64 bestMoveNodes = movesNodes[pvLines[0][0].getMoveEncoded()];
-        if (timeManager.isSoftTimeUp(nodes, bestMoveNodes)) break;
-
-        lastScore = score;
+        resetLimits();
+        this->board = board;
+        nodes = 0;
+        maxPlyReached = 0;
+        tt = TT(true);
+        memset(movesNodes, 0, sizeof(movesNodes));
+        memset(pvLines, 0, sizeof(pvLines));
+        memset(pvLengths, 0, sizeof(pvLengths));
+        memset(killerMoves, 0, sizeof(killerMoves));
+        memset(countermoves, 0, sizeof(countermoves));
+        memset(historyTable, 0, sizeof(historyTable));
     }
 
-    return score;
-}
-
-inline i16 aspiration(u8 iterationDepth, i16 score)
-{
-    // Aspiration Windows
-    // Search with a small window, adjusting it and researching until the score is inside the window
-
-    i16 delta = aspInitialDelta.value;
-    i16 alpha = max(NEG_INFINITY, score - delta);
-    i16 beta = min(POS_INFINITY, score + delta);
-    i16 depth = iterationDepth;
-
-    while (true)
-    {
-        score = search(depth, 0, alpha, beta, false, maxDoubleExtensions.value);
-
-        if (timeManager.isHardTimeUp(nodes)) return 0;
-
-        if (score >= beta)
-        {
-            beta = min(beta + delta, POS_INFINITY);
-            depth--;
-        }
-        else if (score <= alpha)
-        {
-            beta = (alpha + beta) / 2;
-            alpha = max(alpha - delta, NEG_INFINITY);
-            depth = iterationDepth;
-        }
-        else
-            break;
-
-        delta *= aspDeltaMultiplier.value;
+    inline Move bestMoveRoot() {
+        return pvLines[0][0];
     }
 
-    return score;
-}
-
-inline i16 evaluate() {
-    return std::clamp(nnue::evaluate(board.sideToMove()), -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
-}
-
-inline i16 search(i16 depth, u16 ply, i16 alpha, i16 beta, bool cutNode, 
-                  i8 doubleExtensionsLeft, bool singular, i16 eval)
-{
-    if (timeManager.isHardTimeUp(nodes)) return 0;
-
-    pvLengths[ply] = 0; // Ensure fresh PV
-
-    // Drop into qsearch on terminal nodes
-    if (depth <= 0) return qSearch(ply, alpha, beta);
-
-    // Update seldepth
-    if (ply > maxPlyReached) maxPlyReached = ply;
-
-    if (ply > 0 && board.isDraw()) return 0;
-
-    if (ply >= maxDepth) 
-        return board.inCheck() ? 0 : evaluate();
-
-    if (depth > maxDepth) depth = maxDepth;
-
-    // Probe TT
-    auto [ttEntry, shouldCutoff] = tt::probe(board.getZobristHash(), depth, ply, alpha, beta);
-    if (shouldCutoff && !singular) 
-        return ttEntry->adjustedScore(ply);
-
-    bool ttHit = board.getZobristHash() == ttEntry->zobristHash;
-    Move ttMove = ttHit ? ttEntry->bestMove : MOVE_NONE;
-
-    bool pvNode = beta - alpha > 1 || ply == 0;
-    if (cutNode) assert(!pvNode); // cutNode implies !pvNode
-
-    // We don't use eval in check because it's unreliable, so don't bother calculating it if in check
-    // In singular search we already have the eval, passed in the eval arg
-    if (!board.inCheck() && !singular)
-        eval = evaluate();
-
-    if (!pvNode && !board.inCheck() && !singular)
+    inline void resetLimits()
     {
-        // RFP (Reverse futility pruning) / Static NMP
-        if (depth <= rfpMaxDepth.value && eval >= beta + depth * rfpDepthMultiplier.value)
-            return eval;
-
-        // AP (Alpha pruning)
-        if (depth <= apMaxDepth.value && eval + apMargin.value <= alpha)
-            return eval; 
-
-        // Razoring
-        if (depth <= razoringMaxDepth.value && alpha > eval + depth * razoringDepthMultiplier.value) {
-            i16 score = qSearch(ply, alpha, beta);
-            if (score <= alpha) return score;
-        }
-
-        // NMP (Null move pruning)
-        if (depth >= nmpMinDepth.value && board.getLastMove() != MOVE_NONE
-        && board.hasNonPawnMaterial(board.sideToMove()) && eval >= beta)
-        {
-            board.makeNullMove();
-            int nmpDepth = depth - nmpBaseReduction.value - depth / nmpReductionDivisor.value - min((eval - beta)/200, 3);
-            i16 score = -search(nmpDepth, ply + 1, -beta, -alpha, !cutNode, doubleExtensionsLeft);
-            board.undoNullMove();
-
-            if (score >= MIN_MATE_SCORE) return beta;
-            if (score >= beta) return score;
-        }
+        startTime = std::chrono::steady_clock::now();
+        maxDepth = 100;
+        hardTimeUp = false;
+        hardMilliseconds = softMilliseconds
+                         = softNodes
+                         = hardNodes
+                         = U64_MAX;
     }
 
-    bool trySingular = !singular && depth >= singularMinDepth.value
-                       && abs(ttEntry->score) < MIN_MATE_SCORE
-                       && ttEntry->depth >= depth - singularDepthMargin.value
-                       && ttEntry->getBound() != tt::UPPER_BOUND;
-                       
-    // IIR (Internal iterative reduction)
-    if (!ttHit && depth >= iirMinDepth.value && !board.inCheck())
-        depth--;
-
-    // generate all moves except underpromotions
-    MovesList moves = board.pseudolegalMoves(false, false); 
-    auto movesScores = scoreMoves(moves, ttMove, killerMoves[ply]);
-
-    int stm = (int)board.sideToMove();
-    int legalMovesPlayed = 0;
-    i16 bestScore = NEG_INFINITY;
-    Move bestMove = MOVE_NONE;
-    i16 originalAlpha = alpha;
-
-    // Fail low quiets at beginning of array, fail low noisy moves at the end
-    HistoryEntry *failLowsHistoryEntry[256]; 
-    int numFailLowQuiets = 0, numFailLowNoisies = 0;
-
-    for (int i = 0; i < moves.size(); i++)
+    inline void setTimeLimits(u64 milliseconds, u64 incrementMilliseconds, u64 movesToGo, bool isMoveTime)
     {
-        auto [move, moveScore] = incrementalSort(moves, movesScores, i);
+        assert(milliseconds > 0 && movesToGo > 0);
+        u64 maxHardMs = max((i64)1, (i64)milliseconds - (i64)OVERHEAD_MILLISECONDS);
 
-        // Don't search TT move in singular search
-        if (singular && move == ttMove) continue;
-
-        bool isQuietMove = !board.isCapture(move) && move.promotion() == PieceType::NONE;
-        int lmr = lmrTable[depth][legalMovesPlayed + 1];
-
-        // Moves loop pruning
-        if (ply > 0 && moveScore < COUNTERMOVE_SCORE && bestScore > -MIN_MATE_SCORE)
+        if (isMoveTime)
         {
-            // LMP (Late move pruning)
-            if (depth <= lmpMaxDepth.value
-            && legalMovesPlayed >= lmpMinMoves.value + pvNode + board.inCheck() + depth * depth * lmpDepthMultiplier.value)
-                break;
-
-            // FP (Futility pruning)
-            if (depth <= fpMaxDepth.value && !board.inCheck() && alpha < MIN_MATE_SCORE 
-            && eval + fpBase.value + max(depth - lmr, 0) * fpMultiplier.value <= alpha)
-                break;
-
-            // SEE pruning
-            int threshold = isQuietMove ? depth * seeQuietThreshold.value : depth * depth * seeNoisyThreshold.value;
-            if (depth <= seePruningMaxDepth.value && !see::SEE(board, move, threshold))
-                continue;
+            softMilliseconds = U64_MAX;
+            hardMilliseconds = std::clamp(milliseconds, (u64)1, maxHardMs);
+            return;
         }
 
-        int pieceType = (int)board.pieceTypeAt(move.from());
-        int targetSquare = (int)move.to();
+        u64 alloc = min((u64)(milliseconds / movesToGo + incrementMilliseconds * 2.0/3.0), milliseconds);
+        hardMilliseconds = std::clamp(alloc * 2, (u64)1, maxHardMs);
+        softMilliseconds = movesToGo == 1 ? alloc : alloc * softMillisecondsPercentage.value;
+    }
 
-        // skip illegal moves
-        if (!board.makeMove(move)) continue; 
+    inline bool isHardTimeUp()
+    {
+        if (hardTimeUp || nodes >= hardNodes) return true;
 
-        u64 prevNodes = nodes;
-        nodes++;
-        legalMovesPlayed++;
+        // Check time every 1024 nodes
+        if ((nodes % 1024) != 0) return false;
 
-        int extension = 0;
-        if (ply == 0) goto skipExtensions;
+        return hardTimeUp = (millisecondsElapsed(startTime) >= hardMilliseconds);
+    }
 
-        // Extensions
-        // SE (Singular extensions)
-        if (trySingular && move == ttMove)
+    inline double bestMoveNodesFraction() 
+    {
+        assert(bestMoveRoot() != MOVE_NONE);
+        return (double)movesNodes[bestMoveRoot().getMoveEncoded()] / (double)nodes;
+    }
+
+    inline std::pair<Move, i32> search(bool printInfo = true)
+    {
+        // reset and initialize stuff
+        //startTime = std::chrono::steady_clock::now();
+        hardTimeUp = false;
+        nodes = 0;
+        maxPlyReached = 0;
+        memset(movesNodes, 0, sizeof(movesNodes));
+        memset(pvLines, 0, sizeof(pvLines));
+        memset(pvLengths, 0, sizeof(pvLengths));
+
+        // ID (Iterative deepening)
+        i32 score = 0;
+        for (i32 iterationDepth = 1; iterationDepth <= maxDepth; iterationDepth++)
         {
-            // Singular search: before searching any move, search this node at a shallower depth with TT move excluded
+            maxPlyReached = 0;
+            i32 iterationScore = iterationDepth >= aspMinDepth.value 
+                                 ? aspiration(iterationDepth, score)
+                                 : search(iterationDepth, 0, -INF, INF, doubleExtensionsMax.value);
 
-            board.undoMove(); // undo TT move we just made
+            if (isHardTimeUp()) break;
 
-            i16 singularBeta = max(NEG_INFINITY, ttEntry->score - depth * singularBetaMultiplier.value);
-            i16 singularScore = search((depth - 1) / 2, ply, singularBeta - 1, singularBeta, 
-                                       cutNode, doubleExtensionsLeft, true, eval);
+            score = iterationScore;
+            u64 msElapsed = millisecondsElapsed(startTime);
 
-            board.makeMove(move, false); // second arg = false => don't check legality (we already verified it's a legal move)
-
-            // Double extension
-            if (!pvNode && doubleExtensionsLeft > 0 && singularScore < singularBeta - singularBetaMargin.value)
+            if (printInfo)
             {
-                // singularScore is way lower than TT score
-                // TT move is probably MUCH better than all others, so extend its search by 2 plies
-                extension = 2;
-                doubleExtensionsLeft--;
+                std::cout << "info depth " << iterationDepth
+                          << " seldepth " << (int)maxPlyReached
+                          << " time " << msElapsed
+                          << " nodes " << nodes
+                          << " nps " << nodes * 1000 / max(msElapsed, (u64)1);
+                if (abs(score) < MIN_MATE_SCORE)
+                    std::cout << " score cp " << score;
+                else
+                {
+                    i32 pliesToMate = INF - abs(score);
+                    i32 movesTillMate = round(pliesToMate / 2.0);
+                    std::cout << " score mate " << (score > 0 ? movesTillMate : -movesTillMate);
+                }
+                std::cout << " pv " << pvLines[0][0].toUci();
+                for (int i = 1; i < pvLengths[0]; i++)
+                    std::cout << " " << pvLines[0][i].toUci();
+                std::cout << std::endl;
             }
-            // Normal singular extension
-            else if (singularScore < singularBeta)
-                // TT move is probably better than all others, so extend its search by 1 ply
-                extension = 1;
-            // Negative extension
-            else if (ttEntry->score >= beta)
-                // some other move is probably better than TT move, so reduce TT move search by 2 plies
-                extension = -2;
-            // Cutnode negative extension
-            else if (cutNode)
-                extension = -1;
+
+            // Check soft limits
+            if (nodes >= softNodes)
+                break;
+            if (msElapsed >= (iterationDepth >= softTimeMoveNodesScalingMinDepth.value
+                              ? softMilliseconds 
+                                * (softTimeMoveNodesScalingBase.value - bestMoveNodesFraction()) 
+                                * softTimeMoveNodesScalingMultiplier.value
+                              : softMilliseconds))
+                break;
         }
-        // Check extension if no singular extensions
-        else if (board.inCheck())
-            extension = 1;
-        // 7th-rank-pawn extension
-        else if (pieceType == (int)PieceType::PAWN 
-        && (squareRank(targetSquare) == Rank::RANK_2 || squareRank(targetSquare) == Rank::RANK_7))
-            extension = 1;
 
-        skipExtensions:
+        return { bestMoveRoot(), score };
+    }
 
-        // PVS (Principal variation search)
-        
-        i16 score = 0, searchDepth = depth - 1 + extension;
-        HistoryEntry *historyEntry = &(historyTable[stm][pieceType][targetSquare]);
+    private:
 
-        // LMR (Late move reductions)
-        if (legalMovesPlayed > 1 && depth >= 3 && moveScore <= KILLER_SCORE)
+    inline i32 aspiration(i32 iterationDepth, i32 score)
+    {
+        // Aspiration Windows
+        // Search with a small window, adjusting it and researching until the score is inside the window
+
+        i32 delta = aspInitialDelta.value;
+        i32 alpha = max(-INF, score - delta);
+        i32 beta = min(INF, score + delta);
+        i32 depth = iterationDepth;
+
+        while (true)
         {
-            lmr -= board.inCheck(); // reduce checks less
-            lmr -= pvNode; // reduce pv nodes less
+            score = search(depth, 0, alpha, beta, doubleExtensionsMax.value);
 
-            // reduce killers and countermoves less
-            if (moveScore == KILLER_SCORE || moveScore == COUNTERMOVE_SCORE)
-                lmr--;
-            // reduce moves with good history less and vice versa
-            else if (isQuietMove)
-                lmr -= round((moveScore - HISTORY_MOVE_BASE_SCORE) / (double)lmrHistoryDivisor.value);
-            else 
-                lmr -= round(historyEntry->noisyHistory / (double)lmrNoisyHistoryDivisor.value);
+            if (isHardTimeUp()) return 0;
 
-            // if lmr is negative, we would have an extension instead of a reduction
-            // dont reduce into qsearch
-            lmr = std::clamp(lmr, 0, searchDepth - 1);
-
-            // PVS part 1/4: reduced search on null window
-            score = -search(searchDepth - lmr, ply + 1, -alpha-1, -alpha, true, doubleExtensionsLeft);
-
-            // PVS part 2/4: if score is better than expected (score > alpha), do full depth search on null window
-            if (score > alpha && lmr != 1)
-                score = -search(searchDepth, ply + 1, -alpha-1, -alpha, !cutNode, doubleExtensionsLeft);
-        }
-        else if (!pvNode || legalMovesPlayed > 1)
-            // PVS part 3/4: full depth search on null window
-            score = -search(searchDepth, ply + 1, -alpha-1, -alpha, !cutNode, doubleExtensionsLeft);
-
-        // PVS part 4/4: full depth search on full window for some pv nodes
-        if (pvNode && (legalMovesPlayed == 1 || score > alpha))
-            score = -search(searchDepth, ply + 1, -beta, -alpha, false, doubleExtensionsLeft);
-
-        board.undoMove();
-        if (timeManager.isHardTimeUp(nodes)) return 0;
-
-        if (ply == 0) movesNodes[move.getMoveEncoded()] += nodes - prevNodes;
-
-        if (score > bestScore) bestScore = score;
-
-        if (score <= alpha) // Fail low
-        {
-            // Fail low quiets at beginning of array, fail low noisy moves at the end
-            if (isQuietMove)
-                failLowsHistoryEntry[numFailLowQuiets++] = historyEntry;
+            if (score >= beta)
+            {
+                beta = min(beta + delta, INF);
+                depth--;
+            }
+            else if (score <= alpha)
+            {
+                beta = (alpha + beta) / 2;
+                alpha = max(alpha - delta, -INF);
+                depth = iterationDepth;
+            }
             else
-                failLowsHistoryEntry[256 - ++numFailLowNoisies] = historyEntry;
+                break;
 
-            continue;
+            delta *= aspDeltaMultiplier.value;
         }
 
-        alpha = score;
-        bestMove = move;
+        return score;
+    }
 
-        if (pvNode)
+    inline i32 search(i32 depth, u8 ply, i32 alpha, i32 beta, 
+                      u8 doubleExtensionsLeft, bool singular = false, i32 eval = EVAL_NONE)
+    { 
+        if (depth <= 0) return qSearch(ply, alpha, beta);
+
+        if (isHardTimeUp()) return 0;
+
+        // Update seldepth
+        if (ply > maxPlyReached) maxPlyReached = ply;
+
+        if (ply > 0 && !singular && board.isDraw()) return 0;
+
+        if (ply >= maxDepth) return board.inCheck() ? 0 : board.evaluate();
+
+        if (depth > maxDepth) depth = maxDepth;
+
+        TTEntry *ttEntry = tt.probe(board.zobristHash());
+        if (tt.cutoff(ttEntry, board.zobristHash(), depth, ply, alpha, beta) && !singular) 
+            return ttEntry->adjustedScore(ply);
+
+        Color stm = board.sideToMove();
+        bool pvNode = beta > alpha + 1;
+        if (eval == EVAL_NONE)
+            eval = board.inCheck() ? EVAL_NONE : board.evaluate();
+
+        if (!pvNode && !board.inCheck() && !singular)
         {
-            // Update pv line
-            int subPvLineLength = pvLengths[ply + 1];
-            pvLengths[ply] = 1 + subPvLineLength;
-            pvLines[ply][0] = move;
-            // memcpy(dst, src, size)
-            memcpy(&(pvLines[ply][1]), pvLines[ply + 1], subPvLineLength * sizeof(Move));
+            // RFP (Reverse futility pruning) / Static NMP
+            if (depth <= rfpMaxDepth.value && eval >= beta + depth * rfpDepthMultiplier.value)
+                return eval;
+
+            // NMP (Null move pruning)
+            if (depth >= nmpMinDepth.value && eval >= beta
+            && board.lastMove() != MOVE_NONE && board.hasNonPawnMaterial(stm))
+            {
+                board.makeMove(MOVE_NONE);
+
+                i32 nmpDepth = depth - nmpBaseReduction.value - depth / nmpReductionDivisor.value
+                               - min((eval-beta) / nmpEvalBetaDivisor.value, nmpEvalBetaMax.value);
+                i32 score = -search(nmpDepth, ply + 1, -beta, -alpha, doubleExtensionsLeft);
+
+                board.undoMove();
+
+                if (score >= MIN_MATE_SCORE) return beta;
+                if (score >= beta) return score;
+            }
         }
 
-        if (score < beta) continue;
+        Move ttMove = board.zobristHash() == ttEntry->zobristHash
+                      ? ttEntry->bestMove : MOVE_NONE;
 
-        // Fail high / Beta cutoff
+        // IIR (Internal iterative reduction)
+        if (depth >= iirMinDepth.value && ttMove == MOVE_NONE)
+            depth--;
 
-        i32 historyBonus = min(historyMaxBonus.value, historyBonusMultiplier.value * (depth-1));
+        // genenerate all moves except underpromotions
+        MovesList moves = MovesList();
+        board.pseudolegalMoves(moves, false, false); 
+        std::array<i32, 256> movesScores;
+        scoreMoves(moves, movesScores, ttMove, killerMoves[ply]);
 
-        if (isQuietMove)
+        u8 legalMovesPlayed = 0;
+        i32 bestScore = -INF;
+        Move bestMove = MOVE_NONE;
+        i32 originalAlpha = alpha;
+        std::array<HistoryEntry*, 256> failLowsHistoryEntry;
+        u8 failLowQuiets = 0, failLowNoisies = 0;
+
+        for (int i = 0; i < moves.size(); i++)
         {
-            // This quiet move is a killer move and a countermove
-            killerMoves[ply] = move;
-            if (board.getLastMove() != MOVE_NONE)
-                countermoves[stm][board.getLastMove().getMoveEncoded()] = move;
+            auto [move, moveScore] = incrementalSort(moves, movesScores, i);
 
-            // Increase this quiet's history
-            historyEntry->updateQuietHistory(board, historyBonus);
+            // Don't search TT move in singular search
+            if (move == ttMove && singular) continue;
 
-            // Penalize/decrease history of quiets that failed low
-            for (int i = 0; i < numFailLowQuiets; i++)
-                failLowsHistoryEntry[i]->updateQuietHistory(board, -historyBonus); 
-        }
-        else
-        {
-            // Increase history of this noisy move
-            historyEntry->updateNoisyHistory(board, historyBonus);
+            bool isQuiet = !board.isCapture(move) && move.promotion() == PieceType::NONE;
 
-            // Penalize/decrease history of noisy moves that failed low
-            for (int i = 255, j = 0; j < numFailLowNoisies; i--, j++)
+            if (bestScore > -MIN_MATE_SCORE && !pvNode && !board.inCheck() && moveScore < COUNTERMOVE_SCORE)
+            {
+                // LMP (Late move pruning)
+                if (depth <= lmpMaxDepth.value
+                && legalMovesPlayed >= lmpMinMoves.value + depth * depth * lmpDepthMultiplier.value)
+                    break;
+
+                i32 lmrDepth = max(0, depth - LMR_TABLE[depth][legalMovesPlayed+1]);
+
+                // FP (Futility pruning)
+                if (lmrDepth <= fpMaxDepth.value && alpha < MIN_MATE_SCORE
+                && alpha > eval + fpBase.value + lmrDepth * fpMultiplier.value)
+                    break;
+
+                // SEE pruning
+                if (depth <= seePruningMaxDepth.value 
+                && !SEE(board, move, 
+                        depth * (isQuiet ? seeQuietThreshold.value : depth * seeNoisyThreshold.value)))
+                    continue;
+            }
+
+            // skip illegal moves
+            if (!board.makeMove(move)) continue;
+
+            i32 extension = 0;
+            if (ply == 0) goto skipExtensions;
+
+            // SE (Singular extensions)
+            if (move == ttMove
+            && depth >= singularMinDepth.value
+            && abs(ttEntry->score) < MIN_MATE_SCORE
+            && ttEntry->depth >= depth - singularDepthMargin.value
+            && ttEntry->getBound() != Bound::UPPER)
+            {
+                // Singular search: before searching any move, 
+                // search this node at a shallower depth with TT move excluded
+
+                // Undo TT move we just made
+                BoardState boardState = board.getBoardState();
+                Accumulator accumulator = board.getAccumulator();
+                board.undoMove();
+
+                i32 singularBeta = max(-INF, ttEntry->score - depth * singularBetaMultiplier.value);
+                i32 singularScore = search((depth - 1) / 2, ply, singularBeta - 1, singularBeta, 
+                                           doubleExtensionsLeft, true, eval);
+
+                // Make the TT move again
+                board.pushBoardState(boardState);
+                board.pushAccumulator(accumulator);
+
+                // Double extension
+                if (singularScore < singularBeta - doubleExtensionMargin.value 
+                && !pvNode && doubleExtensionsLeft > 0)
+                {
+                    // singularScore is way lower than TT score
+                    // TT move is probably MUCH better than all others, so extend its search by 2 plies
+                    extension = 2;
+                    doubleExtensionsLeft--;
+                }
+                // Normal singular extension
+                else if (singularScore < singularBeta)
+                    // TT move is probably better than all others, so extend its search by 1 ply
+                    extension = 1;
+                // Negative extension
+                else if (ttEntry->score >= beta)
+                    // some other move is probably better than TT move, so reduce TT move search by 2 plies
+                    extension = -2;
+            }
+            // Check extension if no singular extensions
+            else if (board.inCheck())
+                extension = 1;
+
+            skipExtensions:
+
+            legalMovesPlayed++;
+            u64 nodesBefore = nodes;
+            nodes++;
+            HistoryEntry *historyEntry = &historyTable[(i8)stm][(u8)move.pieceType()][move.to()];
+
+    	    // PVS (Principal variation search)
+
+            i32 score = 0, lmr = 0;
+            if (legalMovesPlayed == 1)
+            {
+                score = -search(depth - 1 + extension, ply + 1, -beta, -alpha, doubleExtensionsLeft);
+                goto moveSearched;
+            }
+
+            // LMR (Late move reductions)
+            if (depth >= 3 && moveScore <= KILLER_SCORE)
+            {
+                lmr = LMR_TABLE[depth][legalMovesPlayed];
+                lmr -= pvNode;
+                double moveHistory = moveScore;
+
+                if (moveScore == KILLER_SCORE || moveScore == COUNTERMOVE_SCORE)
+                {
+                    lmr--;
+                    moveHistory = historyEntry->quietHistory(board);
+                }
+                else if (!isQuiet)
+                    moveHistory = historyEntry->noisyHistory;
+
+                lmr -= round(moveHistory / (double)lmrHistoryDivisor.value);
+                lmr = std::clamp(lmr, 0, depth - 2);
+            }
+
+            score = -search(depth - 1 - lmr + extension, ply + 1, -alpha-1, -alpha, doubleExtensionsLeft);
+
+            if (score > alpha && (score < beta || lmr > 0))
+                score = -search(depth - 1 + extension, ply + 1, -beta, -alpha, doubleExtensionsLeft); 
+
+            moveSearched:
+            board.undoMove();
+            if (isHardTimeUp()) return 0;
+
+            if (ply == 0) movesNodes[move.getMoveEncoded()] += nodes - nodesBefore;
+
+            if (score > bestScore) bestScore = score;
+
+            if (score <= alpha) // Fail low
+            {
+                int index = isQuiet ? failLowQuiets++ : 256 - ++failLowNoisies;
+                failLowsHistoryEntry[index] = historyEntry;
+                continue;
+            }
+
+            alpha = score;
+            bestMove = move;
+            if (ply == 0) pvLines[0][0] = move;
+
+            if (score < beta) continue;
+
+            // Fail high / beta cutoff
+
+            i32 historyBonus = min(historyMaxBonus.value, 
+                                   historyBonusMultiplier.value * (depth-1));
+
+            if (isQuiet)
+            {
+                killerMoves[ply] = move;
+
+                Move lastMove = MOVE_NONE;
+                if ((lastMove = board.lastMove()) != MOVE_NONE)
+                    countermoves[(i8)stm][(u8)lastMove.pieceType()][lastMove.to()] = move;
+
+                // Increase history of this fail high quiet move
+                historyEntry->updateQuietHistory(board, historyBonus);
+
+                // History malus: if this fail high is a quiet, decrease history of fail low quiets
+                for  (int i = 0; i < failLowQuiets; i++)
+                    failLowsHistoryEntry[i]->updateQuietHistory(board, -historyBonus);
+            }
+            else
+                // Increaes history of this fail high noisy move
+                historyEntry->updateNoisyHistory(board, historyBonus);
+
+            // History malus: always decrease history of fail low noisy moves
+            for (int i = 255, j = 0; j < failLowNoisies; j++, i--)
                 failLowsHistoryEntry[i]->updateNoisyHistory(board, -historyBonus);
+
+            break; // Fail high / beta cutoff
         }
 
-        break; // Fail high / Beta cutoff
+        if (legalMovesPlayed == 0) return board.inCheck() ? -INF + ply : 0;
+
+        if (!singular)
+            tt.store(ttEntry, board.zobristHash(), depth, ply, bestScore, bestMove, originalAlpha, beta);    
+
+        return bestScore;
     }
 
-    if (legalMovesPlayed == 0) 
-        // checkmate or stalemate
-        return board.inCheck() ? NEG_INFINITY + ply : 0;
-
-    if (!singular)
-        tt::store(ttEntry, board.getZobristHash(), depth, bestScore, bestMove, ply, originalAlpha, beta);    
-
-    return bestScore;
-}
-
-inline i16 qSearch(int ply, i16 alpha, i16 beta)
-{
-    // Quiescence search: search noisy moves until a 'quiet' position is reached
-
-    // Update seldepth
-    if (ply > maxPlyReached) maxPlyReached = ply;
-
-    if (board.isDraw()) return 0;
-
-    if (ply >= maxDepth) 
-        return board.inCheck() ? 0 : evaluate();
-
-    i16 eval = NEG_INFINITY; // eval is NEG_INFINITY in check
-    if (!board.inCheck())
+    inline i32 qSearch(u8 ply, i32 alpha, i32 beta)
     {
-        eval = evaluate();
-        if (eval >= beta) return eval;
-        if (eval > alpha) alpha = eval;
+        // Quiescence search: search noisy moves until a 'quiet' position is reached
+
+        if (isHardTimeUp()) return 0;
+
+        // Update seldepth
+        if (ply > maxPlyReached) maxPlyReached = ply;
+
+        if (board.isDraw()) return 0;
+
+        if (ply >= maxDepth) return board.inCheck() ? 0 : board.evaluate();
+
+        i32 eval = -INF; // eval is -INF in check
+        if (!board.inCheck())
+        {
+            eval = board.evaluate();
+            if (eval >= beta) return eval;
+            if (eval > alpha) alpha = eval;
+        }
+
+        // if in check, generate all moves, else only noisy moves
+        // never generate underpromotions
+        MovesList moves = MovesList();
+        board.pseudolegalMoves(moves, !board.inCheck(), false); 
+        std::array<i32, 256> movesScores;
+        scoreMoves(moves, movesScores, MOVE_NONE, killerMoves[ply]);
+        
+        u8 legalMovesPlayed = 0;
+        i32 bestScore = eval;
+        Move bestMove = MOVE_NONE;
+
+        for (int i = 0; i < moves.size(); i++)
+        {
+            auto [move, moveScore] = incrementalSort(moves, movesScores, i);
+
+            // SEE pruning (skip bad captures)
+            if (!board.inCheck() && moveScore < 0) 
+                continue;
+
+            // skip illegal moves
+            if (!board.makeMove(move)) continue; 
+
+            legalMovesPlayed++;
+            nodes++;
+
+            i32 score = -qSearch(ply + 1, -beta, -alpha);
+            board.undoMove();
+            if (isHardTimeUp()) return 0;
+
+            if (score <= bestScore) continue;
+
+            bestScore = score;
+            bestMove = move;
+
+            if (bestScore >= beta) break;
+            if (bestScore > alpha) alpha = bestScore;
+        }
+
+        if (legalMovesPlayed == 0 && board.inCheck()) 
+            // checkmate
+            return -INF + ply; 
+
+        return bestScore;
     }
 
-    // Probe TT
-    auto [ttEntry, shouldCutoff] = tt::probe(board.getZobristHash(), 0, ply, alpha, beta);
-    if (shouldCutoff) return ttEntry->adjustedScore(ply);
+    const i32 GOOD_QUEEN_PROMO_SCORE = 1'600'000'000,
+              GOOD_NOISY_SCORE       = 1'500'000'000,
+              KILLER_SCORE           = 1'000'000'000,
+              COUNTERMOVE_SCORE      = 500'000'000;
 
-    Move ttMove = board.getZobristHash() == ttEntry->zobristHash ? ttEntry->bestMove : MOVE_NONE;
+    // Most valuable victim     P    N    B    R    Q    K  NONE
+    const i32 MVV_VALUES[7] = { 100, 300, 320, 500, 900, 0, 0 };
 
-    // if in check, generate all moves, else only noisy moves
-    // never generate underpromotions
-    MovesList moves = board.pseudolegalMoves(!board.inCheck(), false); 
-    auto movesScores = scoreMoves(moves, ttMove, killerMoves[ply]);
-    
-    int legalMovesPlayed = 0;
-    i16 bestScore = eval;
-    Move bestMove = MOVE_NONE;
-    i16 originalAlpha = alpha;
-
-    for (int i = 0; i < moves.size(); i++)
+    inline void scoreMoves(MovesList &moves, std::array<i32, 256> &scores, Move ttMove, Move killer)
     {
-        auto [move, moveScore] = incrementalSort(moves, movesScores, i);
+        i8 stm = (i8)board.sideToMove();
+        Move lastMove = MOVE_NONE;
+        Move countermove = (lastMove = board.lastMove()) == MOVE_NONE
+                           ? MOVE_NONE
+                           : countermoves[stm][(u8)lastMove.pieceType()][lastMove.to()];
 
-        // SEE pruning (skip bad noisy moves)
-        if (!board.inCheck() && moveScore < BAD_NOISY_BASE_SCORE + 100'000) 
-            continue;
-
-        // skip illegal moves
-        if (!board.makeMove(move)) continue; 
-
-        nodes++;
-        legalMovesPlayed++;
-
-        i16 score = -qSearch(ply + 1, -beta, -alpha);
-        board.undoMove();
-
-        if (score <= bestScore) continue;
-
-        bestScore = score;
-        bestMove = move;
-
-        if (bestScore >= beta) break;
-        if (bestScore > alpha) alpha = bestScore;
-    }
-
-    if (board.inCheck() && legalMovesPlayed == 0) 
-        // checkmate
-        return NEG_INFINITY + ply; 
-
-    tt::store(ttEntry, board.getZobristHash(), 0, bestScore, bestMove, ply, originalAlpha, beta);    
-
-    return bestScore;
-}
-
-inline std::array<i32, 256> scoreMoves(MovesList &moves, Move ttMove, Move killerMove)
-{
-    std::array<i32, 256> movesScores;
-
-    int stm = (int)board.sideToMove();
-    Move countermove = board.getLastMove() == MOVE_NONE
-                       ? MOVE_NONE
-                       : countermoves[stm][board.getLastMove().getMoveEncoded()];
-
-    for (int i = 0; i < moves.size(); i++)
-    {
-        Move move = moves[i];
-
-        if (move == ttMove)
+        for (int i = 0; i < moves.size(); i++)
         {
-            movesScores[i] = TT_MOVE_SCORE;
-            continue;
-        }
+            Move move = moves[i];
+            if (move == ttMove)
+            {
+                scores[i] = I32_MAX;
+                continue;
+            }
 
-        PieceType captured = board.captured(move);
-        PieceType promotion = move.promotion();
-        int pieceType = (int)board.pieceTypeAt(move.from());
-        int targetSquare = (int)move.to();
-        HistoryEntry *historyEntry = &(historyTable[stm][pieceType][targetSquare]);
+            PieceType captured = board.captured(move);
+            PieceType promotion = move.promotion();
+            HistoryEntry *historyEntry = &historyTable[stm][(u8)move.pieceType()][move.to()];
 
-        if (captured != PieceType::NONE || promotion != PieceType::NONE)
-        {
-            movesScores[i] = see::SEE(board, move) ? GOOD_NOISY_BASE_SCORE : BAD_NOISY_BASE_SCORE;
-            movesScores[i] += MVV_VALUES[(int)captured];
-            movesScores[i] += historyEntry->noisyHistory;
-        }
-        else if (move == killerMove)
-            movesScores[i] = KILLER_SCORE;
-        else if (move == countermove)
-            movesScores[i] = COUNTERMOVE_SCORE;
-        else
-        {
-            movesScores[i] = HISTORY_MOVE_BASE_SCORE;
-            movesScores[i] += historyEntry->quietHistory(board);
+            // Starzix doesn't generate underpromotions in search
+
+            if (captured != PieceType::NONE || promotion == PieceType::QUEEN)
+            {
+                scores[i] = SEE(board, move) ? (promotion == PieceType::QUEEN
+                                                ? GOOD_QUEEN_PROMO_SCORE : GOOD_NOISY_SCORE)
+                                             : -GOOD_NOISY_SCORE;
+
+                scores[i] += MVV_VALUES[(u8)captured];
+                scores[i] += historyEntry->noisyHistory;
+            }
+            else if (move == killer)
+                scores[i] = KILLER_SCORE;
+            else if (move == countermove)
+                scores[i] = COUNTERMOVE_SCORE;
+            else
+                scores[i] = historyEntry->quietHistory(board);
+            
         }
     }
 
-    return movesScores;
-}
-
-}
-
-}
-
+};
