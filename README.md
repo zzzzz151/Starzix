@@ -2,9 +2,9 @@
 
 # Elo (version 3.0)
 
-[CCRL Blitz](https://computerchess.org.uk/ccrl/404/): 3488
+[CCRL Blitz](https://computerchess.org.uk/ccrl/404/): 3489
 
-[CCRL Rapid](https://computerchess.org.uk/ccrl/4040/): 3335
+[CCRL Rapid](https://computerchess.org.uk/ccrl/4040/): 3416
 
 [Ipman Bullet](https://ipmanchess.yolasite.com/r9-7945hx.php): 3309
 
@@ -12,11 +12,11 @@
 
 ### Windows
 
-```clang++ -std=c++20 -march=native -O3 -Wl,/STACK:16777216 src/main.cpp -o Starzix.exe```
+```clang++ -std=c++20 -march=x86-64-v3 -O3 -Wl,/STACK:16777216 src/main.cpp -o Starzix.exe```
 
 ### Linux
 
-```clang++ -std=c++20 -march=native -O3 src/main.cpp -o starzix```
+```clang++ -std=c++20 -march=x86-64-v3 -O3 src/main.cpp -o starzix```
 
 # UCI (Universal Chess Interface)
 
@@ -25,6 +25,8 @@
 - Hash (int, default 32, 1 to 1024) - transposition table size in MB
 
 ### Extra commands
+
+- display - display current position, fen and zobrist hash
 
 - eval - displays current position's evaluation from perspective of side to move
 
