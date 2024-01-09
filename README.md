@@ -42,33 +42,27 @@
 - Pseudolegal move generation (magic bitboards for sliders, lookup tables for pawns, knights and king)
 - Copymake make/undo move
 
-### NNUE evaluation (768->512)x2->1
+### NNUE evaluation 
+- (768->512)x2->1
+- Lc0 data
+- SCReLU activation
 
-### Search framework
+### Search
 - Iterative deepening
 - Aspiration windows
 - Principal variation search with fail-soft Negamax
 - Quiescence search
 - Transposition table
-
-### Pruning
 - Alpha-beta pruning
 - Reverse futility pruning
-- Alpha pruning
-- Razoring
 - Null move pruning
 - Late move pruning
 - Futility pruning
 - SEE pruning
-
-### Extensions
-- Singular extensions (double extensions, negative extension)
-- Check extension
-- 7th-rank-pawn extension
-
-### Reductions
 - Internal iterative reduction
 - Late move reductions
+- Singular extensions (with negative and double extensions)
+- Check extension
 
 ### Move ordering
 - TT move
@@ -78,7 +72,7 @@
 - Quiet moves by history
 - Bad noisy moves
 
-### Move history
+### Moves history
 - Main history
 - Countermove history
 - Follow-up move history
