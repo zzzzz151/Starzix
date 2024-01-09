@@ -3,13 +3,12 @@
 
 // clang-format off
 
+                              // P    N    B    R    Q    K  NONE
+const i32 SEE_PIECE_VALUES[7] = {100, 300, 300, 500, 900, 0, 0};
+
 inline i32 gain(Board &board, Move move);
 
 inline PieceType popLeastValuable(Board &board, u64 &occ, u64 attackers, Color color);
-
-                              // P    N    B    R    Q    K  NONE
-const i32 SEE_PIECE_VALUES[7] = {100, 300, 300, 500, 900, 0, 0};
-const u8 PAWN_INDEX = 0;
 
 // SEE (Static exchange evaluation)
 inline bool SEE(Board &board, Move move, i32 threshold = 0)
@@ -75,14 +74,14 @@ inline i32 gain(Board &board, Move move)
         return 0;
 
     if (moveFlag == Move::EN_PASSANT_FLAG)
-        return SEE_PIECE_VALUES[PAWN_INDEX];
+        return SEE_PIECE_VALUES[(u8)PieceType::PAWN];
 
     i32 score = SEE_PIECE_VALUES[(int)board.pieceTypeAt(move.to())];
 
     PieceType promotion = move.promotion();
     if (promotion != PieceType::NONE)
         // gain promotion, lose the pawn
-        score += SEE_PIECE_VALUES[(int)promotion] - SEE_PIECE_VALUES[PAWN_INDEX]; 
+        score += SEE_PIECE_VALUES[(int)promotion] - SEE_PIECE_VALUES[(u8)PieceType::PAWN]; 
 
     return score;
 }

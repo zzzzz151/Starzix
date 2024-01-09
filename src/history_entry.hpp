@@ -5,14 +5,12 @@
 struct HistoryEntry
 {
     i32 mainHistory;
-    i32 countermoveHistory[6][64];  // [lastMovePieceType][lastMoveTargetSquare]
-    i32 followupMoveHistory[6][64]; // [lastLastMovePieceType][lastLastMoveTargetSquare]
+    i32 continuationHistories[2][6][64]; // [ply-1][pieceType][targetSquare]
     i32 noisyHistory;
 
     inline HistoryEntry() {
         mainHistory = 0;
-        memset(countermoveHistory, 0, sizeof(countermoveHistory));
-        memset(followupMoveHistory, 0, sizeof(followupMoveHistory));
+        memset(continuationHistories, 0, sizeof(continuationHistories));
         noisyHistory = 0;
     }
 
@@ -20,23 +18,16 @@ struct HistoryEntry
     {
         // add main history
         i32 quietHist = mainHistory;
-        
-        // add countermove history using last move
-        Move lastMove;
-        if ((lastMove = board.getNthToLastMove(1)) != MOVE_NONE)
-        {
-            u8 pieceType = (u8)lastMove.pieceType();
-            u8 targetSq = (u8)lastMove.to();
-            quietHist += countermoveHistory[pieceType][targetSq];
-        }
 
-        // add follow-up move history using 2nd-to-last move
-        Move lastLastMove;
-        if ((lastLastMove = board.getNthToLastMove(2)) != MOVE_NONE)
+        // add continuation histories
+        Move move;
+        for (u16 ply : {1, 2})
         {
-            u8 pieceType = (u8)lastLastMove.pieceType();
-            u8 targetSq = (u8)lastLastMove.to();
-            quietHist += followupMoveHistory[pieceType][targetSq];
+            if ((move = board.getNthToLastMove(ply)) != MOVE_NONE)
+            {
+                u8 pt = (u8)move.pieceType();
+                quietHist += continuationHistories[ply-1][pt][move.to()];
+            }
         }
        
         return quietHist;
@@ -47,25 +38,16 @@ struct HistoryEntry
         // Update main history
         mainHistory += bonus - abs(bonus) * mainHistory / historyMax.value;
 
-        // Update countermove history using last move
-        Move lastMove;
-        if ((lastMove = board.getNthToLastMove(1)) != MOVE_NONE)
+        // Update continuation histories
+        Move move;
+        for (u16 ply : {1, 2})
         {
-            u8 pt = (u8)lastMove.pieceType();
-            u8 targetSq = (u8)lastMove.to();
-
-            countermoveHistory[pt][targetSq] 
-                += bonus - abs(bonus) * countermoveHistory[pt][targetSq] / historyMax.value;
-        }
-
-        // Update follow-up move history using 2nd-to-last move
-        Move lastLastMove;
-        if ((lastLastMove = board.getNthToLastMove(2)) != MOVE_NONE)
-        {
-            u8 pt = (u8)lastLastMove.pieceType();
-            u8 targetSq = (u8)lastLastMove.to();
-            followupMoveHistory[pt][targetSq] 
-                += bonus - abs(bonus) * followupMoveHistory[pt][targetSq] / historyMax.value;
+            if ((move = board.getNthToLastMove(ply)) != MOVE_NONE)
+            {
+                u8 pt = (u8)move.pieceType();
+                i32 *history = &continuationHistories[ply-1][pt][move.to()];
+                *history += bonus - abs(bonus) * *history / historyMax.value;
+            }
         }
     }
 
