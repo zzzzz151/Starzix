@@ -31,6 +31,7 @@ class Searcher {
     Move killerMoves[256];               // [ply]
     Move countermoves[2][6][64];         // [color][pieceType][targetSquare]
     HistoryEntry historyTable[2][6][64]; // [color][pieceType][targetSquare]
+    i16 evals[256];                      // [ply]
     const u16 OVERHEAD_MILLISECONDS = 10;
 
     inline Searcher(Board board)
@@ -143,13 +144,12 @@ class Searcher {
             }
 
             // Check soft limits
-            if (nodes >= softNodes)
-                break;
-            if (msElapsed >= (iterationDepth >= softTimeMoveNodesScalingMinDepth.value
-                              ? softMilliseconds 
-                                * (softTimeMoveNodesScalingBase.value - bestMoveNodesFraction()) 
-                                * softTimeMoveNodesScalingMultiplier.value
-                              : softMilliseconds))
+            if (nodes >= softNodes
+            || msElapsed >= (iterationDepth >= softTimeMoveNodesScalingMinDepth.value
+                             ? softMilliseconds 
+                               * (softTimeMoveNodesScalingBase.value - bestMoveNodesFraction()) 
+                               * softTimeMoveNodesScalingMultiplier.value
+                             : softMilliseconds))
                 break;
         }
 
@@ -195,7 +195,7 @@ class Searcher {
     }
 
     inline i32 search(i32 depth, u8 ply, i32 alpha, i32 beta, 
-                      u8 doubleExtensionsLeft, bool singular = false, i32 eval = EVAL_NONE)
+                      u8 doubleExtsLeft, bool singular = false)
     { 
         if (depth <= 0) return qSearch(ply, alpha, beta);
 
@@ -214,10 +214,9 @@ class Searcher {
         if (tt.cutoff(ttEntry, board.zobristHash(), depth, ply, alpha, beta) && !singular) 
             return ttEntry->adjustedScore(ply);
 
-        Color stm = board.sideToMove();
         bool pvNode = beta > alpha + 1;
-        if (eval == EVAL_NONE)
-            eval = board.inCheck() ? EVAL_NONE : board.evaluate();
+        Color stm = board.sideToMove();
+        i32 eval = evals[ply] = singular ? evals[ply] : board.inCheck() ? INF : board.evaluate();
 
         if (!pvNode && !board.inCheck() && !singular)
         {
@@ -233,7 +232,7 @@ class Searcher {
 
                 i32 nmpDepth = depth - nmpBaseReduction.value - depth / nmpReductionDivisor.value
                                - min((eval-beta) / nmpEvalBetaDivisor.value, nmpEvalBetaMax.value);
-                i32 score = -search(nmpDepth, ply + 1, -beta, -alpha, doubleExtensionsLeft);
+                i32 score = -search(nmpDepth, ply + 1, -beta, -alpha, doubleExtsLeft);
 
                 board.undoMove();
 
@@ -248,6 +247,8 @@ class Searcher {
         // IIR (Internal iterative reduction)
         if (depth >= iirMinDepth.value && ttMove == MOVE_NONE)
             depth--;
+
+        bool improving = ply > 1 && !board.inCheck() && eval > evals[ply-2];
 
         // genenerate all moves except underpromotions
         MovesList moves = MovesList();
@@ -314,8 +315,8 @@ class Searcher {
                 board.undoMove();
 
                 i32 singularBeta = max(-INF, ttEntry->score - depth * singularBetaMultiplier.value);
-                i32 singularScore = search((depth - 1) / 2, ply, singularBeta - 1, singularBeta, 
-                                           doubleExtensionsLeft, true, eval);
+                i32 singularScore = search((depth - 1) / 2, ply, singularBeta - 1, 
+                                           singularBeta, doubleExtsLeft, true);
 
                 // Make the TT move again
                 board.pushBoardState(boardState);
@@ -323,12 +324,12 @@ class Searcher {
 
                 // Double extension
                 if (singularScore < singularBeta - doubleExtensionMargin.value 
-                && !pvNode && doubleExtensionsLeft > 0)
+                && !pvNode && doubleExtsLeft > 0)
                 {
                     // singularScore is way lower than TT score
                     // TT move is probably MUCH better than all others, so extend its search by 2 plies
                     extension = 2;
-                    doubleExtensionsLeft--;
+                    doubleExtsLeft--;
                 }
                 // Normal singular extension
                 else if (singularScore < singularBeta)
@@ -355,7 +356,7 @@ class Searcher {
             i32 score = 0, lmr = 0;
             if (legalMovesPlayed == 1)
             {
-                score = -search(depth - 1 + extension, ply + 1, -beta, -alpha, doubleExtensionsLeft);
+                score = -search(depth - 1 + extension, ply + 1, -beta, -alpha, doubleExtsLeft);
                 goto moveSearched;
             }
 
@@ -364,6 +365,7 @@ class Searcher {
             {
                 lmr = LMR_TABLE[depth][legalMovesPlayed];
                 lmr -= pvNode;
+                lmr -= improving;
                 double moveHistory = moveScore;
 
                 if (moveScore == KILLER_SCORE || moveScore == COUNTERMOVE_SCORE)
@@ -378,10 +380,10 @@ class Searcher {
                 lmr = std::clamp(lmr, 0, depth - 2);
             }
 
-            score = -search(depth - 1 - lmr + extension, ply + 1, -alpha-1, -alpha, doubleExtensionsLeft);
+            score = -search(depth - 1 - lmr + extension, ply + 1, -alpha-1, -alpha, doubleExtsLeft);
 
             if (score > alpha && (score < beta || lmr > 0))
-                score = -search(depth - 1 + extension, ply + 1, -beta, -alpha, doubleExtensionsLeft); 
+                score = -search(depth - 1 + extension, ply + 1, -beta, -alpha, doubleExtsLeft); 
 
             moveSearched:
             board.undoMove();
@@ -480,8 +482,7 @@ class Searcher {
             auto [move, moveScore] = incrementalSort(moves, movesScores, i);
 
             // SEE pruning (skip bad captures)
-            if (!board.inCheck() && moveScore < 0) 
-                continue;
+            if (!board.inCheck() && moveScore < 0) break;
 
             // skip illegal moves
             if (!board.makeMove(move)) continue; 
