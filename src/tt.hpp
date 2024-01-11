@@ -44,13 +44,13 @@ struct TTEntry
     }
 
     inline void setAge(u8 newAge) { 
-        assert(newAge < 63);
+        assert(newAge <= 63);
         boundAndAge &= 0b0000'0011;
         boundAndAge |= (newAge << 2);
     }
 
     inline void setBoundAndAge(Bound bound, u8 age) {
-        assert(age < 63);
+        assert(age <= 63);
         boundAndAge = (age << 2) | (u8)bound;
     }
 

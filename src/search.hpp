@@ -191,12 +191,16 @@ class Searcher {
             delta *= aspDeltaMultiplier.value;
         }
 
+        if (tt.age < 63) tt.age++;
+
         return score;
     }
 
     inline i32 search(i32 depth, u8 ply, i32 alpha, i32 beta, 
                       u8 doubleExtsLeft, bool singular = false)
     { 
+        pvLengths[ply] = 0; // Ensure fresh PV
+
         if (depth <= 0) return qSearch(ply, alpha, beta);
 
         if (isHardTimeUp()) return 0;
@@ -405,7 +409,16 @@ class Searcher {
             alpha = score;
             bestMove = move;
             bound = Bound::EXACT;
-            if (ply == 0) pvLines[0][0] = move;
+            
+            // Update pv line
+            if (pvNode)
+            {
+                int subPvLineLength = pvLengths[ply + 1];
+                pvLengths[ply] = 1 + subPvLineLength;
+                pvLines[ply][0] = move;
+                // memcpy(dst, src, size)
+                memcpy(&(pvLines[ply][1]), pvLines[ply + 1], subPvLineLength * sizeof(Move));
+            }
 
             if (score < beta) continue;
 
