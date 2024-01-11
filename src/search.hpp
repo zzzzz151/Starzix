@@ -440,7 +440,8 @@ class Searcher {
         if (legalMovesPlayed == 0) return board.inCheck() ? -INF + ply : 0;
 
         if (!singular)
-            tt.store(ttEntry, board.zobristHash(), depth, ply, bestScore, bestMove, originalAlpha, beta);    
+            tt.store(ttEntry, board.zobristHash(), depth, ply, 
+                     bestScore, bestMove, originalAlpha, beta);    
 
         return bestScore;
     }
@@ -457,6 +458,10 @@ class Searcher {
         if (board.isDraw()) return 0;
 
         if (ply >= maxDepth) return board.inCheck() ? 0 : board.evaluate();
+
+        TTEntry *ttEntry = tt.probe(board.zobristHash());
+        if (tt.cutoff(ttEntry, board.zobristHash(), 0, ply, alpha, beta))
+            return ttEntry->adjustedScore(ply);
 
         i32 eval = -INF; // eval is -INF in check
         if (!board.inCheck())
@@ -476,6 +481,7 @@ class Searcher {
         u8 legalMovesPlayed = 0;
         i32 bestScore = eval;
         Move bestMove = MOVE_NONE;
+        Bound bound = Bound::UPPER;
 
         for (int i = 0; i < moves.size(); i++)
         {
@@ -499,13 +505,19 @@ class Searcher {
             bestScore = score;
             bestMove = move;
 
-            if (bestScore >= beta) break;
+            if (bestScore >= beta)
+            {
+                bound = Bound::LOWER;
+                break;
+            }
             if (bestScore > alpha) alpha = bestScore;
         }
 
         if (legalMovesPlayed == 0 && board.inCheck()) 
             // checkmate
             return -INF + ply; 
+
+        tt.store(ttEntry, board.zobristHash(), 0, ply, bestScore, bestMove, bound);
 
         return bestScore;
     }

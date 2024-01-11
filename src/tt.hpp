@@ -94,19 +94,14 @@ struct TT
                || (ttEntry->getBound() == Bound::UPPER && ttEntry->score <= alpha));
     }
 
-    inline void store(TTEntry *ttEntry, u64 zobristHash, u8 depth, u8 ply, i16 score, Move bestMove, i16 originalAlpha, i16 beta)
+    inline void store(TTEntry *ttEntry, u64 zobristHash, u8 depth, u8 ply, i16 score, Move bestMove, Bound bound)
     {
         ttEntry->zobristHash = zobristHash;
         ttEntry->depth = depth;
         ttEntry->score = score;
-        if (bestMove != MOVE_NONE) ttEntry->bestMove = bestMove;
-
-        if (score <= originalAlpha)
-            ttEntry->setBound(Bound::UPPER);
-        else if (score >= beta)
-            ttEntry->setBound(Bound::LOWER);
-        else 
-            ttEntry->setBound(Bound::EXACT);
+        if (bestMove != MOVE_NONE) 
+            ttEntry->bestMove = bestMove;
+        ttEntry->setBound(bound);
 
         // Adjust mate scores based on ply
         if (ttEntry->score >= MIN_MATE_SCORE)
@@ -114,6 +109,12 @@ struct TT
         else if (ttEntry->score <= -MIN_MATE_SCORE)
             ttEntry->score -= ply;
 
+    }
+
+    inline void store(TTEntry *ttEntry, u64 zobristHash, u8 depth, u8 ply, i16 score, Move bestMove, i16 originalAlpha, i16 beta)
+    {
+        Bound bound = score <= originalAlpha ? Bound::UPPER : score >= beta ? Bound::LOWER : Bound::EXACT;
+        store(ttEntry, zobristHash, depth, ply, score, bestMove, bound);
     }
 };
 
