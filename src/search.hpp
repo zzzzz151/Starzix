@@ -256,12 +256,14 @@ class Searcher {
         std::array<i32, 256> movesScores;
         scoreMoves(moves, movesScores, ttMove, killerMoves[ply]);
 
+        // Fail low quiets at beginning of array, fail low noisy moves at the end
+        std::array<HistoryEntry*, 256> failLowsHistoryEntry;
+        u8 failLowQuiets = 0, failLowNoisies = 0;
+
         u8 legalMovesPlayed = 0;
         i32 bestScore = -INF;
         Move bestMove = MOVE_NONE;
-        i32 originalAlpha = alpha;
-        std::array<HistoryEntry*, 256> failLowsHistoryEntry;
-        u8 failLowQuiets = 0, failLowNoisies = 0;
+        Bound bound = Bound::UPPER;
 
         for (int i = 0; i < moves.size(); i++)
         {
@@ -402,11 +404,14 @@ class Searcher {
 
             alpha = score;
             bestMove = move;
+            bound = Bound::EXACT;
             if (ply == 0) pvLines[0][0] = move;
 
             if (score < beta) continue;
 
             // Fail high / beta cutoff
+
+            bound = Bound::LOWER;
 
             i32 historyBonus = min(historyMaxBonus.value, 
                                    historyBonusMultiplier.value * (depth-1));
@@ -440,8 +445,7 @@ class Searcher {
         if (legalMovesPlayed == 0) return board.inCheck() ? -INF + ply : 0;
 
         if (!singular)
-            tt.store(ttEntry, board.zobristHash(), depth, ply, 
-                     bestScore, bestMove, originalAlpha, beta);    
+            tt.store(ttEntry, board.zobristHash(), depth, ply, bestScore, bestMove, bound);    
 
         return bestScore;
     }
