@@ -2,11 +2,11 @@
 
 # Elo (version 3.0)
 
-[CCRL Blitz](https://computerchess.org.uk/ccrl/404/): 3489
+[CCRL Blitz](https://www.computerchess.org.uk/ccrl/404/cgi/compare_engines.cgi?class=Single-CPU+engines&only_best_in_class=on&num_best_in_class=1&print=Rating+list&profile_step=50&profile_numbers=1&print=Results+table&print=LOS+table&table_size=100&ct_from_elo=0&ct_to_elo=10000&match_length=30&cross_tables_for_best_versions_only=1&sort_tables=by+rating&diag=0&reference_list=None&recalibrate=no): 3514 (#32/710)
 
-[CCRL Rapid](https://computerchess.org.uk/ccrl/4040/): 3416
+[CCRL Rapid](https://www.computerchess.org.uk/ccrl/4040/cgi/compare_engines.cgi?class=Single-CPU+engines&only_best_in_class=on&num_best_in_class=1&print=Rating+list&profile_step=50&profile_numbers=1&print=Results+table&print=LOS+table&table_size=100&ct_from_elo=0&ct_to_elo=10000&match_length=30&cross_tables_for_best_versions_only=1&sort_tables=by+rating&diag=0&reference_list=None&recalibrate=no): 3415 (#33/564)
 
-[Ipman Bullet](https://ipmanchess.yolasite.com/r9-7945hx.php): 3309
+[Ipman Bullet](https://ipmanchess.yolasite.com/r9-7945hx.php): 3307 (#44/49)
 
 # How to compile
 
@@ -52,7 +52,8 @@
 ### Search
 - Iterative deepening
 - Aspiration windows
-- Principal variation search with fail-soft Negamax
+- Fail-soft Negamax
+- Principal variation search
 - Quiescence search
 - Transposition table
 - Alpha-beta pruning
@@ -83,7 +84,7 @@
 ### Time management
 - Any time control
 - Soft and hard limits
-- Soft limit scaling based on best move nodes
+- Nodes TM
 
 # Credits
 

@@ -145,10 +145,9 @@ class Searcher {
 
             // Check soft limits
             if (nodes >= softNodes
-            || msElapsed >= (iterationDepth >= softTimeMoveNodesScalingMinDepth.value
-                             ? softMilliseconds 
-                               * (softTimeMoveNodesScalingBase.value - bestMoveNodesFraction()) 
-                               * softTimeMoveNodesScalingMultiplier.value
+            || msElapsed >= (iterationDepth >= nodesTmMinDepth.value
+                             ? softMilliseconds * nodesTmMultiplier.value
+                               * (nodesTmBase.value - bestMoveNodesFraction()) 
                              : softMilliseconds))
                 break;
         }
@@ -372,8 +371,8 @@ class Searcher {
                 lmr = LMR_TABLE[depth][legalMovesPlayed];
                 lmr -= pvNode;
                 lmr -= improving;
-                double moveHistory = moveScore;
 
+                double moveHistory = moveScore;
                 if (moveScore == KILLER_SCORE || moveScore == COUNTERMOVE_SCORE)
                 {
                     lmr--;
@@ -383,7 +382,7 @@ class Searcher {
                     moveHistory = historyEntry->noisyHistory;
 
                 lmr -= round(moveHistory / (double)lmrHistoryDivisor.value);
-                lmr = std::clamp(lmr, 0, depth - 2);
+                lmr = std::clamp(lmr, 0, depth - 2); // dont extend or reduce into qsearch
             }
 
             score = -search(depth - 1 - lmr + extension, ply + 1, -alpha-1, -alpha, doubleExtsLeft);

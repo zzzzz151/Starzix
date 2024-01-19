@@ -314,16 +314,24 @@ class Board
         std::cout << "Zobrist hash: " << state->zobristHash << std::endl;
     }
 
-    inline bool isCapture(Move move) {
+    inline bool isCapture(Move move) 
+    {
         assert(move != MOVE_NONE);
+
         return colorAt(move.to()) == oppSide() 
                || move.flag() == Move::EN_PASSANT_FLAG;
     }
 
-    inline PieceType captured(Move move) {
+    inline PieceType captured(Move move) 
+    {
         assert(move != MOVE_NONE);
-        return move.flag() == Move::EN_PASSANT_FLAG
-               ? PieceType::PAWN : pieceTypeAt(move.to());
+        auto flag = move.flag();
+
+        return flag == Move::PAWN_TWO_UP_FLAG || flag == Move::CASTLING_FLAG
+               ? PieceType::NONE
+               : flag == Move::EN_PASSANT_FLAG
+               ? PieceType::PAWN
+               : pieceTypeAt(move.to());
     }
 
     inline u64 zobristHash() { return state->zobristHash; }

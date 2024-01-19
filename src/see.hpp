@@ -6,19 +6,39 @@
                               // P    N    B    R    Q    K  NONE
 const i32 SEE_PIECE_VALUES[7] = {100, 300, 300, 500, 900, 0, 0};
 
-inline i32 gain(Board &board, Move move);
+inline PieceType popLeastValuable(Board &board, u64 &occ, u64 attackers, Color color)
+{
+    for (int pt = 0; pt <= 5; pt++)
+    {
+        u64 bb = attackers & board.bitboard(color, (PieceType)pt);
+        if (bb > 0) {
+            occ ^= 1ULL << lsb(bb);
+            return (PieceType)pt;
+        }
+    }
 
-inline PieceType popLeastValuable(Board &board, u64 &occ, u64 attackers, Color color);
+    return PieceType::NONE;
+}
 
 // SEE (Static exchange evaluation)
 inline bool SEE(Board &board, Move move, i32 threshold = 0)
 {
-    i32 score = gain(board, move) - threshold;
-    if (score < 0) return false;
+    assert(move != MOVE_NONE);
+    i32 score = -threshold;
+
+    PieceType captured = board.captured(move);
+    score += SEE_PIECE_VALUES[(u8)captured];
 
     PieceType promotion = move.promotion();
-    PieceType next = promotion != PieceType::NONE ? promotion : board.pieceTypeAt(move.from());
-    score -= SEE_PIECE_VALUES[(int)next];
+
+    if (promotion != PieceType::NONE)
+        score += SEE_PIECE_VALUES[(u8)promotion] 
+                 - SEE_PIECE_VALUES[(u8)PieceType::PAWN];
+
+    if (score < 0) return false;
+
+    PieceType next = promotion != PieceType::NONE ? promotion : move.pieceType();
+    score -= SEE_PIECE_VALUES[(u8)next];
     if (score >= 0) return true;
 
     Square from = move.from();
@@ -29,13 +49,17 @@ inline bool SEE(Board &board, Move move, i32 threshold = 0)
     u64 bishops = queens | board.bitboard(PieceType::BISHOP);
     u64 rooks = queens | board.bitboard(PieceType::ROOK);
 
-    u64 attackers = 0;
-    attackers |= (rooks & attacks::rookAttacks(square, occupancy));
-    attackers |= (bishops & attacks::bishopAttacks(square, occupancy));
-    attackers |= (board.bitboard(Color::BLACK, PieceType::PAWN) & attacks::pawnAttacks(square, Color::WHITE));
-    attackers |= (board.bitboard(Color::WHITE, PieceType::PAWN) & attacks::pawnAttacks(square, Color::BLACK));
-    attackers |= (board.bitboard(PieceType::KNIGHT) & attacks::knightAttacks(square));
-    attackers |= (board.bitboard(PieceType::KING) & attacks::kingAttacks(square));
+    u64 attackers = rooks & attacks::rookAttacks(square, occupancy);
+    attackers |= bishops & attacks::bishopAttacks(square, occupancy);
+
+    attackers |= board.bitboard(Color::BLACK, PieceType::PAWN) 
+                 & attacks::pawnAttacks(square, Color::WHITE);
+
+    attackers |= board.bitboard(Color::WHITE, PieceType::PAWN) 
+                 & attacks::pawnAttacks(square, Color::BLACK);
+
+    attackers |= board.bitboard(PieceType::KNIGHT) & attacks::knightAttacks(square);
+    attackers |= board.bitboard(PieceType::KING) & attacks::kingAttacks(square);
 
     Color us = board.oppSide();
     while (true)
@@ -65,40 +89,3 @@ inline bool SEE(Board &board, Move move, i32 threshold = 0)
 
     return board.sideToMove() != us;
 }
-
-inline i32 gain(Board &board, Move move)
-{
-    auto moveFlag = move.flag();
-
-    if (moveFlag == Move::CASTLING_FLAG)
-        return 0;
-
-    if (moveFlag == Move::EN_PASSANT_FLAG)
-        return SEE_PIECE_VALUES[(u8)PieceType::PAWN];
-
-    i32 score = SEE_PIECE_VALUES[(int)board.pieceTypeAt(move.to())];
-
-    PieceType promotion = move.promotion();
-    if (promotion != PieceType::NONE)
-        // gain promotion, lose the pawn
-        score += SEE_PIECE_VALUES[(int)promotion] - SEE_PIECE_VALUES[(u8)PieceType::PAWN]; 
-
-    return score;
-}
-
-inline PieceType popLeastValuable(Board &board, u64 &occ, u64 attackers, Color color)
-{
-    for (int pt = 0; pt <= 5; pt++)
-    {
-        u64 bb = attackers & board.bitboard(color, (PieceType)pt);
-        if (bb > 0)
-        {
-            occ ^= (1ULL << lsb(bb));
-            return (PieceType)pt;
-        }
-    }
-
-    return PieceType::NONE;
-}
-
-
