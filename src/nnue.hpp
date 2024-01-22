@@ -1,3 +1,5 @@
+// clang-format off
+
 #pragma once
 
 #ifdef _MSC_VER
@@ -7,24 +9,26 @@
 #endif
 #include "incbin.h"
 
-// clang-format off
+#include "simd.hpp"
+using namespace SIMD;
 
 namespace nnue {
 
 const u16 HIDDEN_LAYER_SIZE = 512;
 const i32 SCALE = 400, QA = 181, QB = 64;
+constexpr int WEIGHTS_PER_VEC = sizeof(Vec) / sizeof(i16);
 
-struct alignas(64) NN {
-    std::array<i16, 768 * HIDDEN_LAYER_SIZE> featureWeights;
-    std::array<i16, HIDDEN_LAYER_SIZE> featureBiases;
-    std::array<i16, HIDDEN_LAYER_SIZE * 2> outputWeights;
+struct alignas(ALIGNMENT) Net {
+    i16 featureWeights[768 * HIDDEN_LAYER_SIZE];
+    i16 featureBiases[HIDDEN_LAYER_SIZE];
+    i16 outputWeights[2][HIDDEN_LAYER_SIZE];
     i16 outputBias;
 };
 
 INCBIN(NetFile, "src/net9.nnue");
-const NN *nn = reinterpret_cast<const NN*>(gNetFileData);
+const Net *NET = reinterpret_cast<const Net*>(gNetFileData);
 
-struct Accumulator
+struct alignas(ALIGNMENT) Accumulator
 {
     i16 white[HIDDEN_LAYER_SIZE];
     i16 black[HIDDEN_LAYER_SIZE];
@@ -32,7 +36,7 @@ struct Accumulator
     inline Accumulator()
     {
         for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
-            white[i] = black[i] = nn->featureBiases[i];
+            white[i] = black[i] = NET->featureBiases[i];
     }
 
     inline void activate(Color color, PieceType pieceType, Square sq)
@@ -41,10 +45,10 @@ struct Accumulator
         int blackIdx = !(int)color * 384 + (int)pieceType * 64 + (sq ^ 56);
 
         for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
-            white[i] += nn->featureWeights[whiteIdx * HIDDEN_LAYER_SIZE + i];
+            white[i] += NET->featureWeights[whiteIdx * HIDDEN_LAYER_SIZE + i];
 
         for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
-            black[i] += nn->featureWeights[blackIdx * HIDDEN_LAYER_SIZE + i];
+            black[i] += NET->featureWeights[blackIdx * HIDDEN_LAYER_SIZE + i];
     }
 
     inline void deactivate(Color color, PieceType pieceType, Square sq)
@@ -53,10 +57,10 @@ struct Accumulator
         int blackIdx = !(int)color * 384 + (int)pieceType * 64 + (sq ^ 56);
 
         for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
-            white[i] -= nn->featureWeights[whiteIdx * HIDDEN_LAYER_SIZE + i];
+            white[i] -= NET->featureWeights[whiteIdx * HIDDEN_LAYER_SIZE + i];
 
         for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
-            black[i] -= nn->featureWeights[blackIdx * HIDDEN_LAYER_SIZE + i];
+            black[i] -= NET->featureWeights[blackIdx * HIDDEN_LAYER_SIZE + i];
     }
 };
 
@@ -71,59 +75,46 @@ inline i32 screlu(i32 x) {
 
 inline i32 evaluate(Accumulator &accumulator, Color color)
 {
-    __m256i* stmAccumulator;
-    __m256i* oppAccumulator;
+    Vec *stmAccumulator;
+    Vec *oppAccumulator;
 
     if (color == Color::WHITE)
     {
-        stmAccumulator = (__m256i*)accumulator.white;
-        oppAccumulator = (__m256i*)accumulator.black;
+        stmAccumulator = (Vec*)accumulator.white;
+        oppAccumulator = (Vec*)accumulator.black;
     }
     else
     {
-        stmAccumulator = (__m256i*)accumulator.black;
-        oppAccumulator = (__m256i*)accumulator.white;
+        stmAccumulator = (Vec*)accumulator.black;
+        oppAccumulator = (Vec*)accumulator.white;
     }
-    
-    __m256i* stmWeights = (__m256i*)&nn->outputWeights[0];
-    __m256i* oppWeights = (__m256i*)&nn->outputWeights[HIDDEN_LAYER_SIZE];
 
-    const __m256i reluClipMin = _mm256_setzero_si256();
-    const __m256i reluClipMax = _mm256_set1_epi16(QA);
+    Vec *stmWeights = (Vec*) &(NET->outputWeights[0]);
+    Vec *oppWeights = (Vec*) &(NET->outputWeights[1]);
 
-    __m256i sum = _mm256_setzero_si256();
-    __m256i reg;
+    const Vec vecZero = vecSetZero();
+    const Vec vecQA = vecSet1Epi16(QA);
+    Vec sum = vecSetZero();
+    Vec reg;
 
-    for (int i = 0; i < HIDDEN_LAYER_SIZE / 16; ++i) 
+    for (int i = 0; i < HIDDEN_LAYER_SIZE / WEIGHTS_PER_VEC; ++i) 
     {
-      // Side to move
-      reg = _mm256_max_epi16(stmAccumulator[i], reluClipMin); // clip
-      reg = _mm256_min_epi16(reg, reluClipMax); // clip
-      reg = _mm256_mullo_epi16(reg, reg); // square
-      reg = _mm256_madd_epi16(reg, stmWeights[i]); // multiply with output layer
-      sum = _mm256_add_epi32(sum, reg); // collect the result
+        // Side to move
+        reg = maxEpi16(stmAccumulator[i], vecZero); // clip
+        reg = minEpi16(reg, vecQA); // clip
+        reg = mulloEpi16(reg, reg); // square
+        reg = maddEpi16(reg, stmWeights[i]); // multiply with output layer
+        sum = addEpi32(sum, reg); // collect the result
 
-      // Non side to move
-      reg = _mm256_max_epi16(oppAccumulator[i], reluClipMin);
-      reg = _mm256_min_epi16(reg, reluClipMax);
-      reg = _mm256_mullo_epi16(reg, reg);
-      reg = _mm256_madd_epi16(reg, oppWeights[i]);
-      sum = _mm256_add_epi32(sum, reg);
+        // Non side to move
+        reg = maxEpi16(oppAccumulator[i], vecZero);
+        reg = minEpi16(reg, vecQA);
+        reg = mulloEpi16(reg, reg);
+        reg = maddEpi16(reg, oppWeights[i]);
+        sum = addEpi32(sum, reg);
     }
 
-    // Horizontal sum i32
-    __m128i xmm0;
-    __m128i xmm1;
-    xmm0 = _mm256_castsi256_si128(sum);
-    xmm1 = _mm256_extracti128_si256(sum, 1);
-    xmm0 = _mm_add_epi32(xmm0, xmm1);
-    xmm1 = _mm_unpackhi_epi64(xmm0, xmm0);
-    xmm0 = _mm_add_epi32(xmm0, xmm1);
-    xmm1 = _mm_shuffle_epi32(xmm0, _MM_SHUFFLE(2, 3, 0, 1));
-    xmm0 = _mm_add_epi32(xmm0, xmm1);
-    i32 sum2 = _mm_cvtsi128_si32(xmm0);
-
-    i32 eval = (sum2 / QA + nn->outputBias) * SCALE / (QA * QB);
+    i32 eval = (vecHaddEpi32(sum) / QA + NET->outputBias) * SCALE / (QA * QB);
     return std::clamp(eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
 }
 
