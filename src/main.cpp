@@ -6,7 +6,7 @@
 
 int main()
 {
-    std::cout << "Starzix by zzzzz" << std::endl;
+    std::cout << "Starzix 4.0 by zzzzz" << std::endl;
 
     #if defined(__AVX512F__) && defined(__AVX512BW__)
         std::cout << "Using avx512" << std::endl;
