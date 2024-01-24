@@ -18,11 +18,15 @@ TunableParam<double> aspDeltaMultiplier = TunableParam<double>("aspDeltaMultipli
 TunableParam<i32> rfpMaxDepth = TunableParam<i32>("rfpMaxDepth", 7, 6, 10, 2);
 TunableParam<i32> rfpDepthMultiplier = TunableParam<i32>("rfpDepthMultiplier", 73, 50, 150, 50);
 
+// Razoring
+TunableParam<i32> razoringMaxDepth = TunableParam<i32>("razoringMaxDepth", 2, 2, 6, 2);
+TunableParam<i32> razoringDepthMultiplier = TunableParam<i32>("razoringDepthMultiplier", 420, 250, 450, 100);
+
 // NMP (Null move pruning)
 TunableParam<i32> nmpMinDepth = TunableParam<i32>("nmpMinDepth", 2, 2, 4, 1);
 TunableParam<i32> nmpBaseReduction = TunableParam<i32>("nmpBaseReduction", 3, 2, 4, 1);
 TunableParam<i32> nmpReductionDivisor = TunableParam<i32>("nmpReductionDivisor", 3, 2, 4, 1);
-TunableParam<i32> nmpEvalBetaDivisor = TunableParam<i32>("nmpEvalBetaDivisor", 150, 150, 250, 50);
+TunableParam<i32> nmpEvalBetaDivisor = TunableParam<i32>("nmpEvalBetaDivisor", 150, 100, 300, 100);
 TunableParam<i32> nmpEvalBetaMax = TunableParam<i32>("nmpEvalBetaMax", 4, 2, 4, 1);
 
 // IIR (Internal iterative reduction)
@@ -56,9 +60,9 @@ TunableParam<double> lmrMultiplier = TunableParam<double>("lmrMultiplier", 0.48,
 TunableParam<i32> lmrHistoryDivisor = TunableParam<i32>("lmrHistoryDivisor", 9350, 4096, 16384, 4096);
 
 // History
-TunableParam<i32> historyMaxBonus = TunableParam<i32>("historyMaxBonus", 1800, 1300, 1800, 250);
-TunableParam<i32> historyBonusMultiplier = TunableParam<i32>("historyBonusMultiplier", 300, 270, 470, 100);
-TunableParam<i32> historyMax = TunableParam<i32>("historyMax", 16384, 16384, 16384, 0);
+TunableParam<i32> historyMaxBonus = TunableParam<i32>("historyMaxBonus", 1800, 1500, 2100, 200);
+TunableParam<i32> historyBonusMultiplier = TunableParam<i32>("historyBonusMultiplier", 300, 200, 400, 100);
+TunableParam<i32> historyMax = TunableParam<i32>("historyMax", 16384, 8192, 32768, 8192);
 
 // Time Management
 TunableParam<u16> defaultMovesToGo = TunableParam<u16>("defaultMovesToGo", 23, 20, 25, 5);
@@ -76,6 +80,7 @@ std::vector<TunableParamVariant> tunableParams
     &aspMinDepth, &aspInitialDelta, &aspDeltaMultiplier,
     &rfpMaxDepth, &rfpDepthMultiplier,
     &nmpMinDepth, &nmpBaseReduction, &nmpReductionDivisor, &nmpEvalBetaDivisor, &nmpEvalBetaMax,
+    &razoringMaxDepth, &razoringDepthMultiplier,
     &iirMinDepth, 
     &lmpMaxDepth, &lmpMinMoves, &lmpDepthMultiplier,
     &fpMaxDepth, &fpBase, &fpMultiplier,

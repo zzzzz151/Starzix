@@ -115,9 +115,8 @@ class Board
                 PieceType pt = CHAR_TO_PIECE_TYPE[thisChar];
                 Square sq = currentRank * 8 + currentFile;
                 placePiece(color, pt, sq);
-                if (!perft)
-                    accumulator->activate(color, pt, sq);
                 currentFile++;
+                if (!perft) accumulator->activate(color, pt, sq);
             }
         }
 
@@ -249,7 +248,6 @@ class Board
                     Color color = sqBitboard & state->colorBitboard[(int)Color::WHITE]
                                   ? Color::WHITE : Color::BLACK;
                     return makePiece((PieceType)i, color);
-
                 }
         return Piece::NONE;
      }
@@ -296,9 +294,8 @@ class Board
     inline void print() { 
         std::string str = "";
 
-        for (int i = 7; i >= 0; i--)
-        {
-            for (Square j = 0; j < 8; j++)
+        for (int i = 7; i >= 0; i--) {
+            for (Square j = 0; j < 8; j++) 
             {
                 int square = i * 8 + j;
                 str += pieceAt(square) == Piece::NONE 
@@ -588,21 +585,18 @@ class Board
             Square sq = poplsb(ourPawns);
             bool pawnHasntMoved = false, willPromote = false;
             Rank rank = squareRank(sq);
-            if (rank == Rank::RANK_2)
-            {
+
+            if (rank == Rank::RANK_2) {
                 pawnHasntMoved = state->colorToMove == Color::WHITE;
                 willPromote = state->colorToMove == Color::BLACK;
-            }
-            else if (rank == Rank::RANK_7)
-            {
+            } else if (rank == Rank::RANK_7) {
                 pawnHasntMoved = state->colorToMove == Color::BLACK;
                 willPromote = state->colorToMove == Color::WHITE;
             }
 
             // Generate this pawn's captures
             u64 pawnAttacks = attacks::pawnAttacks(sq, state->colorToMove) & them;
-            while (pawnAttacks > 0)
-            {
+            while (pawnAttacks > 0) {
                 Square targetSquare = poplsb(pawnAttacks);
                 if (willPromote) 
                     addPromotions(moves, sq, targetSquare, underpromotions);
@@ -614,8 +608,7 @@ class Board
             if (isOccupied(squareOneUp))
                 continue;
 
-            if (willPromote)
-            {
+            if (willPromote) {
                 addPromotions(moves, sq, squareOneUp, underpromotions);
                 continue;
             }
@@ -632,12 +625,10 @@ class Board
                 moves.add(Move(sq, squareTwoUp, Move::PAWN_TWO_UP_FLAG));
         }
 
-        while (ourKnights > 0)
-        {
+        while (ourKnights > 0) {
             Square sq = poplsb(ourKnights);
             u64 knightMoves = attacks::knightAttacks(sq) & (noisyOnly ? them : ~us);
-            while (knightMoves > 0)
-            {
+            while (knightMoves > 0) {
                 Square targetSquare = poplsb(knightMoves);
                 moves.add(Move(sq, targetSquare, Move::KNIGHT_FLAG));
             }
@@ -645,8 +636,7 @@ class Board
 
         Square kingSquare = poplsb(ourKing);
         u64 kingMoves = attacks::kingAttacks(kingSquare) & (noisyOnly ? them : ~us);
-        while (kingMoves > 0)
-        {
+        while (kingMoves > 0) {
             Square targetSquare = poplsb(kingMoves);
             moves.add(Move(kingSquare, targetSquare, Move::KING_FLAG));
         }
@@ -672,34 +662,28 @@ class Board
                 moves.add(Move(kingSquare, kingSquare - 2, Move::CASTLING_FLAG));
         }
         
-        while (ourBishops > 0)
-        {
+        while (ourBishops > 0) {
             Square sq = poplsb(ourBishops);
             u64 bishopMoves = attacks::bishopAttacks(sq, occupied) & (noisyOnly ? them : ~us);
-            while (bishopMoves > 0)
-            {
+            while (bishopMoves > 0) {
                 Square targetSquare = poplsb(bishopMoves);
                 moves.add(Move(sq, targetSquare, Move::BISHOP_FLAG));
             }
         }
 
-        while (ourRooks > 0)
-        {
+        while (ourRooks > 0) {
             Square sq = poplsb(ourRooks);
             u64 rookMoves = attacks::rookAttacks(sq, occupied) & (noisyOnly ? them : ~us);
-            while (rookMoves > 0)
-            {
+            while (rookMoves > 0) {
                 Square targetSquare = poplsb(rookMoves);
                 moves.add(Move(sq, targetSquare, Move::ROOK_FLAG));
             }
         }
 
-        while (ourQueens > 0)
-        {
+        while (ourQueens > 0) {
             Square sq = poplsb(ourQueens);
             u64 queenMoves = attacks::queenAttacks(sq, occupied) & (noisyOnly ? them : ~us);
-            while (queenMoves > 0)
-            {
+            while (queenMoves > 0) {
                 Square targetSquare = poplsb(queenMoves);
                 moves.add(Move(sq, targetSquare, Move::QUEEN_FLAG));
             }

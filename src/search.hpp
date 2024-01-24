@@ -227,6 +227,14 @@ class Searcher {
             if (depth <= rfpMaxDepth.value && eval >= beta + depth * rfpDepthMultiplier.value)
                 return eval;
 
+            // Razoring
+            if (depth <= razoringMaxDepth.value 
+            && eval + depth * razoringDepthMultiplier.value < alpha)
+            {
+                i32 score = qSearch(ply, alpha, beta);
+                if (score <= alpha) return score;
+            }
+
             // NMP (Null move pruning)
             if (depth >= nmpMinDepth.value && eval >= beta
             && board.lastMove() != MOVE_NONE && board.hasNonPawnMaterial(stm))

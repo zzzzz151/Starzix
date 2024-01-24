@@ -44,11 +44,10 @@ struct alignas(ALIGNMENT) Accumulator
         int whiteIdx = (int)color * 384 + (int)pieceType * 64 + sq;
         int blackIdx = !(int)color * 384 + (int)pieceType * 64 + (sq ^ 56);
 
-        for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
+        for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) {
             white[i] += NET->featureWeights[whiteIdx * HIDDEN_LAYER_SIZE + i];
-
-        for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
             black[i] += NET->featureWeights[blackIdx * HIDDEN_LAYER_SIZE + i];
+        }
     }
 
     inline void deactivate(Color color, PieceType pieceType, Square sq)
@@ -56,11 +55,10 @@ struct alignas(ALIGNMENT) Accumulator
         int whiteIdx = (int)color * 384 + (int)pieceType * 64 + sq;
         int blackIdx = !(int)color * 384 + (int)pieceType * 64 + (sq ^ 56);
 
-        for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
+        for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) {
             white[i] -= NET->featureWeights[whiteIdx * HIDDEN_LAYER_SIZE + i];
-
-        for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
             black[i] -= NET->featureWeights[blackIdx * HIDDEN_LAYER_SIZE + i];
+        }
     }
 };
 
@@ -75,23 +73,18 @@ inline i32 screlu(i32 x) {
 
 inline i32 evaluate(Accumulator &accumulator, Color color)
 {
-    Vec *stmAccumulator;
-    Vec *oppAccumulator;
-
-    if (color == Color::WHITE)
-    {
+    Vec *stmAccumulator, *oppAccumulator;
+    if (color == Color::WHITE) {
         stmAccumulator = (Vec*)accumulator.white;
         oppAccumulator = (Vec*)accumulator.black;
     }
-    else
-    {
+    else {
         stmAccumulator = (Vec*)accumulator.black;
         oppAccumulator = (Vec*)accumulator.white;
     }
 
     Vec *stmWeights = (Vec*) &(NET->outputWeights[0]);
     Vec *oppWeights = (Vec*) &(NET->outputWeights[1]);
-
     const Vec vecZero = vecSetZero();
     const Vec vecQA = vecSet1Epi16(QA);
     Vec sum = vecSetZero();

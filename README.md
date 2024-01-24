@@ -58,6 +58,7 @@
 - Transposition table
 - Alpha-beta pruning
 - Reverse futility pruning
+- Razoring
 - Null move pruning
 - Late move pruning
 - Futility pruning

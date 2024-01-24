@@ -21,8 +21,7 @@ struct HistoryEntry
 
         // add continuation histories
         Move move;
-        for (u16 ply : {1, 2})
-        {
+        for (u16 ply : {1, 2}) {
             if ((move = board.getNthToLastMove(ply)) != MOVE_NONE)
             {
                 u8 pt = (u8)move.pieceType();
@@ -40,8 +39,7 @@ struct HistoryEntry
 
         // Update continuation histories
         Move move;
-        for (u16 ply : {1, 2})
-        {
+        for (u16 ply : {1, 2}) {
             if ((move = board.getNthToLastMove(ply)) != MOVE_NONE)
             {
                 u8 pt = (u8)move.pieceType();
