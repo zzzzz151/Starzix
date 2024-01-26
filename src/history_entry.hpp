@@ -17,19 +17,19 @@ struct HistoryEntry
     inline i32 quietHistory(Board &board)
     {
         // add main history
-        i32 quietHist = mainHistory;
+        i32 total = mainHistory;
 
         // add continuation histories
         Move move;
         for (u16 ply : {1, 2}) {
-            if ((move = board.getNthToLastMove(ply)) != MOVE_NONE)
+            if ((move = board.nthToLastMove(ply)) != MOVE_NONE)
             {
                 u8 pt = (u8)move.pieceType();
-                quietHist += continuationHistories[ply-1][pt][move.to()];
+                total += continuationHistories[ply-1][pt][move.to()];
             }
         }
        
-        return quietHist;
+        return total;
     }
 
     inline void updateQuietHistory(Board &board, i32 bonus)
@@ -40,7 +40,7 @@ struct HistoryEntry
         // Update continuation histories
         Move move;
         for (u16 ply : {1, 2}) {
-            if ((move = board.getNthToLastMove(ply)) != MOVE_NONE)
+            if ((move = board.nthToLastMove(ply)) != MOVE_NONE)
             {
                 u8 pt = (u8)move.pieceType();
                 i32 *history = &continuationHistories[ply-1][pt][move.to()];
@@ -49,7 +49,7 @@ struct HistoryEntry
         }
     }
 
-    inline void updateNoisyHistory(Board &board, i32 bonus) {
+    inline void updateNoisyHistory(i32 bonus) {
         noisyHistory += bonus - abs(bonus) * noisyHistory / historyMax.value;
     }
 

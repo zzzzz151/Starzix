@@ -163,10 +163,14 @@ inline void setoption(Searcher &searcher, std::vector<std::string> &tokens)
 
 inline void ucinewgame(Searcher &searcher)
 {
-    searcher.tt.reset();
+    searcher.tt.reset(); // reset/clear TT
+
     memset(searcher.historyTable, 0, sizeof(searcher.historyTable)); // reset/clear histories
-    memset(searcher.killerMoves, 0, sizeof(searcher.killerMoves));   // reset/clear killer moves
     memset(searcher.countermoves, 0, sizeof(searcher.countermoves)); // reset/clear countermoves
+
+    // reset/clear killer moves
+    for (int i = 0; i < searcher.pliesData.size(); i++)
+        searcher.pliesData[i].killer = MOVE_NONE;
 }
 
 inline void position(Searcher &searcher, std::vector<std::string> &tokens)

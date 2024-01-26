@@ -333,8 +333,6 @@ class Board
 
     inline u64 zobristHash() { return state->zobristHash; }
 
-    inline Move lastMove() { return state->lastMove; }
-
     inline u16 pliesSinceCreation() { return states.size() - 1; }
 
     inline bool isRepetition()
@@ -776,7 +774,9 @@ class Board
                || bitboard(color, PieceType::QUEEN) > 0;
     }
 
-    inline Move getNthToLastMove(u16 n)
+    inline Move lastMove() { return state->lastMove; }
+
+    inline Move nthToLastMove(u16 n)
     {
         assert(n >= 1);
         if ((int)states.size() - (int)n < 0)

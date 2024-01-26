@@ -3,15 +3,25 @@
 #include "see.hpp"
 #include "history_entry.hpp"
 
-u8 LMR_TABLE[256][256]; // [depth][moveIndex]
+std::array<std::array<u8, 256>, 256> LMR_TABLE; // [depth][moveIndex]
 
 inline void initLmrTable()
 {
-    memset(LMR_TABLE, 0, sizeof(LMR_TABLE));
-    for (int depth = 1; depth < 256; depth++)
-        for (int move = 1; move < 256; move++)
+    memset(LMR_TABLE.data(), 0, sizeof(LMR_TABLE));
+    for (int depth = 1; depth < LMR_TABLE.size(); depth++)
+        for (int move = 1; move < LMR_TABLE.size(); move++)
             LMR_TABLE[depth][move] = round(lmrBase.value + ln(depth) * ln(move) * lmrMultiplier.value);
 }
+
+struct PlyData {
+    public:
+    std::array<Move, 256> pvLine;
+    u8 pvLength;
+    Move killer;
+    i32 eval;
+    MovesList moves;
+    std::array<i32, 256> movesScores;
+};
 
 class Searcher {
     public:
@@ -25,13 +35,11 @@ class Searcher {
     bool hardTimeUp;
     u64 softMilliseconds, hardMilliseconds;
     u64 softNodes, hardNodes;
-    u64 movesNodes[1ULL << 16];          // [moveEncoded]
-    Move pvLines[256][256];              // [ply][ply]
-    u8 pvLengths[256];                   // [pvLineIndex]
-    Move killerMoves[256];               // [ply]
-    Move countermoves[2][6][64];         // [color][pieceType][targetSquare]
-    HistoryEntry historyTable[2][6][64]; // [color][pieceType][targetSquare]
-    i16 evals[256];                      // [ply]
+    std::array<PlyData, 256> pliesData;     // [ply]
+    std::array<u64, 1ULL << 16> movesNodes; // [moveEncoded]
+    Move countermoves[2][6][64];            // [color][pieceType][targetSquare]
+    HistoryEntry historyTable[2][6][64];    // [color][pieceType][targetSquare]
+
     const u16 OVERHEAD_MILLISECONDS = 10;
 
     inline Searcher(Board board)
@@ -41,16 +49,10 @@ class Searcher {
         nodes = 0;
         maxPlyReached = 0;
         tt = TT(true);
-        memset(movesNodes, 0, sizeof(movesNodes));
-        memset(pvLines, 0, sizeof(pvLines));
-        memset(pvLengths, 0, sizeof(pvLengths));
-        memset(killerMoves, 0, sizeof(killerMoves));
+        memset(pliesData.data(), 0, sizeof(pliesData));
+        memset(movesNodes.data(), 0, sizeof(movesNodes));
         memset(countermoves, 0, sizeof(countermoves));
         memset(historyTable, 0, sizeof(historyTable));
-    }
-
-    inline Move bestMoveRoot() {
-        return pvLines[0][0];
     }
 
     inline void resetLimits()
@@ -91,22 +93,51 @@ class Searcher {
         return hardTimeUp = (millisecondsElapsed(startTime) >= hardMilliseconds);
     }
 
+    inline Move bestMoveRoot() {
+        return pliesData[0].pvLine[0];
+    }
+
     inline double bestMoveNodesFraction() 
     {
         assert(bestMoveRoot() != MOVE_NONE);
         return (double)movesNodes[bestMoveRoot().getMoveEncoded()] / (double)nodes;
     }
 
+    inline HistoryEntry* getHistoryEntry(Color color, Move move)
+    {
+        assert(move != MOVE_NONE);
+        u8 pt = (u8)move.pieceType();
+        return &historyTable[(i8)color][pt][move.to()];
+    }
+
+    inline Move &countermove() 
+    {
+        Move lastMove = board.lastMove();
+        if (lastMove == MOVE_NONE)
+        {
+            i8 stm = (i8)Color::BLACK;
+            u8 pt = (u8)PieceType::PAWN;
+            return (countermoves[stm][pt][0] = MOVE_NONE);
+        }
+
+        i8 stm = (i8)board.sideToMove();
+        u8 pt = (u8)lastMove.pieceType();
+        return countermoves[stm][pt][lastMove.to()];
+    }
+
     inline std::pair<Move, i32> search(bool printInfo = true)
     {
         // reset and initialize stuff
-        //startTime = std::chrono::steady_clock::now();
         hardTimeUp = false;
         nodes = 0;
         maxPlyReached = 0;
-        memset(movesNodes, 0, sizeof(movesNodes));
-        memset(pvLines, 0, sizeof(pvLines));
-        memset(pvLengths, 0, sizeof(pvLengths));
+        memset(movesNodes.data(), 0, sizeof(movesNodes));
+
+        // clear pv lines
+        for (int i = 0; i < pliesData.size(); i++) {
+            pliesData[i].pvLength = 0;
+            memset(pliesData[i].pvLine.data(), 0, sizeof(pliesData[i].pvLine));
+        }
 
         // ID (Iterative deepening)
         i32 score = 0;
@@ -137,9 +168,9 @@ class Searcher {
                     i32 movesTillMate = round(pliesToMate / 2.0);
                     std::cout << " score mate " << (score > 0 ? movesTillMate : -movesTillMate);
                 }
-                std::cout << " pv " << pvLines[0][0].toUci();
-                for (int i = 1; i < pvLengths[0]; i++)
-                    std::cout << " " << pvLines[0][i].toUci();
+                std::cout << " pv " << bestMoveRoot().toUci();
+                for (int i = 1; i < pliesData[0].pvLength; i++)
+                    std::cout << " " << pliesData[0].pvLine[i].toUci();
                 std::cout << std::endl;
             }
 
@@ -198,7 +229,8 @@ class Searcher {
     inline i32 search(i32 depth, u8 ply, i32 alpha, i32 beta, 
                       u8 doubleExtsLeft, bool singular = false)
     { 
-        pvLengths[ply] = 0; // Ensure fresh PV
+        PlyData &plyData = pliesData[ply];
+        plyData.pvLength = 0; // Ensure fresh PV
 
         if (depth <= 0) return qSearch(ply, alpha, beta);
 
@@ -219,30 +251,33 @@ class Searcher {
 
         bool pvNode = beta > alpha + 1;
         Color stm = board.sideToMove();
-        i32 eval = evals[ply] = singular ? evals[ply] : board.inCheck() ? INF : board.evaluate();
+
+        if (!singular)
+            plyData.eval = board.inCheck() ? INF : board.evaluate();
 
         if (!pvNode && !board.inCheck() && !singular)
         {
             // RFP (Reverse futility pruning) / Static NMP
-            if (depth <= rfpMaxDepth.value && eval >= beta + depth * rfpDepthMultiplier.value)
-                return eval;
+            if (depth <= rfpMaxDepth.value && plyData.eval >= beta + depth * rfpDepthMultiplier.value)
+                return plyData.eval;
 
             // Razoring
             if (depth <= razoringMaxDepth.value 
-            && eval + depth * razoringDepthMultiplier.value < alpha)
+            && plyData.eval + depth * razoringDepthMultiplier.value < alpha)
             {
                 i32 score = qSearch(ply, alpha, beta);
                 if (score <= alpha) return score;
             }
 
             // NMP (Null move pruning)
-            if (depth >= nmpMinDepth.value && eval >= beta
+            if (depth >= nmpMinDepth.value && plyData.eval >= beta
             && board.lastMove() != MOVE_NONE && board.hasNonPawnMaterial(stm))
             {
                 board.makeMove(MOVE_NONE);
 
                 i32 nmpDepth = depth - nmpBaseReduction.value - depth / nmpReductionDivisor.value
-                               - min((eval-beta) / nmpEvalBetaDivisor.value, nmpEvalBetaMax.value);
+                               - min((plyData.eval-beta) / nmpEvalBetaDivisor.value, nmpEvalBetaMax.value);
+
                 i32 score = -search(nmpDepth, ply + 1, -beta, -alpha, doubleExtsLeft);
 
                 board.undoMove();
@@ -259,13 +294,14 @@ class Searcher {
         if (depth >= iirMinDepth.value && ttMove == MOVE_NONE)
             depth--;
 
-        bool improving = ply > 1 && !board.inCheck() && eval > evals[ply-2];
+        // if we were in check 2 plies ago, pliesData[ply-2].eval is INF, thus improving is false
+        bool improving = ply > 1 && !board.inCheck() && plyData.eval > pliesData[ply-2].eval;
 
-        // genenerate all moves except underpromotions
-        MovesList moves = MovesList();
-        board.pseudolegalMoves(moves, false, false); 
-        std::array<i32, 256> movesScores;
-        scoreMoves(moves, movesScores, ttMove, killerMoves[ply]);
+        // genenerate and score all moves except underpromotions
+        if (!singular) {
+            board.pseudolegalMoves(plyData.moves, false, false);
+            scoreMoves(plyData, ttMove);
+        }
 
         // Fail low quiets at beginning of array, fail low noisy moves at the end
         std::array<HistoryEntry*, 256> failLowsHistoryEntry;
@@ -276,9 +312,9 @@ class Searcher {
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::UPPER;
 
-        for (int i = 0; i < moves.size(); i++)
+        for (int i = 0; i < plyData.moves.size(); i++)
         {
-            auto [move, moveScore] = incrementalSort(moves, movesScores, i);
+            auto [move, moveScore] = incrementalSort(plyData.moves, plyData.movesScores, i);
 
             // Don't search TT move in singular search
             if (move == ttMove && singular) continue;
@@ -292,11 +328,11 @@ class Searcher {
                 && legalMovesPlayed >= lmpMinMoves.value + depth * depth * lmpDepthMultiplier.value)
                     break;
 
-                i32 lmrDepth = max(0, depth - LMR_TABLE[depth][legalMovesPlayed+1]);
+                i32 lmrDepth = max(0, depth - (i32)LMR_TABLE[depth][legalMovesPlayed+1]);
 
                 // FP (Futility pruning)
                 if (lmrDepth <= fpMaxDepth.value && alpha < MIN_MATE_SCORE
-                && alpha > eval + fpBase.value + lmrDepth * fpMultiplier.value)
+                && alpha > plyData.eval + fpBase.value + lmrDepth * fpMultiplier.value)
                     break;
 
                 // SEE pruning
@@ -328,8 +364,9 @@ class Searcher {
                 board.undoMove();
 
                 i32 singularBeta = max(-INF, ttEntry->score - depth * singularBetaMultiplier.value);
-                i32 singularScore = search((depth - 1) / 2, ply, singularBeta - 1, 
-                                           singularBeta, doubleExtsLeft, true);
+
+                i32 singularScore = search((depth - 1) / 2, ply, singularBeta - 1, singularBeta, 
+                                           doubleExtsLeft, true);
 
                 // Make the TT move again
                 board.pushBoardState(boardState);
@@ -362,7 +399,7 @@ class Searcher {
             legalMovesPlayed++;
             u64 nodesBefore = nodes;
             nodes++;
-            HistoryEntry *historyEntry = &historyTable[(i8)stm][(u8)move.pieceType()][move.to()];
+            HistoryEntry *historyEntry = getHistoryEntry(stm, move);
 
     	    // PVS (Principal variation search)
 
@@ -374,22 +411,16 @@ class Searcher {
             }
 
             // LMR (Late move reductions)
-            if (depth >= 3 && moveScore <= KILLER_SCORE)
+            if (depth >= 3 && moveScore < COUNTERMOVE_SCORE)
             {
                 lmr = LMR_TABLE[depth][legalMovesPlayed];
-                lmr -= pvNode;
-                lmr -= improving;
+                lmr -= pvNode;    // reduce pv nodes less
+                lmr -= improving; // reduce less if were improving
 
-                double moveHistory = moveScore;
-                if (moveScore == KILLER_SCORE || moveScore == COUNTERMOVE_SCORE)
-                {
-                    lmr--;
-                    moveHistory = historyEntry->quietHistory(board);
-                }
-                else if (!isQuiet)
-                    moveHistory = historyEntry->noisyHistory;
+                // reduce moves with good history less and vice versa
+                lmr -= isQuiet ? round((double)moveScore / (double)lmrQuietHistoryDiv.value)
+                               : round((double)historyEntry->noisyHistory / (double)lmrNoisyHistoryDiv.value);
 
-                lmr -= round(moveHistory / (double)lmrHistoryDivisor.value);
                 lmr = std::clamp(lmr, 0, depth - 2); // dont extend or reduce into qsearch
             }
 
@@ -420,11 +451,12 @@ class Searcher {
             // Update pv line
             if (pvNode)
             {
-                int subPvLineLength = pvLengths[ply + 1];
-                pvLengths[ply] = 1 + subPvLineLength;
-                pvLines[ply][0] = move;
-                // memcpy(dst, src, size)
-                memcpy(&(pvLines[ply][1]), pvLines[ply + 1], subPvLineLength * sizeof(Move));
+                plyData.pvLength = 1 + pliesData[ply+1].pvLength;
+                plyData.pvLine[0] = move;
+
+                memcpy(&(plyData.pvLine[1]),                      // dst
+                       pliesData[ply+1].pvLine.data(),            // src
+                       pliesData[ply+1].pvLength * sizeof(Move)); // size
             }
 
             if (score < beta) continue;
@@ -436,28 +468,25 @@ class Searcher {
             i32 historyBonus = min(historyMaxBonus.value, 
                                    historyBonusMultiplier.value * (depth-1));
 
-            if (isQuiet)
-            {
-                killerMoves[ply] = move;
-
-                Move lastMove = MOVE_NONE;
-                if ((lastMove = board.lastMove()) != MOVE_NONE)
-                    countermoves[(i8)stm][(u8)lastMove.pieceType()][lastMove.to()] = move;
+            if (isQuiet) {
+                // this fail high quiet is now a killer move and a countermove
+                plyData.killer = move; 
+                countermove() = move;
 
                 // Increase history of this fail high quiet move
                 historyEntry->updateQuietHistory(board, historyBonus);
 
-                // History malus: if this fail high is a quiet, decrease history of fail low quiets
-                for  (int i = 0; i < failLowQuiets; i++)
+                // History malus: this fail high is a quiet, so decrease history of fail low quiets
+                for (int i = 0; i < failLowQuiets; i++)
                     failLowsHistoryEntry[i]->updateQuietHistory(board, -historyBonus);
             }
             else
                 // Increaes history of this fail high noisy move
-                historyEntry->updateNoisyHistory(board, historyBonus);
+                historyEntry->updateNoisyHistory(historyBonus);
 
             // History malus: always decrease history of fail low noisy moves
             for (int i = 255, j = 0; j < failLowNoisies; j++, i--)
-                failLowsHistoryEntry[i]->updateNoisyHistory(board, -historyBonus);
+                failLowsHistoryEntry[i]->updateNoisyHistory(-historyBonus);
 
             break; // Fail high / beta cutoff
         }
@@ -495,21 +524,21 @@ class Searcher {
             if (eval > alpha) alpha = eval;
         }
 
+        PlyData &plyData = pliesData[ply];
+
         // if in check, generate all moves, else only noisy moves
         // never generate underpromotions
-        MovesList moves = MovesList();
-        board.pseudolegalMoves(moves, !board.inCheck(), false); 
-        std::array<i32, 256> movesScores;
-        scoreMoves(moves, movesScores, MOVE_NONE, killerMoves[ply]);
+        board.pseudolegalMoves(plyData.moves, !board.inCheck(), false); 
+        scoreMoves(plyData, MOVE_NONE);
         
         u8 legalMovesPlayed = 0;
         i32 bestScore = eval;
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::UPPER;
 
-        for (int i = 0; i < moves.size(); i++)
+        for (int i = 0; i < plyData.moves.size(); i++)
         {
-            auto [move, moveScore] = incrementalSort(moves, movesScores, i);
+            auto [move, moveScore] = incrementalSort(plyData.moves, plyData.movesScores, i);
 
             // SEE pruning (skip bad captures)
             if (!board.inCheck() && moveScore < 0) break;
@@ -554,44 +583,42 @@ class Searcher {
     // Most valuable victim     P    N    B    R    Q    K  NONE
     const i32 MVV_VALUES[7] = { 100, 300, 320, 500, 900, 0, 0 };
 
-    inline void scoreMoves(MovesList &moves, std::array<i32, 256> &scores, Move ttMove, Move killer)
+    inline void scoreMoves(PlyData &plyData, Move ttMove)
     {
-        i8 stm = (i8)board.sideToMove();
-        Move lastMove = MOVE_NONE;
-        Move countermove = (lastMove = board.lastMove()) == MOVE_NONE
-                           ? MOVE_NONE
-                           : countermoves[stm][(u8)lastMove.pieceType()][lastMove.to()];
+        Move &countermove = this->countermove();
 
-        for (int i = 0; i < moves.size(); i++)
+        for (int i = 0; i < plyData.moves.size(); i++)
         {
-            Move move = moves[i];
-            if (move == ttMove)
-            {
-                scores[i] = I32_MAX;
+            Move move = plyData.moves[i];
+
+            if (move == ttMove) {
+                plyData.movesScores[i] = I32_MAX;
                 continue;
             }
 
             PieceType captured = board.captured(move);
             PieceType promotion = move.promotion();
-            HistoryEntry *historyEntry = &historyTable[stm][(u8)move.pieceType()][move.to()];
+            HistoryEntry *historyEntry = getHistoryEntry(board.sideToMove(), move);
 
             // Starzix doesn't generate underpromotions in search
 
             if (captured != PieceType::NONE || promotion == PieceType::QUEEN)
             {
-                scores[i] = SEE(board, move) ? (promotion == PieceType::QUEEN
-                                                ? GOOD_QUEEN_PROMO_SCORE : GOOD_NOISY_SCORE)
-                                             : -GOOD_NOISY_SCORE;
+                plyData.movesScores[i] = SEE(board, move) 
+                                         ? (promotion == PieceType::QUEEN
+                                            ? GOOD_QUEEN_PROMO_SCORE 
+                                            : GOOD_NOISY_SCORE)
+                                         : -GOOD_NOISY_SCORE;
 
-                scores[i] += MVV_VALUES[(u8)captured];
-                scores[i] += historyEntry->noisyHistory;
+                plyData.movesScores[i] += MVV_VALUES[(u8)captured];
+                plyData.movesScores[i] += historyEntry->noisyHistory;
             }
-            else if (move == killer)
-                scores[i] = KILLER_SCORE;
+            else if (move == plyData.killer)
+                plyData.movesScores[i] = KILLER_SCORE;
             else if (move == countermove)
-                scores[i] = COUNTERMOVE_SCORE;
+                plyData.movesScores[i] = COUNTERMOVE_SCORE;
             else
-                scores[i] = historyEntry->quietHistory(board);
+                plyData.movesScores[i] = historyEntry->quietHistory(board);
             
         }
     }

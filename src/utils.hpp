@@ -12,33 +12,36 @@
 #include "types.hpp"
 
 #if defined(__GNUC__) // GCC, Clang, ICC
-inline u8 lsb(u64 b)
-{
-    assert(b);
-    return u8(__builtin_ctzll(b));
-}
-inline u8 msb(u64 b)
-{
-    assert(b);
-    return u8(63 ^ __builtin_clzll(b));
-}
+
+    inline u8 lsb(u64 b)
+    {
+        assert(b);
+        return u8(__builtin_ctzll(b));
+    }
+    inline u8 msb(u64 b)
+    {
+        assert(b);
+        return u8(63 ^ __builtin_clzll(b));
+    }
 
 #else // Assume MSVC Windows 64
 
-#include <intrin.h>
-inline u8 lsb(u64 b)
-{
-    unsigned long idx;
-    _BitScanForward64(&idx, b);
-    return (u8)idx;
-}
-inline u8 msb(u64 b)
-{
-    unsigned long idx;
-    _BitScanReverse64(&idx, b);
-    return (u8)idx;
-}
+    #include <intrin.h>
+    inline u8 lsb(u64 b)
+    {
+        unsigned long idx;
+        _BitScanForward64(&idx, b);
+        return (u8)idx;
+    }
+    inline u8 msb(u64 b)
+    {
+        unsigned long idx;
+        _BitScanReverse64(&idx, b);
+        return (u8)idx;
+    }
+
 #endif
+
 
 inline u8 poplsb(u64 &mask)
 {

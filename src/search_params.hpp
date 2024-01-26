@@ -34,7 +34,7 @@ TunableParam<i32> iirMinDepth = TunableParam<i32>("iirMinDepth", 5, 4, 6, 2);
 
 // LMP (Late move pruning)
 TunableParam<i32> lmpMaxDepth = TunableParam<i32>("lmpMaxDepth", 12, 6, 12, 2);
-TunableParam<i32> lmpMinMoves = TunableParam<i32>("lmpMinMoves", 2, 2, 4, 1);
+TunableParam<i32> lmpMinMoves = TunableParam<i32>("lmpMinMoves", 2, 2, 4, 2);
 TunableParam<double> lmpDepthMultiplier = TunableParam<double>("lmpDepthMultiplier", 0.92, 0.5, 1.5, 0.5);
 
 // FP (Futility pruning)
@@ -57,12 +57,13 @@ TunableParam<u8> doubleExtensionsMax = TunableParam<u8>("doubleExtensionsMax", 7
 // LMR (Late move reductions)
 TunableParam<double> lmrBase = TunableParam<double>("lmrBase", 0.69, 0.6, 1.0, 0.2);
 TunableParam<double> lmrMultiplier = TunableParam<double>("lmrMultiplier", 0.48, 0.3, 0.6, 0.15);
-TunableParam<i32> lmrHistoryDivisor = TunableParam<i32>("lmrHistoryDivisor", 9350, 4096, 16384, 4096);
+TunableParam<i32> lmrQuietHistoryDiv = TunableParam<i32>("lmrQuietHistoryDiv", 8192, 4096, 24576, 4096);
+TunableParam<i32> lmrNoisyHistoryDiv = TunableParam<i32>("lmrNoisyHistoryDiv", 4096, 0, 24576, 4096);
 
 // History
-TunableParam<i32> historyMaxBonus = TunableParam<i32>("historyMaxBonus", 1800, 1500, 2100, 200);
+TunableParam<i32> historyMaxBonus = TunableParam<i32>("historyMaxBonus", 1800, 1200, 2400, 300);
 TunableParam<i32> historyBonusMultiplier = TunableParam<i32>("historyBonusMultiplier", 300, 200, 400, 100);
-TunableParam<i32> historyMax = TunableParam<i32>("historyMax", 16384, 8192, 32768, 8192);
+TunableParam<i32> historyMax = TunableParam<i32>("historyMax", 16384, 8192, 24576, 4096);
 
 // Time Management
 TunableParam<u16> defaultMovesToGo = TunableParam<u16>("defaultMovesToGo", 23, 20, 25, 5);
@@ -87,7 +88,7 @@ std::vector<TunableParamVariant> tunableParams
     &seePruningMaxDepth, &seeNoisyThreshold, &seeQuietThreshold,
     &singularMinDepth, &singularDepthMargin, &singularBetaMultiplier,
     &doubleExtensionMargin, &doubleExtensionsMax,
-    &lmrBase, &lmrMultiplier, &lmrHistoryDivisor,
+    &lmrBase, &lmrMultiplier, &lmrQuietHistoryDiv,  &lmrNoisyHistoryDiv,
     &historyMaxBonus, &historyBonusMultiplier, &historyMax,
     &defaultMovesToGo, &softMillisecondsPercentage,
     &nodesTmMinDepth, &nodesTmBase, &nodesTmMultiplier
