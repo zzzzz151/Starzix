@@ -33,7 +33,6 @@ TunableParam<i32> nmpEvalBetaMax = TunableParam<i32>("nmpEvalBetaMax", 4, 2, 4, 
 TunableParam<i32> iirMinDepth = TunableParam<i32>("iirMinDepth", 5, 4, 6, 2);
 
 // LMP (Late move pruning)
-TunableParam<i32> lmpMaxDepth = TunableParam<i32>("lmpMaxDepth", 12, 6, 12, 2);
 TunableParam<i32> lmpMinMoves = TunableParam<i32>("lmpMinMoves", 2, 2, 4, 2);
 TunableParam<double> lmpDepthMultiplier = TunableParam<double>("lmpDepthMultiplier", 0.92, 0.5, 1.5, 0.5);
 
@@ -83,7 +82,7 @@ std::vector<TunableParamVariant> tunableParams
     &nmpMinDepth, &nmpBaseReduction, &nmpReductionDivisor, &nmpEvalBetaDivisor, &nmpEvalBetaMax,
     &razoringMaxDepth, &razoringDepthMultiplier,
     &iirMinDepth, 
-    &lmpMaxDepth, &lmpMinMoves, &lmpDepthMultiplier,
+    &lmpMinMoves, &lmpDepthMultiplier,
     &fpMaxDepth, &fpBase, &fpMultiplier,
     &seePruningMaxDepth, &seeNoisyThreshold, &seeQuietThreshold,
     &singularMinDepth, &singularDepthMargin, &singularBetaMultiplier,

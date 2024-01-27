@@ -324,8 +324,7 @@ class Searcher {
             if (bestScore > -MIN_MATE_SCORE && !pvNode && !board.inCheck() && moveScore < COUNTERMOVE_SCORE)
             {
                 // LMP (Late move pruning)
-                if (depth <= lmpMaxDepth.value
-                && legalMovesPlayed >= lmpMinMoves.value + depth * depth * lmpDepthMultiplier.value)
+                if (legalMovesPlayed >= lmpMinMoves.value + depth * depth * lmpDepthMultiplier.value)
                     break;
 
                 i32 lmrDepth = max(0, depth - (i32)LMR_TABLE[depth][legalMovesPlayed+1]);
@@ -528,8 +527,12 @@ class Searcher {
 
         // if in check, generate all moves, else only noisy moves
         // never generate underpromotions
-        board.pseudolegalMoves(plyData.moves, !board.inCheck(), false); 
-        scoreMoves(plyData, MOVE_NONE);
+        board.pseudolegalMoves(plyData.moves, !board.inCheck(), false);
+
+        Move ttMove = board.zobristHash() == ttEntry->zobristHash 
+                      ? ttEntry->bestMove : MOVE_NONE;
+
+        scoreMoves(plyData, ttMove);
         
         u8 legalMovesPlayed = 0;
         i32 bestScore = eval;
