@@ -249,6 +249,7 @@ class Searcher {
         if (tt.cutoff(ttEntry, board.zobristHash(), depth, ply, alpha, beta) && !singular) 
             return ttEntry->adjustedScore(ply);
 
+        bool ttHit = board.zobristHash() == ttEntry->zobristHash;
         bool pvNode = beta > alpha + 1;
         Color stm = board.sideToMove();
 
@@ -270,8 +271,11 @@ class Searcher {
             }
 
             // NMP (Null move pruning)
-            if (depth >= nmpMinDepth.value && plyData.eval >= beta
-            && board.lastMove() != MOVE_NONE && board.hasNonPawnMaterial(stm))
+            if (depth >= nmpMinDepth.value 
+            && board.lastMove() != MOVE_NONE 
+            && plyData.eval >= beta
+            && !(ttHit && ttEntry->getBound() == Bound::UPPER && ttEntry->score < beta)
+            && board.hasNonPawnMaterial(stm))
             {
                 board.makeMove(MOVE_NONE);
 
@@ -287,8 +291,7 @@ class Searcher {
             }
         }
 
-        Move ttMove = board.zobristHash() == ttEntry->zobristHash
-                      ? ttEntry->bestMove : MOVE_NONE;
+        Move ttMove = ttHit ? ttEntry->bestMove : MOVE_NONE;
 
         // IIR (Internal iterative reduction)
         if (depth >= iirMinDepth.value && ttMove == MOVE_NONE)
