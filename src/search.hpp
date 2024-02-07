@@ -277,6 +277,7 @@ class Searcher {
             && !(ttHit && ttEntry->getBound() == Bound::UPPER && ttEntry->score < beta)
             && board.hasNonPawnMaterial(stm))
             {
+                __builtin_prefetch(tt.probe(board.zobristHashAfter(MOVE_NONE)));
                 board.makeMove(MOVE_NONE);
 
                 i32 nmpDepth = depth - nmpBaseReduction.value - depth / nmpReductionDivisor.value
@@ -343,6 +344,8 @@ class Searcher {
                         depth * (isQuiet ? seeQuietThreshold.value : depth * seeNoisyThreshold.value)))
                     continue;
             }
+
+            __builtin_prefetch(tt.probe(board.zobristHashAfter(move)));
 
             // skip illegal moves
             if (!board.makeMove(move)) continue;
@@ -548,6 +551,8 @@ class Searcher {
 
             // SEE pruning (skip bad captures)
             if (!board.inCheck() && moveScore < 0) break;
+
+            __builtin_prefetch(tt.probe(board.zobristHashAfter(move)));
 
             // skip illegal moves
             if (!board.makeMove(move)) continue; 

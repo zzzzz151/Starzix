@@ -803,6 +803,65 @@ class Board
         accumulators.push_back(newAccumulator);
         accumulator = &accumulators.back();
     }
+
+    inline u64 zobristHashAfter(Move move)
+    {
+        i8 stm = (i8)state->colorToMove;
+        i8 nstm = (i8)oppSide();
+
+        u64 hashAfter = state->zobristHash ^ ZOBRIST_COLOR[stm] ^ ZOBRIST_COLOR[nstm];
+
+        if (state->enPassantSquare != SQUARE_NONE) {
+            int file = (int)squareFile(state->enPassantSquare);
+            hashAfter ^= ZOBRIST_FILES[file];
+        }
+
+        if (move == MOVE_NONE) return hashAfter;
+
+        auto moveFlag = move.flag();
+        Square from = move.from();
+        Square to = move.to();
+
+        if (moveFlag == Move::CASTLING_FLAG) {
+            auto [rookFrom, rookTo] = CASTLING_ROOK_FROM_TO[to];
+
+            return hashAfter
+                   ^ ZOBRIST_PIECES[stm][(u8)PieceType::KING][from]
+                   ^ ZOBRIST_PIECES[stm][(u8)PieceType::KING][to]
+                   ^ ZOBRIST_PIECES[stm][(u8)PieceType::ROOK][rookFrom]
+                   ^ ZOBRIST_PIECES[stm][(u8)PieceType::ROOK][rookTo];
+        }
+        else if (moveFlag == Move::EN_PASSANT_FLAG) {
+            Square capturedPawnSquare = state->colorToMove == Color::WHITE
+                                        ? to - 8 : to + 8;
+
+            return hashAfter 
+                   ^ ZOBRIST_PIECES[stm][(u8)PieceType::PAWN][from]
+                   ^ ZOBRIST_PIECES[stm][(u8)PieceType::PAWN][to]
+                   ^ ZOBRIST_PIECES[nstm][(u8)PieceType::PAWN][capturedPawnSquare];
+        }
+        else if (moveFlag == Move::PAWN_TWO_UP_FLAG) {
+            int file = (int)squareFile(to);
+
+            return hashAfter
+                   ^ ZOBRIST_PIECES[stm][(u8)PieceType::PAWN][from]
+                   ^ ZOBRIST_PIECES[stm][(u8)PieceType::PAWN][to]
+                   ^ ZOBRIST_FILES[file];
+        }
+
+        PieceType captured = this->captured(move);
+        if (captured != PieceType::NONE)
+            hashAfter ^= ZOBRIST_PIECES[nstm][(u8)captured][to];
+
+        PieceType pieceType = move.pieceType();
+        PieceType promotion = move.promotion();
+        PieceType place = promotion == PieceType::NONE 
+                          ? pieceType : promotion;
+
+        return hashAfter
+               ^ ZOBRIST_PIECES[stm][(u8)pieceType][from]
+               ^ ZOBRIST_PIECES[stm][(u8)place][to];
+    }
     
 };
 
