@@ -98,9 +98,17 @@ struct TT
     {
         ttEntry->zobristHash = zobristHash;
         ttEntry->depth = depth;
-        ttEntry->score = score >= MIN_MATE_SCORE ? score + ply : score <= -MIN_MATE_SCORE ? score - ply : score;
         ttEntry->setBound(bound);
-        if (bestMove != MOVE_NONE) ttEntry->bestMove = bestMove;
+        ttEntry->score = score >= MIN_MATE_SCORE 
+                         ? score + ply 
+                         : score <= -MIN_MATE_SCORE 
+                         ? score - ply 
+                         : score;
+
+        if (bestMove == MOVE_NONE || (ttEntry->bestMove != MOVE_NONE && bound == Bound::UPPER))
+            return;
+
+        ttEntry->bestMove = bestMove;
     }
 
     inline void store(TTEntry *ttEntry, u64 zobristHash, u8 depth, u8 ply, 
