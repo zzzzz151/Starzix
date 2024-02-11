@@ -197,12 +197,15 @@ class Searcher {
         i32 alpha = max(-INF, score - delta);
         i32 beta = min(INF, score + delta);
         i32 depth = iterationDepth;
+        i32 bestScore = score;
 
         while (true)
         {
             score = search(depth, 0, alpha, beta, doubleExtensionsMax.value);
 
             if (isHardTimeUp()) return 0;
+
+            if (score > bestScore) bestScore = score;
 
             if (score >= beta)
             {
@@ -211,7 +214,7 @@ class Searcher {
             }
             else if (score <= alpha)
             {
-                beta = (alpha + beta) / 2;
+                beta = (alpha + beta + bestScore) / 3;
                 alpha = max(alpha - delta, -INF);
                 depth = iterationDepth;
             }
