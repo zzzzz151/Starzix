@@ -1,12 +1,12 @@
 # Starzix - C++ chess engine
 
-# Elo (version 3.0)
+# Elo
 
-[CCRL Blitz](https://www.computerchess.org.uk/ccrl/404/cgi/compare_engines.cgi?class=Single-CPU+engines&only_best_in_class=on&num_best_in_class=1&print=Rating+list&profile_step=50&profile_numbers=1&print=Results+table&print=LOS+table&table_size=100&ct_from_elo=0&ct_to_elo=10000&match_length=30&cross_tables_for_best_versions_only=1&sort_tables=by+rating&diag=0&reference_list=None&recalibrate=no): 3514 (#32/710)
+[CCRL Blitz](https://www.computerchess.org.uk/ccrl/404/cgi/compare_engines.cgi?class=Single-CPU+engines&only_best_in_class=on&num_best_in_class=1&print=Rating+list&profile_step=50&profile_numbers=1&print=Results+table&print=LOS+table&table_size=100&ct_from_elo=0&ct_to_elo=10000&match_length=30&cross_tables_for_best_versions_only=1&sort_tables=by+rating&diag=0&reference_list=None&recalibrate=no): 3553 (#25/712)
 
-[CCRL Rapid](https://www.computerchess.org.uk/ccrl/4040/cgi/compare_engines.cgi?class=Single-CPU+engines&only_best_in_class=on&num_best_in_class=1&print=Rating+list&profile_step=50&profile_numbers=1&print=Results+table&print=LOS+table&table_size=100&ct_from_elo=0&ct_to_elo=10000&match_length=30&cross_tables_for_best_versions_only=1&sort_tables=by+rating&diag=0&reference_list=None&recalibrate=no): 3415 (#33/564)
+[CCRL Rapid](https://www.computerchess.org.uk/ccrl/4040/cgi/compare_engines.cgi?class=Single-CPU+engines&only_best_in_class=on&num_best_in_class=1&print=Rating+list&profile_step=50&profile_numbers=1&print=Results+table&print=LOS+table&table_size=100&ct_from_elo=0&ct_to_elo=10000&match_length=30&cross_tables_for_best_versions_only=1&sort_tables=by+rating&diag=0&reference_list=None&recalibrate=no): 3472 (#25/571)
 
-[Ipman Bullet](https://ipmanchess.yolasite.com/r9-7945hx.php): 3307 (#44/49)
+[Ipman Bullet](https://ipmanchess.yolasite.com/r9-7945hx.php): 3346 (#38/51)
 
 # How to compile
 
@@ -28,7 +28,7 @@
 
 - display - display current position, fen and zobrist hash
 
-- eval - displays current position's evaluation from perspective of side to move
+- eval - display current position's evaluation from perspective of side to move
 
 - perft \<depth\> - run perft from current position
 
@@ -47,7 +47,7 @@
 ### NNUE evaluation 
 - (768->512)x2->1
 - Lc0 data
-- SCReLU activation
+- SCReLU 181
 
 ### Search
 - Iterative deepening
@@ -86,10 +86,3 @@
 - Any time control
 - Soft and hard limits
 - Nodes TM
-
-# Credits
-
-[Chess Programming Wiki](https://www.chessprogramming.org/)
-
-[Cutechess](https://github.com/cutechess/cutechess) for engine testing
-
