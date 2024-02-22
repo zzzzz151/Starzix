@@ -45,7 +45,7 @@
 - Copymake make/undo move
 
 ### NNUE evaluation 
-- (768->512)x2->1
+- (768->1024)x2->1
 - Lc0 data
 - SCReLU 181
 

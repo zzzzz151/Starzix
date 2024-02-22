@@ -14,7 +14,7 @@ using namespace SIMD;
 
 namespace nnue {
 
-const u16 HIDDEN_LAYER_SIZE = 512;
+const u16 HIDDEN_LAYER_SIZE = 1024;
 const i32 SCALE = 400, QA = 181, QB = 64;
 constexpr int WEIGHTS_PER_VEC = sizeof(Vec) / sizeof(i16);
 
@@ -25,7 +25,7 @@ struct alignas(ALIGNMENT) Net {
     i16 outputBias;
 };
 
-INCBIN(NetFile, "src/net9.nnue");
+INCBIN(NetFile, "src/net.nnue");
 const Net *NET = reinterpret_cast<const Net*>(gNetFileData);
 
 struct alignas(ALIGNMENT) Accumulator
