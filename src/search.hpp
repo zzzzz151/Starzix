@@ -100,7 +100,7 @@ class Searcher {
     inline double bestMoveNodesFraction() 
     {
         assert(bestMoveRoot() != MOVE_NONE);
-        return (double)movesNodes[bestMoveRoot().getMoveEncoded()] / (double)nodes;
+        return (double)movesNodes[bestMoveRoot().encoded()] / (double)nodes;
     }
 
     inline HistoryEntry* getHistoryEntry(Color color, Move move)
@@ -249,7 +249,13 @@ class Searcher {
         if (depth > maxDepth) depth = maxDepth;
 
         TTEntry *ttEntry = tt.probe(board.zobristHash());
-        if (tt.cutoff(ttEntry, board.zobristHash(), depth, ply, alpha, beta) && !singular) 
+
+        if (ttEntry->zobristHash == board.zobristHash()
+        && ttEntry->depth >= depth 
+        && ply > 0 && !singular 
+        && (ttEntry->getBound() == Bound::EXACT
+        || (ttEntry->getBound() == Bound::LOWER && ttEntry->score >= beta) 
+        || (ttEntry->getBound() == Bound::UPPER && ttEntry->score <= alpha)))
             return ttEntry->adjustedScore(ply);
 
         bool ttHit = board.zobristHash() == ttEntry->zobristHash;
@@ -441,7 +447,7 @@ class Searcher {
             board.undoMove();
             if (isHardTimeUp()) return 0;
 
-            if (ply == 0) movesNodes[move.getMoveEncoded()] += nodes - nodesBefore;
+            if (ply == 0) movesNodes[move.encoded()] += nodes - nodesBefore;
 
             if (score > bestScore) bestScore = score;
 
@@ -521,7 +527,12 @@ class Searcher {
         if (ply >= maxDepth) return board.inCheck() ? 0 : board.evaluate();
 
         TTEntry *ttEntry = tt.probe(board.zobristHash());
-        if (tt.cutoff(ttEntry, board.zobristHash(), 0, ply, alpha, beta))
+
+        if (ply > 0
+        && ttEntry->zobristHash == board.zobristHash()
+        && (ttEntry->getBound() == Bound::EXACT
+        || (ttEntry->getBound() == Bound::LOWER && ttEntry->score >= beta) 
+        || (ttEntry->getBound() == Bound::UPPER && ttEntry->score <= alpha)))
             return ttEntry->adjustedScore(ply);
 
         i32 eval = -INF; // eval is -INF in check

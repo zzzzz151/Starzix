@@ -85,15 +85,6 @@ struct TT
         return &tt[zobristHash % tt.size()];
     }
 
-    inline bool cutoff(TTEntry *ttEntry, u64 zobristHash, u8 depth, u8 ply, i16 alpha, i16 beta) {
-        return ply > 0 
-               && ttEntry->zobristHash == zobristHash
-               && ttEntry->depth >= depth 
-               && (ttEntry->getBound() == Bound::EXACT
-               || (ttEntry->getBound() == Bound::LOWER && ttEntry->score >= beta) 
-               || (ttEntry->getBound() == Bound::UPPER && ttEntry->score <= alpha));
-    }
-
     inline void store(TTEntry *ttEntry, u64 zobristHash, u8 depth, u8 ply, i16 score, Move bestMove, Bound bound)
     {
         ttEntry->zobristHash = zobristHash;

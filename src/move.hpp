@@ -49,7 +49,7 @@ struct Move
         moveEncoded |= flag;
     }
 
-    inline u16 getMoveEncoded() { return moveEncoded; }
+    inline u16 encoded() { return moveEncoded; }
 
     inline Square from() { return (moveEncoded >> 10) & 0b111111; }
 
