@@ -440,7 +440,7 @@ class Searcher {
 
             score = -search(depth - 1 - lmr + extension, ply + 1, -alpha-1, -alpha, doubleExtsLeft);
 
-            if (score > alpha && (score < beta || lmr > 0))
+            if (score > alpha && (pvNode || lmr > 0))
                 score = -search(depth - 1 + extension, ply + 1, -beta, -alpha, doubleExtsLeft); 
 
             moveSearched:
