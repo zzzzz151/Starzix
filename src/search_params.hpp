@@ -23,11 +23,11 @@ TunableParam<i32> razoringMaxDepth = TunableParam<i32>("razoringMaxDepth", 2, 2,
 TunableParam<i32> razoringDepthMultiplier = TunableParam<i32>("razoringDepthMultiplier", 420, 250, 450, 100);
 
 // NMP (Null move pruning)
-TunableParam<i32> nmpMinDepth = TunableParam<i32>("nmpMinDepth", 2, 2, 4, 1);
+TunableParam<i32> nmpMinDepth = TunableParam<i32>("nmpMinDepth", 2, 2, 4, 2);
 TunableParam<i32> nmpBaseReduction = TunableParam<i32>("nmpBaseReduction", 3, 2, 4, 1);
 TunableParam<i32> nmpReductionDivisor = TunableParam<i32>("nmpReductionDivisor", 3, 2, 4, 1);
 TunableParam<i32> nmpEvalBetaDivisor = TunableParam<i32>("nmpEvalBetaDivisor", 150, 100, 300, 100);
-TunableParam<i32> nmpEvalBetaMax = TunableParam<i32>("nmpEvalBetaMax", 4, 2, 4, 1);
+TunableParam<i32> nmpEvalBetaMax = TunableParam<i32>("nmpEvalBetaMax", 4, 2, 4, 2);
 
 // IIR (Internal iterative reduction)
 TunableParam<i32> iirMinDepth = TunableParam<i32>("iirMinDepth", 5, 4, 6, 2);
@@ -50,19 +50,19 @@ TunableParam<i32> seeQuietThreshold = TunableParam<i32>("seeQuietThreshold", -58
 TunableParam<i32> singularMinDepth = TunableParam<i32>("singularMinDepth", 7, 6, 10, 2);
 TunableParam<i32> singularDepthMargin = TunableParam<i32>("singularDepthMargin", 3, 1, 5, 2);
 TunableParam<i32> singularBetaMultiplier = TunableParam<i32>("singularBetaMultiplier", 2, 1, 3, 1);
-TunableParam<i32> doubleExtensionMargin = TunableParam<i32>("doubleExtensionMargin", 18, 12, 32, 10);
+TunableParam<i32> doubleExtensionMargin = TunableParam<i32>("doubleExtensionMargin", 18, 10, 30, 10);
 TunableParam<u8> doubleExtensionsMax = TunableParam<u8>("doubleExtensionsMax", 7, 2, 8, 3);
 
 // LMR (Late move reductions)
 TunableParam<double> lmrBase = TunableParam<double>("lmrBase", 0.69, 0.6, 1.0, 0.2);
 TunableParam<double> lmrMultiplier = TunableParam<double>("lmrMultiplier", 0.48, 0.3, 0.6, 0.15);
-TunableParam<i32> lmrQuietHistoryDiv = TunableParam<i32>("lmrQuietHistoryDiv", 8192, 4096, 24576, 4096);
-TunableParam<i32> lmrNoisyHistoryDiv = TunableParam<i32>("lmrNoisyHistoryDiv", 4096, 0, 24576, 4096);
+TunableParam<i32> lmrQuietHistoryDiv = TunableParam<i32>("lmrQuietHistoryDiv", 8192, 4096, 32768, 4096);
+TunableParam<i32> lmrNoisyHistoryDiv = TunableParam<i32>("lmrNoisyHistoryDiv", 4096, 0, 32768, 8192);
 
 // History
 TunableParam<i32> historyMaxBonus = TunableParam<i32>("historyMaxBonus", 1800, 1200, 2400, 300);
 TunableParam<i32> historyBonusMultiplier = TunableParam<i32>("historyBonusMultiplier", 300, 200, 400, 100);
-TunableParam<i32> historyMax = TunableParam<i32>("historyMax", 16384, 8192, 24576, 4096);
+TunableParam<i32> historyMax = TunableParam<i32>("historyMax", 16384, 8192, 32768, 4096);
 
 // Time Management
 TunableParam<u16> defaultMovesToGo = TunableParam<u16>("defaultMovesToGo", 23, 20, 25, 5);
@@ -79,8 +79,8 @@ std::vector<TunableParamVariant> tunableParams
 {
     &aspMinDepth, &aspInitialDelta, &aspDeltaMultiplier,
     &rfpMaxDepth, &rfpDepthMultiplier,
-    &nmpMinDepth, &nmpBaseReduction, &nmpReductionDivisor, &nmpEvalBetaDivisor, &nmpEvalBetaMax,
     &razoringMaxDepth, &razoringDepthMultiplier,
+    &nmpMinDepth, &nmpBaseReduction, &nmpReductionDivisor, &nmpEvalBetaDivisor, &nmpEvalBetaMax,
     &iirMinDepth, 
     &lmpMinMoves, &lmpDepthMultiplier,
     &fpMaxDepth, &fpBase, &fpMultiplier,
