@@ -19,10 +19,10 @@ const i32 SCALE = 400, QA = 181, QB = 64;
 constexpr int WEIGHTS_PER_VEC = sizeof(Vec) / sizeof(i16);
 
 struct alignas(ALIGNMENT) Net {
-    i16 featureWeights[768 * HIDDEN_LAYER_SIZE];
-    i16 featureBiases[HIDDEN_LAYER_SIZE];
-    i16 outputWeights[2][HIDDEN_LAYER_SIZE];
-    i16 outputBias;
+    std::array<i16, 768 * HIDDEN_LAYER_SIZE>          featureWeights;
+    std::array<i16, HIDDEN_LAYER_SIZE>                featureBiases;
+    std::array<std::array<i16, HIDDEN_LAYER_SIZE>, 2> outputWeights;
+    i16                                               outputBias;
 };
 
 INCBIN(NetFile, "src/net.nnue");
@@ -30,11 +30,9 @@ const Net *NET = reinterpret_cast<const Net*>(gNetFileData);
 
 struct alignas(ALIGNMENT) Accumulator
 {
-    i16 white[HIDDEN_LAYER_SIZE];
-    i16 black[HIDDEN_LAYER_SIZE];
+    std::array<i16, HIDDEN_LAYER_SIZE> white, black;
 
-    inline Accumulator()
-    {
+    inline Accumulator() {
         for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
             white[i] = black[i] = NET->featureBiases[i];
     }
@@ -60,27 +58,18 @@ struct alignas(ALIGNMENT) Accumulator
             black[i] -= NET->featureWeights[blackIdx * HIDDEN_LAYER_SIZE + i];
         }
     }
-};
-
-inline i32 crelu(i16 x) {
-    return x < 0 ? 0 : x > QA ? QA : x;
-}
-
-inline i32 screlu(i32 x) {
-    i32 clamped = std::clamp(x, 0, QA);
-    return clamped * clamped;
-}
+}; // struct alignas(ALIGNMENT) Accumulator
 
 inline i32 evaluate(Accumulator &accumulator, Color color)
 {
     Vec *stmAccumulator, *oppAccumulator;
     if (color == Color::WHITE) {
-        stmAccumulator = (Vec*)accumulator.white;
-        oppAccumulator = (Vec*)accumulator.black;
+        stmAccumulator = (Vec*)&accumulator.white;
+        oppAccumulator = (Vec*)&accumulator.black;
     }
     else {
-        stmAccumulator = (Vec*)accumulator.black;
-        oppAccumulator = (Vec*)accumulator.white;
+        stmAccumulator = (Vec*)&accumulator.black;
+        oppAccumulator = (Vec*)&accumulator.white;
     }
 
     Vec *stmWeights = (Vec*) &(NET->outputWeights[0]);
@@ -111,6 +100,6 @@ inline i32 evaluate(Accumulator &accumulator, Color color)
     return std::clamp(eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
 }
 
-}
+} // namespace nnue
 
 using Accumulator = nnue::Accumulator;

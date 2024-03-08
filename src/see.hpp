@@ -1,10 +1,10 @@
 
-#pragma once
-
 // clang-format off
 
-                              // P    N    B    R    Q    K  NONE
-const i32 SEE_PIECE_VALUES[7] = {100, 300, 300, 500, 900, 0, 0};
+#pragma once
+
+                                              // P    N    B    R    Q    K  NONE
+constexpr std::array<i32, 7> SEE_PIECE_VALUES = {100, 300, 300, 500, 900, 0, 0};
 
 inline PieceType popLeastValuable(Board &board, u64 &occ, u64 attackers, Color color)
 {
@@ -53,10 +53,10 @@ inline bool SEE(Board &board, Move move, i32 threshold = 0)
     attackers |= bishops & attacks::bishopAttacks(square, occupancy);
 
     attackers |= board.bitboard(Color::BLACK, PieceType::PAWN) 
-                 & attacks::pawnAttacks(square, Color::WHITE);
+                 & attacks::pawnAttacks(Color::WHITE, square);
 
     attackers |= board.bitboard(Color::WHITE, PieceType::PAWN) 
-                 & attacks::pawnAttacks(square, Color::BLACK);
+                 & attacks::pawnAttacks(Color::BLACK, square);
 
     attackers |= board.bitboard(PieceType::KNIGHT) & attacks::knightAttacks(square);
     attackers |= board.bitboard(PieceType::KING) & attacks::kingAttacks(square);

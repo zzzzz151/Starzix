@@ -1,3 +1,4 @@
+// clang-format off
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -9,15 +10,14 @@
 int failed = 0, passed = 0;
 
 int main() {
+    initZobrist();
     attacks::init();
 
-    // Open the file for reading
     std::ifstream inputFile("tests/SEE.txt");
 
-    // Check if the file is open
     if (!inputFile.is_open()) {
         std::cout << "Failed to open the file." << std::endl;
-        return 1; // Return an error code
+        return 1;
     }
 
     std::string line;
@@ -45,7 +45,6 @@ int main() {
     }
 
     inputFile.close();
-
     std::cout << "Passed: " << passed << std::endl;
     std::cout << "Failed: " << failed << std::endl;
 

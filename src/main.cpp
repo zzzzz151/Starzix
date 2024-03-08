@@ -16,6 +16,7 @@ int main()
         std::cout << "Not using avx2 or avx512" << std::endl;
     #endif
 
+    initZobrist();
     attacks::init();
     initLmrTable();
     Searcher searcher = Searcher(START_BOARD);

@@ -163,4 +163,4 @@ namespace SIMD {
 
 constexpr int ALIGNMENT = std::max<int>(8, sizeof(Vec));
 
-}
+} // namespace SIMD

@@ -5,7 +5,7 @@
 
 std::array<std::array<u8, 256>, 256> LMR_TABLE; // [depth][moveIndex]
 
-inline void initLmrTable()
+constexpr void initLmrTable()
 {
     memset(LMR_TABLE.data(), 0, sizeof(LMR_TABLE));
     for (int depth = 1; depth < LMR_TABLE.size(); depth++)
@@ -35,10 +35,13 @@ class Searcher {
     bool hardTimeUp;
     u64 softMilliseconds, hardMilliseconds;
     u64 softNodes, hardNodes;
+
     std::array<PlyData, 256> pliesData;     // [ply]
     std::array<u64, 1ULL << 16> movesNodes; // [moveEncoded]
-    Move countermoves[2][6][64];            // [color][pieceType][targetSquare]
-    HistoryEntry historyTable[2][6][64];    // [color][pieceType][targetSquare]
+
+    // [color][pieceType][targetSquare]
+    std::array<std::array<std::array<Move, 64>, 6>, 2> countermoves;
+    std::array<std::array<std::array<HistoryEntry, 64>, 6>, 2> historyTable;
 
     const u16 OVERHEAD_MILLISECONDS = 10;
 
@@ -51,8 +54,8 @@ class Searcher {
         tt = TT(true);
         memset(pliesData.data(), 0, sizeof(pliesData));
         memset(movesNodes.data(), 0, sizeof(movesNodes));
-        memset(countermoves, 0, sizeof(countermoves));
-        memset(historyTable, 0, sizeof(historyTable));
+        memset(countermoves.data(), 0, sizeof(countermoves));
+        memset(historyTable.data(), 0, sizeof(historyTable));
     }
 
     inline void resetLimits()
@@ -115,8 +118,8 @@ class Searcher {
         Move lastMove = board.lastMove();
         if (lastMove == MOVE_NONE)
         {
-            i8 stm = (i8)Color::BLACK;
-            u8 pt = (u8)PieceType::PAWN;
+            int stm = (int)Color::BLACK;
+            int pt = (int)PieceType::PAWN;
             return (countermoves[stm][pt][0] = MOVE_NONE);
         }
 
@@ -249,16 +252,15 @@ class Searcher {
         if (depth > maxDepth) depth = maxDepth;
 
         TTEntry *ttEntry = tt.probe(board.zobristHash());
+        bool ttHit = board.zobristHash() == ttEntry->zobristHash;
 
-        if (ttEntry->zobristHash == board.zobristHash()
+        if (ttHit && ply > 0 && !singular
         && ttEntry->depth >= depth 
-        && ply > 0 && !singular 
         && (ttEntry->getBound() == Bound::EXACT
         || (ttEntry->getBound() == Bound::LOWER && ttEntry->score >= beta) 
         || (ttEntry->getBound() == Bound::UPPER && ttEntry->score <= alpha)))
             return ttEntry->adjustedScore(ply);
 
-        bool ttHit = board.zobristHash() == ttEntry->zobristHash;
         bool pvNode = beta > alpha + 1;
         Color stm = board.sideToMove();
 
@@ -366,7 +368,7 @@ class Searcher {
             if (move == ttMove
             && depth >= singularMinDepth.value
             && abs(ttEntry->score) < MIN_MATE_SCORE
-            && ttEntry->depth >= depth - singularDepthMargin.value
+            && (i32)ttEntry->depth >= depth - singularDepthMargin.value
             && ttEntry->getBound() != Bound::UPPER)
             {
                 // Singular search: before searching any move, 
@@ -588,6 +590,7 @@ class Searcher {
                 bound = Bound::LOWER;
                 break;
             }
+            
             if (bestScore > alpha) alpha = bestScore;
         }
 
@@ -605,8 +608,8 @@ class Searcher {
               KILLER_SCORE           = 1'000'000'000,
               COUNTERMOVE_SCORE      = 500'000'000;
 
-    // Most valuable victim     P    N    B    R    Q    K  NONE
-    const i32 MVV_VALUES[7] = { 100, 300, 320, 500, 900, 0, 0 };
+    // Most valuable victim         P    N    B    R    Q    K  NONE
+    const std::array<i32 ,7> MVV = {100, 300, 320, 500, 900, 0, 0};
 
     inline void scoreMoves(PlyData &plyData, Move ttMove)
     {
@@ -635,7 +638,7 @@ class Searcher {
                                             : GOOD_NOISY_SCORE)
                                          : -GOOD_NOISY_SCORE;
 
-                plyData.movesScores[i] += MVV_VALUES[(u8)captured];
+                plyData.movesScores[i] += MVV[(int)captured];
                 plyData.movesScores[i] += historyEntry->noisyHistory;
             }
             else if (move == plyData.killer)
@@ -648,4 +651,4 @@ class Searcher {
         }
     }
 
-};
+}; // class Searcher

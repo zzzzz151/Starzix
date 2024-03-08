@@ -2,21 +2,21 @@
 
 # Elo
 
-[CCRL Blitz](https://www.computerchess.org.uk/ccrl/404/cgi/compare_engines.cgi?class=Single-CPU+engines&only_best_in_class=on&num_best_in_class=1&print=Rating+list&profile_step=50&profile_numbers=1&print=Results+table&print=LOS+table&table_size=100&ct_from_elo=0&ct_to_elo=10000&match_length=30&cross_tables_for_best_versions_only=1&sort_tables=by+rating&diag=0&reference_list=None&recalibrate=no): 3553 (#25/712)
+[CCRL Blitz](https://www.computerchess.org.uk/ccrl/404/cgi/compare_engines.cgi?class=Single-CPU+engines&only_best_in_class=on&num_best_in_class=1&print=Rating+list&profile_step=50&profile_numbers=1&print=Results+table&print=LOS+table&table_size=100&ct_from_elo=0&ct_to_elo=10000&match_length=30&cross_tables_for_best_versions_only=1&sort_tables=by+rating&diag=0&reference_list=None&recalibrate=no): 3557 (#30/716)
 
-[CCRL Rapid](https://www.computerchess.org.uk/ccrl/4040/cgi/compare_engines.cgi?class=Single-CPU+engines&only_best_in_class=on&num_best_in_class=1&print=Rating+list&profile_step=50&profile_numbers=1&print=Results+table&print=LOS+table&table_size=100&ct_from_elo=0&ct_to_elo=10000&match_length=30&cross_tables_for_best_versions_only=1&sort_tables=by+rating&diag=0&reference_list=None&recalibrate=no): 3472 (#25/571)
+[CCRL Rapid](https://www.computerchess.org.uk/ccrl/4040/cgi/compare_engines.cgi?class=Single-CPU+engines&only_best_in_class=on&num_best_in_class=1&print=Rating+list&profile_step=50&profile_numbers=1&print=Results+table&print=LOS+table&table_size=100&ct_from_elo=0&ct_to_elo=10000&match_length=30&cross_tables_for_best_versions_only=1&sort_tables=by+rating&diag=0&reference_list=None&recalibrate=no): 3473 (#30/580)
 
-[Ipman Bullet](https://ipmanchess.yolasite.com/r9-7945hx.php): 3346 (#38/51)
+[Ipman Bullet](https://ipmanchess.yolasite.com/r9-7945hx.php): 3340 (#39/51)
 
 # How to compile
 
 ### Windows
 
-```clang++ -std=c++20 -march=x86-64-v3 -O3 -Wl,/STACK:16777216 src/main.cpp -o Starzix.exe```
+```clang++ -std=c++20 -march=native -O3 -DNDEBUG -Wl,/STACK:16777216 src/main.cpp -o Starzix.exe```
 
 ### Linux
 
-```clang++ -std=c++20 -march=x86-64-v3 -O3 src/main.cpp -o starzix```
+```clang++ -std=c++20 -march=native -O3 -DNDEBUG src/main.cpp -o starzix```
 
 # UCI (Universal Chess Interface)
 

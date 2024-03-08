@@ -1,6 +1,6 @@
-#pragma once
-
 // clang-format-off
+
+#pragma once
 
 #include "bench.hpp"
 #include "perft.hpp"
@@ -50,11 +50,11 @@ inline void uciLoop(Searcher &searcher)
         else if (tokens[0] == "bench")
         {
             if (tokens.size() == 1)
-                bench::bench(searcher);
+                bench();
             else
             {
                 u8 depth = stoi(tokens[1]);
-                bench::bench(searcher, depth);
+                bench(depth);
             }
         }
         else if (tokens[0] == "perft")
@@ -165,8 +165,9 @@ inline void ucinewgame(Searcher &searcher)
 {
     searcher.tt.reset(); // reset/clear TT
 
-    memset(searcher.historyTable, 0, sizeof(searcher.historyTable)); // reset/clear histories
-    memset(searcher.countermoves, 0, sizeof(searcher.countermoves)); // reset/clear countermoves
+     // reset/clear histories and countermoves
+    memset(searcher.historyTable.data(), 0, sizeof(searcher.historyTable));
+    memset(searcher.countermoves.data(), 0, sizeof(searcher.countermoves));
 
     // reset/clear killer moves
     for (int i = 0; i < searcher.pliesData.size(); i++)
@@ -204,7 +205,7 @@ inline void go(Searcher &searcher, std::vector<std::string> &tokens)
     u16 movesToGo = defaultMovesToGo.value;
     bool isMoveTime = false;
 
-    for (int i = 1; i < tokens.size() - 1; i += 2)
+    for (int i = 1; i < (int)tokens.size() - 1; i += 2)
     {
         i64 value = stoi(tokens[i + 1]);
 
@@ -235,6 +236,6 @@ inline void go(Searcher &searcher, std::vector<std::string> &tokens)
     std::cout << "bestmove " + bestMove.toUci() + "\n";
 }
 
-}
+} // namespace uci
 
 

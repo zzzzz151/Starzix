@@ -1,8 +1,8 @@
 #pragma once
 
-#include <sstream>
-#include <string>
+#include <array>
 #include <vector>
+#include <sstream>
 #include <iostream>
 #include <algorithm>
 #include <bitset>
@@ -140,11 +140,9 @@ inline PieceType pieceToPieceType(Piece piece)
 
 inline Color pieceColor(Piece piece)
 {
-    if ((u8)piece <= 5) return Color::WHITE;
-
-    if ((u8)piece <= 11) return Color::BLACK;
-
-    return Color::NONE;
+    return (int)piece <= 5 ? Color::WHITE
+           : (int)piece <= 11 ? Color::BLACK
+           : Color::NONE;
 }
 
 inline Piece makePiece(PieceType pieceType, Color color)
@@ -253,32 +251,6 @@ inline T max(T a, T b) {
 inline auto millisecondsElapsed(std::chrono::steady_clock::time_point start)
 {
     return (std::chrono::steady_clock::now() - start) / std::chrono::milliseconds(1);
-}
-
-inline bool isNumber(std::string &s)
-{
-    std::string::const_iterator it = s.begin();
-    while (it != s.end() && std::isdigit(*it)) ++it;
-    return !s.empty() && it == s.end();
-}
-
-std::string getRandomString(int length) {
-    const std::string characters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-    const int charactersLength = characters.length();
-
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<> distribution(0, charactersLength - 1);
-
-    std::string randomString;
-    randomString.reserve(length);
-
-    for (int i = 0; i < length; ++i) {
-        int randomIndex = distribution(gen);
-        randomString.push_back(characters[randomIndex]);
-    }
-
-    return randomString;
 }
 
 #include "move.hpp"

@@ -1,16 +1,19 @@
-#pragma once
-
 // clang-format off
+
+#pragma once
 
 struct HistoryEntry
 {
     i32 mainHistory;
-    i32 continuationHistories[2][6][64]; // [ply-1][pieceType][targetSquare]
+
+    // [ply-1][pieceType][targetSquare]
+    std::array<std::array<std::array<i32, 64>, 6>, 2> continuationHistories;
+
     i32 noisyHistory;
 
     inline HistoryEntry() {
         mainHistory = 0;
-        memset(continuationHistories, 0, sizeof(continuationHistories));
+        memset(continuationHistories.data(), 0, sizeof(continuationHistories));
         noisyHistory = 0;
     }
 
@@ -21,10 +24,10 @@ struct HistoryEntry
 
         // add continuation histories
         Move move;
-        for (u16 ply : {1, 2}) {
+        for (int ply : {1, 2}) {
             if ((move = board.nthToLastMove(ply)) != MOVE_NONE)
             {
-                u8 pt = (u8)move.pieceType();
+                int pt = (int)move.pieceType();
                 total += continuationHistories[ply-1][pt][move.to()];
             }
         }
@@ -39,10 +42,10 @@ struct HistoryEntry
 
         // Update continuation histories
         Move move;
-        for (u16 ply : {1, 2}) {
+        for (int ply : {1, 2}) {
             if ((move = board.nthToLastMove(ply)) != MOVE_NONE)
             {
-                u8 pt = (u8)move.pieceType();
+                int pt = (int)move.pieceType();
                 i32 *history = &continuationHistories[ply-1][pt][move.to()];
                 *history += bonus - abs(bonus) * *history / historyMax.value;
             }
@@ -53,4 +56,4 @@ struct HistoryEntry
         noisyHistory += bonus - abs(bonus) * noisyHistory / historyMax.value;
     }
 
-};
+}; // struct HistoryEntry

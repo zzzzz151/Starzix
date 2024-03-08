@@ -54,7 +54,7 @@ struct TTEntry
         boundAndAge = (age << 2) | (u8)bound;
     }
 
-} __attribute__((packed)); 
+} __attribute__((packed)); // struct TTEntry
 
 struct TT
 {
@@ -108,5 +108,5 @@ struct TT
         Bound bound = score <= originalAlpha ? Bound::UPPER : score >= beta ? Bound::LOWER : Bound::EXACT;
         store(ttEntry, zobristHash, depth, ply, score, bestMove, bound);
     }
-};
+}; // struct TT
 

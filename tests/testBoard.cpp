@@ -53,6 +53,7 @@ template <typename T> inline void testNotEquals(std::string testName, T got, T e
 
 int main()
 {   
+    initZobrist();
     attacks::init();
 
     test("std::popcount()", std::popcount((uint64_t)5), 2); // 5 = 101

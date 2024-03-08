@@ -1,7 +1,7 @@
+// clang-format off
+
 #pragma once
 
-// clang-format off
-#include <cassert>
 #include "types.hpp"
 #include "utils.hpp"
 
@@ -41,9 +41,6 @@ struct Move
 
     inline Move(Square from, Square to, u16 flag)
     {
-        // from/to: 00100101
-        // (u16)from/to: 00000000 00100101
-
         moveEncoded = ((u16)from << 10);
         moveEncoded |= ((u16)to << 4);
         moveEncoded |= flag;
@@ -94,7 +91,7 @@ struct Move
         return str;
     }
     
-};
+}; // struct Move
 
 Move MOVE_NONE = Move();
 
@@ -147,5 +144,5 @@ struct MovesList
             swap(i, randomIndex);
         }
     }
-};
+}; // struct MovesList
 
