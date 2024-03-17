@@ -15,7 +15,7 @@ using namespace SIMD;
 namespace nnue {
 
 const u16 HIDDEN_LAYER_SIZE = 1024;
-const i32 SCALE = 400, QA = 181, QB = 64;
+const i32 SCALE = 400, QA = 255, QB = 64;
 constexpr int WEIGHTS_PER_VEC = sizeof(Vec) / sizeof(i16);
 
 struct alignas(ALIGNMENT) Net {
@@ -77,23 +77,22 @@ inline i32 evaluate(Accumulator &accumulator, Color color)
     const Vec vecZero = vecSetZero();
     const Vec vecQA = vecSet1Epi16(QA);
     Vec sum = vecSetZero();
-    Vec reg;
+    Vec v0, v1;
 
-    for (int i = 0; i < HIDDEN_LAYER_SIZE / WEIGHTS_PER_VEC; ++i) 
-    {
-        // Side to move
-        reg = maxEpi16(stmAccumulator[i], vecZero); // clip
-        reg = minEpi16(reg, vecQA); // clip
-        reg = mulloEpi16(reg, reg); // square
-        reg = maddEpi16(reg, stmWeights[i]); // multiply with output layer
-        sum = addEpi32(sum, reg); // collect the result
+    for (int i = 0; i < HIDDEN_LAYER_SIZE / WEIGHTS_PER_VEC; ++i) {
+      // Side to move
+      v0 = maxEpi16(stmAccumulator[i], vecZero); // clip
+      v0 = minEpi16(v0, vecQA); // clip
+      v1 = mulloEpi16(v0, stmWeights[i]); // square
+      v1 = maddEpi16(v1, v0); // multiply with output layer
+      sum = addEpi32(sum, v1); // collect the result
 
-        // Non side to move
-        reg = maxEpi16(oppAccumulator[i], vecZero);
-        reg = minEpi16(reg, vecQA);
-        reg = mulloEpi16(reg, reg);
-        reg = maddEpi16(reg, oppWeights[i]);
-        sum = addEpi32(sum, reg);
+      // Non side to move
+      v0 = maxEpi16(oppAccumulator[i], vecZero);
+      v0 = minEpi16(v0, vecQA);
+      v1 = mulloEpi16(v0, oppWeights[i]);
+      v1 = maddEpi16(v1, v0);
+      sum = addEpi32(sum, v1);
     }
 
     i32 eval = (vecHaddEpi32(sum) / QA + NET->outputBias) * SCALE / (QA * QB);
