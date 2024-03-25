@@ -33,32 +33,28 @@ inline void initZobrist()
         ZOBRIST_FILES[file] = distribution(gen);
 }
 
-struct BoardState
-{
+struct BoardState {
     public:
     Color colorToMove = Color::NONE;
-    std::array<u64, 2> colorBitboard;   // [color]
-    std::array<u64, 6> piecesBitboards; // [pieceType]
+    std::array<u64, 2> colorBitboard = { };   // [color]
+    std::array<u64, 6> piecesBitboards = { }; // [pieceType]
     u64 castlingRights = 0;
     Square enPassantSquare = SQUARE_NONE;
     u8 pliesSincePawnOrCapture = 0;
     u16 currentMoveCounter = 1;
     u64 zobristHash = 0;
-    i8 inCheckCached = -1; // -1 means invalid (need to calculate inCheck())
+    i8 inCheckCached = -1; // -1 means invalid (need to calculate)
     Move lastMove = MOVE_NONE;
-
-    inline BoardState() = default;
 };
 
-class Board
-{
+class Board {
+    private:
     BoardState *state = nullptr;
     std::vector<BoardState> states = {};
     Accumulator *accumulator = nullptr;
     std::vector<Accumulator> accumulators = {};
 
     public:
-
     bool nnue = true;
 
     inline Board() = default;
@@ -158,93 +154,52 @@ class Board
         state->currentMoveCounter = fenSplit.size() >= 6 ? stoi(fenSplit[5]) : 1;
     }
 
-    inline BoardState getBoardState() { 
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
+    inline BoardState getState() { return *state; }
 
-        return *state; 
-    }
-
-    inline Accumulator getAccumulator() { 
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
-        return *accumulator; 
-    }
-
+    inline Accumulator getAccumulator() { return *accumulator; }
 
     inline Color sideToMove() {
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
         assert(state->colorToMove != Color::NONE);
         return state->colorToMove; 
     }
 
     inline Color oppSide() { 
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
         assert(state->colorToMove != Color::NONE);
         return state->colorToMove == Color::WHITE 
                ? Color::BLACK : Color::WHITE; 
     }
 
     inline u64 bitboard(PieceType pieceType) {   
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
         return state->piecesBitboards[(int)pieceType];
     }
 
     inline u64 bitboard(Color color) { 
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
         return state->colorBitboard[(int)color]; 
     }
 
     inline u64 bitboard(Color color, PieceType pieceType) {
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
         return state->piecesBitboards[(int)pieceType]
                & state->colorBitboard[(int)color];
     }
 
     inline u64 us() { 
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
         return state->colorBitboard[(int)state->colorToMove]; 
     }
 
     inline u64 them() { 
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
         return state->colorBitboard[(int)oppSide()]; 
     }
 
     inline u64 occupancy() { 
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
         return state->colorBitboard[(int)Color::WHITE] 
                | state->colorBitboard[(int)Color::BLACK]; 
     }
 
     inline bool isOccupied(Square square) {
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
         return occupancy() & (1ULL << square);
     }
     
     inline PieceType pieceTypeAt(Square square) { 
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
         u64 sqBitboard = 1ULL << square;
         for (int i = 0; i < state->piecesBitboards.size(); i++)
             if (sqBitboard & state->piecesBitboards[i])
@@ -253,9 +208,6 @@ class Board
     }
 
     inline Piece pieceAt(Square square) { 
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
         u64 sqBitboard = 1ULL << square;
 
         for (int i = 0; i < state->piecesBitboards.size(); i++)
@@ -270,9 +222,6 @@ class Board
      }
 
     inline Color colorAt(Square square) {
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
         u64 sqBitboard = 1ULL << square;
         if (sqBitboard & state->colorBitboard[(int)Color::WHITE])
             return Color::WHITE;
@@ -284,9 +233,6 @@ class Board
     private:
 
     inline void placePiece(Color color, PieceType pieceType, Square square) {
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
         u64 sqBitboard = 1ULL << square;
         state->colorBitboard[(int)color] |= sqBitboard;
         state->piecesBitboards[(int)pieceType] |= sqBitboard;
@@ -294,9 +240,6 @@ class Board
     }
 
     inline void removePiece(Square square) {
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
         Color color = colorAt(square);
         if (color != Color::NONE)
         {
@@ -310,11 +253,7 @@ class Board
 
     public:
 
-    inline std::string fen()
-    {
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
+    inline std::string fen() {
         std::string myFen = "";
 
         for (int rank = 7; rank >= 0; rank--)
@@ -369,9 +308,6 @@ class Board
     }
 
     inline void print() { 
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
         std::string str = "";
 
         for (int i = 7; i >= 0; i--) {
@@ -391,22 +327,13 @@ class Board
         std::cout << "Zobrist hash: " << state->zobristHash << std::endl;
     }
 
-    inline bool isCapture(Move move) 
-    {
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
+    inline bool isCapture(Move move) {
         assert(move != MOVE_NONE);
-
         return colorAt(move.to()) == oppSide() 
                || move.flag() == Move::EN_PASSANT_FLAG;
     }
 
-    inline PieceType captured(Move move) 
-    {
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
+    inline PieceType captured(Move move) {
         assert(move != MOVE_NONE);
         auto flag = move.flag();
 
@@ -417,18 +344,9 @@ class Board
                : pieceTypeAt(move.to());
     }
 
-    inline u64 zobristHash() { 
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());        
-        
-        return state->zobristHash; 
-    }
+    inline u64 zobristHash() { return state->zobristHash; }
 
-    inline bool isRepetition()
-    {
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());        
-
+    inline bool isRepetition() {
         if (states.size() <= 4) return false;
 
         for (int i = (int)states.size() - 3; 
@@ -440,11 +358,7 @@ class Board
         return false;
     }
 
-    inline bool isDraw()
-    {
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
+    inline bool isDraw() {
         if (isRepetition() || state->pliesSincePawnOrCapture >= 100)
             return true;
 
@@ -592,17 +506,11 @@ class Board
         state->inCheckCached = -1;
         state->lastMove = move;
 
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
         return true;
     }
 
     inline Move uciToMove(std::string uciMove)
     {
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
         Move move = MOVE_NONE;
         Square from = strToSquare(uciMove.substr(0,2));
         Square to = strToSquare(uciMove.substr(2,4));
@@ -657,14 +565,10 @@ class Board
 
         states.pop_back();
         state = &states.back();
-
     }
 
     inline void pseudolegalMoves(MovesList &moves, bool noisyOnly = false, bool underpromotions = true)
     {
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
         moves.clear();
 
         Color enemyColor = oppSide();
@@ -814,11 +718,7 @@ class Board
 
     public:
 
-    inline bool isSquareAttacked(Square square, Color colorAttacking)
-    {
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
+    inline bool isSquareAttacked(Square square, Color colorAttacking) {
          // Idea: put a super piece in this square and see if its attacks intersect with an enemy piece
 
         // Pawn
@@ -853,11 +753,7 @@ class Board
         return false;
     }   
 
-    inline bool inCheck()
-    {
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
+    inline bool inCheck() {
         if (state->inCheckCached != -1) return state->inCheckCached;
 
         u64 ourKingBitboard = bitboard(state->colorToMove, PieceType::KING);
@@ -870,9 +766,6 @@ class Board
     // Used internally in makeMove()
     inline bool inCheckNoCache()
     {
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
         u64 ourKingBitboard = bitboard(state->colorToMove, PieceType::KING);
         Square ourKingSquare = lsb(ourKingBitboard);
         return isSquareAttacked(ourKingSquare, oppSide());
@@ -882,9 +775,6 @@ class Board
 
     inline bool hasNonPawnMaterial(Color color = Color::NONE)
     {
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
         if (color == Color::NONE)
             return bitboard(PieceType::KNIGHT) > 0
                    || bitboard(PieceType::BISHOP) > 0
@@ -897,57 +787,35 @@ class Board
                || bitboard(color, PieceType::QUEEN) > 0;
     }
 
-    inline Move lastMove() { 
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
+    inline Move lastMove() { return state->lastMove; }
 
-        return state->lastMove; 
-    }
-
-    inline Move nthToLastMove(int n)
-    {
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
+    inline Move nthToLastMove(int n) {
         assert(n >= 1);
-
         return (int)states.size() - n < 0 
                ? MOVE_NONE : states[states.size() - n].lastMove;
     }
 
     inline auto evaluate() {
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
         assert(state->colorToMove != Color::NONE);
         return nnue::evaluate(*accumulator, state->colorToMove);
     }
 
-    inline void pushBoardState(BoardState &newState)
+    inline void pushState(BoardState &newState)
     {
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
         states.push_back(newState);
         state = &states.back();
     }
 
     inline void pushAccumulator(Accumulator &newAccumulator)
     {
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
         accumulators.push_back(newAccumulator);
         accumulator = &accumulators.back();
     }
 
     inline u64 zobristHashAfter(Move move)
     {
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
-
-        i8 stm = (i8)state->colorToMove;
-        i8 nstm = (i8)oppSide();
+        int stm = (int)state->colorToMove;
+        int nstm = (int)oppSide();
 
         u64 hashAfter = state->zobristHash ^ ZOBRIST_COLOR[stm] ^ ZOBRIST_COLOR[nstm];
 
@@ -1003,6 +871,15 @@ class Board
                ^ ZOBRIST_PIECES[stm][(u8)place][to];
     }
     
+    inline bool inCheck2PliesAgo() {
+        if (states.size() <= 2) return false;
+
+        state = &states[states.size() - 3];
+        bool wasInCheck = inCheck();
+        state = &states.back();
+        return wasInCheck;
+    }
+
 }; // class Board
 
 const Board START_BOARD = Board(START_FEN);

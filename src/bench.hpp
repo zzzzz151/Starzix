@@ -66,19 +66,17 @@ inline void bench(u8 depth = 14)
     std::cout << "Running bench depth " << (int)depth 
               << " on " << BENCH_FENS.size() << " positions" << std::endl;
 
-    Searcher searcher = Searcher(START_BOARD);
+    Searcher searcher = Searcher();
     u64 totalNodes = 0;
     u64 totalMilliseconds = 0;
 
     for (std::string fen : BENCH_FENS)
     {
-        uci::ucinewgame(searcher);
         searcher.board = Board(fen);
-        searcher.resetLimits();
-        searcher.maxDepth = depth;
-        searcher.search(false);
-        totalMilliseconds += millisecondsElapsed(searcher.startTime);
-        totalNodes += searcher.nodes;
+        searcher.search(depth, I64_MAX, 0, 1, true, U64_MAX, U64_MAX, false);
+        totalMilliseconds += searcher.millisecondsElapsed();
+        totalNodes += searcher.getNodes();
+        searcher.ucinewgame();
     }
 
     std::cout << "bench depth " << (int)depth

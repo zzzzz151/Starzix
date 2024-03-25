@@ -19,8 +19,7 @@ int main()
     initZobrist();
     attacks::init();
     initLmrTable();
-    Searcher searcher = Searcher(START_BOARD);
-    uci::uciLoop(searcher);
+    uci::uciLoop();
     return 0;
 }
 

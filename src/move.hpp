@@ -5,8 +5,7 @@
 #include "types.hpp"
 #include "utils.hpp"
 
-struct Move
-{
+struct Move {
     private:
 
     // 16 bits: ffffff tttttt FFFF (f = from, t = to, F = flag)  

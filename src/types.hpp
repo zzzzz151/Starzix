@@ -15,12 +15,13 @@ using i64 = int64_t;
 
 using Square = u8;
 
-const inline i32 I32_MAX = 2147483647;
-const inline u64 U64_MAX = 9223372036854775807;
+constexpr i32 I32_MAX = 2147483647;
+constexpr u64 U64_MAX = 9223372036854775807;
+constexpr i64 I64_MAX = 9223372036854775807;
 
 const std::string START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-const Square SQUARE_NONE = 255;
+constexpr Square SQUARE_NONE = 255;
 
 enum class Color : i8
 {
@@ -81,8 +82,8 @@ enum class File : u8
     H = 7
 };
 
-const u8 CASTLE_SHORT = 0, CASTLE_LONG = 1;
+constexpr u8 CASTLE_SHORT = 0, CASTLE_LONG = 1;
 
-const i32 INF = 32000, 
-          MIN_MATE_SCORE = INF - 256,
-          EVAL_NONE = INF;
+constexpr i32 INF = 32000, 
+              MIN_MATE_SCORE = INF - 256,
+              EVAL_NONE = INF;

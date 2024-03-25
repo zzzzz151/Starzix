@@ -14,15 +14,15 @@ enum class Bound {
     UPPER = 3
 };
 
-struct TTEntry
-{
+struct TTEntry {
+    public:
     u64 zobristHash = 0;
     i16 score = 0;
     Move bestMove = MOVE_NONE;
     u8 depth = 0; 
     u8 boundAndAge = 0; // lowest 2 bits for bound, highest 6 bits for age
 
-    inline i16 adjustedScore(u16 ply)
+    inline i16 adjustedScore(i16 ply)
     {
         if (score >= MIN_MATE_SCORE)
             return score - ply;
@@ -56,33 +56,25 @@ struct TTEntry
 
 } __attribute__((packed)); // struct TTEntry
 
-struct TT
-{
-    std::vector<TTEntry> tt = {};
+struct TT {
+    public:
+    std::vector<TTEntry> entries = {};
     u8 age = 0;
 
-    inline TT() = default;
-
-    inline TT(bool init) {
-        if (init) resize();
-    }
-
-    inline void resize()
-    {
-        tt.clear();
+    inline void resize() {
+        entries.clear();
         u32 numEntries = ttSizeMB * 1024 * 1024 / sizeof(TTEntry);
-        tt.resize(numEntries);
-        std::cout << "TT size: " << ttSizeMB << " MB (" << numEntries << " entries)" << std::endl;
+        entries.resize(numEntries);
+        //std::cout << "TT size: " << ttSizeMB << " MB (" << numEntries << " entries)" << std::endl;
     }
 
-    inline void reset()
-    {
-        memset(tt.data(), 0, sizeof(TTEntry) * tt.size());
+    inline void reset() {
+        memset(entries.data(), 0, sizeof(TTEntry) * entries.size());
         age = 0;
     }
 
     inline TTEntry* probe(u64 zobristHash) {
-        return &tt[zobristHash % tt.size()];
+        return &entries[zobristHash % entries.size()];
     }
 
     inline void store(TTEntry *ttEntry, u64 zobristHash, u8 depth, u8 ply, i16 score, Move bestMove, Bound bound)

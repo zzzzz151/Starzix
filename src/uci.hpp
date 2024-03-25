@@ -10,15 +10,14 @@ namespace uci { // Universal chess interface
 inline void uci();
 inline void setoption(Searcher &searcher, std::vector<std::string> &tokens);
 inline void ucinewgame(Searcher &searcher);
-inline void position(Searcher &searcher, std::vector<std::string> &tokens);
+inline void position(Board &board, std::vector<std::string> &tokens);
 inline void go(Searcher &searcher, std::vector<std::string> &tokens);
 
-inline void uciLoop(Searcher &searcher)
+inline void uciLoop()
 {
-    while (true)
-    {
-        searcher.resetLimits();
+    Searcher searcher = Searcher();
 
+    while (true) {
         std::string received = "";
         getline(std::cin, received);
         trim(received);
@@ -35,11 +34,11 @@ inline void uciLoop(Searcher &searcher)
         else if (tokens[0] == "setoption") // e.g. "setoption name Hash value 32"
             setoption(searcher, tokens);
         else if (received == "ucinewgame")
-            ucinewgame(searcher);
+            searcher.ucinewgame();
         else if (received == "isready")
             std::cout << "readyok\n";
         else if (tokens[0] == "position")
-            position(searcher, tokens);
+            position(searcher.board, tokens);
         else if (tokens[0] == "go")
             go(searcher, tokens);
         else if (tokens[0] == "print" || tokens[0] == "d"
@@ -51,19 +50,18 @@ inline void uciLoop(Searcher &searcher)
         {
             if (tokens.size() == 1)
                 bench();
-            else
-            {
-                u8 depth = stoi(tokens[1]);
+            else {
+                int depth = stoi(tokens[1]);
                 bench(depth);
             }
         }
-        else if (tokens[0] == "perft")
+        else if (tokens[0] == "perft" || (tokens[0] == "go" && tokens[1] == "perft"))
         {
-            int depth = stoi(tokens[1]);
+            int depth = stoi(tokens.back());
             perft::perftBench(searcher.board, depth);
         }
         else if (tokens[0] == "perftsplit" || tokens[0] == "splitperft" 
-        || tokens[0] == "perftdivide")
+        || tokens[0] == "perftdivide" || tokens[0] == "divideperft")
         {
             int depth = stoi(tokens[1]);
             perft::perftSplit(searcher.board, depth);
@@ -88,12 +86,10 @@ inline void uciLoop(Searcher &searcher)
         {
 
         }
-        
     }
 }
 
-inline void uci()
-{
+inline void uci() {
     std::cout << "id name Starzix\n";
     std::cout << "id author zzzzz\n";
     std::cout << "option name Hash type spin default " << TT_DEFAULT_SIZE_MB << " min 1 max 1024\n";
@@ -134,10 +130,9 @@ inline void setoption(Searcher &searcher, std::vector<std::string> &tokens)
     if (optionName == "Hash" || optionName == "hash")
     {
         ttSizeMB = stoi(optionValue);
-        searcher.tt.resize();
+        searcher.resizeTT();
     }
-    else
-    {
+    else {
         bool found = false;
         for (auto &myTunableParam : tunableParams) 
         {
@@ -161,26 +156,12 @@ inline void setoption(Searcher &searcher, std::vector<std::string> &tokens)
     }
 }
 
-inline void ucinewgame(Searcher &searcher)
-{
-    searcher.tt.reset(); // reset/clear TT
-
-     // reset/clear histories and countermoves
-    memset(searcher.historyTable.data(), 0, sizeof(searcher.historyTable));
-    memset(searcher.countermoves.data(), 0, sizeof(searcher.countermoves));
-
-    // reset/clear killer moves
-    for (int i = 0; i < searcher.pliesData.size(); i++)
-        searcher.pliesData[i].killer = MOVE_NONE;
-}
-
-inline void position(Searcher &searcher, std::vector<std::string> &tokens)
+inline void position(Board &board, std::vector<std::string> &tokens)
 {
     int movesTokenIndex = -1;
 
-    if (tokens[1] == "startpos")
-    {
-        searcher.board = START_BOARD;
+    if (tokens[1] == "startpos") {
+        board = START_BOARD;
         movesTokenIndex = 2;
     }
     else if (tokens[1] == "fen")
@@ -190,24 +171,26 @@ inline void position(Searcher &searcher, std::vector<std::string> &tokens)
         for (i = 2; i < tokens.size() && tokens[i] != "moves"; i++)
             fen += tokens[i] + " ";
         fen.pop_back(); // remove last whitespace
-        searcher.board = Board(fen);
+        board = Board(fen);
         movesTokenIndex = i;
     }
 
     for (int i = movesTokenIndex + 1; i < tokens.size(); i++)
-        searcher.board.makeMove(tokens[i]);
+        board.makeMove(tokens[i]);
 }
 
 inline void go(Searcher &searcher, std::vector<std::string> &tokens)
 {
-    u64 milliseconds = U64_MAX;
-    u64 incrementMilliseconds = 0;
-    u16 movesToGo = defaultMovesToGo.value;
+    u8 maxDepth = 100;
+    i64 milliseconds = I64_MAX;
+    u64 incrementMs = 0;
+    u64 movesToGo = defaultMovesToGo.value;
     bool isMoveTime = false;
+    u64 maxNodes = U64_MAX;
 
     for (int i = 1; i < (int)tokens.size() - 1; i += 2)
     {
-        i64 value = stoi(tokens[i + 1]);
+        i64 value = std::stoll(tokens[i + 1]);
 
         if ((tokens[i] == "wtime" && searcher.board.sideToMove() == Color::WHITE) 
         ||  (tokens[i] == "btime" && searcher.board.sideToMove() == Color::BLACK))
@@ -215,7 +198,7 @@ inline void go(Searcher &searcher, std::vector<std::string> &tokens)
 
         else if ((tokens[i] == "winc" && searcher.board.sideToMove() == Color::WHITE) 
         ||       (tokens[i] == "binc" && searcher.board.sideToMove() == Color::BLACK))
-            incrementMilliseconds = value;
+            incrementMs = value;
 
         else if (tokens[i] == "movestogo")
             movesToGo = value;
@@ -225,13 +208,13 @@ inline void go(Searcher &searcher, std::vector<std::string> &tokens)
             isMoveTime = true;
         }
         else if (tokens[i] == "depth")
-            searcher.maxDepth = value;
+            maxDepth = std::clamp(value, (i64)1, (i64)255);
         else if (tokens[i] == "nodes")
-            searcher.softNodes = searcher.hardNodes = value;
+            maxNodes = value;
     }
 
-    searcher.setTimeLimits(milliseconds, incrementMilliseconds, movesToGo, isMoveTime);
-    auto [bestMove, score] = searcher.search();
+    auto [bestMove, score] = searcher.search(maxDepth, milliseconds, incrementMs, movesToGo, 
+                                             isMoveTime, maxNodes, maxNodes, true);
     assert(bestMove != MOVE_NONE);
     std::cout << "bestmove " + bestMove.toUci() + "\n";
 }

@@ -2,27 +2,20 @@
 
 #pragma once
 
-struct HistoryEntry
-{
-    i32 mainHistory;
+struct HistoryEntry {
+    public:
+
+    i32 mainHistory = 0, noisyHistory = 0;
 
     // [ply-1][pieceType][targetSquare]
-    std::array<std::array<std::array<i32, 64>, 6>, 2> continuationHistories;
-
-    i32 noisyHistory;
-
-    inline HistoryEntry() {
-        mainHistory = 0;
-        memset(continuationHistories.data(), 0, sizeof(continuationHistories));
-        noisyHistory = 0;
-    }
+    std::array<std::array<std::array<i32, 64>, 6>, 2> continuationHistories = { };
 
     inline i32 quietHistory(Board &board)
     {
-        // add main history
+        // Add main history
         i32 total = mainHistory;
 
-        // add continuation histories
+        // Add continuation histories
         Move move;
         for (int ply : {1, 2}) {
             if ((move = board.nthToLastMove(ply)) != MOVE_NONE)
@@ -46,8 +39,8 @@ struct HistoryEntry
             if ((move = board.nthToLastMove(ply)) != MOVE_NONE)
             {
                 int pt = (int)move.pieceType();
-                i32 *history = &continuationHistories[ply-1][pt][move.to()];
-                *history += bonus - abs(bonus) * *history / historyMax.value;
+                i32 &history = continuationHistories[ply-1][pt][move.to()];
+                history += bonus - abs(bonus) * history / historyMax.value;
             }
         }
     }

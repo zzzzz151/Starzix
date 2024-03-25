@@ -57,7 +57,7 @@ TunableParam<u8> doubleExtensionsMax = TunableParam<u8>("doubleExtensionsMax", 5
 TunableParam<double> lmrBase = TunableParam<double>("lmrBase", 0.69, 0.6, 1.0, 0.2);
 TunableParam<double> lmrMultiplier = TunableParam<double>("lmrMultiplier", 0.53, 0.3, 0.6, 0.15);
 TunableParam<i32> lmrQuietHistoryDiv = TunableParam<i32>("lmrQuietHistoryDiv", 9695, 4096, 24576, 4096);
-TunableParam<i32> lmrNoisyHistoryDiv = TunableParam<i32>("lmrNoisyHistoryDiv", 2407, 0, 16384, 8192);
+TunableParam<i32> lmrNoisyHistoryDiv = TunableParam<i32>("lmrNoisyHistoryDiv", 2407, 4, 16384, 4095);
 
 // History
 TunableParam<i32> historyMaxBonus = TunableParam<i32>("historyMaxBonus", 1320, 1200, 1800, 300);
@@ -65,15 +65,16 @@ TunableParam<i32> historyBonusMultiplier = TunableParam<i32>("historyBonusMultip
 TunableParam<i32> historyMax = TunableParam<i32>("historyMax", 12042, 8192, 24576, 4096);
 
 // Time Management
-TunableParam<u16> defaultMovesToGo = TunableParam<u16>("defaultMovesToGo", 20, 20, 25, 5);
-TunableParam<double> softMillisecondsPercentage = TunableParam<double>("softMillisecondsPercentage", 0.59, 0.5, 0.6, 0.1);
+TunableParam<u64> defaultMovesToGo = TunableParam<u64>("defaultMovesToGo", 20, 20, 25, 5);
+TunableParam<double> hardTimePercentage = TunableParam<double>("hardTimePercentage", 0.45, 0.3, 0.6, 0.15);
+TunableParam<double> softTimePercentage = TunableParam<double>("softTimePercentage", 0.6, 0.5, 0.7, 0.2);
 
 // Nodes time management (scale soft time based on best move nodes fraction)
 TunableParam<i32> nodesTmMinDepth = TunableParam<i32>("nodesTmMinDepth", 9, 7, 11, 2);
 TunableParam<double> nodesTmBase = TunableParam<double>("nodesTmBase", 1.57, 1.4, 1.6, 0.2);
 TunableParam<double> nodesTmMultiplier = TunableParam<double>("nodesTmMultiplier", 1.47, 1.3, 1.5, 0.2);
 
-using TunableParamVariant = std::variant<TunableParam<i32>*, TunableParam<double>*, TunableParam<u16>*, TunableParam<u8>*>;
+using TunableParamVariant = std::variant<TunableParam<i32>*, TunableParam<double>*, TunableParam<u16>*, TunableParam<u8>*, TunableParam<u64>*>;
 
 std::vector<TunableParamVariant> tunableParams 
 {
@@ -89,7 +90,7 @@ std::vector<TunableParamVariant> tunableParams
     &doubleExtensionMargin, &doubleExtensionsMax,
     &lmrBase, &lmrMultiplier, &lmrQuietHistoryDiv,  &lmrNoisyHistoryDiv,
     &historyMaxBonus, &historyBonusMultiplier, &historyMax,
-    &defaultMovesToGo, &softMillisecondsPercentage,
+    &defaultMovesToGo, &hardTimePercentage, &softTimePercentage,
     &nodesTmMinDepth, &nodesTmBase, &nodesTmMultiplier
 };
 
