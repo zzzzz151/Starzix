@@ -626,9 +626,6 @@ class Searcher {
               KILLER_SCORE           = 1'000'000'000,
               COUNTERMOVE_SCORE      = 500'000'000;
 
-    // Most valuable victim         P    N    B    R    Q    K  NONE
-    const std::array<i32, 7> MVV = {100, 300, 320, 500, 900, 0, 0};
-
     inline void scoreMoves(PlyData &plyData, Move ttMove)
     {
         int stm = (int)board.sideToMove();
@@ -653,7 +650,7 @@ class Searcher {
 
             // Starzix doesn't generate underpromotions in search
 
-            if (captured != PieceType::NONE || promotion == PieceType::QUEEN)
+            if (captured != PieceType::NONE)
             {
                 plyData.movesScores[i] = SEE(board, move) 
                                          ? (promotion == PieceType::QUEEN
@@ -661,7 +658,12 @@ class Searcher {
                                             : GOOD_NOISY_SCORE)
                                          : -GOOD_NOISY_SCORE;
 
-                plyData.movesScores[i] += MVV[(int)captured];
+                plyData.movesScores[i] += ((i32)captured + 1) * 1'000'000; // MVV (most valuable victim)
+                plyData.movesScores[i] += historyEntry->noisyHistory;
+            }
+            else if (promotion == PieceType::QUEEN)
+            {
+                plyData.movesScores[i] = SEE(board, move) ? GOOD_QUEEN_PROMO_SCORE : -GOOD_NOISY_SCORE;
                 plyData.movesScores[i] += historyEntry->noisyHistory;
             }
             else if (move == plyData.killer)
