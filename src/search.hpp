@@ -53,7 +53,7 @@ class Searcher {
     inline Searcher() {  
         ucinewgame();
         nodes = 0;      
-        std::cout << "TT size: " << ttSizeMB << " MB (" << tt.entries.size() << " entries)" << std::endl;
+        resizeTT();
     }
 
     inline void ucinewgame() {
@@ -76,7 +76,10 @@ class Searcher {
         return pliesData[0].pvLine[0];
     }
 
-    inline void resizeTT() { tt.resize(); }
+    inline void resizeTT() { 
+        tt.resize(); 
+        std::cout << "TT size: " << ttSizeMB << " MB (" << tt.entries.size() << " entries)" << std::endl;
+    }
 
     inline u64 millisecondsElapsed() {
         return (std::chrono::steady_clock::now() - startTime) / std::chrono::milliseconds(1);
