@@ -65,11 +65,7 @@ class Searcher {
         memset(countermoves.data(), 0, sizeof(countermoves));
         memset(historyTable.data(), 0, sizeof(historyTable));
     }
-
-    inline void resetLimits() {
-        maxDepth = 100;
-    }
-
+    
     inline u64 getNodes() { return nodes; }
 
     inline Move bestMoveRoot() {
@@ -299,8 +295,7 @@ class Searcher {
             && !(ttHit && ttEntry->getBound() == Bound::UPPER && ttEntry->score < beta)
             && board.hasNonPawnMaterial(stm))
             {
-                __builtin_prefetch(tt.probe(board.zobristHashAfter(MOVE_NONE)));
-                board.makeMove(MOVE_NONE);
+                board.makeMove(MOVE_NONE, &tt);
 
                 i32 nmpDepth = depth - nmpBaseReduction.value - depth / nmpReductionDivisor.value
                                - min((plyData.eval-beta) / nmpEvalBetaDivisor.value, nmpEvalBetaMax.value);
@@ -367,10 +362,8 @@ class Searcher {
                     continue;
             }
 
-            __builtin_prefetch(tt.probe(board.zobristHashAfter(move)));
-
             // skip illegal moves
-            if (!board.makeMove(move)) continue;
+            if (!board.makeMove(move, &tt)) continue;
 
             i32 extension = 0;
             if (ply == 0) goto skipExtensions;
@@ -387,7 +380,6 @@ class Searcher {
 
                 // Undo TT move we just made
                 BoardState boardState = board.getState();
-                Accumulator accumulator = board.getAccumulator();
                 board.undoMove();
 
                 i32 singularBeta = max(-INF, ttEntry->score - depth * singularBetaMultiplier.value);
@@ -395,9 +387,7 @@ class Searcher {
                 i32 singularScore = search((depth - 1) / 2, ply, singularBeta - 1, singularBeta, 
                                            doubleExtsLeft, true);
 
-                // Make the TT move again
-                board.pushState(boardState);
-                board.pushAccumulator(accumulator);
+                board.pushState(boardState, &tt); // Make the TT move again
 
                 // Double extension
                 if (singularScore < singularBeta - doubleExtensionMargin.value 
@@ -590,10 +580,8 @@ class Searcher {
             // SEE pruning (skip bad noisy moves)
             if (!board.inCheck() && moveScore < 0) break;
 
-            __builtin_prefetch(tt.probe(board.zobristHashAfter(move)));
-
             // skip illegal moves
-            if (!board.makeMove(move)) continue; 
+            if (!board.makeMove(move, &tt)) continue; 
 
             legalMovesPlayed++;
             nodes++;

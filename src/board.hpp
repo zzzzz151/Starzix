@@ -8,6 +8,7 @@
 #include "utils.hpp"
 #include "move.hpp"
 #include "attacks.hpp"
+#include "tt.hpp"
 #include "nnue.hpp"
 
 std::array<u64, 2> ZOBRIST_COLOR; // [color]
@@ -49,10 +50,10 @@ struct BoardState {
 
 class Board {
     private:
-    BoardState *state = nullptr;
     std::vector<BoardState> states = {};
-    Accumulator *accumulator = nullptr;
+    BoardState *state = nullptr;
     std::vector<Accumulator> accumulators = {};
+    u16 accumulatorIdx = 0;
 
     public:
     bool nnue = true;
@@ -60,9 +61,10 @@ class Board {
     inline Board() = default;
 
     // Copy constructor
-    Board(const Board& other) : states(other.states), accumulators(other.accumulators) {
+    Board(const Board& other) 
+    : states(other.states), accumulators(other.accumulators), accumulatorIdx(other.accumulatorIdx) 
+    {
         state = states.empty() ? nullptr : &states.back();
-        accumulator = accumulators.empty() ? nullptr : &accumulators.back();
     }
 
     // Copy assignment operator
@@ -71,7 +73,7 @@ class Board {
             states = other.states;
             state = states.empty() ? nullptr : &states.back();
             accumulators = other.accumulators;
-            accumulator = accumulators.empty() ? nullptr : &accumulators.back();
+            accumulatorIdx = other.accumulatorIdx;
         }
         return *this;
     }
@@ -79,14 +81,14 @@ class Board {
     inline Board(std::string fen)
     {
         states = {};
-        states.reserve(256);
+        states.reserve(512);
         states.push_back(BoardState());
         state = &states[0];
 
         accumulators = {};
-        accumulators.reserve(256);
-        accumulators.push_back(Accumulator());
-        accumulator = &accumulators[0];
+        accumulators.resize(512);
+        accumulators[0].init();
+        accumulatorIdx = 0;
 
         nnue = true;
 
@@ -119,7 +121,7 @@ class Board {
                 Square sq = currentRank * 8 + currentFile;
                 placePiece(color, pt, sq);
                 currentFile++;
-                if (nnue) accumulator->activate(color, pt, sq);
+                if (nnue) accumulators[accumulatorIdx].activate(color ,pt , sq);
             }
         }
 
@@ -156,8 +158,6 @@ class Board {
 
     inline BoardState getState() { return *state; }
 
-    inline Accumulator getAccumulator() { return *accumulator; }
-
     inline Color sideToMove() {
         assert(state->colorToMove != Color::NONE);
         return state->colorToMove; 
@@ -168,6 +168,10 @@ class Board {
         return state->colorToMove == Color::WHITE 
                ? Color::BLACK : Color::WHITE; 
     }
+
+    inline u64 zobristHash() { return state->zobristHash; }
+
+    inline Move lastMove() { return state->lastMove; }
 
     inline u64 bitboard(PieceType pieceType) {   
         return state->piecesBitboards[(int)pieceType];
@@ -344,8 +348,6 @@ class Board {
                : pieceTypeAt(move.to());
     }
 
-    inline u64 zobristHash() { return state->zobristHash; }
-
     inline bool isRepetition() {
         if (states.size() <= 4) return false;
 
@@ -373,10 +375,51 @@ class Board {
                || bitboard(PieceType::BISHOP) > 0);
     }
 
-    inline bool makeMove(Move move, bool verifyLegality = true)
+    inline Move uciToMove(std::string uciMove)
     {
-        assert(states.size() >= 1 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
+        Move move = MOVE_NONE;
+        Square from = strToSquare(uciMove.substr(0,2));
+        Square to = strToSquare(uciMove.substr(2,4));
+        PieceType pieceType = pieceTypeAt(from);
+        u16 moveFlag = (u16)pieceType + 1;
+
+        if (uciMove.size() == 5) // promotion
+        {
+            char promotionLowerCase = uciMove.back(); // last char of string
+            if (promotionLowerCase == 'n') 
+                moveFlag = Move::KNIGHT_PROMOTION_FLAG;
+            else if (promotionLowerCase == 'b') 
+                moveFlag = Move::BISHOP_PROMOTION_FLAG;
+            else if (promotionLowerCase == 'r') 
+                moveFlag = Move::ROOK_PROMOTION_FLAG;
+            else
+                moveFlag = Move::QUEEN_PROMOTION_FLAG;
+        }
+        else if (pieceType == PieceType::KING)
+        {
+            if (abs((int)to - (int)from) == 2)
+                moveFlag = Move::CASTLING_FLAG;
+        }
+        else if (pieceType == PieceType::PAWN)
+        { 
+            int bitboardSquaresTraveled = abs((int)to - (int)from);
+            if (bitboardSquaresTraveled == 16)
+                moveFlag = Move::PAWN_TWO_UP_FLAG;
+            else if (bitboardSquaresTraveled != 8 && !isOccupied(to))
+                moveFlag = Move::EN_PASSANT_FLAG;
+        }
+
+        return Move(from, to, moveFlag);
+    }
+
+    inline bool makeMove(std::string uciMove, TT *tt = nullptr) 
+    {
+        return makeMove(uciToMove(uciMove), tt);
+    }
+
+    inline bool makeMove(Move move, TT *tt = nullptr)
+    {
+        assert(states.size() >= 1 && state == &states.back() && accumulatorIdx < accumulators.size());
 
         states.push_back(*state);
         state = &states.back();
@@ -394,6 +437,8 @@ class Board {
                 state->zobristHash ^= ZOBRIST_FILES[(int)squareFile(state->enPassantSquare)];
                 state->enPassantSquare = SQUARE_NONE;
             }
+
+            if (tt != nullptr) __builtin_prefetch(tt->probe(state->zobristHash));
 
             state->pliesSincePawnOrCapture++;
 
@@ -439,28 +484,10 @@ class Board {
                        to);
         }
 
-        if (verifyLegality && inCheckNoCache())
-        {
+        if (inCheckNoCache()) {
             states.pop_back();
             state = &states.back();
             return false;
-        }
-
-        // Update NNUE accumulator
-        if (nnue)
-        {
-            accumulators.push_back(*accumulator);
-            accumulator = &accumulators.back();
-            accumulator->deactivate(state->colorToMove, pieceType, from);
-            if (captured != PieceType::NONE)
-                accumulator->deactivate(oppSide, captured, capturedPieceSquare);
-            accumulator->activate(state->colorToMove, promotion != PieceType::NONE ? promotion : pieceType, to);
-            if (moveFlag == Move::CASTLING_FLAG)
-            {
-                auto [rookFrom, rookTo] = CASTLING_ROOK_FROM_TO[to];
-                accumulator->deactivate(state->colorToMove, PieceType::ROOK, rookFrom);
-                accumulator->activate(state->colorToMove, PieceType::ROOK, rookTo);
-            }
         }
 
         state->zobristHash ^= state->castlingRights; // XOR old castling rights out
@@ -491,6 +518,22 @@ class Board {
             state->zobristHash ^= ZOBRIST_FILES[(int)squareFile(state->enPassantSquare)];
         }
 
+        state->zobristHash ^= ZOBRIST_COLOR[(int)state->colorToMove];
+        state->zobristHash ^= ZOBRIST_COLOR[(int)oppSide];
+
+        if (tt != nullptr) __builtin_prefetch(tt->probe(state->zobristHash));
+
+        // Update accumulator
+        if (nnue) {
+            if (accumulatorIdx == accumulators.size() - 1)
+                accumulators.push_back(Accumulator());
+
+            accumulators[accumulatorIdx+1].update(accumulators[accumulatorIdx], 
+                state->colorToMove, move, captured);
+
+            accumulatorIdx++;
+        }
+
         if (pieceType == PieceType::PAWN || captured != PieceType::NONE)
             state->pliesSincePawnOrCapture = 0;
         else
@@ -499,71 +542,50 @@ class Board {
         if (state->colorToMove == Color::BLACK)
             state->currentMoveCounter++;
 
-        state->zobristHash ^= ZOBRIST_COLOR[(int)state->colorToMove];
         state->colorToMove = oppSide;
-        state->zobristHash ^= ZOBRIST_COLOR[(int)state->colorToMove];
-
         state->inCheckCached = -1;
         state->lastMove = move;
 
         return true;
     }
 
-    inline Move uciToMove(std::string uciMove)
-    {
-        Move move = MOVE_NONE;
-        Square from = strToSquare(uciMove.substr(0,2));
-        Square to = strToSquare(uciMove.substr(2,4));
-        PieceType pieceType = pieceTypeAt(from);
-        u16 moveFlag = (u16)pieceType + 1;
-
-        if (uciMove.size() == 5) // promotion
-        {
-            char promotionLowerCase = uciMove.back(); // last char of string
-            if (promotionLowerCase == 'n') 
-                moveFlag = Move::KNIGHT_PROMOTION_FLAG;
-            else if (promotionLowerCase == 'b') 
-                moveFlag = Move::BISHOP_PROMOTION_FLAG;
-            else if (promotionLowerCase == 'r') 
-                moveFlag = Move::ROOK_PROMOTION_FLAG;
-            else
-                moveFlag = Move::QUEEN_PROMOTION_FLAG;
-        }
-        else if (pieceType == PieceType::KING)
-        {
-            if (abs((int)to - (int)from) == 2)
-                moveFlag = Move::CASTLING_FLAG;
-        }
-        else if (pieceType == PieceType::PAWN)
-        { 
-            int bitboardSquaresTraveled = abs((int)to - (int)from);
-            if (bitboardSquaresTraveled == 16)
-                moveFlag = Move::PAWN_TWO_UP_FLAG;
-            else if (bitboardSquaresTraveled != 8 && !isOccupied(to))
-                moveFlag = Move::EN_PASSANT_FLAG;
-        }
-
-        return Move(from, to, moveFlag);
-    }
-
-    inline bool makeMove(std::string uciMove, bool verifyLegality = true)
-    {
-        return makeMove(uciToMove(uciMove), verifyLegality);
-    }
-
     inline void undoMove()
     {
-        assert(states.size() >= 2 && state == &states.back() 
-               && accumulators.size() >= 1 && accumulator == &accumulators.back());
+        assert(states.size() >= 2 && state == &states.back() && accumulatorIdx < accumulators.size());
 
         if (state->lastMove != MOVE_NONE && nnue)
         {
-            assert(accumulators.size() >= 2);
-            accumulators.pop_back();
-            accumulator = &accumulators.back();
+            assert(accumulatorIdx > 0);
+            accumulatorIdx--;
         }
 
         states.pop_back();
+        state = &states.back();
+    }
+
+    inline void pushState(BoardState &newState, TT *tt = nullptr)
+    {
+        assert(states.size() >= 1 && state == &states.back() && accumulatorIdx < accumulators.size());
+
+        if (tt != nullptr) __builtin_prefetch(tt->probe(newState.zobristHash));
+
+        Move move = newState.lastMove;
+
+        // Update accumulator
+        if (nnue && move != MOVE_NONE) 
+        {
+            if (accumulatorIdx == accumulators.size() - 1)
+                accumulators.push_back(Accumulator());
+
+            PieceType captured = this->captured(move);
+
+            accumulators[accumulatorIdx+1].update(accumulators[accumulatorIdx], 
+                state->colorToMove, move, captured);
+
+            accumulatorIdx++;
+        }
+
+        states.push_back(newState);
         state = &states.back();
     }
 
@@ -761,6 +783,15 @@ class Board {
         return state->inCheckCached = isSquareAttacked(ourKingSquare, oppSide());
     }
 
+    inline bool inCheck2PliesAgo() {
+        if (states.size() <= 2) return false;
+
+        state = &states[states.size() - 3];
+        bool wasInCheck = inCheck();
+        state = &states.back();
+        return wasInCheck;
+    }
+
     private:
 
     // Used internally in makeMove()
@@ -787,8 +818,6 @@ class Board {
                || bitboard(color, PieceType::QUEEN) > 0;
     }
 
-    inline Move lastMove() { return state->lastMove; }
-
     inline Move nthToLastMove(int n) {
         assert(n >= 1);
         return (int)states.size() - n < 0 
@@ -797,87 +826,7 @@ class Board {
 
     inline auto evaluate() {
         assert(state->colorToMove != Color::NONE);
-        return nnue::evaluate(*accumulator, state->colorToMove);
-    }
-
-    inline void pushState(BoardState &newState)
-    {
-        states.push_back(newState);
-        state = &states.back();
-    }
-
-    inline void pushAccumulator(Accumulator &newAccumulator)
-    {
-        accumulators.push_back(newAccumulator);
-        accumulator = &accumulators.back();
-    }
-
-    inline u64 zobristHashAfter(Move move)
-    {
-        int stm = (int)state->colorToMove;
-        int nstm = (int)oppSide();
-
-        u64 hashAfter = state->zobristHash ^ ZOBRIST_COLOR[stm] ^ ZOBRIST_COLOR[nstm];
-
-        if (state->enPassantSquare != SQUARE_NONE) {
-            int file = (int)squareFile(state->enPassantSquare);
-            hashAfter ^= ZOBRIST_FILES[file];
-        }
-
-        if (move == MOVE_NONE) return hashAfter;
-
-        auto moveFlag = move.flag();
-        Square from = move.from();
-        Square to = move.to();
-
-        if (moveFlag == Move::CASTLING_FLAG) {
-            auto [rookFrom, rookTo] = CASTLING_ROOK_FROM_TO[to];
-
-            return hashAfter
-                   ^ ZOBRIST_PIECES[stm][(u8)PieceType::KING][from]
-                   ^ ZOBRIST_PIECES[stm][(u8)PieceType::KING][to]
-                   ^ ZOBRIST_PIECES[stm][(u8)PieceType::ROOK][rookFrom]
-                   ^ ZOBRIST_PIECES[stm][(u8)PieceType::ROOK][rookTo];
-        }
-        else if (moveFlag == Move::EN_PASSANT_FLAG) {
-            Square capturedPawnSquare = state->colorToMove == Color::WHITE
-                                        ? to - 8 : to + 8;
-
-            return hashAfter 
-                   ^ ZOBRIST_PIECES[stm][(u8)PieceType::PAWN][from]
-                   ^ ZOBRIST_PIECES[stm][(u8)PieceType::PAWN][to]
-                   ^ ZOBRIST_PIECES[nstm][(u8)PieceType::PAWN][capturedPawnSquare];
-        }
-        else if (moveFlag == Move::PAWN_TWO_UP_FLAG) {
-            int file = (int)squareFile(to);
-
-            return hashAfter
-                   ^ ZOBRIST_PIECES[stm][(u8)PieceType::PAWN][from]
-                   ^ ZOBRIST_PIECES[stm][(u8)PieceType::PAWN][to]
-                   ^ ZOBRIST_FILES[file];
-        }
-
-        PieceType captured = this->captured(move);
-        if (captured != PieceType::NONE)
-            hashAfter ^= ZOBRIST_PIECES[nstm][(u8)captured][to];
-
-        PieceType pieceType = move.pieceType();
-        PieceType promotion = move.promotion();
-        PieceType place = promotion == PieceType::NONE 
-                          ? pieceType : promotion;
-
-        return hashAfter
-               ^ ZOBRIST_PIECES[stm][(u8)pieceType][from]
-               ^ ZOBRIST_PIECES[stm][(u8)place][to];
-    }
-    
-    inline bool inCheck2PliesAgo() {
-        if (states.size() <= 2) return false;
-
-        state = &states[states.size() - 3];
-        bool wasInCheck = inCheck();
-        state = &states.back();
-        return wasInCheck;
+        return nnue::evaluate(accumulators[accumulatorIdx], state->colorToMove);
     }
 
 }; // class Board
