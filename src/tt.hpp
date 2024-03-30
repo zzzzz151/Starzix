@@ -74,7 +74,8 @@ struct TT {
     }
 
     inline TTEntry* probe(u64 zobristHash) {
-        return &entries[zobristHash % entries.size()];
+        u64 idx = ((u128)zobristHash * (u128)entries.size()) >> 64;
+        return &entries[idx];
     }
 
     inline void store(TTEntry *ttEntry, u64 zobristHash, u8 depth, u8 ply, i16 score, Move bestMove, Bound bound)
