@@ -3,9 +3,6 @@
 
 #pragma once
 
-                                              // P    N    B    R    Q    K  NONE
-constexpr std::array<i32, 7> SEE_PIECE_VALUES = {100, 300, 300, 500, 900, 0, 0};
-
 inline PieceType popLeastValuable(Board &board, u64 &occ, u64 attackers, Color color)
 {
     for (int pt = 0; pt <= 5; pt++)
@@ -24,21 +21,32 @@ inline PieceType popLeastValuable(Board &board, u64 &occ, u64 attackers, Color c
 inline bool SEE(Board &board, Move move, i32 threshold = 0)
 {
     assert(move != MOVE_NONE);
+
+    const std::array<i32, 7> SEE_PIECE_VALUES = {
+        seePawnValue.value,  // Pawn
+        seeMinorValue.value, // Knight
+        seeMinorValue.value, // Bishop
+        seeRookValue.value,  // Rook
+        seeQueenValue.value, // Queen
+        0,                   // King
+        0                    // None
+    };
+
     i32 score = -threshold;
 
     PieceType captured = board.captured(move);
-    score += SEE_PIECE_VALUES[(u8)captured];
+    score += SEE_PIECE_VALUES[(int)captured];
 
     PieceType promotion = move.promotion();
 
     if (promotion != PieceType::NONE)
-        score += SEE_PIECE_VALUES[(u8)promotion] 
-                 - SEE_PIECE_VALUES[(u8)PieceType::PAWN];
+        score += SEE_PIECE_VALUES[(int)promotion] 
+                 - SEE_PIECE_VALUES[(int)PieceType::PAWN];
 
     if (score < 0) return false;
 
     PieceType next = promotion != PieceType::NONE ? promotion : move.pieceType();
-    score -= SEE_PIECE_VALUES[(u8)next];
+    score -= SEE_PIECE_VALUES[(int)next];
     if (score >= 0) return true;
 
     Square from = move.from();

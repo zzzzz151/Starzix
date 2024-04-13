@@ -5,7 +5,6 @@
 #include <cstring> // for memset()
 
 const u16 TT_DEFAULT_SIZE_MB = 32;
-u16 ttSizeMB = TT_DEFAULT_SIZE_MB;
 
 enum class Bound {
     INVALID = 0,
@@ -61,11 +60,10 @@ struct TT {
     std::vector<TTEntry> entries = {};
     u8 age = 0;
 
-    inline void resize() {
+    inline void resize(u64 newSizeMB) {
         entries.clear();
-        u32 numEntries = ttSizeMB * 1024 * 1024 / sizeof(TTEntry);
+        u64 numEntries = newSizeMB * (u64)1024 * (u64)1024 / (u64)sizeof(TTEntry);
         entries.resize(numEntries);
-        //std::cout << "TT size: " << ttSizeMB << " MB (" << numEntries << " entries)" << std::endl;
     }
 
     inline void reset() {

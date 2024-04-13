@@ -10,71 +10,92 @@ template <typename T> struct TunableParam {
 };
 
 // Aspiration windows
-TunableParam<i32> aspMinDepth = TunableParam<i32>("aspMinDepth", 8, 6, 10, 2);
-TunableParam<i32> aspInitialDelta = TunableParam<i32>("aspInitialDelta", 11, 10, 20, 5);
-TunableParam<double> aspDeltaMultiplier = TunableParam<double>("aspDeltaMultiplier", 1.28, 1.25, 2.0, 0.25);
+TunableParam<i32> aspMinDepth = TunableParam<i32>("aspMinDepth", 8, 6, 10, 1);
+TunableParam<i32> aspInitialDelta = TunableParam<i32>("aspInitialDelta", 11, 5, 25, 5);
+TunableParam<double> aspDeltaMultiplier = TunableParam<double>("aspDeltaMultiplier", 1.51, 1.2, 2.0, 0.1);
 
 // RFP (Reverse futility pruning) / Static NMP
-TunableParam<i32> rfpMaxDepth = TunableParam<i32>("rfpMaxDepth", 6, 6, 10, 2);
-TunableParam<i32> rfpDepthMultiplier = TunableParam<i32>("rfpDepthMultiplier", 61, 40, 160, 60);
+TunableParam<i32> rfpMaxDepth = TunableParam<i32>("rfpMaxDepth", 8, 6, 10, 1);
+TunableParam<i32> rfpDepthMultiplier = TunableParam<i32>("rfpDepthMultiplier", 68, 40, 130, 10);
 
 // Razoring
-TunableParam<i32> razoringMaxDepth = TunableParam<i32>("razoringMaxDepth", 3, 2, 6, 2);
-TunableParam<i32> razoringDepthMultiplier = TunableParam<i32>("razoringDepthMultiplier", 386, 250, 450, 100);
+TunableParam<i32> razoringMaxDepth = TunableParam<i32>("razoringMaxDepth", 5, 2, 6, 2);
+TunableParam<i32> razoringDepthMultiplier = TunableParam<i32>("razoringDepthMultiplier", 290, 250, 450, 100);
 
 // NMP (Null move pruning)
-TunableParam<i32> nmpMinDepth = TunableParam<i32>("nmpMinDepth", 2, 2, 4, 1);
-TunableParam<i32> nmpBaseReduction = TunableParam<i32>("nmpBaseReduction", 4, 2, 4, 1);
-TunableParam<i32> nmpReductionDivisor = TunableParam<i32>("nmpReductionDivisor", 3, 2, 4, 1);
-TunableParam<i32> nmpEvalBetaDivisor = TunableParam<i32>("nmpEvalBetaDivisor", 274, 100, 300, 100);
-TunableParam<i32> nmpEvalBetaMax = TunableParam<i32>("nmpEvalBetaMax", 3, 2, 4, 2);
+TunableParam<i32> nmpMinDepth = TunableParam<i32>("nmpMinDepth", 3, 2, 4, 1);
+TunableParam<float> nmpBaseReduction = TunableParam<float>("nmpBaseReduction", 2.48, 2.0, 4.0, 0.5);
+TunableParam<float> nmpReductionDivisor = TunableParam<float>("nmpReductionDivisor", 2.43, 2.0, 4.0, 0.5);
+TunableParam<i32> nmpEvalBetaDivisor = TunableParam<i32>("nmpEvalBetaDivisor", 212, 100, 300, 50);
+TunableParam<i32> nmpEvalBetaMax = TunableParam<i32>("nmpEvalBetaMax", 4, 1, 5, 2);
 
 // IIR (Internal iterative reduction)
-TunableParam<i32> iirMinDepth = TunableParam<i32>("iirMinDepth", 5, 4, 6, 2);
+TunableParam<i32> iirMinDepth = TunableParam<i32>("iirMinDepth", 5, 4, 6, 1);
 
 // LMP (Late move pruning)
-TunableParam<i32> lmpMinMoves = TunableParam<i32>("lmpMinMoves", 2, 2, 4, 2);
-TunableParam<double> lmpDepthMultiplier = TunableParam<double>("lmpDepthMultiplier", 1.0, 0.5, 1.5, 0.5);
+TunableParam<i32> lmpMinMoves = TunableParam<i32>("lmpMinMoves", 2, 2, 4, 1);
+TunableParam<float> lmpDepthMultiplier = TunableParam<float>("lmpDepthMultiplier", 0.95, 0.5, 1.5, 0.1);
 
 // FP (Futility pruning)
-TunableParam<i32> fpMaxDepth = TunableParam<i32>("fpMaxDepth", 7, 6, 10, 2);
-TunableParam<i32> fpBase = TunableParam<i32>("fpBase", 97, 50, 200, 50);
-TunableParam<i32> fpMultiplier = TunableParam<i32>("fpMultiplier", 136, 60, 180, 60);
+TunableParam<i32> fpMaxDepth = TunableParam<i32>("fpMaxDepth", 7, 6, 10, 1);
+TunableParam<i32> fpBase = TunableParam<i32>("fpBase", 160, 40, 260, 22);
+TunableParam<i32> fpMultiplier = TunableParam<i32>("fpMultiplier", 185, 40, 260, 22);
 
 // SEE pruning
-TunableParam<i32> seePruningMaxDepth = TunableParam<i32>("seePruningMaxDepth", 8, 7, 11, 2);
-TunableParam<i32> seeNoisyThreshold = TunableParam<i32>("seeNoisyThreshold", -17, -35, -5, 15);
-TunableParam<i32> seeQuietThreshold = TunableParam<i32>("seeQuietThreshold", -60, -85, -45, 20);
+TunableParam<i32> seePruningMaxDepth = TunableParam<i32>("seePruningMaxDepth", 8, 7, 11, 1);
+TunableParam<i32> seeNoisyThreshold = TunableParam<i32>("seeNoisyThreshold", -13, -51, -1, 10);
+TunableParam<i32> seeQuietThreshold = TunableParam<i32>("seeQuietThreshold", -53, -101, -1, 20);
 
 // SE (Singular extensions)
-TunableParam<i32> singularMinDepth = TunableParam<i32>("singularMinDepth", 6, 6, 10, 2);
-TunableParam<i32> singularDepthMargin = TunableParam<i32>("singularDepthMargin", 4, 1, 5, 2);
-TunableParam<i32> singularBetaMultiplier = TunableParam<i32>("singularBetaMultiplier", 2, 1, 3, 1);
-TunableParam<i32> doubleExtensionMargin = TunableParam<i32>("doubleExtensionMargin", 23, 10, 30, 10);
-TunableParam<u8> doubleExtensionsMax = TunableParam<u8>("doubleExtensionsMax", 5, 2, 8, 3);
+TunableParam<i32> singularMinDepth = TunableParam<i32>("singularMinDepth", 7, 6, 10, 1);
+TunableParam<i32> singularDepthMargin = TunableParam<i32>("singularDepthMargin", 2, 1, 5, 1);
+TunableParam<float> singularBetaMultiplier = TunableParam<float>("singularBetaMultiplier", 2.04, 1.0, 3.0, 0.5);
+TunableParam<i32> doubleExtensionMargin = TunableParam<i32>("doubleExtensionMargin", 20, 2, 42, 10);
+TunableParam<u8> doubleExtensionsMax = TunableParam<u8>("doubleExtensionsMax", 6, 4, 10, 2);
 
 // LMR (Late move reductions)
-TunableParam<double> lmrBase = TunableParam<double>("lmrBase", 0.69, 0.6, 1.0, 0.2);
-TunableParam<double> lmrMultiplier = TunableParam<double>("lmrMultiplier", 0.53, 0.3, 0.6, 0.15);
-TunableParam<i32> lmrQuietHistoryDiv = TunableParam<i32>("lmrQuietHistoryDiv", 9695, 4096, 24576, 4096);
-TunableParam<i32> lmrNoisyHistoryDiv = TunableParam<i32>("lmrNoisyHistoryDiv", 2407, 4, 16384, 4095);
+TunableParam<double> lmrBase = TunableParam<double>("lmrBase", 0.69, 0.4, 1.2, 0.1);
+TunableParam<double> lmrMultiplier = TunableParam<double>("lmrMultiplier", 0.38, 0.2, 0.8, 0.1);
+TunableParam<i32> lmrQuietHistoryDiv = TunableParam<i32>("lmrQuietHistoryDiv", 6677, 2048, 32768, 2048);
+TunableParam<i32> lmrNoisyHistoryDiv = TunableParam<i32>("lmrNoisyHistoryDiv", 1806, 16, 32768, 2047);
 
 // History
-TunableParam<i32> historyMaxBonus = TunableParam<i32>("historyMaxBonus", 1320, 1200, 1800, 300);
-TunableParam<i32> historyBonusMultiplier = TunableParam<i32>("historyBonusMultiplier", 292, 200, 400, 100);
-TunableParam<i32> historyMax = TunableParam<i32>("historyMax", 12042, 8192, 24576, 4096);
+TunableParam<i32> historyMax = TunableParam<i32>("historyMax", 10389, 8192, 32768, 2048);
+TunableParam<i32> historyBonusMultiplier = TunableParam<i32>("historyBonusMultiplier", 274, 50, 600, 50);
+TunableParam<i32> historyBonusOffset = TunableParam<i32>("historyBonusOffset", 57, 0, 1000, 100);
+TunableParam<i32> historyBonusMax = TunableParam<i32>("historyBonusMax", 1351, 500, 2500, 100);
+TunableParam<i32> historyMalusMultiplier = TunableParam<i32>("historyMalusMultiplier", 521, 50, 600, 50);
+TunableParam<i32> historyMalusOffset = TunableParam<i32>("historyMalusOffset", 90, 0, 1000, 100);
+TunableParam<i32> historyMalusMax = TunableParam<i32>("historyMalusMax", 1029, 500, 2500, 100);
+TunableParam<float> historyBonusMultiplierMain = TunableParam<float>("historyBonusMultiplierMain", 1.07, 0.25, 4.0, 0.25);
+TunableParam<float> historyBonusMultiplierNoisy = TunableParam<float>("historyBonusMultiplierNoisy", 0.69, 0.25, 4.0, 0.25);
+TunableParam<float> historyBonusMultiplier1Ply = TunableParam<float>("historyBonusMultiplier1Ply", 1.25, 0.25, 4.0, 0.25);
+TunableParam<float> historyBonusMultiplier2Ply = TunableParam<float>("historyBonusMultiplier2Ply", 1.05, 0.25, 4.0, 0.25);
+TunableParam<float> historyBonusMultiplier4Ply = TunableParam<float>("historyBonusMultiplier4Ply", 0.95, 0.25, 4.0, 0.25);
 
 // Time Management
-TunableParam<u64> defaultMovesToGo = TunableParam<u64>("defaultMovesToGo", 20, 20, 25, 5);
-TunableParam<double> hardTimePercentage = TunableParam<double>("hardTimePercentage", 0.45, 0.3, 0.6, 0.15);
-TunableParam<double> softTimePercentage = TunableParam<double>("softTimePercentage", 0.6, 0.5, 0.7, 0.2);
+TunableParam<u64> defaultMovesToGo = TunableParam<u64>("defaultMovesToGo", 21, 20, 26, 3);
+TunableParam<double> hardTimePercentage = TunableParam<double>("hardTimePercentage", 0.57, 0.3, 0.6, 0.15);
+TunableParam<double> softTimePercentage = TunableParam<double>("softTimePercentage", 0.69, 0.5, 0.7, 0.1);
 
 // Nodes time management (scale soft time based on best move nodes fraction)
-TunableParam<i32> nodesTmMinDepth = TunableParam<i32>("nodesTmMinDepth", 9, 7, 11, 2);
-TunableParam<double> nodesTmBase = TunableParam<double>("nodesTmBase", 1.57, 1.4, 1.6, 0.2);
-TunableParam<double> nodesTmMultiplier = TunableParam<double>("nodesTmMultiplier", 1.47, 1.3, 1.5, 0.2);
+TunableParam<i32> nodesTmMinDepth = TunableParam<i32>("nodesTmMinDepth", 10, 7, 11, 1);
+TunableParam<double> nodesTmBase = TunableParam<double>("nodesTmBase", 1.49, 1.4, 1.6, 0.1);
+TunableParam<double> nodesTmMultiplier = TunableParam<double>("nodesTmMultiplier", 1.5, 1.3, 1.5, 0.1);
 
-using TunableParamVariant = std::variant<TunableParam<i32>*, TunableParam<double>*, TunableParam<u16>*, TunableParam<u8>*, TunableParam<u64>*>;
+// SEE piece values
+TunableParam<i32> seePawnValue = TunableParam<i32>("seePawnValue", 185, 0, 200, 40);
+TunableParam<i32> seeMinorValue = TunableParam<i32>("seeMinorValue", 296, 150, 450, 50);
+TunableParam<i32> seeRookValue = TunableParam<i32>("seeRookValue", 378, 300, 700, 50);
+TunableParam<i32> seeQueenValue = TunableParam<i32>("seeQueenValue", 722, 600, 1200, 100);
+
+using TunableParamVariant = std::variant<
+    TunableParam<u8>*,
+    TunableParam<u64>*,
+    TunableParam<i32>*, 
+    TunableParam<double>*, 
+    TunableParam<float>*
+>;
 
 std::vector<TunableParamVariant> tunableParams 
 {
@@ -88,10 +109,15 @@ std::vector<TunableParamVariant> tunableParams
     &seePruningMaxDepth, &seeNoisyThreshold, &seeQuietThreshold,
     &singularMinDepth, &singularDepthMargin, &singularBetaMultiplier,
     &doubleExtensionMargin, &doubleExtensionsMax,
-    &lmrBase, &lmrMultiplier, &lmrQuietHistoryDiv,  &lmrNoisyHistoryDiv,
-    &historyMaxBonus, &historyBonusMultiplier, &historyMax,
+    &lmrBase, &lmrMultiplier, &lmrQuietHistoryDiv, &lmrNoisyHistoryDiv,
+    &historyMax,
+    &historyBonusMultiplier, &historyBonusOffset, &historyBonusMax,
+    &historyMalusMultiplier, &historyMalusOffset, &historyMalusMax,
+    &historyBonusMultiplierMain, &historyBonusMultiplierNoisy,
+    &historyBonusMultiplier1Ply, &historyBonusMultiplier2Ply, &historyBonusMultiplier4Ply,
     &defaultMovesToGo, &hardTimePercentage, &softTimePercentage,
-    &nodesTmMinDepth, &nodesTmBase, &nodesTmMultiplier
+    &nodesTmMinDepth, &nodesTmBase, &nodesTmMultiplier,
+    &seePawnValue, &seeMinorValue, &seeRookValue, &seeQueenValue
 };
 
 inline void printParamsAsJson()
@@ -119,29 +145,33 @@ inline void printParamsAsJson()
             std::cout << indent << indent 
                       << "\"value\": " 
                       << (std::is_same<decltype(tunableParam->value), double>::value
-                          ? tunableParam->value * 100.0
-                          : (i64)tunableParam->value)
+                         || std::is_same<decltype(tunableParam->value), float>::value
+                         ? tunableParam->value * 100.0
+                         : (i64)tunableParam->value)
                       << "," << std::endl;
 
             std::cout << indent << indent 
                       << "\"min_value\": " 
                       << (std::is_same<decltype(tunableParam->min), double>::value
-                          ? tunableParam->min * 100.0
-                          : (i64)tunableParam->min)
+                         || std::is_same<decltype(tunableParam->min), float>::value
+                         ? tunableParam->min * 100.0
+                         : (i64)tunableParam->min)
                       << "," << std::endl;
 
             std::cout << indent << indent 
                       << "\"max_value\": " 
                       << (std::is_same<decltype(tunableParam->max), double>::value
-                          ? tunableParam->max * 100.0
-                          : (i64)tunableParam->max)
+                         || std::is_same<decltype(tunableParam->max), float>::value
+                         ? tunableParam->max * 100.0
+                         : (i64)tunableParam->max)
                       << "," << std::endl;
 
             std::cout << indent << indent 
                       << "\"step\": " 
                       << (std::is_same<decltype(tunableParam->step), double>::value
-                          ? tunableParam->step * 100.0
-                          : (i64)tunableParam->step)
+                         || std::is_same<decltype(tunableParam->step), float>::value
+                         ? tunableParam->step * 100.0
+                         : (i64)tunableParam->step)
                       << std::endl;
 
             std::cout << indent << "}," << std::endl;

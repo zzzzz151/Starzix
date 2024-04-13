@@ -94,17 +94,18 @@ inline void uci() {
     std::cout << "id author zzzzz\n";
     std::cout << "option name Hash type spin default " << TT_DEFAULT_SIZE_MB << " min 1 max 1024\n";
 
-    /*
+    
     for (auto &myTunableParam : tunableParams) 
     {
         std::visit([](auto &tunableParam) 
         {
             std::cout << "option name " << tunableParam->name;
-            if (std::is_same<decltype(tunableParam->value), double>::value)
+            if (std::is_same<decltype(tunableParam->value), double>::value
+            || std::is_same<decltype(tunableParam->value), float>::value)
             {
-                std::cout << " type spin default " << (tunableParam->value * 100.0)
-                          << " min " << (tunableParam->min * 100.0)
-                          << " max " << (tunableParam->max * 100.0);
+                std::cout << " type spin default " << i64(tunableParam->value * 100.0)
+                          << " min " << i64(tunableParam->min * 100.0)
+                          << " max " << i64(tunableParam->max * 100.0);
             }
             else
             {
@@ -115,7 +116,7 @@ inline void uci() {
             std::cout << "\n";
         }, myTunableParam);
     }
-    */
+    
 
     std::cout << "uciok" << std::endl;
 }
@@ -128,10 +129,7 @@ inline void setoption(Searcher &searcher, std::vector<std::string> &tokens)
     trim(optionValue);
 
     if (optionName == "Hash" || optionName == "hash")
-    {
-        ttSizeMB = stoi(optionValue);
-        searcher.resizeTT();
-    }
+        searcher.resizeTT(stoll(optionValue));
     else {
         bool found = false;
         for (auto &myTunableParam : tunableParams) 
@@ -141,7 +139,8 @@ inline void setoption(Searcher &searcher, std::vector<std::string> &tokens)
                 if (optionName == tunableParam->name)
                 {
                     tunableParam->value = std::is_same<decltype(tunableParam->value), double>::value
-                                          ? stoi(optionValue) / 100.0 : stoi(optionValue);
+                                          || std::is_same<decltype(tunableParam->value), float>::value
+                                          ? stoll(optionValue) / 100.0 : stoll(optionValue);
 
                     if (tunableParam->name == lmrBase.name 
                     || tunableParam->name == lmrMultiplier.name)

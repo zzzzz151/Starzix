@@ -52,14 +52,14 @@ class Searcher {
 
     inline Searcher() {  
         ucinewgame();
+        resizeTT(TT_DEFAULT_SIZE_MB);
         nodes = 0;      
-        resizeTT();
     }
 
     inline void ucinewgame() {
         startTime = std::chrono::steady_clock::now();
         board = START_BOARD;
-        tt.resize();
+        memset(tt.entries.data(), 0, tt.entries.size() * sizeof(TTEntry));
         memset(pliesData.data(), 0, sizeof(pliesData));
         memset(movesNodes.data(), 0, sizeof(movesNodes));
         memset(countermoves.data(), 0, sizeof(countermoves));
@@ -72,9 +72,9 @@ class Searcher {
         return pliesData[0].pvLine[0];
     }
 
-    inline void resizeTT() { 
-        tt.resize(); 
-        std::cout << "TT size: " << ttSizeMB << " MB (" << tt.entries.size() << " entries)" << std::endl;
+    inline void resizeTT(u16 newSizeMB) { 
+        tt.resize(newSizeMB); 
+        std::cout << "TT size: " << newSizeMB << " MB (" << tt.entries.size() << " entries)" << std::endl;
     }
 
     inline u64 millisecondsElapsed() {
@@ -382,7 +382,7 @@ class Searcher {
                 BoardState boardState = board.getState();
                 board.undoMove();
 
-                i32 singularBeta = max(-INF, ttEntry->score - depth * singularBetaMultiplier.value);
+                i32 singularBeta = max(-INF, (i32)ttEntry->score - i32(depth * singularBetaMultiplier.value));
 
                 i32 singularScore = search((depth - 1) / 2, ply, singularBeta - 1, singularBeta, 
                                            doubleExtsLeft, true);
@@ -482,8 +482,11 @@ class Searcher {
 
             bound = Bound::LOWER;
 
-            i32 historyBonus = min(historyMaxBonus.value, 
-                                   historyBonusMultiplier.value * (depth-1));
+            i32 historyBonus = min(historyBonusMax.value, 
+                                   depth * historyBonusMultiplier.value - historyBonusOffset.value);
+
+            i32 historyMalus = -min(historyMalusMax.value,
+                                    depth * historyMalusMultiplier.value - historyMalusOffset.value);
 
             if (isQuiet) {
                 // This fail high quiet is now a killer move
@@ -499,7 +502,7 @@ class Searcher {
 
                 // History malus: this fail high is a quiet, so decrease history of fail low quiets
                 for (int i = 0; i < failLowQuiets; i++)
-                    failLowsHistoryEntry[i]->updateQuietHistory(board, -historyBonus);
+                    failLowsHistoryEntry[i]->updateQuietHistory(board, historyMalus);
             }
             else
                 // Increaes history of this fail high noisy move
@@ -507,7 +510,7 @@ class Searcher {
 
             // History malus: always decrease history of fail low noisy moves
             for (int i = 255, j = 0; j < failLowNoisies; j++, i--)
-                failLowsHistoryEntry[i]->updateNoisyHistory(-historyBonus);
+                failLowsHistoryEntry[i]->updateNoisyHistory(historyMalus);
 
             break; // Fail high / beta cutoff
         }
@@ -516,7 +519,7 @@ class Searcher {
             return board.inCheck() ? -INF + ply : 0;
 
         if (!singular)
-            tt.store(ttEntry, board.zobristHash(), depth, ply, bestScore, bestMove, bound);    
+            tt.store(ttEntry, board.zobristHash(), depth, ply, bestScore, bestMove, bound);
 
         return bestScore;
     }
