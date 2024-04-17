@@ -1,21 +1,25 @@
 #include "search_params.hpp"
 #include "tt.hpp"
+#include "nnue.hpp"
 #include "see.hpp"
 #include "history_entry.hpp"
 
-std::array<std::array<u8, 256>, 256> LMR_TABLE; // [depth][moveIndex]
+constexpr u8 MAX_DEPTH = 100;
+constexpr i64 OVERHEAD_MILLISECONDS = 10;
+
+std::array<std::array<u8, 256>, MAX_DEPTH> LMR_TABLE; // [depth][moveIndex]
 
 constexpr void initLmrTable()
 {
     memset(LMR_TABLE.data(), 0, sizeof(LMR_TABLE));
     for (int depth = 1; depth < LMR_TABLE.size(); depth++)
-        for (int move = 1; move < LMR_TABLE.size(); move++)
+        for (int move = 1; move < LMR_TABLE[0].size(); move++)
             LMR_TABLE[depth][move] = round(lmrBase.value + ln(depth) * ln(move) * lmrMultiplier.value);
 }
 
 struct PlyData {
     public:
-    std::array<Move, 256> pvLine = { };
+    std::array<Move, MAX_DEPTH+1> pvLine = { };
     u8 pvLength = 0;
     Move killer = MOVE_NONE;
     i32 eval = 0;
@@ -26,44 +30,52 @@ struct PlyData {
 class Searcher {
     public:
 
-    Board board;
+    Board board = START_BOARD;
 
     private:
 
-    u8 maxDepth;
-    u64 nodes;
-    u8 maxPlyReached;
-    TT tt;
-    std::chrono::time_point<std::chrono::steady_clock> startTime;
-    u64 softMilliseconds, hardMilliseconds;
-    u64 softNodes, hardNodes;
-    bool hardTimeUp;
+    u8 maxDepth = MAX_DEPTH;
+    u64 nodes = 0;
+    u8 maxPlyReached = 0;
 
-    std::array<PlyData, 256> pliesData;     // [ply]
-    std::array<u64, 1ULL << 16> movesNodes; // [moveEncoded]
+    std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
+
+    u64 softMilliseconds = U64_MAX, 
+        hardMilliseconds = U64_MAX,
+        softNodes = U64_MAX,
+        hardNodes = U64_MAX;
+
+    bool hardTimeUp = false;
+
+    std::array<PlyData, MAX_DEPTH+1> pliesData = {}; // [ply]
+
+    std::array<Accumulator, MAX_DEPTH+1> accumulators = { START_POS_ACCUMULATOR };
+    u8 accumulatorIdx = 0;
+
+    std::vector<TTEntry> tt = std::vector<TTEntry>(32 * 1024 * 1024 / sizeof(TTEntry));
+
+    std::array<u64, 1ULL << 17> movesNodes = {}; // [moveEncoded]
 
     // [color][pieceType][targetSquare]
-    std::array<std::array<std::array<Move, 64>, 6>, 2> countermoves;
-    std::array<std::array<std::array<HistoryEntry, 64>, 6>, 2> historyTable;
-
-    const i64 OVERHEAD_MILLISECONDS = 10;
+    std::array<std::array<std::array<Move, 64>, 6>, 2> countermoves = {};
+    std::array<std::array<std::array<HistoryEntry, 64>, 6>, 2> historyTable = {};
 
     public:
 
-    inline Searcher() {  
-        ucinewgame();
-        resizeTT(TT_DEFAULT_SIZE_MB);
-        nodes = 0;      
-    }
-
     inline void ucinewgame() {
         startTime = std::chrono::steady_clock::now();
+
         board = START_BOARD;
-        memset(tt.entries.data(), 0, tt.entries.size() * sizeof(TTEntry));
-        memset(pliesData.data(), 0, sizeof(pliesData));
-        memset(movesNodes.data(), 0, sizeof(movesNodes));
-        memset(countermoves.data(), 0, sizeof(countermoves));
-        memset(historyTable.data(), 0, sizeof(historyTable));
+        accumulators = { START_POS_ACCUMULATOR };
+        accumulatorIdx = 0;
+
+        nodes = maxPlyReached = 0;
+        hardTimeUp = false;
+        pliesData = {};
+        memset(tt.data(), 0, tt.size() * sizeof(TTEntry));
+        movesNodes = {};
+        countermoves = {};
+        historyTable = {};
     }
     
     inline u64 getNodes() { return nodes; }
@@ -72,9 +84,19 @@ class Searcher {
         return pliesData[0].pvLine[0];
     }
 
-    inline void resizeTT(u16 newSizeMB) { 
-        tt.resize(newSizeMB); 
-        std::cout << "TT size: " << newSizeMB << " MB (" << tt.entries.size() << " entries)" << std::endl;
+    inline void resizeTT(u64 newSizeMB) { 
+        tt.clear();
+        u64 numEntries = newSizeMB * (u64)1024 * (u64)1024 / (u64)sizeof(TTEntry); 
+        tt.resize(numEntries);
+    }
+
+    inline void printTTSize() {
+        double bytes = (u64)tt.size() * (u64)sizeof(TTEntry);
+        double megabytes = bytes / (1024.0 * 1024.0);
+
+        std::cout << "TT size: " << round(megabytes) << " MB"
+                  << " (" << tt.size() << " entries)" 
+                  << std::endl;
     }
 
     inline u64 millisecondsElapsed() {
@@ -104,19 +126,25 @@ class Searcher {
     inline std::pair<Move, i32> search(u8 maxDepth, i64 milliseconds, u64 incrementMs, u64 movesToGo, 
                                        bool isMoveTime, u64 softNodes, u64 hardNodes, bool printInfo)
     {
-        // init and reset stuff
+        // init/reset stuff
+
         startTime = std::chrono::steady_clock::now();
-        this->maxDepth = maxDepth;
-        nodes = maxPlyReached = 0;
+
+        this->maxDepth = maxDepth = std::clamp(maxDepth, (u8)1, MAX_DEPTH);
         this->softNodes = softNodes;
         this->hardNodes = hardNodes;
-        hardTimeUp = false;
-        memset(movesNodes.data(), 0, sizeof(movesNodes));
 
-        // clear best root move and pv lines
+        nodes = maxPlyReached = 0;
+        hardTimeUp = false;
+
         pliesData[0].pvLine[0] = MOVE_NONE;
         for (int i = 0; i < pliesData.size(); i++) 
             pliesData[i].pvLength = 0;
+
+        accumulators[0] = Accumulator(board);
+        accumulatorIdx = 0;
+
+        movesNodes = {};
 
         // Set time limits
 
@@ -139,10 +167,11 @@ class Searcher {
         for (i32 iterationDepth = 1; iterationDepth <= maxDepth; iterationDepth++)
         {
             maxPlyReached = 0;
+
             i32 iterationScore = iterationDepth >= aspMinDepth.value 
                                  ? aspiration(iterationDepth, score)
                                  : search(iterationDepth, 0, -INF, INF, doubleExtensionsMax.value);
-
+                                 
             if (isHardTimeUp()) break;
 
             score = iterationScore;
@@ -209,6 +238,7 @@ class Searcher {
             {
                 beta = min(beta + delta, INF);
                 depth--;
+                //if (depth > 1) depth--;
             }
             else if (score <= alpha)
             {
@@ -221,8 +251,6 @@ class Searcher {
 
             delta *= aspDeltaMultiplier.value;
         }
-
-        if (tt.age < 63) tt.age++;
 
         return score;
     }
@@ -245,7 +273,7 @@ class Searcher {
         if (depth > maxDepth) depth = maxDepth;
 
         // Probe TT
-        TTEntry *ttEntry = tt.probe(board.zobristHash());
+        TTEntry *ttEntry = probeTT(tt, board.zobristHash());
         bool ttHit = board.zobristHash() == ttEntry->zobristHash;
 
         // TT cutoff
@@ -256,22 +284,18 @@ class Searcher {
         || (ttEntry->getBound() == Bound::UPPER && ttEntry->score <= alpha)))
             return ttEntry->adjustedScore(ply);
 
-        if (!singular) {
-            plyData.eval = board.inCheck() ? 0 : board.evaluate();
+        Color stm = board.sideToMove();
 
-            // If possible, use tt score as static eval
-            /*
-            if (ttHit
-            && !board.inCheck()
-            && (plyData.eval <= ttEntry->score || ttEntry->getBound() != Bound::LOWER)
-            && (plyData.eval >= ttEntry->score || ttEntry->getBound() != Bound::UPPER))
-                plyData.eval = ttEntry->score;
-            */
+        if (!singular) {
+            if (!accumulators[accumulatorIdx].updated) 
+                accumulators[accumulatorIdx].update(
+                    accumulators[accumulatorIdx-1], oppColor(stm), board.lastMove(), board.captured());
+
+            plyData.eval = board.inCheck() ? 0 : evaluate(accumulators[accumulatorIdx], stm);
         }
 
         if (ply >= maxDepth) return plyData.eval;
 
-        Color stm = board.sideToMove();
         bool pvNode = beta > alpha + 1;
 
         if (!pvNode && !singular && !board.inCheck())
@@ -301,7 +325,6 @@ class Searcher {
                                - min((plyData.eval-beta) / nmpEvalBetaDivisor.value, nmpEvalBetaMax.value);
 
                 i32 score = -search(nmpDepth, ply + 1, -beta, -alpha, doubleExtsLeft);
-
                 board.undoMove();
 
                 if (score >= MIN_MATE_SCORE) return beta;
@@ -335,7 +358,7 @@ class Searcher {
 
         for (int i = 0; i < plyData.moves.size(); i++)
         {
-            auto [move, moveScore] = incrementalSort(plyData.moves, plyData.movesScores, i);
+            auto [move, moveScore] = plyData.moves.incrementalSort(plyData.movesScores, i);
 
             // Don't search TT move in singular search
             if (move == ttMove && singular) continue;
@@ -387,8 +410,6 @@ class Searcher {
                 i32 singularScore = search((depth - 1) / 2, ply, singularBeta - 1, singularBeta, 
                                            doubleExtsLeft, true);
 
-                board.pushState(boardState, &tt); // Make the TT move again
-
                 // Double extension
                 if (singularScore < singularBeta - doubleExtensionMargin.value 
                 && !pvNode && doubleExtsLeft > 0)
@@ -406,6 +427,8 @@ class Searcher {
                 else if (ttEntry->score >= beta)
                     // some other move is probably better than TT move, so reduce TT move search by 2 plies
                     extension = -2;
+
+                board.pushState(boardState); // Make the TT move again
             }
             // Check extension if no singular extensions
             else if (board.inCheck())
@@ -416,6 +439,10 @@ class Searcher {
             legalMovesPlayed++;
             u64 nodesBefore = nodes;
             nodes++;
+
+            accumulatorIdx++;
+            accumulators[accumulatorIdx].updated = false;
+
             u8 pt = (u8)move.pieceType();
             HistoryEntry *historyEntry = &historyTable[(int)stm][pt][move.to()];
 
@@ -449,6 +476,7 @@ class Searcher {
 
             moveSearched:
             board.undoMove();
+            accumulatorIdx--;
             if (isHardTimeUp()) return 0;
 
             if (ply == 0) movesNodes[move.encoded()] += nodes - nodesBefore;
@@ -519,7 +547,7 @@ class Searcher {
             return board.inCheck() ? -INF + ply : 0;
 
         if (!singular)
-            tt.store(ttEntry, board.zobristHash(), depth, ply, bestScore, bestMove, bound);
+            ttEntry->update(board.zobristHash(), depth, ply, bestScore, bestMove, bound);
 
         return bestScore;
     }
@@ -535,7 +563,7 @@ class Searcher {
         if (ply > 0 && board.isDraw()) return 0;
 
         // Probe TT
-        TTEntry *ttEntry = tt.probe(board.zobristHash());
+        TTEntry *ttEntry = probeTT(tt, board.zobristHash());
         bool ttHit = ttEntry->zobristHash == board.zobristHash();
 
         // TT cutoff
@@ -547,18 +575,14 @@ class Searcher {
 
         PlyData &plyData = pliesData[ply];
 
+        if (!accumulators[accumulatorIdx].updated) 
+            accumulators[accumulatorIdx].update(
+                accumulators[accumulatorIdx-1], board.oppSide(), board.lastMove(), board.captured());
+
         if (board.inCheck())
             plyData.eval = 0;
         else {
-            plyData.eval = board.evaluate();
-
-            // If possible, use tt score as static eval
-            /*
-            if (ttHit
-            && (plyData.eval <= ttEntry->score || ttEntry->getBound() != Bound::LOWER)
-            && (plyData.eval >= ttEntry->score || ttEntry->getBound() != Bound::UPPER))
-                plyData.eval = ttEntry->score;
-            */
+            plyData.eval = evaluate(accumulators[accumulatorIdx], board.sideToMove());
 
             if (plyData.eval >= beta) return plyData.eval; 
             if (plyData.eval > alpha) alpha = plyData.eval;
@@ -578,7 +602,7 @@ class Searcher {
 
         for (int i = 0; i < plyData.moves.size(); i++)
         {
-            auto [move, moveScore] = incrementalSort(plyData.moves, plyData.movesScores, i);
+            auto [move, moveScore] = plyData.moves.incrementalSort(plyData.movesScores, i);
 
             // SEE pruning (skip bad noisy moves)
             if (!board.inCheck() && moveScore < 0) break;
@@ -589,8 +613,12 @@ class Searcher {
             legalMovesPlayed++;
             nodes++;
 
+            accumulatorIdx++;
+            accumulators[accumulatorIdx].updated = false;
+
             i32 score = -qSearch(ply + 1, -beta, -alpha);
             board.undoMove();
+            accumulatorIdx--;
             if (isHardTimeUp()) return 0;
 
             if (score <= bestScore) continue;
@@ -610,7 +638,7 @@ class Searcher {
             // checkmate
             return -INF + ply; 
 
-        tt.store(ttEntry, board.zobristHash(), 0, ply, bestScore, bestMove, bound);
+        ttEntry->update(board.zobristHash(), 0, ply, bestScore, bestMove, bound);
 
         return bestScore;
     }

@@ -25,12 +25,11 @@ inline u64 perft(Board &board, int depth)
     return nodes;
 }
 
-inline void perftSplit(Board board, int depth)
+inline void perftSplit(Board &board, int depth)
 {
     std::cout << "Running split perft depth " << depth 
               << " on " << board.fen() << std::endl;
 
-    board.nnue = false;
     MovesList moves = MovesList();
     board.pseudolegalMoves(moves);
     u64 totalNodes = 0;
@@ -49,12 +48,11 @@ inline void perftSplit(Board board, int depth)
     std::cout << "Total: " << totalNodes << std::endl;
 }
 
-inline u64 perftBench(Board board, int depth)
+inline u64 perftBench(Board &board, int depth)
 {
     std::string fen = board.fen();
     std::cout << "Running perft depth " << depth << " on " << fen << std::endl;
 
-    board.nnue = false;
     std::chrono::steady_clock::time_point start =  std::chrono::steady_clock::now();
     u64 nodes = perft(board, depth);
 

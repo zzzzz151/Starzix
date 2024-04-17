@@ -9,7 +9,7 @@
 #endif
 #include "incbin.h"
 
-#include "move.hpp"
+#include "board.hpp"
 #include "simd.hpp"
 using namespace SIMD;
 
@@ -32,13 +32,27 @@ const Net *NET = reinterpret_cast<const Net*>(gNetFileData);
 struct alignas(ALIGNMENT) Accumulator
 {
     public:
-    std::array<i16, HIDDEN_LAYER_SIZE> white, black;
+    std::array<i16, HIDDEN_LAYER_SIZE> white = NET->featureBiases;
+    std::array<i16, HIDDEN_LAYER_SIZE> black = NET->featureBiases;
+    bool updated = false;
 
-    inline void init() {
-        for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
-            white[i] = black[i] = NET->featureBiases[i];
+    inline Accumulator() = default;
+
+    inline Accumulator(const Board &board) {
+        white = black = NET->featureBiases;
+
+        for (Color color : {Color::WHITE, Color::BLACK})
+            for (int pt = (int)PieceType::PAWN; pt <= (int)PieceType::KING; pt++)
+                {
+                    u64 bb = board.bitboard(color, (PieceType)pt);
+                    while (bb > 0) {
+                        Square sq = poplsb(bb);
+                        activate(color, (PieceType)pt, sq);
+                    }
+                }
+
+        updated = true;
     }
-
 
     inline void activate(Color color, PieceType pieceType, Square square)
     {
@@ -64,6 +78,9 @@ struct alignas(ALIGNMENT) Accumulator
 
     inline void update(Accumulator &oldAcc, Color stm, Move move, PieceType captured)
     {
+        assert(oldAcc.updated && !updated);
+        assert(move != MOVE_NONE);
+
         auto moveFlag = move.flag();
         Square from = move.from();
         Square to = move.to();
@@ -141,13 +158,16 @@ struct alignas(ALIGNMENT) Accumulator
                            + NET->featureWeights[add1BlackIdx + i]; // Put piece on destination
             }        
         }
-        
+
+        updated = true;
     }
 
 }; // struct Accumulator
 
 inline i32 evaluate(Accumulator &accumulator, Color color)
 {
+    assert(accumulator.updated);
+
     Vec *stmAccumulator, *oppAccumulator;
     if (color == Color::WHITE) {
         stmAccumulator = (Vec*)&accumulator.white;
@@ -188,3 +208,4 @@ inline i32 evaluate(Accumulator &accumulator, Color color)
 } // namespace nnue
 
 using Accumulator = nnue::Accumulator;
+Accumulator START_POS_ACCUMULATOR = Accumulator(START_BOARD);

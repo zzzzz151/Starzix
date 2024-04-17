@@ -9,7 +9,6 @@
 #include "move.hpp"
 #include "attacks.hpp"
 #include "tt.hpp"
-#include "nnue.hpp"
 
 std::array<u64, 2> ZOBRIST_COLOR; // [color]
 std::array<std::array<std::array<u64, 64>, 6>, 2> ZOBRIST_PIECES; // [color][pieceType][square]
@@ -46,24 +45,20 @@ struct BoardState {
     u64 zobristHash = 0;
     i8 inCheckCached = -1; // -1 means invalid (need to calculate)
     Move lastMove = MOVE_NONE;
+    PieceType captured = PieceType::NONE;
 };
 
 class Board {
     private:
     std::vector<BoardState> states = {};
     BoardState *state = nullptr;
-    std::vector<Accumulator> accumulators = {};
-    u16 accumulatorIdx = 0;
 
     public:
-    bool nnue = true;
 
     inline Board() = default;
 
     // Copy constructor
-    Board(const Board& other) 
-    : states(other.states), accumulators(other.accumulators), accumulatorIdx(other.accumulatorIdx) 
-    {
+    Board(const Board& other) : states(other.states) {
         state = states.empty() ? nullptr : &states.back();
     }
 
@@ -72,8 +67,6 @@ class Board {
         if (this != &other) {
             states = other.states;
             state = states.empty() ? nullptr : &states.back();
-            accumulators = other.accumulators;
-            accumulatorIdx = other.accumulatorIdx;
         }
         return *this;
     }
@@ -84,13 +77,6 @@ class Board {
         states.reserve(512);
         states.push_back(BoardState());
         state = &states[0];
-
-        accumulators = {};
-        accumulators.resize(512);
-        accumulators[0].init();
-        accumulatorIdx = 0;
-
-        nnue = true;
 
         trim(fen);
         std::vector<std::string> fenSplit = splitString(fen, ' ');
@@ -121,7 +107,6 @@ class Board {
                 Square sq = currentRank * 8 + currentFile;
                 placePiece(color, pt, sq);
                 currentFile++;
-                if (nnue) accumulators[accumulatorIdx].activate(color ,pt , sq);
             }
         }
 
@@ -158,30 +143,30 @@ class Board {
 
     inline BoardState getState() { return *state; }
 
-    inline Color sideToMove() {
-        assert(state->colorToMove != Color::NONE);
-        return state->colorToMove; 
+    inline void pushState(BoardState &newState) {
+        states.push_back(newState);
+        state = &states.back();
     }
 
-    inline Color oppSide() { 
-        assert(state->colorToMove != Color::NONE);
-        return state->colorToMove == Color::WHITE 
-               ? Color::BLACK : Color::WHITE; 
-    }
+    inline Color sideToMove() { return state->colorToMove; }
+
+    inline Color oppSide() { return oppColor(state->colorToMove); }
 
     inline u64 zobristHash() { return state->zobristHash; }
 
     inline Move lastMove() { return state->lastMove; }
 
-    inline u64 bitboard(PieceType pieceType) {   
+    inline PieceType captured() { return state->captured; }
+
+    inline u64 bitboard(PieceType pieceType) const {   
         return state->piecesBitboards[(int)pieceType];
     }
 
-    inline u64 bitboard(Color color) { 
+    inline u64 bitboard(Color color) const { 
         return state->colorBitboard[(int)color]; 
     }
 
-    inline u64 bitboard(Color color, PieceType pieceType) {
+    inline u64 bitboard(Color color, PieceType pieceType) const {
         return state->piecesBitboards[(int)pieceType]
                & state->colorBitboard[(int)color];
     }
@@ -412,25 +397,24 @@ class Board {
         return Move(from, to, moveFlag);
     }
 
-    inline bool makeMove(std::string uciMove, TT *tt = nullptr) 
-    {
-        return makeMove(uciToMove(uciMove), tt);
+    inline bool makeMove(std::string uciMove) {
+        return makeMove(uciToMove(uciMove));
     }
 
-    inline bool makeMove(Move move, TT *tt = nullptr)
+    inline bool makeMove(Move move, std::vector<TTEntry> *tt = nullptr)
     {
-        assert(states.size() >= 1 && state == &states.back() && accumulatorIdx < accumulators.size());
+        assert(states.size() >= 1 && state == &states.back());
 
         states.push_back(*state);
         state = &states.back();
+        Color oppSide = this->oppSide();
 
         if (move == MOVE_NONE)
         {
             assert(!state->inCheckCached);
 
             state->zobristHash ^= ZOBRIST_COLOR[(int)state->colorToMove];
-            state->colorToMove = oppSide();
-            state->zobristHash ^= ZOBRIST_COLOR[(int)state->colorToMove];
+            state->zobristHash ^= ZOBRIST_COLOR[(int)oppSide];
 
             if (state->enPassantSquare != SQUARE_NONE)
             {
@@ -438,14 +422,16 @@ class Board {
                 state->enPassantSquare = SQUARE_NONE;
             }
 
-            if (tt != nullptr) __builtin_prefetch(tt->probe(state->zobristHash));
+            if (tt != nullptr) __builtin_prefetch(probeTT(*tt, state->zobristHash));
 
             state->pliesSincePawnOrCapture++;
 
             if (state->colorToMove == Color::WHITE)
                 state->currentMoveCounter++;
 
+            state->colorToMove = oppSide;
             state->lastMove = move;
+            state->captured = PieceType::NONE;
             return true;
         }
 
@@ -454,8 +440,7 @@ class Board {
         auto moveFlag = move.flag();
         PieceType promotion = move.promotion();
         PieceType pieceType = move.pieceType();
-        Color oppSide = this->oppSide();
-        PieceType captured = PieceType::NONE;
+        state->captured = PieceType::NONE;
         Square capturedPieceSquare = to;
 
         removePiece(from);
@@ -471,18 +456,25 @@ class Board {
         {
             capturedPieceSquare = state->colorToMove == Color::WHITE
                                   ? to - 8 : to + 8;
+
             removePiece(capturedPieceSquare);
             placePiece(state->colorToMove, PieceType::PAWN, to);
-            captured = PieceType::PAWN;
+            state->captured = PieceType::PAWN;
         }
         else
         {
-            if ((captured = pieceTypeAt(to)) != PieceType::NONE)
+            if ((state->captured = pieceTypeAt(to)) != PieceType::NONE)
                 removePiece(to);
+
             placePiece(state->colorToMove, 
                        promotion != PieceType::NONE ? promotion : pieceType, 
                        to);
         }
+
+        state->zobristHash ^= ZOBRIST_COLOR[(int)state->colorToMove];
+        state->zobristHash ^= ZOBRIST_COLOR[(int)oppSide];
+
+        if (tt != nullptr) __builtin_prefetch(probeTT(*tt, state->zobristHash));
 
         if (inCheckNoCache()) {
             states.pop_back();
@@ -518,23 +510,7 @@ class Board {
             state->zobristHash ^= ZOBRIST_FILES[(int)squareFile(state->enPassantSquare)];
         }
 
-        state->zobristHash ^= ZOBRIST_COLOR[(int)state->colorToMove];
-        state->zobristHash ^= ZOBRIST_COLOR[(int)oppSide];
-
-        if (tt != nullptr) __builtin_prefetch(tt->probe(state->zobristHash));
-
-        // Update accumulator
-        if (nnue) {
-            if (accumulatorIdx == accumulators.size() - 1)
-                accumulators.push_back(Accumulator());
-
-            accumulators[accumulatorIdx+1].update(accumulators[accumulatorIdx], 
-                state->colorToMove, move, captured);
-
-            accumulatorIdx++;
-        }
-
-        if (pieceType == PieceType::PAWN || captured != PieceType::NONE)
+        if (pieceType == PieceType::PAWN || state->captured != PieceType::NONE)
             state->pliesSincePawnOrCapture = 0;
         else
             state->pliesSincePawnOrCapture++;
@@ -545,47 +521,13 @@ class Board {
         state->colorToMove = oppSide;
         state->inCheckCached = -1;
         state->lastMove = move;
-
         return true;
     }
 
     inline void undoMove()
     {
-        assert(states.size() >= 2 && state == &states.back() && accumulatorIdx < accumulators.size());
-
-        if (state->lastMove != MOVE_NONE && nnue)
-        {
-            assert(accumulatorIdx > 0);
-            accumulatorIdx--;
-        }
-
+        assert(states.size() >= 2 && state == &states.back());
         states.pop_back();
-        state = &states.back();
-    }
-
-    inline void pushState(BoardState &newState, TT *tt = nullptr)
-    {
-        assert(states.size() >= 1 && state == &states.back() && accumulatorIdx < accumulators.size());
-
-        if (tt != nullptr) __builtin_prefetch(tt->probe(newState.zobristHash));
-
-        Move move = newState.lastMove;
-
-        // Update accumulator
-        if (nnue && move != MOVE_NONE) 
-        {
-            if (accumulatorIdx == accumulators.size() - 1)
-                accumulators.push_back(Accumulator());
-
-            PieceType captured = this->captured(move);
-
-            accumulators[accumulatorIdx+1].update(accumulators[accumulatorIdx], 
-                state->colorToMove, move, captured);
-
-            accumulatorIdx++;
-        }
-
-        states.push_back(newState);
         state = &states.back();
     }
 
@@ -616,8 +558,7 @@ class Board {
             }
         }
 
-        while (ourPawns > 0)
-        {
+        while (ourPawns > 0) {
             Square sq = poplsb(ourPawns);
             bool pawnHasntMoved = false, willPromote = false;
             Rank rank = squareRank(sq);
@@ -822,11 +763,6 @@ class Board {
         assert(n >= 1);
         return (int)states.size() - n < 0 
                ? MOVE_NONE : states[states.size() - n].lastMove;
-    }
-
-    inline auto evaluate() {
-        assert(state->colorToMove != Color::NONE);
-        return nnue::evaluate(accumulators[accumulatorIdx], state->colorToMove);
     }
 
 }; // class Board

@@ -127,5 +127,17 @@ struct MovesList
         moves[j] = temp;
     }
 
+    inline std::pair<Move, i32> incrementalSort(std::array<i32, 256> &movesScores, int i)
+    {
+        for (int j = i + 1; j < this->size(); j++)
+            if (movesScores[j] > movesScores[i])
+            {
+                this->swap(i, j);
+                std::swap(movesScores[i], movesScores[j]);
+            }
+
+        return { moves[i], movesScores[i] };
+    }
+
 }; // struct MovesList
 

@@ -253,16 +253,3 @@ inline auto millisecondsElapsed(std::chrono::steady_clock::time_point start)
     return (std::chrono::steady_clock::now() - start) / std::chrono::milliseconds(1);
 }
 
-#include "move.hpp"
-
-inline std::pair<Move, i32> incrementalSort(MovesList &moves, std::array<i32, 256> &movesScores, int i)
-{
-    for (int j = i + 1; j < moves.size(); j++)
-        if (movesScores[j] > movesScores[i])
-        {
-            moves.swap(i, j);
-            std::swap(movesScores[i], movesScores[j]);
-        }
-
-    return { moves[i], movesScores[i] };
-}

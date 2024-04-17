@@ -16,6 +16,7 @@ inline void go(Searcher &searcher, std::vector<std::string> &tokens);
 inline void uciLoop()
 {
     Searcher searcher = Searcher();
+    searcher.printTTSize();
 
     while (true) {
         std::string received = "";
@@ -44,8 +45,10 @@ inline void uciLoop()
         else if (tokens[0] == "print" || tokens[0] == "d"
         || tokens[0] == "display" || tokens[0] == "show")
             searcher.board.print();
-        else if (tokens[0] == "eval")
-            std::cout << "eval " << searcher.board.evaluate() << " cp" << std::endl;
+        else if (tokens[0] == "eval") {
+            Accumulator acc = Accumulator(searcher.board);
+            std::cout << "eval " << evaluate(acc, searcher.board.sideToMove()) << " cp" << std::endl;
+        }
         else if (tokens[0] == "bench")
         {
             if (tokens.size() == 1)
@@ -92,9 +95,8 @@ inline void uciLoop()
 inline void uci() {
     std::cout << "id name Starzix\n";
     std::cout << "id author zzzzz\n";
-    std::cout << "option name Hash type spin default " << TT_DEFAULT_SIZE_MB << " min 1 max 1024\n";
+    std::cout << "option name Hash type spin default 32 min 1 max 1024\n";
 
-    
     for (auto &myTunableParam : tunableParams) 
     {
         std::visit([](auto &tunableParam) 
@@ -129,7 +131,10 @@ inline void setoption(Searcher &searcher, std::vector<std::string> &tokens)
     trim(optionValue);
 
     if (optionName == "Hash" || optionName == "hash")
+    {
         searcher.resizeTT(stoll(optionValue));
+        searcher.printTTSize();
+    }
     else {
         bool found = false;
         for (auto &myTunableParam : tunableParams) 
@@ -180,7 +185,7 @@ inline void position(Board &board, std::vector<std::string> &tokens)
 
 inline void go(Searcher &searcher, std::vector<std::string> &tokens)
 {
-    u8 maxDepth = 100;
+    u8 maxDepth = MAX_DEPTH;
     i64 milliseconds = I64_MAX;
     u64 incrementMs = 0;
     u64 movesToGo = defaultMovesToGo.value;
@@ -207,13 +212,14 @@ inline void go(Searcher &searcher, std::vector<std::string> &tokens)
             isMoveTime = true;
         }
         else if (tokens[i] == "depth")
-            maxDepth = std::clamp(value, (i64)1, (i64)255);
+            maxDepth = std::clamp(value, (i64)1, (i64)MAX_DEPTH);
         else if (tokens[i] == "nodes")
             maxNodes = value;
     }
 
     auto [bestMove, score] = searcher.search(maxDepth, milliseconds, incrementMs, movesToGo, 
                                              isMoveTime, maxNodes, maxNodes, true);
+
     assert(bestMove != MOVE_NONE);
     std::cout << "bestmove " + bestMove.toUci() + "\n";
 }

@@ -2,10 +2,6 @@
 
 // clang-format off
 
-#include <cstring> // for memset()
-
-const u16 TT_DEFAULT_SIZE_MB = 32;
-
 enum class Bound {
     INVALID = 0,
     EXACT = 1,
@@ -53,51 +49,35 @@ struct TTEntry {
         boundAndAge = (age << 2) | (u8)bound;
     }
 
+    inline void update(u64 zobristHash, u8 depth, u8 ply, i16 score, Move bestMove, Bound bound)
+    {
+        this->zobristHash = zobristHash;
+        this->depth = depth;
+        this->setBound(bound);
+        this->score = score >= MIN_MATE_SCORE 
+                      ? score + (i16)ply 
+                      : score <= -MIN_MATE_SCORE 
+                      ? score - (i16)ply 
+                      : score;
+
+        if (bestMove != MOVE_NONE && (this->bestMove == MOVE_NONE || bound != Bound::UPPER))
+            this->bestMove = bestMove;
+    }
+
+    inline void update(u64 zobristHash, u8 depth, u8 ply, 
+                       i16 score, Move bestMove, i16 originalAlpha, i16 beta)
+    {
+        Bound bound = score <= originalAlpha ? Bound::UPPER 
+                      : score >= beta ? Bound::LOWER 
+                      : Bound::EXACT;
+
+        update(zobristHash, depth, ply, score, bestMove, bound);
+    }
+
 } __attribute__((packed)); // struct TTEntry
 
-struct TT {
-    public:
-    std::vector<TTEntry> entries = {};
-    u8 age = 0;
-
-    inline void resize(u64 newSizeMB) {
-        entries.clear();
-        u64 numEntries = newSizeMB * (u64)1024 * (u64)1024 / (u64)sizeof(TTEntry);
-        entries.resize(numEntries);
-    }
-
-    inline void reset() {
-        memset(entries.data(), 0, sizeof(TTEntry) * entries.size());
-        age = 0;
-    }
-
-    inline TTEntry* probe(u64 zobristHash) {
-        u64 idx = ((u128)zobristHash * (u128)entries.size()) >> 64;
-        return &entries[idx];
-    }
-
-    inline void store(TTEntry *ttEntry, u64 zobristHash, u8 depth, u8 ply, i16 score, Move bestMove, Bound bound)
-    {
-        ttEntry->zobristHash = zobristHash;
-        ttEntry->depth = depth;
-        ttEntry->setBound(bound);
-        ttEntry->score = score >= MIN_MATE_SCORE 
-                         ? score + ply 
-                         : score <= -MIN_MATE_SCORE 
-                         ? score - ply 
-                         : score;
-
-        if (bestMove == MOVE_NONE || (ttEntry->bestMove != MOVE_NONE && bound == Bound::UPPER))
-            return;
-
-        ttEntry->bestMove = bestMove;
-    }
-
-    inline void store(TTEntry *ttEntry, u64 zobristHash, u8 depth, u8 ply, 
-                      i16 score, Move bestMove, i16 originalAlpha, i16 beta)
-    {
-        Bound bound = score <= originalAlpha ? Bound::UPPER : score >= beta ? Bound::LOWER : Bound::EXACT;
-        store(ttEntry, zobristHash, depth, ply, score, bestMove, bound);
-    }
-}; // struct TT
-
+inline TTEntry* probeTT(std::vector<TTEntry> &tt, u64 zobristHash) 
+{
+    u64 idx = ((u128)zobristHash * (u128)tt.size()) >> 64;
+    return &tt[idx];
+}
