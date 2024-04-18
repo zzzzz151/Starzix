@@ -424,12 +424,12 @@ class Board {
 
             if (tt != nullptr) __builtin_prefetch(probeTT(*tt, state->zobristHash));
 
+            state->colorToMove = oppSide;
             state->pliesSincePawnOrCapture++;
 
             if (state->colorToMove == Color::WHITE)
                 state->currentMoveCounter++;
 
-            state->colorToMove = oppSide;
             state->lastMove = move;
             state->captured = PieceType::NONE;
             return true;
@@ -510,15 +510,16 @@ class Board {
             state->zobristHash ^= ZOBRIST_FILES[(int)squareFile(state->enPassantSquare)];
         }
 
+        state->colorToMove = oppSide;
+
         if (pieceType == PieceType::PAWN || state->captured != PieceType::NONE)
             state->pliesSincePawnOrCapture = 0;
         else
             state->pliesSincePawnOrCapture++;
 
-        if (state->colorToMove == Color::BLACK)
+        if (state->colorToMove == Color::WHITE)
             state->currentMoveCounter++;
 
-        state->colorToMove = oppSide;
         state->inCheckCached = -1;
         state->lastMove = move;
         return true;

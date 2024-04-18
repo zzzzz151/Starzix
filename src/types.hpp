@@ -1,6 +1,7 @@
+// clang-format off
+
 #pragma once
 
-// clang-format off
 #include <cstdint>
 #include <string>
 

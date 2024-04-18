@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "search_params.hpp"
+
 inline PieceType popLeastValuable(Board &board, u64 &occ, u64 attackers, Color color)
 {
     for (int pt = 0; pt <= 5; pt++)

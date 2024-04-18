@@ -1,3 +1,7 @@
+// clang-format off
+
+#pragma once
+
 #include "search_params.hpp"
 #include "tt.hpp"
 #include "nnue.hpp"
@@ -177,8 +181,7 @@ class Searcher {
             score = iterationScore;
             u64 msElapsed = millisecondsElapsed();
 
-            if (printInfo)
-            {
+            if (printInfo) {
                 std::cout << "info depth " << iterationDepth
                           << " seldepth " << (int)maxPlyReached
                           << " time " << msElapsed
@@ -226,8 +229,7 @@ class Searcher {
         i32 depth = iterationDepth;
         i32 bestScore = score;
 
-        while (true)
-        {
+        while (true) {
             score = search(depth, 0, alpha, beta, doubleExtensionsMax.value);
 
             if (isHardTimeUp()) return 0;
@@ -237,8 +239,7 @@ class Searcher {
             if (score >= beta)
             {
                 beta = min(beta + delta, INF);
-                depth--;
-                //if (depth > 1) depth--;
+                if (depth > 1) depth--;
             }
             else if (score <= alpha)
             {
@@ -347,14 +348,14 @@ class Searcher {
         bool improving = ply > 1 && plyData.eval > pliesData[ply-2].eval 
                          && !board.inCheck() && !board.inCheck2PliesAgo();
 
-        u8 legalMovesPlayed = 0;
+        int legalMovesPlayed = 0;
         i32 bestScore = -INF;
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::UPPER;
 
         // Fail low quiets at beginning of array, fail low noisy moves at the end
         std::array<HistoryEntry*, 256> failLowsHistoryEntry;
-        u8 failLowQuiets = 0, failLowNoisies = 0;
+        int failLowQuiets = 0, failLowNoisies = 0;
 
         for (int i = 0; i < plyData.moves.size(); i++)
         {
@@ -374,19 +375,26 @@ class Searcher {
                 i32 lmrDepth = max(0, depth - (i32)LMR_TABLE[depth][legalMovesPlayed+1]);
 
                 // FP (Futility pruning)
-                if (lmrDepth <= fpMaxDepth.value && alpha < MIN_MATE_SCORE
+                if (lmrDepth <= fpMaxDepth.value 
+                && alpha < MIN_MATE_SCORE
                 && alpha > plyData.eval + fpBase.value + lmrDepth * fpMultiplier.value)
                     break;
 
                 // SEE pruning
-                if (depth <= seePruningMaxDepth.value 
-                && !SEE(board, move, 
-                        depth * (isQuiet ? seeQuietThreshold.value : depth * seeNoisyThreshold.value)))
-                    continue;
+                if (depth <= seePruningMaxDepth.value) {
+                    i32 threshold = isQuiet ? depth * seeQuietThreshold.value 
+                                            : depth * depth * seeNoisyThreshold.value;
+
+                    if (!SEE(board, move, threshold)) continue;
+                }
             }
 
             // skip illegal moves
             if (!board.makeMove(move, &tt)) continue;
+
+            legalMovesPlayed++;
+            u64 nodesBefore = nodes;
+            nodes++;
 
             i32 extension = 0;
             if (ply == 0) goto skipExtensions;
@@ -410,9 +418,13 @@ class Searcher {
                 i32 singularScore = search((depth - 1) / 2, ply, singularBeta - 1, singularBeta, 
                                            doubleExtsLeft, true);
 
+                __builtin_prefetch(probeTT(tt, boardState.zobristHash));
+                board.pushState(boardState); // Make the TT move again
+
                 // Double extension
                 if (singularScore < singularBeta - doubleExtensionMargin.value 
-                && !pvNode && doubleExtsLeft > 0)
+                && !pvNode 
+                && doubleExtsLeft > 0)
                 {
                     // singularScore is way lower than TT score
                     // TT move is probably MUCH better than all others, so extend its search by 2 plies
@@ -427,8 +439,6 @@ class Searcher {
                 else if (ttEntry->score >= beta)
                     // some other move is probably better than TT move, so reduce TT move search by 2 plies
                     extension = -2;
-
-                board.pushState(boardState); // Make the TT move again
             }
             // Check extension if no singular extensions
             else if (board.inCheck())
@@ -436,14 +446,10 @@ class Searcher {
 
             skipExtensions:
 
-            legalMovesPlayed++;
-            u64 nodesBefore = nodes;
-            nodes++;
-
             accumulatorIdx++;
             accumulators[accumulatorIdx].updated = false;
 
-            u8 pt = (u8)move.pieceType();
+            int pt = (int)move.pieceType();
             HistoryEntry *historyEntry = &historyTable[(int)stm][pt][move.to()];
 
     	    // PVS (Principal variation search)
@@ -475,8 +481,10 @@ class Searcher {
                 score = -search(depth - 1 + extension, ply + 1, -beta, -alpha, doubleExtsLeft); 
 
             moveSearched:
+
             board.undoMove();
             accumulatorIdx--;
+
             if (isHardTimeUp()) return 0;
 
             if (ply == 0) movesNodes[move.encoded()] += nodes - nodesBefore;
@@ -501,7 +509,7 @@ class Searcher {
 
                 memcpy(&(plyData.pvLine[1]),                      // dst
                        pliesData[ply+1].pvLine.data(),            // src
-                       pliesData[ply+1].pvLength * sizeof(Move)); // size
+                       pliesData[ply+1].pvLength * sizeof(Move)); // size                
             }
 
             if (score < beta) continue;
@@ -617,8 +625,10 @@ class Searcher {
             accumulators[accumulatorIdx].updated = false;
 
             i32 score = -qSearch(ply + 1, -beta, -alpha);
+
             board.undoMove();
             accumulatorIdx--;
+
             if (isHardTimeUp()) return 0;
 
             if (score <= bestScore) continue;
@@ -651,8 +661,9 @@ class Searcher {
     inline void scoreMoves(PlyData &plyData, Move ttMove)
     {
         int stm = (int)board.sideToMove();
-        Move lastMove;
-        Move countermove = (lastMove = board.lastMove()) == MOVE_NONE
+        Move lastMove = board.lastMove();
+
+        Move countermove = lastMove == MOVE_NONE
                            ? MOVE_NONE
                            : countermoves[stm][(int)lastMove.pieceType()][lastMove.to()];
 
@@ -667,7 +678,7 @@ class Searcher {
 
             PieceType captured = board.captured(move);
             PieceType promotion = move.promotion();
-            u8 pt = (u8)move.pieceType();
+            int pt = (int)move.pieceType();
             HistoryEntry *historyEntry = &historyTable[stm][pt][move.to()];
 
             // Starzix doesn't generate underpromotions in search

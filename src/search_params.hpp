@@ -1,3 +1,7 @@
+// clang-format off
+
+#pragma once
+
 #include <variant>
 
 template <typename T> struct TunableParam {

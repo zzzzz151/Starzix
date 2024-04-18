@@ -1,6 +1,6 @@
-#pragma once
-
 // clang-format off
+
+#pragma once
 
 enum class Bound {
     INVALID = 0,

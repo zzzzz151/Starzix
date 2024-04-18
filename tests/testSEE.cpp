@@ -20,6 +20,11 @@ int main() {
         return 1;
     }
 
+    seePawnValue.value = 100;
+    seeMinorValue.value = 300;
+    seeRookValue.value = 500;
+    seeQueenValue.value = 900;
+
     std::string line;
     while (std::getline(inputFile, line))
     {
@@ -36,8 +41,7 @@ int main() {
 
         if (result == expected)
             passed++;
-        else
-        {
+        else {
             std::cout << "FAILED " << fen << " | " << uciMove << " | Expected: " << expected << std::endl;
             failed++;
         }
