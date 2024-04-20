@@ -18,6 +18,7 @@ int main()
 
     initZobrist();
     attacks::init();
+    initUtils();
     initLmrTable();
     uci::uciLoop();
     return 0;

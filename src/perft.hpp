@@ -5,20 +5,28 @@
 #include <chrono>
 #include "board.hpp"
 
-namespace perft {
-
 inline u64 perft(Board &board, int depth)
 {
-    if (depth == 0) return 1;
+    if (depth <= 0) return 1;
 
     MovesList moves = MovesList();
     board.pseudolegalMoves(moves);
     u64 nodes = 0;
+    u64 pinned = board.pinned();
+
+    if (depth == 1) {
+         for (int i = 0; i < moves.size(); i++)
+            nodes += board.isPseudolegalLegal(moves[i], pinned);
+
+        return nodes;
+    }
 
     for (int i = 0; i < moves.size(); i++) 
     {
-        if (board.makeMove(moves[i]))
+        Move move = moves[i];
+        if (board.isPseudolegalLegal(move, pinned))
         {
+            board.makeMove(move);
             nodes += perft(board, depth - 1);
             board.undoMove();
         }
@@ -29,19 +37,38 @@ inline u64 perft(Board &board, int depth)
 
 inline void perftSplit(Board &board, int depth)
 {
+    if (depth <= 0) return;
+
     std::cout << "Running split perft depth " << depth 
-              << " on " << board.fen() << std::endl;
+              << " on " << board.fen() 
+              << std::endl;
 
     MovesList moves = MovesList();
     board.pseudolegalMoves(moves);
     u64 totalNodes = 0;
+    u64 pinned = board.pinned();
+
+    if (depth == 1) {
+        for (int i = 0; i < moves.size(); i++) 
+        {
+            Move move = moves[i];
+
+            if (!board.isPseudolegalLegal(move, pinned)) continue;
+
+            std::cout << move.toUci() << ": 1" << std::endl;   
+        }
+
+        return;
+    }
 
     for (int i = 0; i < moves.size(); i++) 
     {
-        if (board.makeMove(moves[i])) 
+        Move move = moves[i];
+        if (board.isPseudolegalLegal(move, pinned))
         {
+            board.makeMove(move);
             u64 nodes = perft(board, depth - 1);
-            std::cout << moves[i].toUci() << ": " << nodes << std::endl;
+            std::cout << move.toUci() << ": " << nodes << std::endl;
             totalNodes += nodes;
             board.undoMove();
         }
@@ -60,12 +87,10 @@ inline u64 perftBench(Board &board, int depth)
 
     std::cout << "perft depth " << depth 
               << " nodes " << nodes 
-              << " nps " << nodes * 1000 / max((u64)millisecondsElapsed(start), (u64)1)
+              << " nps " << nodes * 1000 / std::max((u64)millisecondsElapsed(start), (u64)1)
               << " time " << millisecondsElapsed(start)
               << " fen " << fen
               << std::endl;
 
     return nodes;
-}
-
 }

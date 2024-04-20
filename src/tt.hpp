@@ -64,8 +64,8 @@ struct TTEntry {
             this->bestMove = bestMove;
     }
 
-    inline void update(u64 zobristHash, u8 depth, u8 ply, 
-                       i16 score, Move bestMove, i16 originalAlpha, i16 beta)
+    inline void update(u64 zobristHash, u8 depth, u8 ply,  i16 score, 
+                       Move bestMove, i16 originalAlpha, i16 beta)
     {
         Bound bound = score <= originalAlpha ? Bound::UPPER 
                       : score >= beta ? Bound::LOWER 

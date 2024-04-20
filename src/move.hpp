@@ -20,13 +20,13 @@ struct Move {
                      ROOK_FLAG = 0x0004,
                      QUEEN_FLAG = 0x0005,
                      KING_FLAG = 0x0006,
-                     CASTLING_FLAG = 0x0007,
+                     PAWN_TWO_UP_FLAG = 0x0007,
+                     EN_PASSANT_FLAG = 0x0008,
                      KNIGHT_PROMOTION_FLAG = 0x000A,
                      BISHOP_PROMOTION_FLAG = 0x000B,
                      ROOK_PROMOTION_FLAG = 0x000C,
                      QUEEN_PROMOTION_FLAG = 0x000D,
-                     EN_PASSANT_FLAG = 0x000E,
-                     PAWN_TWO_UP_FLAG = 0x000F;
+                     CASTLING_FLAG = 0x000F;
 
     inline Move() = default;
 
@@ -89,6 +89,8 @@ struct Move {
 
         return str;
     }
+
+    inline bool isSpecial() { return flag() >= EN_PASSANT_FLAG; }
     
 }; // struct Move
 

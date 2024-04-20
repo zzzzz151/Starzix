@@ -1,29 +1,22 @@
 // clang-format off
-#include <iostream>
 #include <fstream>
-#include <string>
-#include <sstream>
-#include <vector>
-#include "../src/board.hpp"
-#include "../src/see.hpp"
-
-int failed = 0, passed = 0;
+#include "../src-test/board.hpp"
+#include "../src-test/see.hpp"
 
 int main() {
-    initZobrist();
     attacks::init();
+    initUtils();
+    initZobrist();
 
     std::ifstream inputFile("tests/SEE.txt");
-
-    if (!inputFile.is_open()) {
-        std::cout << "Failed to open the file." << std::endl;
-        return 1;
-    }
+    assert(inputFile.is_open());
 
     seePawnValue.value = 100;
     seeMinorValue.value = 300;
     seeRookValue.value = 500;
     seeQueenValue.value = 900;
+
+    int failed = 0, passed = 0;
 
     std::string line;
     while (std::getline(inputFile, line))
@@ -51,6 +44,5 @@ int main() {
     inputFile.close();
     std::cout << "Passed: " << passed << std::endl;
     std::cout << "Failed: " << failed << std::endl;
-
     return 0;
 }

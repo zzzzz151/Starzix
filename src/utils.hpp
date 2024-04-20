@@ -44,7 +44,6 @@
 
 #endif
 
-
 inline u8 poplsb(u64 &mask)
 {
     u8 s = lsb(mask);
@@ -61,6 +60,72 @@ inline u64 pdep(u64 val, u64 mask) {
     }
     return res;
 }
+
+inline void trim(std::string &str) {
+    size_t first = str.find_first_not_of(" \t\n\r");
+    size_t last = str.find_last_not_of(" \t\n\r");
+    
+    if (first == std::string::npos) // The string is empty or contains only whitespace characters
+    {
+        str = "";
+        return;
+    }
+    
+    str = str.substr(first, (last - first + 1));
+}
+
+inline std::vector<std::string> splitString(std::string &str, char delimiter)
+{
+    trim(str);
+    if (str == "") return std::vector<std::string>{};
+
+    std::vector<std::string> strSplit;
+    std::stringstream ss(str);
+    std::string token;
+
+    while (getline(ss, token, delimiter))
+    {
+        trim(token);
+        strSplit.push_back(token);
+    }
+
+    return strSplit;
+}
+
+inline u64 toBitboard(Square sq) { return 1ULL << sq; }
+
+inline void printBitboard(u64 bb)
+{
+    std::bitset<64> b(bb);
+    std::string str_bitset = b.to_string(); 
+    for (int i = 0; i < 64; i += 8)
+    {
+        std::string x = str_bitset.substr(i, 8);
+        reverse(x.begin(), x.end());
+        for (u64 j = 0; j < x.length(); j++)
+            std::cout << std::string(1, x[j]) << " ";
+        std::cout << std::endl;
+    }
+}
+
+inline int charToInt(char myChar) { return myChar - '0'; }
+
+inline double ln(u64 x) {
+    assert(x > 0);
+    return log(x);
+}
+
+inline u64 shiftRight(u64 bb) {
+	return (bb << 1ULL) & 0xfefefefefefefefeULL;
+}
+
+inline u64 shiftLeft(u64 bb) {
+	return (bb >> 1ULL) & 0x7f7f7f7f7f7f7f7fULL;
+}
+
+inline u64 shiftUp(u64 bb) { return bb << 8ULL; }
+
+inline u64 shiftDown(u64 bb) { return bb >> 8ULL; }
 
 inline Color oppColor(Color color)
 {
@@ -154,104 +219,53 @@ inline Piece makePiece(PieceType pieceType, Color color)
     return color == Color::WHITE ? (Piece)pt : (Piece)(pt+6);
 }
 
-// [color][CASTLE_SHORT or CASTLE_LONG or isLongCastle]
-const static std::array<std::array<u64, 2>, 2> CASTLING_MASKS = {
-    1ULL << 7,  // White short castle       
-    1ULL,       // White long castle
-    1ULL << 63, // Black short castle
-    1ULL << 56  // Black long castle
-};
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wc99-designator"
-
-// [kingTargetSquare]
-std::pair<Square, Square> CASTLING_ROOK_FROM_TO[64] = {
-    [6] = {7, 5},    // White short castle
-    [2] = {0, 3},    // White long castle
-    [62] = {63, 61}, // Black short castle
-    [58] = {56, 59}  // Black long castle
-};
-
-#pragma clang diagnostic pop
-
-inline void trim(std::string &str) {
-    size_t first = str.find_first_not_of(" \t\n\r");
-    size_t last = str.find_last_not_of(" \t\n\r");
-    
-    if (first == std::string::npos) // The string is empty or contains only whitespace characters
-    {
-        str = "";
-        return;
-    }
-    
-    str = str.substr(first, (last - first + 1));
-}
-
-inline std::vector<std::string> splitString(std::string &str, char delimiter)
-{
-    trim(str);
-    if (str == "") return std::vector<std::string>{};
-
-    std::vector<std::string> strSplit;
-    std::stringstream ss(str);
-    std::string token;
-
-    while (getline(ss, token, delimiter))
-    {
-        trim(token);
-        strSplit.push_back(token);
-    }
-
-    return strSplit;
-}
-
-
-inline void printBitboard(u64 bb)
-{
-    std::bitset<64> b(bb);
-    std::string str_bitset = b.to_string(); 
-    for (int i = 0; i < 64; i += 8)
-    {
-        std::string x = str_bitset.substr(i, 8);
-        reverse(x.begin(), x.end());
-        for (int j = 0; j < x.length(); j++)
-            std::cout << std::string(1, x[j]) << " ";
-        std::cout << std::endl;
-    }
-}
-
-inline int charToInt(char myChar) { return myChar - '0'; }
-
-inline u64 shiftRight(u64 bb) {
-	return (bb << 1ULL) & 0xfefefefefefefefeULL;
-}
-
-inline u64 shiftLeft(u64 bb) {
-	return (bb >> 1ULL) & 0x7f7f7f7f7f7f7f7fULL;
-}
-
-inline u64 shiftUp(u64 bb) { return bb << 8ULL; }
-
-inline u64 shiftDown(u64 bb) { return bb >> 8ULL; }
-
-inline double ln(u64 x) {
-    assert(x > 0);
-    return log(x);
-}
-
-template <typename T>
-inline T min(T a, T b) {
-    return a < b ? a : b;
-}
-
-template <typename T>
-inline T max(T a, T b) {
-    return a > b ? a : b;
-}
-
 inline auto millisecondsElapsed(std::chrono::steady_clock::time_point start)
 {
     return (std::chrono::steady_clock::now() - start) / std::chrono::milliseconds(1);
 }
 
+// [color][CASTLE_SHORT or CASTLE_LONG or isLongCastle]
+const static std::array<std::array<u64, 2>, 2> CASTLING_MASKS = {{
+    // White short and long castle
+    { 1ULL << 7, 1ULL },
+    // Black short and long castle
+    { 1ULL << 63, 1ULL << 56 } 
+}};
+
+std::array<std::pair<Square, Square>, 64> CASTLING_ROOK_FROM_TO = {};
+
+std::array<std::array<u64, 64>, 64> BETWEEN = {},
+                                    LINE_THROUGH = {};
+
+#include "attacks.hpp"
+
+constexpr void initUtils() {
+    CASTLING_ROOK_FROM_TO[6] = {7, 5};    // White short castle
+    CASTLING_ROOK_FROM_TO[2] = {0, 3};    // White long castle
+    CASTLING_ROOK_FROM_TO[62] = {63, 61}; // Black short castle
+    CASTLING_ROOK_FROM_TO[58] = {56, 59}; // Black long castle
+
+    for (Square sq1 = 0; sq1 < 64; sq1++) {
+        for (Square sq2 = 0; sq2 < 64; sq2++) 
+        {
+            if (sq1 == sq2) continue;
+
+            u64 bbSq1 = 1ULL << sq1;
+            u64 bbSq2 = 1ULL << sq2;
+            LINE_THROUGH[sq1][sq2] = bbSq1 | bbSq2;
+
+            if (attacks::bishopAttacks(sq1, 0) & bbSq2) 
+            {
+                BETWEEN[sq1][sq2] = attacks::bishopAttacks(sq1, bbSq2) & attacks::bishopAttacks(sq2, bbSq1);
+                LINE_THROUGH[sq1][sq2] |= attacks::bishopAttacks(sq1, 0) & attacks::bishopAttacks(sq2, 0);
+            }
+            else  if (attacks::rookAttacks(sq1, 0) & bbSq2) 
+            {
+                BETWEEN[sq1][sq2] = attacks::rookAttacks(sq1, bbSq2) & attacks::rookAttacks(sq2, bbSq1);
+                LINE_THROUGH[sq1][sq2] |= attacks::rookAttacks(sq1, 0) & attacks::rookAttacks(sq2, 0);
+            }
+
+      }
+    }
+    
+}

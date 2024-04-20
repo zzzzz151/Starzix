@@ -16,8 +16,8 @@ std::array<std::array<u8, 256>, MAX_DEPTH> LMR_TABLE; // [depth][moveIndex]
 constexpr void initLmrTable()
 {
     memset(LMR_TABLE.data(), 0, sizeof(LMR_TABLE));
-    for (int depth = 1; depth < LMR_TABLE.size(); depth++)
-        for (int move = 1; move < LMR_TABLE[0].size(); move++)
+    for (u64 depth = 1; depth < LMR_TABLE.size(); depth++)
+        for (u64 move = 1; move < LMR_TABLE[0].size(); move++)
             LMR_TABLE[depth][move] = round(lmrBase.value + ln(depth) * ln(move) * lmrMultiplier.value);
 }
 
@@ -142,7 +142,7 @@ class Searcher {
         hardTimeUp = false;
 
         pliesData[0].pvLine[0] = MOVE_NONE;
-        for (int i = 0; i < pliesData.size(); i++) 
+        for (u64 i = 0; i < pliesData.size(); i++) 
             pliesData[i].pvLength = 0;
 
         accumulators[0] = Accumulator(board);
@@ -153,8 +153,8 @@ class Searcher {
         // Set time limits
 
         assert(movesToGo > 0);
-        milliseconds = max((i64)0, milliseconds);
-        u64 maxHardMilliseconds = max((i64)0, milliseconds - OVERHEAD_MILLISECONDS);
+        milliseconds = std::max((i64)0, milliseconds);
+        u64 maxHardMilliseconds = std::max((i64)0, milliseconds - OVERHEAD_MILLISECONDS);
 
         if (isMoveTime || maxHardMilliseconds <= 0) {
             hardMilliseconds = maxHardMilliseconds;
@@ -163,7 +163,7 @@ class Searcher {
         else {
             hardMilliseconds = maxHardMilliseconds * hardTimePercentage.value;
             softMilliseconds = (maxHardMilliseconds / movesToGo + incrementMs * 0.6666) * softTimePercentage.value;
-            softMilliseconds = min(softMilliseconds, hardMilliseconds);
+            softMilliseconds = std::min(softMilliseconds, hardMilliseconds);
         }
 
         // ID (Iterative deepening)
@@ -186,7 +186,7 @@ class Searcher {
                           << " seldepth " << (int)maxPlyReached
                           << " time " << msElapsed
                           << " nodes " << nodes
-                          << " nps " << nodes * 1000 / max(msElapsed, (u64)1);
+                          << " nps " << nodes * 1000 / std::max(msElapsed, (u64)1);
 
                 if (abs(score) < MIN_MATE_SCORE)
                     std::cout << " score cp " << score;
@@ -224,8 +224,8 @@ class Searcher {
         // Search with a small window, adjusting it and researching until the score is inside the window
 
         i32 delta = aspInitialDelta.value;
-        i32 alpha = max(-INF, score - delta);
-        i32 beta = min(INF, score + delta);
+        i32 alpha = std::max(-INF, score - delta);
+        i32 beta = std::min(INF, score + delta);
         i32 depth = iterationDepth;
         i32 bestScore = score;
 
@@ -238,13 +238,13 @@ class Searcher {
 
             if (score >= beta)
             {
-                beta = min(beta + delta, INF);
+                beta = std::min(beta + delta, INF);
                 if (depth > 1) depth--;
             }
             else if (score <= alpha)
             {
                 beta = (alpha + beta + bestScore) / 3;
-                alpha = max(alpha - delta, -INF);
+                alpha = std::max(alpha - delta, -INF);
                 depth = iterationDepth;
             }
             else
@@ -320,10 +320,13 @@ class Searcher {
             && !(ttHit && ttEntry->getBound() == Bound::UPPER && ttEntry->score < beta)
             && board.hasNonPawnMaterial(stm))
             {
-                board.makeMove(MOVE_NONE, &tt);
+                u64 hashAfter = board.zobristHash() ^ ZOBRIST_COLOR[(int)stm] ^ ZOBRIST_COLOR[(int)board.oppSide()];
+                __builtin_prefetch(probeTT(tt, hashAfter));
+
+                board.makeMove(MOVE_NONE);
 
                 i32 nmpDepth = depth - nmpBaseReduction.value - depth / nmpReductionDivisor.value
-                               - min((plyData.eval-beta) / nmpEvalBetaDivisor.value, nmpEvalBetaMax.value);
+                               - std::min((plyData.eval-beta) / nmpEvalBetaDivisor.value, nmpEvalBetaMax.value);
 
                 i32 score = -search(nmpDepth, ply + 1, -beta, -alpha, doubleExtsLeft);
                 board.undoMove();
@@ -348,7 +351,7 @@ class Searcher {
         bool improving = ply > 1 && plyData.eval > pliesData[ply-2].eval 
                          && !board.inCheck() && !board.inCheck2PliesAgo();
 
-        int legalMovesPlayed = 0;
+        int legalMovesSeen = 0;
         i32 bestScore = -INF;
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::UPPER;
@@ -357,6 +360,8 @@ class Searcher {
         std::array<HistoryEntry*, 256> failLowsHistoryEntry;
         int failLowQuiets = 0, failLowNoisies = 0;
 
+        u64 pinned = board.pinned();
+
         for (int i = 0; i < plyData.moves.size(); i++)
         {
             auto [move, moveScore] = plyData.moves.incrementalSort(plyData.movesScores, i);
@@ -364,15 +369,19 @@ class Searcher {
             // Don't search TT move in singular search
             if (move == ttMove && singular) continue;
 
+            // skip illegal moves
+            if (!board.isPseudolegalLegal(move, pinned)) continue;
+
+            legalMovesSeen++;
             bool isQuiet = !board.isCapture(move) && move.promotion() == PieceType::NONE;
 
             if (bestScore > -MIN_MATE_SCORE && !pvNode && !board.inCheck() && moveScore < COUNTERMOVE_SCORE)
             {
                 // LMP (Late move pruning)
-                if (legalMovesPlayed >= lmpMinMoves.value + depth * depth * lmpDepthMultiplier.value)
+                if (legalMovesSeen >= lmpMinMoves.value + depth * depth * lmpDepthMultiplier.value)
                     break;
 
-                i32 lmrDepth = max(0, depth - (i32)LMR_TABLE[depth][legalMovesPlayed+1]);
+                i32 lmrDepth = std::max(0, depth - (i32)LMR_TABLE[depth][legalMovesSeen]);
 
                 // FP (Futility pruning)
                 if (lmrDepth <= fpMaxDepth.value 
@@ -389,12 +398,7 @@ class Searcher {
                 }
             }
 
-            // skip illegal moves
-            if (!board.makeMove(move, &tt)) continue;
-
-            legalMovesPlayed++;
             u64 nodesBefore = nodes;
-            nodes++;
 
             i32 extension = 0;
             if (ply == 0) goto skipExtensions;
@@ -409,17 +413,10 @@ class Searcher {
                 // Singular search: before searching any move, 
                 // search this node at a shallower depth with TT move excluded
 
-                // Undo TT move we just made
-                BoardState boardState = board.getState();
-                board.undoMove();
-
-                i32 singularBeta = max(-INF, (i32)ttEntry->score - i32(depth * singularBetaMultiplier.value));
+                i32 singularBeta = std::max(-INF, (i32)ttEntry->score - i32(depth * singularBetaMultiplier.value));
 
                 i32 singularScore = search((depth - 1) / 2, ply, singularBeta - 1, singularBeta, 
                                            doubleExtsLeft, true);
-
-                __builtin_prefetch(probeTT(tt, boardState.zobristHash));
-                board.pushState(boardState); // Make the TT move again
 
                 // Double extension
                 if (singularScore < singularBeta - doubleExtensionMargin.value 
@@ -446,6 +443,11 @@ class Searcher {
 
             skipExtensions:
 
+            if (!move.isSpecial()) __builtin_prefetch(probeTT(tt, board.zobristHashAfter(move)));
+
+            board.makeMove(move);
+            nodes++;
+
             accumulatorIdx++;
             accumulators[accumulatorIdx].updated = false;
 
@@ -455,7 +457,7 @@ class Searcher {
     	    // PVS (Principal variation search)
 
             i32 score = 0, lmr = 0;
-            if (legalMovesPlayed == 1)
+            if (legalMovesSeen == 1)
             {
                 score = -search(depth - 1 + extension, ply + 1, -beta, -alpha, doubleExtsLeft);
                 goto moveSearched;
@@ -464,7 +466,7 @@ class Searcher {
             // LMR (Late move reductions)
             if (depth >= 3 && moveScore < COUNTERMOVE_SCORE)
             {
-                lmr = LMR_TABLE[depth][legalMovesPlayed];
+                lmr = LMR_TABLE[depth][legalMovesSeen];
                 lmr -= pvNode;    // reduce pv nodes less
                 lmr -= improving; // reduce less if were improving
                 
@@ -518,10 +520,10 @@ class Searcher {
 
             bound = Bound::LOWER;
 
-            i32 historyBonus = min(historyBonusMax.value, 
+            i32 historyBonus = std::min(historyBonusMax.value, 
                                    depth * historyBonusMultiplier.value - historyBonusOffset.value);
 
-            i32 historyMalus = -min(historyMalusMax.value,
+            i32 historyMalus = -std::min(historyMalusMax.value,
                                     depth * historyMalusMultiplier.value - historyMalusOffset.value);
 
             if (isQuiet) {
@@ -551,8 +553,8 @@ class Searcher {
             break; // Fail high / beta cutoff
         }
 
-        if (legalMovesPlayed == 0) 
-            return board.inCheck() ? -INF + ply : 0;
+        if (legalMovesSeen == 0) 
+            return board.inCheck() ? -INF + (i32)ply : 0;
 
         if (!singular)
             ttEntry->update(board.zobristHash(), depth, ply, bestScore, bestMove, bound);
@@ -563,19 +565,21 @@ class Searcher {
     // Quiescence search
     inline i32 qSearch(u8 ply, i32 alpha, i32 beta)
     {
+        assert(ply > 0);
+
         if (isHardTimeUp()) return 0;
 
         // Update seldepth
         if (ply > maxPlyReached) maxPlyReached = ply;
 
-        if (ply > 0 && board.isDraw()) return 0;
+        if (board.isDraw()) return 0;
 
         // Probe TT
         TTEntry *ttEntry = probeTT(tt, board.zobristHash());
         bool ttHit = ttEntry->zobristHash == board.zobristHash();
 
         // TT cutoff
-        if (ttHit && ply > 0
+        if (ttHit
         && (ttEntry->getBound() == Bound::EXACT
         || (ttEntry->getBound() == Bound::LOWER && ttEntry->score >= beta) 
         || (ttEntry->getBound() == Bound::UPPER && ttEntry->score <= alpha)))
@@ -608,6 +612,8 @@ class Searcher {
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::UPPER;
 
+        u64 pinned = board.pinned();
+
         for (int i = 0; i < plyData.moves.size(); i++)
         {
             auto [move, moveScore] = plyData.moves.incrementalSort(plyData.movesScores, i);
@@ -616,8 +622,11 @@ class Searcher {
             if (!board.inCheck() && moveScore < 0) break;
 
             // skip illegal moves
-            if (!board.makeMove(move, &tt)) continue; 
+            if (!board.isPseudolegalLegal(move, pinned)) continue;
 
+            if (!move.isSpecial()) __builtin_prefetch(probeTT(tt, board.zobristHashAfter(move)));
+
+            board.makeMove(move);
             legalMovesPlayed++;
             nodes++;
 
@@ -646,7 +655,7 @@ class Searcher {
 
         if (legalMovesPlayed == 0 && board.inCheck()) 
             // checkmate
-            return -INF + ply; 
+            return -INF + (i32)ply; 
 
         ttEntry->update(board.zobristHash(), 0, ply, bestScore, bestMove, bound);
 

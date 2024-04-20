@@ -61,26 +61,42 @@ inline void uciLoop()
         else if (tokens[0] == "perft" || (tokens[0] == "go" && tokens[1] == "perft"))
         {
             int depth = stoi(tokens.back());
-            perft::perftBench(searcher.board, depth);
+            perftBench(searcher.board, depth);
         }
         else if (tokens[0] == "perftsplit" || tokens[0] == "splitperft" 
         || tokens[0] == "perftdivide" || tokens[0] == "divideperft")
         {
             int depth = stoi(tokens[1]);
-            perft::perftSplit(searcher.board, depth);
+            perftSplit(searcher.board, depth);
         }
         else if (tokens[0] == "makemove")
         {
-            if (tokens[1] == "0000" || tokens[1] == "null" || tokens[1] == "none")
-            {
-                assert(!searcher.board.inCheck());
+            if ((tokens[1] == "0000" || tokens[1] == "null" || tokens[1] == "none")
+            && !searcher.board.inCheck())
                 searcher.board.makeMove(MOVE_NONE);
-            }
             else
                 searcher.board.makeMove(tokens[1]);
         }
         else if (tokens[0] == "undomove")
             searcher.board.undoMove();
+        else if (tokens[0] == "islegal")
+        {
+            Move move = searcher.board.uciToMove(tokens[1]);
+            u64 pinned = searcher.board.pinned();
+            std::cout << searcher.board.isPseudolegalLegal(move, pinned) << std::endl;
+        }
+        else if (tokens[0] == "moves") {
+            MovesList moves = MovesList();
+            searcher.board.pseudolegalMoves(moves);
+            std::cout << "Pseudolegals: " << (int)moves.size() << std::endl;
+
+            u8 legals = 0;
+            u64 pinned = searcher.board.pinned();
+            for (int i = 0; i < moves.size(); i++)
+                legals += searcher.board.isPseudolegalLegal(moves[i], pinned);
+
+            std::cout << "Legals: " << (int)legals << std::endl;
+        }
         else if (received == "paramsjson")
             printParamsAsJson();
 
@@ -171,7 +187,7 @@ inline void position(Board &board, std::vector<std::string> &tokens)
     else if (tokens[1] == "fen")
     {
         std::string fen = "";
-        int i = 0;
+        u64 i = 0;
         for (i = 2; i < tokens.size() && tokens[i] != "moves"; i++)
             fen += tokens[i] + " ";
         fen.pop_back(); // remove last whitespace
@@ -179,7 +195,7 @@ inline void position(Board &board, std::vector<std::string> &tokens)
         movesTokenIndex = i;
     }
 
-    for (int i = movesTokenIndex + 1; i < tokens.size(); i++)
+    for (u64 i = movesTokenIndex + 1; i < tokens.size(); i++)
         board.makeMove(tokens[i]);
 }
 

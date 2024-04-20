@@ -81,7 +81,7 @@ inline void bench(u8 depth = 14)
 
     std::cout << "bench depth " << (int)depth
               << " nodes " << totalNodes
-              << " nps " << totalNodes * 1000 / max((u64)totalMilliseconds, (u64)1)
+              << " nps " << totalNodes * 1000 / std::max((u64)totalMilliseconds, (u64)1)
               << " time " << totalMilliseconds
               << std::endl;
 }
