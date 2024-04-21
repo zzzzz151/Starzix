@@ -4,7 +4,6 @@
 
 namespace uci
 {
-extern bool outputSearchInfo;
 inline void ucinewgame(Searcher &searcher);
 }
 

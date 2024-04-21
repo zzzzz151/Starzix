@@ -113,6 +113,7 @@ inline void uci() {
     std::cout << "id author zzzzz\n";
     std::cout << "option name Hash type spin default 32 min 1 max 1024\n";
 
+    /*
     for (auto &myTunableParam : tunableParams) 
     {
         std::visit([](auto &tunableParam) 
@@ -134,7 +135,7 @@ inline void uci() {
             std::cout << "\n";
         }, myTunableParam);
     }
-    
+    */
 
     std::cout << "uciok" << std::endl;
 }

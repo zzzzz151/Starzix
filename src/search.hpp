@@ -398,8 +398,6 @@ class Searcher {
                 }
             }
 
-            u64 nodesBefore = nodes;
-
             i32 extension = 0;
             if (ply == 0) goto skipExtensions;
 
@@ -446,6 +444,7 @@ class Searcher {
             if (!move.isSpecial()) __builtin_prefetch(probeTT(tt, board.zobristHashAfter(move)));
 
             board.makeMove(move);
+            u64 nodesBefore = nodes;
             nodes++;
 
             accumulatorIdx++;
