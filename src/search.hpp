@@ -303,13 +303,13 @@ class Searcher {
         {
             // RFP (Reverse futility pruning) / Static NMP
             if (depth <= rfpMaxDepth.value && plyData.eval >= beta + depth * rfpDepthMultiplier.value)
-                return plyData.eval;
+                return (plyData.eval + beta) / 2;
 
             // Razoring
             if (depth <= razoringMaxDepth.value 
             && plyData.eval + depth * razoringDepthMultiplier.value < alpha)
             {
-                i32 score = qSearch(ply, alpha, beta);
+                i32 score = qSearch(ply, alpha, beta, true);
                 if (score <= alpha) return score;
             }
 
@@ -562,16 +562,18 @@ class Searcher {
     }
 
     // Quiescence search
-    inline i32 qSearch(u8 ply, i32 alpha, i32 beta)
+    inline i32 qSearch(u8 ply, i32 alpha, i32 beta, bool razoring = false)
     {
         assert(ply > 0);
 
-        if (isHardTimeUp()) return 0;
+        if (!razoring) {
+            if (isHardTimeUp()) return 0;
 
-        // Update seldepth
-        if (ply > maxPlyReached) maxPlyReached = ply;
+            // Update seldepth
+            if (ply > maxPlyReached) maxPlyReached = ply;
 
-        if (board.isDraw()) return 0;
+            if (board.isDraw()) return 0;
+        }
 
         // Probe TT
         TTEntry *ttEntry = probeTT(tt, board.zobristHash());
@@ -593,7 +595,7 @@ class Searcher {
         if (board.inCheck())
             plyData.eval = 0;
         else {
-            plyData.eval = evaluate(accumulators[accumulatorIdx], board.sideToMove());
+            if (!razoring) plyData.eval = evaluate(accumulators[accumulatorIdx], board.sideToMove());
 
             if (plyData.eval >= beta) return plyData.eval; 
             if (plyData.eval > alpha) alpha = plyData.eval;
