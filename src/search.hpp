@@ -463,11 +463,12 @@ class Searcher {
             }
 
             // LMR (Late move reductions)
-            if (depth >= 3 && moveScore < COUNTERMOVE_SCORE)
+            if (depth >= 3 && moveScore < COUNTERMOVE_SCORE && legalMovesSeen > 2)
             {
                 lmr = LMR_TABLE[depth][legalMovesSeen];
-                lmr -= pvNode;    // reduce pv nodes less
-                lmr -= improving; // reduce less if were improving
+                lmr -= pvNode;          // reduce pv nodes less
+                lmr -= board.inCheck(); // reduce less if move gives check
+                lmr -= improving;       // reduce less if were improving
                 
                 // reduce moves with good history less and vice versa
                 lmr -= round(isQuiet ? (float)moveScore / (float)lmrQuietHistoryDiv.value
@@ -530,9 +531,11 @@ class Searcher {
                 plyData.killer = move; 
 
                 // This fail high quiet is now a countermove
-                Move lastMove;
-                if ((lastMove = board.lastMove()) != MOVE_NONE)
-                    countermoves[(int)stm][(int)lastMove.pieceType()][lastMove.to()] = move;
+                Move lastMove = board.lastMove();
+                if (lastMove != MOVE_NONE) {
+                    pt = (int)lastMove.pieceType();
+                    countermoves[(int)stm][pt][lastMove.to()] = move;
+                }
 
                 // Increase history of this fail high quiet move
                 historyEntry->updateQuietHistory(board, historyBonus);
