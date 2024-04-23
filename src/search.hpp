@@ -200,7 +200,8 @@ class Searcher {
 
             i32 iterationScore = iterationDepth >= aspMinDepth.value 
                                  ? aspiration(iterationDepth, score)
-                                 : search(iterationDepth, 0, -INF, INF, doubleExtensionsMax.value);
+                                 : search(iterationDepth, 0, -INF, INF, 
+                                          doubleExtensionsMax.value, false);
                                  
             if (isHardTimeUp()) break;
 
@@ -256,7 +257,7 @@ class Searcher {
         i32 bestScore = score;
 
         while (true) {
-            score = search(depth, 0, alpha, beta, doubleExtensionsMax.value);
+            score = search(depth, 0, alpha, beta, doubleExtensionsMax.value, false);
 
             if (isHardTimeUp()) return 0;
 
@@ -283,7 +284,7 @@ class Searcher {
     }
 
     inline i32 search(i32 depth, u8 ply, i32 alpha, i32 beta, 
-                      u8 doubleExtsLeft, bool singular = false)
+                      u8 doubleExtsLeft, bool cutNode, bool singular = false)
     { 
         assert(ply <= maxDepth);
         assert(alpha >= -INF && alpha <= INF);
@@ -297,6 +298,7 @@ class Searcher {
         if (depth > maxDepth) depth = maxDepth;
 
         bool pvNode = beta > alpha + 1;
+        if (pvNode) assert(!cutNode);
 
         // Probe TT
         TTEntry *ttEntry = probeTT(tt, board.zobristHash());
@@ -351,7 +353,7 @@ class Searcher {
                     i32 nmpDepth = depth - nmpBaseReduction.value - depth / nmpReductionDivisor.value
                                    - std::min((plyData.eval-beta) / nmpEvalBetaDivisor.value, nmpEvalBetaMax.value);
 
-                    score = -search(nmpDepth, ply + 1, -beta, -alpha, doubleExtsLeft);
+                    score = -search(nmpDepth, ply + 1, -beta, -alpha, doubleExtsLeft, !cutNode);
                 }
 
                 board.undoMove();
@@ -441,7 +443,7 @@ class Searcher {
                 i32 singularBeta = std::max(-INF, (i32)ttEntry->score - i32(depth * singularBetaMultiplier.value));
 
                 i32 singularScore = search((depth - 1) / 2, ply, singularBeta - 1, singularBeta, 
-                                           doubleExtsLeft, true);
+                                           doubleExtsLeft, cutNode, true);
 
                 // Double extension
                 if (singularScore < singularBeta - doubleExtensionMargin.value 
@@ -481,7 +483,7 @@ class Searcher {
             if (board.isDraw()) goto moveSearched;
 
             if (legalMovesSeen == 1) {
-                score = -search(depth - 1 + extension, ply + 1, -beta, -alpha, doubleExtsLeft);
+                score = -search(depth - 1 + extension, ply + 1, -beta, -alpha, doubleExtsLeft, false);
                 goto moveSearched;
             }
 
@@ -492,6 +494,7 @@ class Searcher {
                 lmr -= pvNode;          // reduce pv nodes less
                 lmr -= board.inCheck(); // reduce less if move gives check
                 lmr -= improving;       // reduce less if were improving
+                lmr += 2 * cutNode;     // reduce more if we expect to fail high
                 
                 // reduce moves with good history less and vice versa
                 lmr -= round(isQuiet ? (float)moveScore / (float)lmrQuietHistoryDiv.value
@@ -500,13 +503,13 @@ class Searcher {
                 lmr = std::clamp(lmr, 0, depth - 2); // dont extend or reduce into qsearch
             }
 
-            score = -search(depth - 1 - lmr + extension, ply + 1, -alpha-1, -alpha, doubleExtsLeft);
+            score = -search(depth - 1 - lmr + extension, ply + 1, -alpha-1, -alpha, doubleExtsLeft, true);
 
             if (score > alpha && lmr > 0)
-                score = -search(depth - 1 + extension, ply + 1, -alpha-1, -alpha, doubleExtsLeft); 
+                score = -search(depth - 1 + extension, ply + 1, -alpha-1, -alpha, doubleExtsLeft, !cutNode); 
 
             if (score > alpha && pvNode)
-                score = -search(depth - 1 + extension, ply + 1, -beta, -alpha, doubleExtsLeft);
+                score = -search(depth - 1 + extension, ply + 1, -beta, -alpha, doubleExtsLeft, false);
 
             moveSearched:
 
