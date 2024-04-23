@@ -273,12 +273,14 @@ class Searcher {
 
         if (depth > maxDepth) depth = maxDepth;
 
+        bool pvNode = beta > alpha + 1;
+
         // Probe TT
         TTEntry *ttEntry = probeTT(tt, board.zobristHash());
         bool ttHit = board.zobristHash() == ttEntry->zobristHash;
 
         // TT cutoff
-        if (ttHit && ply > 0 && !singular
+        if (ttHit && !pvNode && !singular
         && ttEntry->depth >= depth 
         && (ttEntry->getBound() == Bound::EXACT
         || (ttEntry->getBound() == Bound::LOWER && ttEntry->score >= beta) 
@@ -296,8 +298,6 @@ class Searcher {
         }
 
         if (ply >= maxDepth) return plyData.eval;
-
-        bool pvNode = beta > alpha + 1;
 
         if (!pvNode && !singular && !board.inCheck())
         {
