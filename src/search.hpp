@@ -368,7 +368,7 @@ class Searcher {
         Move ttMove = ttHit ? ttEntry->bestMove : MOVE_NONE;
 
         // IIR (Internal iterative reduction)
-        if (depth >= iirMinDepth.value && ttMove == MOVE_NONE)
+        if (depth >= iirMinDepth.value && ttMove == MOVE_NONE && (pvNode || cutNode))
             depth--;
 
         // genenerate and score all moves except underpromotions
