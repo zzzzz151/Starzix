@@ -26,7 +26,7 @@ struct PlyData {
     std::array<Move, MAX_DEPTH+1> pvLine = { };
     u8 pvLength = 0;
     Move killer = MOVE_NONE;
-    i32 eval = 0;
+    i32 eval = EVAL_NONE;
     MovesList moves = MovesList();
     std::array<i32, 256> movesScores = { };
 };
@@ -109,6 +109,32 @@ class Searcher {
 
     private:
 
+    inline void makeMove(Move move, u8 newPly)
+    {
+        if (move == MOVE_NONE) {
+            u64 hashAfter = board.zobristHash() 
+                            ^ ZOBRIST_COLOR[(int)board.sideToMove()] 
+                            ^ ZOBRIST_COLOR[(int)board.oppSide()];
+                            
+            __builtin_prefetch(probeTT(tt, hashAfter));
+        }
+        else {
+            if (!move.isSpecial())
+                __builtin_prefetch(probeTT(tt, board.zobristHashAfter(move)));
+
+            accumulators[++accumulatorIdx].updated = false;
+        }
+
+        board.makeMove(move);
+        nodes++;
+
+        // Update seldepth
+        if (newPly > maxPlyReached) maxPlyReached = newPly;
+        
+        pliesData[newPly].eval = EVAL_NONE;
+        pliesData[newPly].pvLength = 0;
+    }
+
     inline bool isHardTimeUp() {
         if (bestMoveRoot() == MOVE_NONE) return false;
 
@@ -142,11 +168,11 @@ class Searcher {
         hardTimeUp = false;
 
         pliesData[0].pvLine[0] = MOVE_NONE;
-        for (u64 i = 0; i < pliesData.size(); i++) 
-            pliesData[i].pvLength = 0;
+        pliesData[0].pvLength = 0;
 
         accumulators[0] = Accumulator(board);
         accumulatorIdx = 0;
+        pliesData[0].eval = board.inCheck() ? 0 : evaluate(accumulators[0], board.sideToMove());
 
         movesNodes = {};
 
@@ -259,17 +285,14 @@ class Searcher {
     inline i32 search(i32 depth, u8 ply, i32 alpha, i32 beta, 
                       u8 doubleExtsLeft, bool singular = false)
     { 
-        PlyData &plyData = pliesData[ply];
-        plyData.pvLength = 0; // Ensure fresh PV
+        assert(ply <= maxDepth);
+        assert(alpha >= -INF && alpha <= INF);
+        assert(beta >= -INF && beta <= INF);
+        assert(alpha < beta);
 
         if (depth <= 0) return qSearch(ply, alpha, beta);
 
         if (isHardTimeUp()) return 0;
-
-        // Update seldepth
-        if (ply > maxPlyReached) maxPlyReached = ply;
-
-        if (ply > 0 && !singular && board.isDraw()) return 0;
 
         if (depth > maxDepth) depth = maxDepth;
 
@@ -287,15 +310,15 @@ class Searcher {
         || (ttEntry->getBound() == Bound::UPPER && ttEntry->score <= alpha)))
             return ttEntry->adjustedScore(ply);
 
+        PlyData &plyData = pliesData[ply];
         Color stm = board.sideToMove();
 
-        if (!singular) {
-            if (!accumulators[accumulatorIdx].updated) 
-                accumulators[accumulatorIdx].update(
-                    accumulators[accumulatorIdx-1], oppColor(stm), board.lastMove(), board.captured());
+        if (!accumulators[accumulatorIdx].updated) 
+            accumulators[accumulatorIdx].update(
+                accumulators[accumulatorIdx-1], oppColor(stm), board.lastMove(), board.captured());
 
+        if (plyData.eval == EVAL_NONE)
             plyData.eval = board.inCheck() ? 0 : evaluate(accumulators[accumulatorIdx], stm);
-        }
 
         if (ply >= maxDepth) return plyData.eval;
 
@@ -309,7 +332,7 @@ class Searcher {
             if (depth <= razoringMaxDepth.value 
             && plyData.eval + depth * razoringDepthMultiplier.value < alpha)
             {
-                i32 score = qSearch(ply, alpha, beta, true);
+                i32 score = qSearch(ply, alpha, beta);
                 if (score <= alpha) return score;
             }
 
@@ -320,20 +343,24 @@ class Searcher {
             && !(ttHit && ttEntry->getBound() == Bound::UPPER && ttEntry->score < beta)
             && board.hasNonPawnMaterial(stm))
             {
-                u64 hashAfter = board.zobristHash() ^ ZOBRIST_COLOR[(int)stm] ^ ZOBRIST_COLOR[(int)board.oppSide()];
-                __builtin_prefetch(probeTT(tt, hashAfter));
+                makeMove(MOVE_NONE, ply + 1);
 
-                board.makeMove(MOVE_NONE);
+                i32 score = 0;
 
-                i32 nmpDepth = depth - nmpBaseReduction.value - depth / nmpReductionDivisor.value
-                               - std::min((plyData.eval-beta) / nmpEvalBetaDivisor.value, nmpEvalBetaMax.value);
+                if (!board.isDraw()) {
+                    i32 nmpDepth = depth - nmpBaseReduction.value - depth / nmpReductionDivisor.value
+                                   - std::min((plyData.eval-beta) / nmpEvalBetaDivisor.value, nmpEvalBetaMax.value);
 
-                i32 score = -search(nmpDepth, ply + 1, -beta, -alpha, doubleExtsLeft);
+                    score = -search(nmpDepth, ply + 1, -beta, -alpha, doubleExtsLeft);
+                }
+
                 board.undoMove();
 
                 if (score >= MIN_MATE_SCORE) return beta;
                 if (score >= beta) return score;
             }
+
+            if (isHardTimeUp()) return 0;
         }
 
         Move ttMove = ttHit ? ttEntry->bestMove : MOVE_NONE;
@@ -441,14 +468,8 @@ class Searcher {
 
             skipExtensions:
 
-            if (!move.isSpecial()) __builtin_prefetch(probeTT(tt, board.zobristHashAfter(move)));
-
-            board.makeMove(move);
             u64 nodesBefore = nodes;
-            nodes++;
-
-            accumulatorIdx++;
-            accumulators[accumulatorIdx].updated = false;
+            makeMove(move, ply + 1);
 
             int pt = (int)move.pieceType();
             HistoryEntry *historyEntry = &historyTable[(int)stm][pt][move.to()];
@@ -456,14 +477,16 @@ class Searcher {
     	    // PVS (Principal variation search)
 
             i32 score = 0, lmr = 0;
-            if (legalMovesSeen == 1)
-            {
+
+            if (board.isDraw()) goto moveSearched;
+
+            if (legalMovesSeen == 1) {
                 score = -search(depth - 1 + extension, ply + 1, -beta, -alpha, doubleExtsLeft);
                 goto moveSearched;
             }
 
             // LMR (Late move reductions)
-            if (depth >= 3 && moveScore < COUNTERMOVE_SCORE && legalMovesSeen > 2)
+            if (depth >= 3 && legalMovesSeen >= lmrMinMoves.value && moveScore < COUNTERMOVE_SCORE)
             {
                 lmr = LMR_TABLE[depth][legalMovesSeen];
                 lmr -= pvNode;          // reduce pv nodes less
@@ -479,8 +502,11 @@ class Searcher {
 
             score = -search(depth - 1 - lmr + extension, ply + 1, -alpha-1, -alpha, doubleExtsLeft);
 
-            if (score > alpha && (pvNode || lmr > 0))
-                score = -search(depth - 1 + extension, ply + 1, -beta, -alpha, doubleExtsLeft); 
+            if (score > alpha && lmr > 0)
+                score = -search(depth - 1 + extension, ply + 1, -alpha-1, -alpha, doubleExtsLeft); 
+
+            if (score > alpha && pvNode)
+                score = -search(depth - 1 + extension, ply + 1, -beta, -alpha, doubleExtsLeft);
 
             moveSearched:
 
@@ -565,18 +591,14 @@ class Searcher {
     }
 
     // Quiescence search
-    inline i32 qSearch(u8 ply, i32 alpha, i32 beta, bool razoring = false)
+    inline i32 qSearch(u8 ply, i32 alpha, i32 beta)
     {
-        assert(ply > 0);
+        assert(ply > 0 && ply <= maxDepth);
+        assert(alpha >= -INF && alpha <= INF);
+        assert(beta >= -INF && beta <= INF);
+        assert(alpha < beta);
 
-        if (!razoring) {
-            if (isHardTimeUp()) return 0;
-
-            // Update seldepth
-            if (ply > maxPlyReached) maxPlyReached = ply;
-
-            if (board.isDraw()) return 0;
-        }
+        if (isHardTimeUp()) return 0;
 
         // Probe TT
         TTEntry *ttEntry = probeTT(tt, board.zobristHash());
@@ -598,7 +620,8 @@ class Searcher {
         if (board.inCheck())
             plyData.eval = 0;
         else {
-            if (!razoring) plyData.eval = evaluate(accumulators[accumulatorIdx], board.sideToMove());
+            if (plyData.eval == EVAL_NONE)
+                plyData.eval = evaluate(accumulators[accumulatorIdx], board.sideToMove());
 
             if (plyData.eval >= beta) return plyData.eval; 
             if (plyData.eval > alpha) alpha = plyData.eval;
@@ -628,16 +651,10 @@ class Searcher {
             // skip illegal moves
             if (!board.isPseudolegalLegal(move, pinned)) continue;
 
-            if (!move.isSpecial()) __builtin_prefetch(probeTT(tt, board.zobristHashAfter(move)));
-
-            board.makeMove(move);
+            makeMove(move, ply + 1);
             legalMovesPlayed++;
-            nodes++;
 
-            accumulatorIdx++;
-            accumulators[accumulatorIdx].updated = false;
-
-            i32 score = -qSearch(ply + 1, -beta, -alpha);
+            i32 score = board.isDraw() ? 0 : -qSearch(ply + 1, -beta, -alpha);
 
             board.undoMove();
             accumulatorIdx--;

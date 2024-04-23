@@ -60,6 +60,7 @@ TunableParam<u8> doubleExtensionsMax = TunableParam<u8>("doubleExtensionsMax", 6
 // LMR (Late move reductions)
 TunableParam<double> lmrBase = TunableParam<double>("lmrBase", 0.69, 0.4, 1.2, 0.1);
 TunableParam<double> lmrMultiplier = TunableParam<double>("lmrMultiplier", 0.38, 0.2, 0.8, 0.1);
+TunableParam<i32> lmrMinMoves = TunableParam<i32>("lmrMinMoves", 3, 2, 4, 1);
 TunableParam<i32> lmrQuietHistoryDiv = TunableParam<i32>("lmrQuietHistoryDiv", 6677, 2048, 32768, 2048);
 TunableParam<i32> lmrNoisyHistoryDiv = TunableParam<i32>("lmrNoisyHistoryDiv", 1806, 16, 32768, 2047);
 
@@ -113,7 +114,9 @@ std::vector<TunableParamVariant> tunableParams
     &seePruningMaxDepth, &seeNoisyThreshold, &seeQuietThreshold,
     &singularMinDepth, &singularDepthMargin, &singularBetaMultiplier,
     &doubleExtensionMargin, &doubleExtensionsMax,
-    &lmrBase, &lmrMultiplier, &lmrQuietHistoryDiv, &lmrNoisyHistoryDiv,
+    &lmrBase, &lmrMultiplier, 
+    &lmrMinMoves,
+    &lmrQuietHistoryDiv, &lmrNoisyHistoryDiv,
     &historyMax,
     &historyBonusMultiplier, &historyBonusOffset, &historyBonusMax,
     &historyMalusMultiplier, &historyMalusOffset, &historyMalusMax,
