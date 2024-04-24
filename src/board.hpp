@@ -417,10 +417,6 @@ class Board {
 
     inline bool inCheck() { return state->checkers > 0; }
 
-    inline bool inCheck2PliesAgo() {
-        return states.size() >= 2 && states[states.size() - 2].checkers > 0;
-    }
-
     inline u64 pinned() { 
         Square kingSquare = lsb(bitboard(sideToMove(), PieceType::KING));
         Color oppSide = this->oppSide();

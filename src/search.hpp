@@ -172,7 +172,7 @@ class Searcher {
 
         accumulators[0] = Accumulator(board);
         accumulatorIdx = 0;
-        pliesData[0].eval = board.inCheck() ? 0 : evaluate(accumulators[0], board.sideToMove());
+        pliesData[0].eval = board.inCheck() ? INF : evaluate(accumulators[0], board.sideToMove());
 
         movesNodes = {};
 
@@ -312,6 +312,8 @@ class Searcher {
         || (ttEntry->getBound() == Bound::UPPER && ttEntry->score <= alpha)))
             return ttEntry->adjustedScore(ply);
 
+        if (ply >= maxDepth && board.inCheck()) return 0;
+
         PlyData &plyData = pliesData[ply];
         Color stm = board.sideToMove();
 
@@ -320,12 +322,12 @@ class Searcher {
                 accumulators[accumulatorIdx-1], oppColor(stm), board.lastMove(), board.captured());
 
         if (plyData.eval == EVAL_NONE)
-            plyData.eval = board.inCheck() ? 0 : evaluate(accumulators[accumulatorIdx], stm);
+            plyData.eval = board.inCheck() ? INF : evaluate(accumulators[accumulatorIdx], stm);
 
         if (ply >= maxDepth) return plyData.eval;
 
-        bool improving = ply > 1 && plyData.eval > pliesData[ply-2].eval 
-                         && !board.inCheck() && !board.inCheck2PliesAgo();
+        // If in check 2 plies ago, then pliesData[ply-2].eval is INF, and improving is false
+        bool improving = ply > 1 && !board.inCheck() && plyData.eval > pliesData[ply-2].eval;
 
         if (!pvNode && !singular && !board.inCheck())
         {
@@ -407,7 +409,7 @@ class Searcher {
             if (bestScore > -MIN_MATE_SCORE && !pvNode && !board.inCheck() && moveScore < COUNTERMOVE_SCORE)
             {
                 // LMP (Late move pruning)
-                if (legalMovesSeen >= lmpMinMoves.value + depth * depth * lmpDepthMultiplier.value)
+                if (legalMovesSeen >= lmpMinMoves.value + depth * depth * lmpDepthMultiplier.value / (improving ? 1 : 2))
                     break;
 
                 i32 lmrDepth = std::max(0, depth - (i32)LMR_TABLE[depth][legalMovesSeen]);
@@ -614,23 +616,23 @@ class Searcher {
         || (ttEntry->getBound() == Bound::UPPER && ttEntry->score <= alpha)))
             return ttEntry->adjustedScore(ply);
 
+        if (ply >= maxDepth && board.inCheck()) return 0;
+
         PlyData &plyData = pliesData[ply];
 
         if (!accumulators[accumulatorIdx].updated) 
             accumulators[accumulatorIdx].update(
                 accumulators[accumulatorIdx-1], board.oppSide(), board.lastMove(), board.captured());
 
-        if (board.inCheck())
-            plyData.eval = 0;
-        else {
+        if (!board.inCheck()) {
             if (plyData.eval == EVAL_NONE)
                 plyData.eval = evaluate(accumulators[accumulatorIdx], board.sideToMove());
 
-            if (plyData.eval >= beta) return plyData.eval; 
+            if (plyData.eval >= beta || ply >= maxDepth) 
+                return plyData.eval; 
+
             if (plyData.eval > alpha) alpha = plyData.eval;
         }
-
-        if (ply >= maxDepth) return plyData.eval;
 
         // if in check, generate all moves, else only noisy moves
         // never generate underpromotions
