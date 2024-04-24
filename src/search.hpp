@@ -324,10 +324,14 @@ class Searcher {
 
         if (ply >= maxDepth) return plyData.eval;
 
+        bool improving = ply > 1 && plyData.eval > pliesData[ply-2].eval 
+                         && !board.inCheck() && !board.inCheck2PliesAgo();
+
         if (!pvNode && !singular && !board.inCheck())
         {
             // RFP (Reverse futility pruning) / Static NMP
-            if (depth <= rfpMaxDepth.value && plyData.eval >= beta + depth * rfpDepthMultiplier.value)
+            if (depth <= rfpMaxDepth.value 
+            && plyData.eval >= beta + (depth - improving) * rfpDepthMultiplier.value)
                 return (plyData.eval + beta) / 2;
 
             // Razoring
@@ -377,10 +381,8 @@ class Searcher {
             scoreMoves(plyData, ttMove);
         }
 
-        bool improving = ply > 1 && plyData.eval > pliesData[ply-2].eval 
-                         && !board.inCheck() && !board.inCheck2PliesAgo();
-
         int legalMovesSeen = 0;
+        u64 pinned = board.pinned();
         i32 bestScore = -INF;
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::UPPER;
@@ -388,8 +390,6 @@ class Searcher {
         // Fail low quiets at beginning of array, fail low noisy moves at the end
         std::array<HistoryEntry*, 256> failLowsHistoryEntry;
         int failLowQuiets = 0, failLowNoisies = 0;
-
-        u64 pinned = board.pinned();
 
         for (int i = 0; i < plyData.moves.size(); i++)
         {
