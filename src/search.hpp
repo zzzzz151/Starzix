@@ -461,10 +461,13 @@ class Searcher {
                 else if (singularScore < singularBeta)
                     // TT move is probably better than all others, so extend its search by 1 ply
                     extension = 1;
-                // Negative extension
-                else if (ttEntry->score >= beta)
-                    // some other move is probably better than TT move, so reduce TT move search by 2 plies
-                    extension = -2;
+                // Negative extensions
+                else {
+                    // some other move is probably better than TT move, so reduce TT move search
+                    extension -= ttEntry->score >= beta; 
+                    // reduce TT move search more if we expect to fail high
+                    extension -= cutNode; 
+                }
             }
             // Check extension if no singular extensions
             else if (board.inCheck())
