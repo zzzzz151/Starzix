@@ -383,8 +383,8 @@ class Searcher {
             scoreMoves(plyData, ttMove);
         }
 
-        int legalMovesSeen = 0;
         u64 pinned = board.pinned();
+        int legalMovesSeen = 0;
         i32 bestScore = -INF;
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::UPPER;
@@ -642,12 +642,11 @@ class Searcher {
         board.pseudolegalMoves(plyData.moves, !board.inCheck(), false);
         scoreMoves(plyData, ttHit ? ttEntry->bestMove : MOVE_NONE);
         
-        u8 legalMovesPlayed = 0;
+        u64 pinned = board.pinned();
+        int legalMovesPlayed = 0;
         i32 bestScore = board.inCheck() ? -INF : plyData.eval;
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::UPPER;
-
-        u64 pinned = board.pinned();
 
         for (int i = 0; i < plyData.moves.size(); i++)
         {
