@@ -58,10 +58,10 @@ class Searcher {
 
     std::vector<TTEntry> tt = std::vector<TTEntry>(32 * 1024 * 1024 / sizeof(TTEntry));
 
-    std::array<u64, 1ULL << 17> movesNodes = {}; // [moveEncoded]
+    std::array<u64, 1ULL << 17> movesNodes = {}; // [move]
+    std::array<std::array<Move, 1ULL << 17>, 2> countermoves = {}; // [nstm][lastMove]
 
     // [color][pieceType][targetSquare]
-    std::array<std::array<std::array<Move, 64>, 6>, 2> countermoves = {};
     std::array<std::array<std::array<HistoryEntry, 64>, 6>, 2> historyTable = {};
 
     public:
@@ -565,10 +565,9 @@ class Searcher {
                 plyData.killer = move; 
 
                 // This fail high quiet is now a countermove
-                Move lastMove = board.lastMove();
-                if (lastMove != MOVE_NONE) {
-                    pt = (int)lastMove.pieceType();
-                    countermoves[(int)stm][pt][lastMove.to()] = move;
+                if (board.lastMove() != MOVE_NONE) {
+                    int nstm = (int)board.oppSide();
+                    countermoves[nstm][board.lastMove().encoded()] = move;
                 }
 
                 // Increase history of this fail high quiet move
@@ -698,11 +697,10 @@ class Searcher {
     inline void scoreMoves(PlyData &plyData, Move ttMove)
     {
         int stm = (int)board.sideToMove();
-        Move lastMove = board.lastMove();
+        int nstm = (int)board.oppSide();
 
-        Move countermove = lastMove == MOVE_NONE
-                           ? MOVE_NONE
-                           : countermoves[stm][(int)lastMove.pieceType()][lastMove.to()];
+        Move countermove = board.lastMove() == MOVE_NONE
+                           ? MOVE_NONE : countermoves[nstm][board.lastMove().encoded()];
 
         for (int i = 0; i < plyData.moves.size(); i++)
         {
