@@ -406,6 +406,9 @@ class Searcher {
             legalMovesSeen++;
             bool isQuiet = !board.isCapture(move) && move.promotion() == PieceType::NONE;
 
+            int pt = (int)move.pieceType();
+            HistoryEntry *historyEntry = &historyTable[(int)stm][pt][move.to()];
+
             if (bestScore > -MIN_MATE_SCORE && !pvNode && !board.inCheck() && moveScore < COUNTERMOVE_SCORE)
             {
                 // LMP (Late move pruning)
@@ -421,11 +424,14 @@ class Searcher {
                     break;
 
                 // SEE pruning
-                if (depth <= seePruningMaxDepth.value) {
+                if (depth <= seePruningMaxDepth.value) 
+                {
                     i32 threshold = isQuiet ? depth * seeQuietThreshold.value 
-                                            : depth * depth * seeNoisyThreshold.value;
+                                              - moveScore / seePruningQuietHistoryDiv.value
+                                            : depth * depth * seeNoisyThreshold.value 
+                                              - historyEntry->noisyHistory / seePruningNoisyHistoryDiv.value;
 
-                    if (!SEE(board, move, threshold)) continue;
+                    if (!SEE(board, move, std::min(threshold, -1))) continue;
                 }
             }
 
@@ -477,9 +483,6 @@ class Searcher {
 
             u64 nodesBefore = nodes;
             makeMove(move, ply + 1);
-
-            int pt = (int)move.pieceType();
-            HistoryEntry *historyEntry = &historyTable[(int)stm][pt][move.to()];
 
     	    // PVS (Principal variation search)
 

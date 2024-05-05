@@ -49,6 +49,8 @@ TunableParam<i32> fpMultiplier = TunableParam<i32>("fpMultiplier", 204, 40, 260,
 TunableParam<i32> seePruningMaxDepth = TunableParam<i32>("seePruningMaxDepth", 10, 7, 11, 1);
 TunableParam<i32> seeNoisyThreshold = TunableParam<i32>("seeNoisyThreshold", -23, -51, -1, 10);
 TunableParam<i32> seeQuietThreshold = TunableParam<i32>("seeQuietThreshold", -40, -101, -1, 20);
+TunableParam<i32> seePruningQuietHistoryDiv = TunableParam<i32>("seePruningQuietHistoryDiv", 128, 16, 512, 62);
+TunableParam<i32> seePruningNoisyHistoryDiv = TunableParam<i32>("seePruningNoisyHistoryDiv", 64, 8, 256, 62);
 
 // SE (Singular extensions)
 TunableParam<i32> singularMinDepth = TunableParam<i32>("singularMinDepth", 7, 6, 10, 1);
@@ -112,6 +114,7 @@ std::vector<TunableParamVariant> tunableParams
     &lmpMinMoves, &lmpDepthMultiplier,
     &fpMaxDepth, &fpBase, &fpMultiplier,
     &seePruningMaxDepth, &seeNoisyThreshold, &seeQuietThreshold,
+    &seePruningQuietHistoryDiv, &seePruningNoisyHistoryDiv,
     &singularMinDepth, &singularDepthMargin, &singularBetaMultiplier,
     &doubleExtensionMargin, &doubleExtensionsMax,
     &lmrBase, &lmrMultiplier, 

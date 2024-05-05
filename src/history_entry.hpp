@@ -15,28 +15,15 @@ struct HistoryEntry {
         // Add main history
         i32 total = mainHistory;
 
-        Move move;
+        // Add continuation histories
 
-        // Add continuation history 1 ply
-        if ((move = board.nthToLastMove(1)) != MOVE_NONE)
-        {
-            int pt = (int)move.pieceType();
-            total += continuationHistories[0][pt][move.to()];
-        }
+        std::array<Move, 3> moves = { board.nthToLastMove(1), board.nthToLastMove(2), board.nthToLastMove(4) };
 
-        // Add continuation history 2 ply
-        if ((move = board.nthToLastMove(2)) != MOVE_NONE)
-        {
-            int pt = (int)move.pieceType();
-            total += continuationHistories[1][pt][move.to()];
-        }
-
-        // Add continuation history 4 ply
-        if ((move = board.nthToLastMove(4)) != MOVE_NONE)
-        {
-            int pt = (int)move.pieceType();
-            total += continuationHistories[2][pt][move.to()];
-        }
+        for (int i = 0; i < 3; i++) 
+            if (moves[i] != MOVE_NONE) {
+                int pt = (int)moves[i].pieceType();
+                total += continuationHistories[i][pt][moves[i].to()];
+            }
        
         return total;
     }
@@ -47,34 +34,21 @@ struct HistoryEntry {
         i32 thisBonus = bonus * historyBonusMultiplierMain.value;
         mainHistory += thisBonus - abs(thisBonus) * mainHistory / historyMax.value;
 
-        Move move;
+        // Update continuation histories
 
-        // Update continuation history 1 ply
-        if ((move = board.nthToLastMove(1)) != MOVE_NONE)
-        {
-            int pt = (int)move.pieceType();
-            i32 &history = continuationHistories[0][pt][move.to()];
-            thisBonus = bonus * historyBonusMultiplier1Ply.value;
-            history += thisBonus - abs(thisBonus) * history / historyMax.value;
-        }
+        std::array<Move, 3> moves = { board.nthToLastMove(1), board.nthToLastMove(2), board.nthToLastMove(4) };
 
-        // Update continuation history 2 ply
-        if ((move = board.nthToLastMove(2)) != MOVE_NONE)
-        {
-            int pt = (int)move.pieceType();
-            i32 &history = continuationHistories[1][pt][move.to()];
-            thisBonus = bonus * historyBonusMultiplier2Ply.value;
-            history += thisBonus - abs(thisBonus) * history / historyMax.value;
-        }
+        std::array<float, 3> bonusMultipliers = { historyBonusMultiplier1Ply.value, 
+                                                  historyBonusMultiplier2Ply.value, 
+                                                  historyBonusMultiplier4Ply.value };
 
-        // Update continuation history 4 ply
-        if ((move = board.nthToLastMove(4)) != MOVE_NONE)
-        {
-            int pt = (int)move.pieceType();
-            i32 &history = continuationHistories[2][pt][move.to()];
-            thisBonus = bonus * historyBonusMultiplier4Ply.value;
-            history += thisBonus - abs(thisBonus) * history / historyMax.value;
-        }
+        for (int i = 0; i < 3; i++)
+            if (moves[i] != MOVE_NONE) {
+                int pt = (int)moves[i].pieceType();
+                auto &history = continuationHistories[i][pt][moves[i].to()];
+                thisBonus = bonus * bonusMultipliers[i];
+                history += thisBonus - abs(thisBonus) * history / historyMax.value;
+            }
     }
 
     inline void updateNoisyHistory(i32 bonus) {
