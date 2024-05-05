@@ -421,7 +421,7 @@ class Searcher {
                 if (legalMovesSeen >= lmpMinMoves.value + depth * depth * lmpDepthMultiplier.value / (improving ? 1 : 2))
                     break;
 
-                i32 lmrDepth = std::max(0, depth - (i32)LMR_TABLE[depth][legalMovesSeen]);
+                i32 lmrDepth = std::max(0, depth - (i32)LMR_TABLE[depth][legalMovesSeen] - !improving);
 
                 // FP (Futility pruning)
                 if (lmrDepth <= fpMaxDepth.value 
@@ -564,10 +564,10 @@ class Searcher {
             bound = Bound::LOWER;
 
             i32 historyBonus = std::min(historyBonusMax.value, 
-                                   depth * historyBonusMultiplier.value - historyBonusOffset.value);
+                                        depth * historyBonusMultiplier.value - historyBonusOffset.value);
 
             i32 historyMalus = -std::min(historyMalusMax.value,
-                                    depth * historyMalusMultiplier.value - historyMalusOffset.value);
+                                         depth * historyMalusMultiplier.value - historyMalusOffset.value);
 
             if (isQuiet) {
                 // This fail high quiet is now a killer move
