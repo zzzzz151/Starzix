@@ -8,7 +8,6 @@
 #include "utils.hpp"
 #include "move.hpp"
 #include "attacks.hpp"
-#include "tt.hpp"
 
 std::array<u64, 2> ZOBRIST_COLOR; // [color]
 std::array<std::array<std::array<u64, 64>, 6>, 2> ZOBRIST_PIECES; // [color][pieceType][square]
@@ -797,17 +796,18 @@ class Board {
                || bitboard(color, PieceType::QUEEN) > 0;
     }
 
-    inline u64 zobristHashAfter(Move move) 
+    inline u64 roughHashAfter(Move move) 
     {
-        assert(move != MOVE_NONE && !move.isSpecial());
-
         int stm = (int)sideToMove();
         int nstm = (int)oppSide();
-        Square to = move.to();
 
         u64 hashAfter = zobristHash() ^ ZOBRIST_COLOR[stm] ^ ZOBRIST_COLOR[nstm];
-        
+
+        if (move == MOVE_NONE) return hashAfter;
+
+        Square to = move.to();
         PieceType captured = pieceTypeAt(to);
+
         if (captured != PieceType::NONE)
             hashAfter ^= ZOBRIST_PIECES[nstm][(int)captured][to];
 

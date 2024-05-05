@@ -3,7 +3,7 @@
 #pragma once
 
 #include "search_params.hpp"
-#include "tt.hpp"
+#include "tt_entry.hpp"
 #include "nnue.hpp"
 #include "see.hpp"
 #include "history_entry.hpp"
@@ -127,28 +127,25 @@ class Searcher {
 
     inline void makeMove(Move move, u8 newPly)
     {
-        if (move == MOVE_NONE) {
-            u64 hashAfter = board.zobristHash() 
-                            ^ ZOBRIST_COLOR[(int)board.sideToMove()] 
-                            ^ ZOBRIST_COLOR[(int)board.oppSide()];
-                            
-            __builtin_prefetch(probeTT(tt, hashAfter));
-        }
-        else {
-            if (!move.isSpecial())
-                __builtin_prefetch(probeTT(tt, board.zobristHashAfter(move)));
-
-            accumulators[++accumulatorIdx].updated = false;
+        // If not a special move, we can probably correctly predict the zobrist hash after the move
+        // and prefetch the TT entry
+        if (move.flag() <= Move::KING_FLAG) 
+        {
+            auto ttEntryIdx = TTEntryIndex(board.roughHashAfter(move), tt.size());
+            __builtin_prefetch(&tt[ttEntryIdx]);
         }
 
         board.makeMove(move);
         nodes++;
 
+        if (move != MOVE_NONE)
+            accumulators[++accumulatorIdx].updated = false;
+        
+        pliesData[newPly].pvLength = 0;
+        pliesData[newPly].eval = INF;
+
         // Update seldepth
         if (newPly > maxPlyReached) maxPlyReached = newPly;
-        
-        pliesData[newPly].eval = INF;
-        pliesData[newPly].pvLength = 0;
     }
 
     inline void setEval(PlyData &plyData) 
@@ -312,16 +309,17 @@ class Searcher {
         if (pvNode) assert(!cutNode);
 
         // Probe TT
-        TTEntry *ttEntry = probeTT(tt, board.zobristHash());
-        bool ttHit = board.zobristHash() == ttEntry->zobristHash;
+        auto ttEntryIdx = TTEntryIndex(board.zobristHash(), tt.size());
+        TTEntry ttEntry = tt[ttEntryIdx];
+        bool ttHit = board.zobristHash() == ttEntry.zobristHash;
 
         // TT cutoff
         if (ttHit && !pvNode && !singular
-        && ttEntry->depth >= depth 
-        && (ttEntry->getBound() == Bound::EXACT
-        || (ttEntry->getBound() == Bound::LOWER && ttEntry->score >= beta) 
-        || (ttEntry->getBound() == Bound::UPPER && ttEntry->score <= alpha)))
-            return ttEntry->adjustedScore(ply);
+        && ttEntry.depth >= depth 
+        && (ttEntry.getBound() == Bound::EXACT
+        || (ttEntry.getBound() == Bound::LOWER && ttEntry.score >= beta) 
+        || (ttEntry.getBound() == Bound::UPPER && ttEntry.score <= alpha)))
+            return ttEntry.adjustedScore(ply);
 
         if (ply >= maxDepth && board.inCheck()) return 0;
 
@@ -354,7 +352,7 @@ class Searcher {
             if (depth >= nmpMinDepth.value 
             && board.lastMove() != MOVE_NONE 
             && plyData.eval >= beta
-            && !(ttHit && ttEntry->getBound() == Bound::UPPER && ttEntry->score < beta)
+            && !(ttHit && ttEntry.getBound() == Bound::UPPER && ttEntry.score < beta)
             && board.hasNonPawnMaterial(stm))
             {
                 makeMove(MOVE_NONE, ply + 1);
@@ -377,16 +375,16 @@ class Searcher {
             if (isHardTimeUp()) return 0;
         }
 
-        Move ttMove = ttHit ? ttEntry->bestMove : MOVE_NONE;
+        if (!ttHit) ttEntry.move = MOVE_NONE;
 
         // IIR (Internal iterative reduction)
-        if (depth >= iirMinDepth.value && ttMove == MOVE_NONE && (pvNode || cutNode))
+        if (depth >= iirMinDepth.value && ttEntry.move == MOVE_NONE && (pvNode || cutNode))
             depth--;
 
         // genenerate and score all moves except underpromotions
         if (!singular) {
             board.pseudolegalMoves(plyData.moves, false, false);
-            scoreMoves(plyData, ttMove);
+            scoreMoves(plyData, ttEntry.move);
         }
 
         u64 pinned = board.pinned();
@@ -404,7 +402,7 @@ class Searcher {
             auto [move, moveScore] = plyData.moves.incrementalSort(plyData.movesScores, i);
 
             // Don't search TT move in singular search
-            if (move == ttMove && singular) continue;
+            if (move == ttEntry.move && singular) continue;
 
             // skip illegal moves
             if (!board.isPseudolegalLegal(move, pinned)) continue;
@@ -445,16 +443,16 @@ class Searcher {
             if (ply == 0) goto skipExtensions;
 
             // SE (Singular extensions)
-            if (move == ttMove
+            if (move == ttEntry.move
             && depth >= singularMinDepth.value
-            && abs(ttEntry->score) < MIN_MATE_SCORE
-            && (i32)ttEntry->depth >= depth - singularDepthMargin.value
-            && ttEntry->getBound() != Bound::UPPER)
+            && abs(ttEntry.score) < MIN_MATE_SCORE
+            && (i32)ttEntry.depth >= depth - singularDepthMargin.value
+            && ttEntry.getBound() != Bound::UPPER)
             {
                 // Singular search: before searching any move, 
                 // search this node at a shallower depth with TT move excluded
 
-                i32 singularBeta = std::max(-INF, (i32)ttEntry->score - i32(depth * singularBetaMultiplier.value));
+                i32 singularBeta = std::max(-INF, (i32)ttEntry.score - i32(depth * singularBetaMultiplier.value));
 
                 i32 singularScore = search((depth - 1) / 2, ply, singularBeta - 1, singularBeta, 
                                            doubleExtsLeft, cutNode, true);
@@ -476,7 +474,7 @@ class Searcher {
                 // Negative extensions
                 else {
                     // some other move is probably better than TT move, so reduce TT move search
-                    extension -= ttEntry->score >= beta; 
+                    extension -= ttEntry.score >= beta; 
                     // reduce TT move search more if we expect to fail high
                     extension -= cutNode; 
                 }
@@ -601,7 +599,7 @@ class Searcher {
             return board.inCheck() ? -INF + (i32)ply : 0;
 
         if (!singular)
-            ttEntry->update(board.zobristHash(), depth, ply, bestScore, bestMove, bound);
+            tt[ttEntryIdx].update(board.zobristHash(), depth, ply, bestScore, bestMove, bound);
 
         return bestScore;
     }
@@ -617,8 +615,9 @@ class Searcher {
         if (isHardTimeUp()) return 0;
 
         // Probe TT
-        TTEntry *ttEntry = probeTT(tt, board.zobristHash());
-        bool ttHit = ttEntry->zobristHash == board.zobristHash();
+        auto ttEntryIdx = TTEntryIndex(board.zobristHash(), tt.size());
+        TTEntry *ttEntry = &tt[ttEntryIdx];
+        bool ttHit = board.zobristHash() == ttEntry->zobristHash;
 
         // TT cutoff
         if (ttHit
@@ -643,7 +642,7 @@ class Searcher {
         // if in check, generate all moves, else only noisy moves
         // never generate underpromotions
         board.pseudolegalMoves(plyData.moves, !board.inCheck(), false);
-        scoreMoves(plyData, ttHit ? ttEntry->bestMove : MOVE_NONE);
+        scoreMoves(plyData, ttHit ? ttEntry->move : MOVE_NONE);
         
         u64 pinned = board.pinned();
         int legalMovesPlayed = 0;

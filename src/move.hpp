@@ -89,8 +89,6 @@ struct Move {
 
         return str;
     }
-
-    inline bool isSpecial() { return flag() >= EN_PASSANT_FLAG; }
     
 }; // struct Move
 
