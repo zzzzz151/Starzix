@@ -26,7 +26,7 @@ struct PlyData {
     std::array<Move, MAX_DEPTH+1> pvLine = { };
     u8 pvLength = 0;
     Move killer = MOVE_NONE;
-    i32 eval = EVAL_NONE;
+    i32 eval = INF;
     MovesList moves = MovesList();
     std::array<i32, 256> movesScores = { };
 };
@@ -109,6 +109,22 @@ class Searcher {
 
     private:
 
+    inline bool isHardTimeUp() {
+        if (bestMoveRoot() == MOVE_NONE) return false;
+
+        if (hardTimeUp || nodes >= hardNodes) return true;
+
+        // Check time every 1024 nodes
+        if ((nodes % 1024) != 0) return false;
+
+        return hardTimeUp = (millisecondsElapsed() >= hardMilliseconds);
+    }
+
+    inline double bestMoveNodesFraction() {
+        assert(bestMoveRoot() != MOVE_NONE);
+        return (double)movesNodes[bestMoveRoot().encoded()] / (double)nodes;
+    }
+
     inline void makeMove(Move move, u8 newPly)
     {
         if (move == MOVE_NONE) {
@@ -131,24 +147,20 @@ class Searcher {
         // Update seldepth
         if (newPly > maxPlyReached) maxPlyReached = newPly;
         
-        pliesData[newPly].eval = EVAL_NONE;
+        pliesData[newPly].eval = INF;
         pliesData[newPly].pvLength = 0;
     }
 
-    inline bool isHardTimeUp() {
-        if (bestMoveRoot() == MOVE_NONE) return false;
+    inline void setEval(PlyData &plyData) 
+    {
+        assert(accumulators[accumulatorIdx == 0 ? 0 : accumulatorIdx - 1].updated);
 
-        if (hardTimeUp || nodes >= hardNodes) return true;
+        if (!accumulators[accumulatorIdx].updated) 
+            accumulators[accumulatorIdx].update(
+                accumulators[accumulatorIdx-1], board.oppSide(), board.lastMove(), board.captured());
 
-        // Check time every 1024 nodes
-        if ((nodes % 1024) != 0) return false;
-
-        return hardTimeUp = (millisecondsElapsed() >= hardMilliseconds);
-    }
-
-    inline double bestMoveNodesFraction() {
-        assert(bestMoveRoot() != MOVE_NONE);
-        return (double)movesNodes[bestMoveRoot().encoded()] / (double)nodes;
+        if (plyData.eval == INF && !board.inCheck())
+            plyData.eval = evaluate(accumulators[accumulatorIdx], board, true);
     }
 
     public:
@@ -167,12 +179,11 @@ class Searcher {
         nodes = maxPlyReached = 0;
         hardTimeUp = false;
 
-        pliesData[0].pvLine[0] = MOVE_NONE;
-        pliesData[0].pvLength = 0;
+        pliesData[0] = PlyData();
 
-        accumulators[0] = Accumulator(board);
         accumulatorIdx = 0;
-        pliesData[0].eval = board.inCheck() ? INF : evaluate(accumulators[0], board.sideToMove());
+        accumulators[0] = Accumulator(board);
+        setEval(pliesData[0]);
 
         movesNodes = {};
 
@@ -315,16 +326,11 @@ class Searcher {
         if (ply >= maxDepth && board.inCheck()) return 0;
 
         PlyData &plyData = pliesData[ply];
-        Color stm = board.sideToMove();
-
-        if (!accumulators[accumulatorIdx].updated) 
-            accumulators[accumulatorIdx].update(
-                accumulators[accumulatorIdx-1], oppColor(stm), board.lastMove(), board.captured());
-
-        if (plyData.eval == EVAL_NONE)
-            plyData.eval = board.inCheck() ? INF : evaluate(accumulators[accumulatorIdx], stm);
+        setEval(plyData);
 
         if (ply >= maxDepth) return plyData.eval;
+
+        Color stm = board.sideToMove();
 
         // If in check 2 plies ago, then pliesData[ply-2].eval is INF, and improving is false
         bool improving = ply > 1 && !board.inCheck() && plyData.eval > pliesData[ply-2].eval;
@@ -624,16 +630,11 @@ class Searcher {
         if (ply >= maxDepth && board.inCheck()) return 0;
 
         PlyData &plyData = pliesData[ply];
+        setEval(plyData);
 
-        if (!accumulators[accumulatorIdx].updated) 
-            accumulators[accumulatorIdx].update(
-                accumulators[accumulatorIdx-1], board.oppSide(), board.lastMove(), board.captured());
-
-        if (!board.inCheck()) {
-            if (plyData.eval == EVAL_NONE)
-                plyData.eval = evaluate(accumulators[accumulatorIdx], board.sideToMove());
-
-            if (plyData.eval >= beta || ply >= maxDepth) 
+        if (!board.inCheck()) 
+        {
+            if (ply >= maxDepth || plyData.eval >= beta) 
                 return plyData.eval; 
 
             if (plyData.eval > alpha) alpha = plyData.eval;

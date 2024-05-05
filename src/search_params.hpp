@@ -13,6 +13,10 @@ template <typename T> struct TunableParam {
     : name(name), value(value), min(min), max(max), step(step) { }
 };
 
+// Eval scale with material / game phase
+TunableParam<float> evalMaterialScaleMin = TunableParam<float>("evalMaterialScaleMin", 0.8, 0.5, 1.0, 0.1);
+TunableParam<float> evalMaterialScaleMax = TunableParam<float>("evalMaterialScaleMax", 1.05, 1.0, 1.5, 0.1);
+
 // Aspiration windows
 TunableParam<i32> aspMinDepth = TunableParam<i32>("aspMinDepth", 8, 6, 10, 1);
 TunableParam<i32> aspInitialDelta = TunableParam<i32>("aspInitialDelta", 18, 5, 25, 5);
@@ -74,11 +78,11 @@ TunableParam<i32> historyBonusMax = TunableParam<i32>("historyBonusMax", 1336, 5
 TunableParam<i32> historyMalusMultiplier = TunableParam<i32>("historyMalusMultiplier", 482, 50, 600, 50);
 TunableParam<i32> historyMalusOffset = TunableParam<i32>("historyMalusOffset", 22, 0, 1000, 100);
 TunableParam<i32> historyMalusMax = TunableParam<i32>("historyMalusMax", 984, 500, 2500, 100);
-TunableParam<float> historyBonusMultiplierMain = TunableParam<float>("historyBonusMultiplierMain", 1.07, 0.25, 4.0, 0.25);
-TunableParam<float> historyBonusMultiplierNoisy = TunableParam<float>("historyBonusMultiplierNoisy", 1.08, 0.25, 4.0, 0.25);
-TunableParam<float> historyBonusMultiplier1Ply = TunableParam<float>("historyBonusMultiplier1Ply", 0.86, 0.25, 4.0, 0.25);
-TunableParam<float> historyBonusMultiplier2Ply = TunableParam<float>("historyBonusMultiplier2Ply", 1.36, 0.25, 4.0, 0.25);
-TunableParam<float> historyBonusMultiplier4Ply = TunableParam<float>("historyBonusMultiplier4Ply", 0.89, 0.25, 4.0, 0.25);
+TunableParam<float> historyBonusScaleMain = TunableParam<float>("historyBonusScaleMain", 1.07, 0.25, 4.0, 0.25);
+TunableParam<float> historyBonusScaleNoisy = TunableParam<float>("historyBonusScaleNoisy", 1.08, 0.25, 4.0, 0.25);
+TunableParam<float> historyBonusScale1Ply = TunableParam<float>("historyBonusScale1Ply", 0.86, 0.25, 4.0, 0.25);
+TunableParam<float> historyBonusScale2Ply = TunableParam<float>("historyBonusScale2Ply", 1.36, 0.25, 4.0, 0.25);
+TunableParam<float> historyBonusScale4Ply = TunableParam<float>("historyBonusScale4Ply", 0.89, 0.25, 4.0, 0.25);
 
 // Time Management
 TunableParam<u64> defaultMovesToGo = TunableParam<u64>("defaultMovesToGo", 20, 20, 26, 3);
@@ -106,6 +110,7 @@ using TunableParamVariant = std::variant<
 
 std::vector<TunableParamVariant> tunableParams 
 {
+    &evalMaterialScaleMin, &evalMaterialScaleMax,
     &aspMinDepth, &aspInitialDelta, &aspDeltaMultiplier,
     &rfpMaxDepth, &rfpDepthMultiplier,
     &razoringMaxDepth, &razoringDepthMultiplier,
@@ -123,8 +128,8 @@ std::vector<TunableParamVariant> tunableParams
     &historyMax,
     &historyBonusMultiplier, &historyBonusOffset, &historyBonusMax,
     &historyMalusMultiplier, &historyMalusOffset, &historyMalusMax,
-    &historyBonusMultiplierMain, &historyBonusMultiplierNoisy,
-    &historyBonusMultiplier1Ply, &historyBonusMultiplier2Ply, &historyBonusMultiplier4Ply,
+    &historyBonusScaleMain, &historyBonusScaleNoisy,
+    &historyBonusScale1Ply, &historyBonusScale2Ply, &historyBonusScale4Ply,
     &defaultMovesToGo, &hardTimePercentage, &softTimePercentage,
     &nodesTmMinDepth, &nodesTmBase, &nodesTmMultiplier,
     &seePawnValue, &seeMinorValue, &seeRookValue, &seeQueenValue

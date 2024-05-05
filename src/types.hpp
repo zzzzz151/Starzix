@@ -24,8 +24,7 @@ const std::string START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQk
 constexpr u8 CASTLE_SHORT = 0, CASTLE_LONG = 1;
 
 constexpr i32 INF = 32000, 
-              MIN_MATE_SCORE = INF - 256,
-              EVAL_NONE = -999'999;
+              MIN_MATE_SCORE = INF - 256;
 
 using Square = u8;
 constexpr Square SQUARE_NONE = 255;

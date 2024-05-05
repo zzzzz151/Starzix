@@ -31,28 +31,28 @@ struct HistoryEntry {
     inline void updateQuietHistory(Board &board, i32 bonus)
     {
         // Update main history
-        i32 thisBonus = bonus * historyBonusMultiplierMain.value;
+        i32 thisBonus = bonus * historyBonusScaleMain.value;
         mainHistory += thisBonus - abs(thisBonus) * mainHistory / historyMax.value;
 
         // Update continuation histories
 
         std::array<Move, 3> moves = { board.nthToLastMove(1), board.nthToLastMove(2), board.nthToLastMove(4) };
 
-        std::array<float, 3> bonusMultipliers = { historyBonusMultiplier1Ply.value, 
-                                                  historyBonusMultiplier2Ply.value, 
-                                                  historyBonusMultiplier4Ply.value };
+        std::array<float, 3> bonusScales = { historyBonusScale1Ply.value, 
+                                             historyBonusScale2Ply.value, 
+                                             historyBonusScale4Ply.value };
 
         for (int i = 0; i < 3; i++)
             if (moves[i] != MOVE_NONE) {
                 int pt = (int)moves[i].pieceType();
                 auto &history = continuationHistories[i][pt][moves[i].to()];
-                thisBonus = bonus * bonusMultipliers[i];
+                thisBonus = bonus * bonusScales[i];
                 history += thisBonus - abs(thisBonus) * history / historyMax.value;
             }
     }
 
     inline void updateNoisyHistory(i32 bonus) {
-        bonus *= historyBonusMultiplierNoisy.value;
+        bonus *= historyBonusScaleNoisy.value;
         noisyHistory += bonus - abs(bonus) * noisyHistory / historyMax.value;
     }
 

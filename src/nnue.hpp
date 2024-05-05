@@ -164,12 +164,12 @@ struct alignas(ALIGNMENT) Accumulator
 
 }; // struct Accumulator
 
-inline i32 evaluate(Accumulator &accumulator, Color color)
+inline i32 evaluate(Accumulator &accumulator, Board &board, bool materialScale)
 {
     assert(accumulator.updated);
 
     Vec *stmAccumulator, *oppAccumulator;
-    if (color == Color::WHITE) {
+    if (board.sideToMove() == Color::WHITE) {
         stmAccumulator = (Vec*)&accumulator.white;
         oppAccumulator = (Vec*)&accumulator.black;
     }
@@ -202,6 +202,20 @@ inline i32 evaluate(Accumulator &accumulator, Color color)
     }
 
     i32 eval = (vecHaddEpi32(sum) / QA + NET->outputBias) * SCALE / (QA * QB);
+
+    // Scale eval with material / game phase
+    if (materialScale) {
+        i32 material = 3 * std::popcount(board.bitboard(PieceType::KNIGHT))
+                     + 3 * std::popcount(board.bitboard(PieceType::BISHOP))
+                     + 5 * std::popcount(board.bitboard(PieceType::ROOK))
+                     + 9 * std::popcount(board.bitboard(PieceType::QUEEN));
+
+        constexpr i32 MATERIAL_MAX = 62;
+
+        // Linear lerp from evalMaterialScaleMin to evalMaterialScaleMax as material goes from 0 to MATERIAL_MAX
+        eval *= evalMaterialScaleMin.value + (evalMaterialScaleMax.value - evalMaterialScaleMin.value) * material / MATERIAL_MAX;
+    }
+
     return std::clamp(eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
 }
 

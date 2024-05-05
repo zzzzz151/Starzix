@@ -47,7 +47,9 @@ inline void uciLoop()
             searcher.board.print();
         else if (tokens[0] == "eval") {
             Accumulator acc = Accumulator(searcher.board);
-            std::cout << "eval " << evaluate(acc, searcher.board.sideToMove()) << " cp" << std::endl;
+            std::cout << "eval " << evaluate(acc, searcher.board, false)
+                      << " scaled "  << evaluate(acc, searcher.board, true)
+                      << std::endl;
         }
         else if (tokens[0] == "bench")
         {
