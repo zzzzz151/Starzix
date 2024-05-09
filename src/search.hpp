@@ -432,7 +432,7 @@ class Searcher {
                 // SEE pruning
                 if (depth <= seePruningMaxDepth.value) 
                 {
-                    i32 threshold = isQuiet ? depth * seeQuietThreshold.value 
+                    i32 threshold = isQuiet ? lmrDepth * seeQuietThreshold.value 
                                               - moveScore / seeQuietHistoryDiv.value
                                             : depth * depth * seeNoisyThreshold.value 
                                               - historyEntry->noisyHistory(captured) / seeNoisyHistoryDiv.value;
@@ -547,14 +547,14 @@ class Searcher {
             bestMove = move;
             bound = Bound::EXACT;
             
-            // Update pv line
+            // Update PV
             if (pvNode) {
                 plyData.pvLength = 1 + pliesData[ply+1].pvLength;
                 plyData.pvLine[0] = move;
 
-                memcpy(&(plyData.pvLine[1]),                      // dst
-                       pliesData[ply+1].pvLine.data(),            // src
-                       pliesData[ply+1].pvLength * sizeof(Move)); // size                
+                // Copy child's PV
+                for (int idx = 0; idx < pliesData[ply+1].pvLength; idx++)
+                    plyData.pvLine[idx + 1] = pliesData[ply+1].pvLine[idx];            
             }
 
             if (score < beta) continue;
