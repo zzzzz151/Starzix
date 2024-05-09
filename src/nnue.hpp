@@ -7,7 +7,7 @@
 #pragma push_macro("_MSC_VER")
 #undef _MSC_VER
 #endif
-#include "incbin.h"
+#include "3rdparty/incbin.h"
 
 #include "board.hpp"
 #include "simd.hpp"

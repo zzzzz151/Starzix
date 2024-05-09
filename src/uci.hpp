@@ -37,7 +37,7 @@ inline void uciLoop()
         else if (received == "ucinewgame")
             searcher.ucinewgame();
         else if (received == "isready")
-            std::cout << "readyok\n";
+            std::cout << "readyok" << std::endl;
         else if (tokens[0] == "position")
             position(searcher.board, tokens);
         else if (tokens[0] == "go")
@@ -111,31 +111,33 @@ inline void uciLoop()
 }
 
 inline void uci() {
-    std::cout << "id name Starzix\n";
-    std::cout << "id author zzzzz\n";
-    std::cout << "option name Hash type spin default 32 min 1 max 1024\n";
+    std::cout << "id name Starzix" << std::endl;
+    std::cout << "id author zzzzz" << std::endl;
+    std::cout << "option name Hash type spin default 32 min 1 max 1024" << std::endl;
 
     /*
-    for (auto &myTunableParam : tunableParams) 
-    {
-        std::visit([](auto &tunableParam) 
+    for (auto [paramName, tunableParam] : tunableParams) {
+        std::cout << "option name " << paramName;
+
+        std::visit([&] (auto *myParam) 
         {
-            std::cout << "option name " << tunableParam->name;
-            if (std::is_same<decltype(tunableParam->value), double>::value
-            || std::is_same<decltype(tunableParam->value), float>::value)
+            if (myParam == nullptr) return;
+
+            if (std::is_same<decltype(myParam->value), double>::value
+            || std::is_same<decltype(myParam->value), float>::value)
             {
-                std::cout << " type spin default " << i64(tunableParam->value * 100.0)
-                          << " min " << i64(tunableParam->min * 100.0)
-                          << " max " << i64(tunableParam->max * 100.0);
+                std::cout << " type spin default " << round(myParam->value * 100.0)
+                          << " min " << round(myParam->min * 100.0)
+                          << " max " << round(myParam->max * 100.0);
             }
-            else
-            {
-                std::cout << " type spin default " << (i64)tunableParam->value
-                          << " min " << (i64)tunableParam->min
-                          << " max " << (i64)tunableParam->max;
+            else {
+                std::cout << " type spin default " << myParam->value
+                          << " min " << myParam->min
+                          << " max " << myParam->max;
             }
-            std::cout << "\n";
-        }, myTunableParam);
+        }, tunableParam);
+
+        std::cout << std::endl;
     }
     */
 
@@ -154,28 +156,25 @@ inline void setoption(Searcher &searcher, std::vector<std::string> &tokens)
         searcher.resizeTT(stoll(optionValue));
         searcher.printTTSize();
     }
-    else {
-        bool found = false;
-        for (auto &myTunableParam : tunableParams) 
+    else if (tunableParams.count(optionName) > 0) 
+    {
+        auto tunableParam = tunableParams[optionName];
+        i64 newValue = stoll(optionValue);
+
+        std::visit([optionName, newValue] (auto *myParam) 
         {
-            std::visit([optionName, optionValue, &found](auto &tunableParam) 
-            {
-                if (optionName == tunableParam->name)
-                {
-                    tunableParam->value = std::is_same<decltype(tunableParam->value), double>::value
-                                          || std::is_same<decltype(tunableParam->value), float>::value
-                                          ? stoll(optionValue) / 100.0 : stoll(optionValue);
+            if (myParam == nullptr) return;
 
-                    if (tunableParam->name == lmrBase.name 
-                    || tunableParam->name == lmrMultiplier.name)
-                        initLmrTable();
+            myParam->value = std::is_same<decltype(myParam->value), double>::value 
+                             || std::is_same<decltype(myParam->value), float>::value 
+                             ? (double)newValue / 100.0 
+                             : newValue;
 
-                    found = true;
-                }
-            }, myTunableParam);
+            if (optionName == stringify(lmrBase) || optionName == stringify(lmrMultiplier))
+                initLmrTable();
 
-            if (found) break;
-        }
+            std::cout << optionName << " set to " << myParam->value << std::endl;
+        }, tunableParam);
     }
 }
 
@@ -240,7 +239,7 @@ inline void go(Searcher &searcher, std::vector<std::string> &tokens)
                                              isMoveTime, maxNodes, maxNodes, true);
 
     assert(bestMove != MOVE_NONE);
-    std::cout << "bestmove " + bestMove.toUci() + "\n";
+    std::cout << "bestmove " + bestMove.toUci() << std::endl;
 }
 
 } // namespace uci

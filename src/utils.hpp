@@ -2,6 +2,8 @@
 
 #pragma once
 
+#define stringify(myVar) (std::string)#myVar
+
 #include <array>
 #include <vector>
 #include <sstream>
@@ -11,6 +13,7 @@
 #include <cassert>
 #include <chrono>
 #include <unordered_map>
+#include "3rdparty/ordered_map.h"
 #include "types.hpp"
 
 #if defined(__GNUC__) // GCC, Clang, ICC

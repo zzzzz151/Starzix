@@ -209,7 +209,7 @@ class Searcher {
             i32 iterationScore = iterationDepth >= aspMinDepth.value 
                                  ? aspiration(iterationDepth, score)
                                  : search(iterationDepth, 0, -INF, INF, 
-                                          doubleExtensionsMax.value, false);
+                                          DOUBLE_EXTENSIONS_MAX, false);
                                  
             if (isHardTimeUp()) break;
 
@@ -265,7 +265,7 @@ class Searcher {
         i32 bestScore = score;
 
         while (true) {
-            score = search(depth, 0, alpha, beta, doubleExtensionsMax.value, false);
+            score = search(depth, 0, alpha, beta, DOUBLE_EXTENSIONS_MAX, false);
 
             if (isHardTimeUp()) return 0;
 
@@ -337,12 +337,12 @@ class Searcher {
         {
             // RFP (Reverse futility pruning) / Static NMP
             if (depth <= rfpMaxDepth.value 
-            && plyData.eval >= beta + (depth - improving) * rfpDepthMultiplier.value)
+            && plyData.eval >= beta + (depth - improving) * rfpMultiplier.value)
                 return (plyData.eval + beta) / 2;
 
             // Razoring
             if (depth <= razoringMaxDepth.value 
-            && plyData.eval + depth * razoringDepthMultiplier.value < alpha)
+            && plyData.eval + depth * razoringMultiplier.value < alpha)
             {
                 i32 score = qSearch(ply, alpha, beta);
                 if (score <= alpha) return score;
@@ -408,15 +408,17 @@ class Searcher {
             if (!board.isPseudolegalLegal(move, pinned)) continue;
 
             legalMovesSeen++;
-            bool isQuiet = !board.isCapture(move) && move.promotion() == PieceType::NONE;
 
-            int pt = (int)move.pieceType();
-            HistoryEntry *historyEntry = &historyTable[(int)stm][pt][move.to()];
+            PieceType captured = board.captured(move);
+            bool isQuiet = captured == PieceType::NONE && move.promotion() == PieceType::NONE;
+
+            PieceType pt = move.pieceType();
+            HistoryEntry *historyEntry = &historyTable[(int)stm][(int)pt][move.to()];
 
             if (bestScore > -MIN_MATE_SCORE && !pvNode && !board.inCheck() && moveScore < COUNTERMOVE_SCORE)
             {
                 // LMP (Late move pruning)
-                if (legalMovesSeen >= lmpMinMoves.value + depth * depth * lmpDepthMultiplier.value / (improving ? 1 : 2))
+                if (legalMovesSeen >= lmpMinMoves.value + depth * depth * lmpMultiplier.value / (improving ? 1 : 2))
                     break;
 
                 i32 lmrDepth = std::max(0, depth - (i32)LMR_TABLE[depth][legalMovesSeen] - !improving);
@@ -431,9 +433,9 @@ class Searcher {
                 if (depth <= seePruningMaxDepth.value) 
                 {
                     i32 threshold = isQuiet ? depth * seeQuietThreshold.value 
-                                              - moveScore / seePruningQuietHistoryDiv.value
+                                              - moveScore / seeQuietHistoryDiv.value
                                             : depth * depth * seeNoisyThreshold.value 
-                                              - historyEntry->noisyHistory / seePruningNoisyHistoryDiv.value;
+                                              - historyEntry->noisyHistory(captured) / seeNoisyHistoryDiv.value;
 
                     if (!SEE(board, move, std::min(threshold, -1))) continue;
                 }
@@ -510,7 +512,7 @@ class Searcher {
                 
                 // reduce moves with good history less and vice versa
                 lmr -= round(isQuiet ? (float)moveScore / (float)lmrQuietHistoryDiv.value
-                                     : (float)historyEntry->noisyHistory / (float)lmrNoisyHistoryDiv.value);
+                                     : (float)historyEntry->noisyHistory(captured) / (float)lmrNoisyHistoryDiv.value);
 
                 lmr = std::clamp(lmr, 0, depth - 2); // dont extend or reduce into qsearch
             }
@@ -561,11 +563,8 @@ class Searcher {
 
             bound = Bound::LOWER;
 
-            i32 historyBonus = std::min(historyBonusMax.value, 
-                                        depth * historyBonusMultiplier.value - historyBonusOffset.value);
-
-            i32 historyMalus = -std::min(historyMalusMax.value,
-                                         depth * historyMalusMultiplier.value - historyMalusOffset.value);
+            i32 historyBonus = std::clamp(depth * historyBonusMultiplier.value, 0, historyBonusMax.value);
+            i32 historyMalus = -std::clamp(depth * historyMalusMultiplier.value, 0, historyMalusMax.value);
 
             if (isQuiet) {
                 // This fail high quiet is now a killer move
@@ -578,19 +577,19 @@ class Searcher {
                 }
 
                 // Increase history of this fail high quiet move
-                historyEntry->updateQuietHistory(board, historyBonus);
+                historyEntry->updateQuietHistory(historyBonus, board);
 
-                // History malus: this fail high is a quiet, so decrease history of fail low quiets
-                for (int i = 0; i < failLowQuiets; i++)
-                    failLowsHistoryEntry[i]->updateQuietHistory(board, historyMalus);
+                // History malus: decrease history of fail low quiets
+                for (int j = 0; j < failLowQuiets; j++)
+                    failLowsHistoryEntry[j]->updateQuietHistory(historyMalus, board);
             }
-            else
+            else 
                 // Increaes history of this fail high noisy move
-                historyEntry->updateNoisyHistory(historyBonus);
+                historyEntry->updateNoisyHistory(historyBonus, captured);
 
-            // History malus: always decrease history of fail low noisy moves
-            for (int i = 255, j = 0; j < failLowNoisies; j++, i--)
-                failLowsHistoryEntry[i]->updateNoisyHistory(historyMalus);
+            // History malus: decrease history of fail low noisy moves
+            for (int idx = 255, penalized = 0; penalized < failLowNoisies; idx--, penalized++)
+                failLowsHistoryEntry[idx]->updateNoisyHistory(historyMalus, captured);
 
             break; // Fail high / beta cutoff
         }
@@ -730,12 +729,12 @@ class Searcher {
                                          : -GOOD_NOISY_SCORE;
 
                 plyData.movesScores[i] += ((i32)captured + 1) * 1'000'000; // MVV (most valuable victim)
-                plyData.movesScores[i] += historyEntry->noisyHistory;
+                plyData.movesScores[i] += historyEntry->noisyHistory(captured);
             }
             else if (promotion == PieceType::QUEEN)
             {
                 plyData.movesScores[i] = SEE(board, move) ? GOOD_QUEEN_PROMO_SCORE : -GOOD_NOISY_SCORE;
-                plyData.movesScores[i] += historyEntry->noisyHistory;
+                plyData.movesScores[i] += historyEntry->noisyHistory(captured);
             }
             else if (move == plyData.killer)
                 plyData.movesScores[i] = KILLER_SCORE;

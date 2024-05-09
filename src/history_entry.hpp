@@ -3,57 +3,63 @@
 #pragma once
 
 struct HistoryEntry {
-    public:
+    private:
 
-    i32 mainHistory = 0, noisyHistory = 0;
+    i16 mainHistory = 0;
 
     // [0 = 1ply, 1 = 2ply, 2 = 4ply][pieceType][targetSquare]
-    std::array<std::array<std::array<i32, 64>, 6>, 3> continuationHistories = { };
+    std::array<std::array<std::array<i16, 64>, 6>, 3> continuationHistories = { };
+
+    std::array<i16, 7> noisyHist = { }; // [pieceTypeCaptured]
+
+    public:
 
     inline i32 quietHistory(Board &board)
     {
         // Add main history
-        i32 total = mainHistory;
+        float total = (float)mainHistory * mainHistoryWeight.value;
 
         // Add continuation histories
 
         std::array<Move, 3> moves = { board.nthToLastMove(1), board.nthToLastMove(2), board.nthToLastMove(4) };
+        std::array<float, 3> weights = { onePlyContHistWeight.value, twoPlyContHistWeight.value, fourPlyContHistWeight.value };
 
         for (int i = 0; i < 3; i++) 
-            if (moves[i] != MOVE_NONE) {
+            if (moves[i] != MOVE_NONE) 
+            {
                 int pt = (int)moves[i].pieceType();
-                total += continuationHistories[i][pt][moves[i].to()];
+                Square to = moves[i].to();
+                total += (float)continuationHistories[i][pt][to] * weights[i];
             }
        
         return total;
     }
 
-    inline void updateQuietHistory(Board &board, i32 bonus)
+    inline i32 noisyHistory(PieceType captured) {
+        return noisyHist[(int)captured];
+    }
+
+    inline void updateQuietHistory(i32 bonus, Board &board)
     {
         // Update main history
-        i32 thisBonus = bonus * historyBonusScaleMain.value;
-        mainHistory += thisBonus - abs(thisBonus) * mainHistory / historyMax.value;
+        mainHistory += bonus - abs(bonus) * (i32)mainHistory / historyMax.value;
 
         // Update continuation histories
 
         std::array<Move, 3> moves = { board.nthToLastMove(1), board.nthToLastMove(2), board.nthToLastMove(4) };
 
-        std::array<float, 3> bonusScales = { historyBonusScale1Ply.value, 
-                                             historyBonusScale2Ply.value, 
-                                             historyBonusScale4Ply.value };
-
         for (int i = 0; i < 3; i++)
-            if (moves[i] != MOVE_NONE) {
+            if (moves[i] != MOVE_NONE) 
+            {
                 int pt = (int)moves[i].pieceType();
                 auto &history = continuationHistories[i][pt][moves[i].to()];
-                thisBonus = bonus * bonusScales[i];
-                history += thisBonus - abs(thisBonus) * history / historyMax.value;
+                history += bonus - abs(bonus) * (i32)history / historyMax.value;
             }
     }
 
-    inline void updateNoisyHistory(i32 bonus) {
-        bonus *= historyBonusScaleNoisy.value;
-        noisyHistory += bonus - abs(bonus) * noisyHistory / historyMax.value;
+    inline void updateNoisyHistory(i32 bonus, PieceType captured) 
+    {
+        noisyHist[(int)captured] += bonus - abs(bonus) * (i32)noisyHist[(int)captured] / historyMax.value;
     }
 
 }; // struct HistoryEntry
