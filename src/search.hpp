@@ -66,7 +66,7 @@ class Searcher {
 
     public:
 
-    inline void ucinewgame() {
+    void ucinewgame() {
         startTime = std::chrono::steady_clock::now();
 
         board = START_BOARD;

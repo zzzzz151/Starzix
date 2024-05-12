@@ -9,7 +9,6 @@ namespace uci { // Universal chess interface
 
 inline void uci();
 inline void setoption(Searcher &searcher, std::vector<std::string> &tokens);
-inline void ucinewgame(Searcher &searcher);
 inline void position(Board &board, std::vector<std::string> &tokens);
 inline void go(Searcher &searcher, std::vector<std::string> &tokens);
 

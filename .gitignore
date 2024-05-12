@@ -4,6 +4,8 @@
 .ipynb_checkpoints
 
 **/*.exe
+**/starzix
+src/starzix
 
 src-test
 src-test/

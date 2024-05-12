@@ -740,9 +740,9 @@ class Board {
         Color oppSide = this->oppSide();
 
         if (moveFlag == Move::CASTLING_FLAG)
-            return to > from ? 
+            return to > from
                    // Short castle
-                   !isSquareAttacked(from + 1, oppSide) && !isSquareAttacked(from + 2, oppSide)
+                   ? !isSquareAttacked(from + 1, oppSide) && !isSquareAttacked(from + 2, oppSide)
                    // Long castle
                    : !isSquareAttacked(from - 1, oppSide) && !isSquareAttacked(from - 2, oppSide);
 
