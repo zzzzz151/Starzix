@@ -45,9 +45,9 @@
 - Copymake make/undo move
 
 ### NNUE evaluation 
-- (768->1024)x2->1
+- (768 -> 1024)x2 -> 1
 - Lc0 data
-- SCReLU 181
+- Trained with [my trainer](https://github.com/zzzzz151/nn-trainer)
 
 ### Search
 - Iterative deepening
