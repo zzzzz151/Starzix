@@ -38,6 +38,8 @@ inline void uciLoop(std::vector<TTEntry> &tt)
             setoption(tokens, tt);
         else if (received == "ucinewgame")
         {
+            board = Board(START_FEN);
+            
             resetTT(tt);
 
             for (auto &searchThread : searchThreads)

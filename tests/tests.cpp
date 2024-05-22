@@ -149,7 +149,7 @@ int main()
 
     // zobristHashAfter()
     move = Move(strToSquare("g5"), strToSquare("e3"), Move::QUEEN_FLAG);
-    hashAfter = board.zobristHashAfter(move);
+    hashAfter = board.roughHashAfter(move);
     board.makeMove(move);
     assert(hashAfter == board.zobristHash());
 
@@ -162,7 +162,7 @@ int main()
 
     // Perft
 
-    board = START_BOARD;
+    board = Board(START_FEN);
     Board boardPos2 = Board(POSITION2_KIWIPETE);
     Board boardPos3 = Board(POSITION3);
     Board boardPos4 = Board(POSITION4);

@@ -22,7 +22,7 @@
 
 ### Options
 
-- Hash (int, default 32, 1 to 1024) - transposition table size in MB
+- Hash (int, default 32, 1 to 65536) - transposition table size in MB
 
 - Threads (int, default 1, 1 to 256) - search threads
 
@@ -85,7 +85,7 @@
 
 ### Moves history
 - Main history
-- Continuation histores (1 ply, 2 ply, 4 ply)
+- Continuation histories (1 ply, 2 ply, 4 ply)
 - Noisy history
 - History malus and gravity
 
