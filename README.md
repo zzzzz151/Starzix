@@ -24,6 +24,8 @@
 
 - Hash (int, default 32, 1 to 1024) - transposition table size in MB
 
+- Threads (int, default 1, 1 to 256) - search threads
+
 ### Extra commands
 
 - display
