@@ -92,7 +92,7 @@ struct Move {
     
 }; // struct Move
 
-Move MOVE_NONE = Move();
+constexpr Move MOVE_NONE = Move();
 
 struct MovesList
 {
