@@ -16,7 +16,7 @@ using i32 = int32_t;
 using i64 = int64_t;
 
 constexpr i32 I32_MAX = 2147483647;
-constexpr u64 U64_MAX = 9223372036854775807;
+//constexpr u64 U64_MAX = 9223372036854775807;
 constexpr i64 I64_MAX = 9223372036854775807;
 
 const std::string START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";

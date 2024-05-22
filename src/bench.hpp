@@ -57,26 +57,37 @@ constexpr std::array BENCH_FENS {
 
 inline void bench(int depth = 14)
 {
+    depth = std::clamp(depth, 1, (int)MAX_DEPTH);
+
     std::cout << "Running bench depth " << depth
               << " on " << BENCH_FENS.size() << " positions" 
               << std::endl;
 
-    Searcher searcher = Searcher();
-    u64 totalNodes = 0;
-    u64 totalMilliseconds = 0;
+    std::vector<TTEntry> benchTT;
+    resizeTT(benchTT, 32);
+
+    SearchThread searchThread = SearchThread(&benchTT);
+
+    u64 totalNodes = 0, totalMilliseconds = 0;
 
     for (std::string fen : BENCH_FENS)
     {
-        searcher.board = Board(fen);
-        searcher.search(depth, I64_MAX, 0, 1, true, U64_MAX, U64_MAX, false);
-        totalMilliseconds += searcher.millisecondsElapsed();
-        totalNodes += searcher.getNodes();
-        searcher.ucinewgame();
+        Board board = Board(fen);
+
+        SearchThread::searchStopped = false;
+        searchThread.search(board, depth, std::chrono::steady_clock::now(), I64_MAX, I64_MAX, I64_MAX, I64_MAX);
+
+        totalMilliseconds += searchThread.millisecondsElapsed();
+        totalNodes += searchThread.getNodes();
+
+        searchThread.reset();
+        resetTT(benchTT);
     }
 
-    std::cout << "bench depth " << (int)depth
+    std::cout << "bench"
+              << " depth " << depth
               << " nodes " << totalNodes
-              << " nps " << totalNodes * 1000 / std::max((u64)totalMilliseconds, (u64)1)
-              << " time " << totalMilliseconds
+              << " nps "   << totalNodes * 1000 / std::max((u64)totalMilliseconds, (u64)1)
+              << " time "  << totalMilliseconds
               << std::endl;
 }

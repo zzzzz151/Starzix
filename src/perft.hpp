@@ -79,7 +79,9 @@ inline void perftSplit(Board &board, int depth)
 
 inline u64 perftBench(Board &board, int depth)
 {
+    depth = std::max(depth, 0);
     std::string fen = board.fen();
+
     std::cout << "Running perft depth " << depth << " on " << fen << std::endl;
 
     std::chrono::steady_clock::time_point start =  std::chrono::steady_clock::now();

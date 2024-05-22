@@ -817,5 +817,3 @@ class Board {
 
 }; // class Board
 
-const Board START_BOARD = Board(START_FEN);
-

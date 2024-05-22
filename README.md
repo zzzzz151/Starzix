@@ -26,15 +26,19 @@
 
 ### Extra commands
 
-- display - display current position, fen and zobrist hash
+- display
 
-- eval - display current position's evaluation from perspective of side to move
+- eval
 
-- perft \<depth\> - run perft from current position
+- perft \<depth\> 
 
-- perftsplit \<depth\> - run split perft from current position
+- perftsplit \<depth\>
 
-- bench \<depth\> - run benchmark, default depth 14
+- bench \<depth\>
+
+- makemove \<move\>
+
+- undomove
 
 # Features
 
@@ -51,9 +55,9 @@
 
 ### Search
 - Iterative deepening
-- Aspiration windows
 - Fail-soft Negamax
 - Principal variation search
+- Aspiration windows
 - Quiescence search
 - Transposition table
 - Alpha-beta pruning
@@ -67,6 +71,7 @@
 - Late move reductions
 - Singular extensions (with negative and double extensions)
 - Check extension
+- Multithreading / Lazy SMP
 
 ### Move ordering
 - TT move
@@ -78,9 +83,9 @@
 
 ### Moves history
 - Main history
-- Countermove history
-- Follow-up move history
+- Continuation histores (1 ply, 2 ply, 4 ply)
 - Noisy history
+- History malus and gravity
 
 ### Time management
 - Any time control

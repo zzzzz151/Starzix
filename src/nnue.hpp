@@ -76,9 +76,9 @@ struct alignas(ALIGNMENT) Accumulator
         }
     }
 
-    inline void update(Accumulator &oldAcc, Color stm, Move move, PieceType captured)
+    inline void update(Accumulator *oldAcc, Color stm, Move move, PieceType captured)
     {
-        assert(oldAcc.updated && !updated);
+        assert(oldAcc->updated && !updated);
         assert(move != MOVE_NONE);
 
         auto moveFlag = move.flag();
@@ -108,12 +108,12 @@ struct alignas(ALIGNMENT) Accumulator
 
             for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
             {
-                white[i] = oldAcc.white[i] 
+                white[i] = oldAcc->white[i] 
                            - NET->featureWeights[sub1WhiteIdx][i]  // Remove piece from origin
                            - NET->featureWeights[sub2WhiteIdx][i]  // Remove captured piece
                            + NET->featureWeights[add1WhiteIdx][i]; // Put piece on destination
 
-                black[i] = oldAcc.black[i] 
+                black[i] = oldAcc->black[i] 
                            - NET->featureWeights[sub1BlackIdx][i]  // Remove piece from origin
                            - NET->featureWeights[sub2BlackIdx][i]  // Remove captured piece
                            + NET->featureWeights[add1BlackIdx][i]; // Put piece on destination
@@ -133,13 +133,13 @@ struct alignas(ALIGNMENT) Accumulator
 
             for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
             {
-                white[i] = oldAcc.white[i] 
+                white[i] = oldAcc->white[i] 
                            - NET->featureWeights[sub1WhiteIdx][i]  // Remove king from origin
                            + NET->featureWeights[add1WhiteIdx][i]  // Put king on destination
                            - NET->featureWeights[sub2WhiteIdx][i]  // Remove rook from origin
                            + NET->featureWeights[add2WhiteIdx][i]; // Put rook on destination
 
-                black[i] = oldAcc.black[i] 
+                black[i] = oldAcc->black[i] 
                            - NET->featureWeights[sub1BlackIdx][i]  // Remove king from origin
                            + NET->featureWeights[add1BlackIdx][i]  // Put king on destination
                            - NET->featureWeights[sub2BlackIdx][i]  // Remove rook from origin
@@ -149,11 +149,11 @@ struct alignas(ALIGNMENT) Accumulator
         else {
             for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
             {
-                white[i] = oldAcc.white[i] 
+                white[i] = oldAcc->white[i] 
                            - NET->featureWeights[sub1WhiteIdx][i]  // Remove piece from origin
                            + NET->featureWeights[add1WhiteIdx][i]; // Put piece on destination
 
-                black[i] = oldAcc.black[i] 
+                black[i] = oldAcc->black[i] 
                            - NET->featureWeights[sub1BlackIdx][i]  // Remove piece from origin
                            + NET->featureWeights[add1BlackIdx][i]; // Put piece on destination
             }        
@@ -164,18 +164,18 @@ struct alignas(ALIGNMENT) Accumulator
 
 }; // struct Accumulator
 
-inline i32 evaluate(Accumulator &accumulator, Board &board, bool materialScale)
+inline i32 evaluate(Accumulator *accumulator, Board &board, bool materialScale)
 {
-    assert(accumulator.updated);
+    assert(accumulator->updated);
 
     Vec *stmAccumulator, *oppAccumulator;
     if (board.sideToMove() == Color::WHITE) {
-        stmAccumulator = (Vec*)&accumulator.white;
-        oppAccumulator = (Vec*)&accumulator.black;
+        stmAccumulator = (Vec*)&accumulator->white;
+        oppAccumulator = (Vec*)&accumulator->black;
     }
     else {
-        stmAccumulator = (Vec*)&accumulator.black;
-        oppAccumulator = (Vec*)&accumulator.white;
+        stmAccumulator = (Vec*)&accumulator->black;
+        oppAccumulator = (Vec*)&accumulator->white;
     }
 
     Vec *stmWeights = (Vec*) &(NET->outputWeights[0]);
@@ -222,4 +222,3 @@ inline i32 evaluate(Accumulator &accumulator, Board &board, bool materialScale)
 } // namespace nnue
 
 using Accumulator = nnue::Accumulator;
-Accumulator START_POS_ACCUMULATOR = Accumulator(START_BOARD);
