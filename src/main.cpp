@@ -20,7 +20,15 @@ int main()
     attacks::init();
     initUtils();
     initLmrTable();
-    uci::uciLoop();
+
+    std::vector<TTEntry> tt;
+    resizeTT(tt, 32);
+    printTTSize(tt);
+    
+    searchThreads = { SearchThread(&tt) };
+    mainThread = &searchThreads[0];
+
+    uci::uciLoop(tt);
     return 0;
 }
 

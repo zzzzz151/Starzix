@@ -1,12 +1,12 @@
 # Starzix - C++ chess engine
 
-# Elo
+# Elo (4.0)
 
-[CCRL Blitz](https://www.computerchess.org.uk/ccrl/404/cgi/compare_engines.cgi?class=Single-CPU+engines&only_best_in_class=on&num_best_in_class=1&print=Rating+list&profile_step=50&profile_numbers=1&print=Results+table&print=LOS+table&table_size=100&ct_from_elo=0&ct_to_elo=10000&match_length=30&cross_tables_for_best_versions_only=1&sort_tables=by+rating&diag=0&reference_list=None&recalibrate=no): 3557 (#30/716)
+[CCRL Blitz](https://www.computerchess.org.uk/ccrl/404/cgi/compare_engines.cgi?class=Single-CPU+engines&only_best_in_class=on&num_best_in_class=1&print=Rating+list&profile_step=50&profile_numbers=1&print=Results+table&print=LOS+table&table_size=100&ct_from_elo=0&ct_to_elo=10000&match_length=30&cross_tables_for_best_versions_only=1&sort_tables=by+rating&diag=0&reference_list=None&recalibrate=no): 3555 (#32/733)
 
-[CCRL Rapid](https://www.computerchess.org.uk/ccrl/4040/cgi/compare_engines.cgi?class=Single-CPU+engines&only_best_in_class=on&num_best_in_class=1&print=Rating+list&profile_step=50&profile_numbers=1&print=Results+table&print=LOS+table&table_size=100&ct_from_elo=0&ct_to_elo=10000&match_length=30&cross_tables_for_best_versions_only=1&sort_tables=by+rating&diag=0&reference_list=None&recalibrate=no): 3473 (#30/580)
+[CCRL Rapid](https://www.computerchess.org.uk/ccrl/4040/cgi/compare_engines.cgi?class=Single-CPU+engines&only_best_in_class=on&num_best_in_class=1&print=Rating+list&profile_step=50&profile_numbers=1&print=Results+table&print=LOS+table&table_size=100&ct_from_elo=0&ct_to_elo=10000&match_length=30&cross_tables_for_best_versions_only=1&sort_tables=by+rating&diag=0&reference_list=None&recalibrate=no): 3479 (#30/585)
 
-[Ipman Bullet](https://ipmanchess.yolasite.com/r9-7945hx.php): 3340 (#39/51)
+[Ipman Bullet](https://ipmanchess.yolasite.com/r9-7945hx.php): 3334 (#48/51)
 
 # How to compile
 
@@ -16,7 +16,7 @@
 
 ### Linux
 
-```clang++ -std=c++20 -march=native -O3 -DNDEBUG src/main.cpp -o starzix```
+```clang++ -std=c++20 -lstdc++ -lm -march=native -O3 -DNDEBUG src/main.cpp -o starzix```
 
 # UCI (Universal Chess Interface)
 
@@ -24,17 +24,23 @@
 
 - Hash (int, default 32, 1 to 1024) - transposition table size in MB
 
+- Threads (int, default 1, 1 to 256) - search threads
+
 ### Extra commands
 
-- display - display current position, fen and zobrist hash
+- display
 
-- eval - display current position's evaluation from perspective of side to move
+- eval
 
-- perft \<depth\> - run perft from current position
+- perft \<depth\> 
 
-- perftsplit \<depth\> - run split perft from current position
+- perftsplit \<depth\>
 
-- bench \<depth\> - run benchmark, default depth 14
+- bench \<depth\>
+
+- makemove \<move\>
+
+- undomove
 
 # Features
 
@@ -51,9 +57,9 @@
 
 ### Search
 - Iterative deepening
-- Aspiration windows
 - Fail-soft Negamax
 - Principal variation search
+- Aspiration windows
 - Quiescence search
 - Transposition table
 - Alpha-beta pruning
@@ -67,6 +73,7 @@
 - Late move reductions
 - Singular extensions (with negative and double extensions)
 - Check extension
+- Multithreading / Lazy SMP
 
 ### Move ordering
 - TT move
@@ -78,9 +85,9 @@
 
 ### Moves history
 - Main history
-- Countermove history
-- Follow-up move history
+- Continuation histores (1 ply, 2 ply, 4 ply)
 - Noisy history
+- History malus and gravity
 
 ### Time management
 - Any time control

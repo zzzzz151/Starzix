@@ -2,20 +2,23 @@
 
 #pragma once
 
+#include "board.hpp"
 #include "search_params.hpp"
-#include "tt_entry.hpp"
-#include "nnue.hpp"
-#include "see.hpp"
+#include "tt.hpp"
 #include "history_entry.hpp"
+#include "see.hpp"
+#include "nnue.hpp"
+
+inline u64 totalNodes();
 
 constexpr u8 MAX_DEPTH = 100;
-constexpr i64 OVERHEAD_MILLISECONDS = 10;
 
 std::array<std::array<u8, 256>, MAX_DEPTH> LMR_TABLE; // [depth][moveIndex]
 
 constexpr void initLmrTable()
 {
     memset(LMR_TABLE.data(), 0, sizeof(LMR_TABLE));
+
     for (u64 depth = 1; depth < LMR_TABLE.size(); depth++)
         for (u64 move = 1; move < LMR_TABLE[0].size(); move++)
             LMR_TABLE[depth][move] = round(lmrBase.value + ln(depth) * ln(move) * lmrMultiplier.value);
@@ -23,235 +26,246 @@ constexpr void initLmrTable()
 
 struct PlyData {
     public:
-    std::array<Move, MAX_DEPTH+1> pvLine = { };
+
+    std::array<Move, MAX_DEPTH+1> pvLine = { MOVE_NONE };
     u8 pvLength = 0;
     Move killer = MOVE_NONE;
     i32 eval = INF;
-    MovesList moves = MovesList();
-    std::array<i32, 256> movesScores = { };
-};
+    MovesList moves;
+    std::array<i32, 256> movesScores;
 
-class Searcher {
-    public:
+    inline std::string pvString() {
+        if (pvLength == 0) return "";
 
-    Board board = START_BOARD;
+        std::string pvStr = pvLine[0].toUci();
 
+        for (u8 i = 1; i < pvLength; i++)
+            pvStr += " " + pvLine[i].toUci();
+
+        return pvStr;
+    }
+
+    inline std::pair<Move, i32> nextMove(int idx)
+    {
+        // Incremental sort
+        for (int j = idx + 1; j < moves.size(); j++)
+            if (movesScores[j] > movesScores[idx])
+            {
+                moves.swap(idx, j);
+                std::swap(movesScores[idx], movesScores[j]);
+            }
+
+        return { moves[idx], movesScores[idx] };
+    }
+
+}; // struct PlyData
+
+class SearchThread;
+SearchThread *mainThread = nullptr; // set to &searchThreads[0] in main()
+
+class SearchThread {
     private:
+
+    Board board;
 
     u8 maxDepth = MAX_DEPTH;
     u64 nodes = 0;
-    u8 maxPlyReached = 0;
+    u8 maxPlyReached = 0; // seldepth
 
-    std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
+    std::chrono::time_point<std::chrono::steady_clock> startTime;
 
-    u64 softMilliseconds = U64_MAX, 
-        hardMilliseconds = U64_MAX,
-        softNodes = U64_MAX,
-        hardNodes = U64_MAX;
+    u64 softMilliseconds = I64_MAX, 
+        hardMilliseconds = I64_MAX,
+        softNodes = I64_MAX,
+        hardNodes = I64_MAX;
 
-    bool hardTimeUp = false;
+    std::array<PlyData, MAX_DEPTH+1> pliesData = { };
+    PlyData *plyDataPtr = &pliesData[0];
 
-    std::array<PlyData, MAX_DEPTH+1> pliesData = {}; // [ply]
+    std::array<Accumulator, MAX_DEPTH+1> accumulators;
+    Accumulator *accumulatorPtr = &accumulators[0];
 
-    std::array<Accumulator, MAX_DEPTH+1> accumulators = { START_POS_ACCUMULATOR };
-    u8 accumulatorIdx = 0;
-
-    std::vector<TTEntry> tt = std::vector<TTEntry>(32 * 1024 * 1024 / sizeof(TTEntry));
-
-    std::array<u64, 1ULL << 17> movesNodes = {}; // [move]
+    std::array<u64, 1ULL << 17> movesNodes; // [move]
     std::array<std::array<Move, 1ULL << 17>, 2> countermoves = {}; // [nstm][lastMove]
 
     // [color][pieceType][targetSquare]
     std::array<std::array<std::array<HistoryEntry, 64>, 6>, 2> historyTable = {};
 
+    std::vector<TTEntry> *tt = nullptr;
+
     public:
 
-    void ucinewgame() {
-        startTime = std::chrono::steady_clock::now();
+    inline static bool searchStopped = false; // This must be reset to false before calling search()
 
-        board = START_BOARD;
-        accumulators = { START_POS_ACCUMULATOR };
-        accumulatorIdx = 0;
-
-        nodes = maxPlyReached = 0;
-        hardTimeUp = false;
-        pliesData = {};
-        memset(tt.data(), 0, tt.size() * sizeof(TTEntry));
-        movesNodes = {};
-        countermoves = {};
-        historyTable = {};
+    inline SearchThread(std::vector<TTEntry> *tt) {
+        this->tt = tt;
     }
-    
-    inline u64 getNodes() { return nodes; }
+
+    inline void reset() {
+        pliesData[0] = PlyData();
+
+        for (PlyData &plyData : pliesData)
+            plyData.killer = MOVE_NONE;
+
+        historyTable = {};
+        countermoves = {};
+    }
 
     inline Move bestMoveRoot() {
         return pliesData[0].pvLine[0];
     }
 
-    inline void resizeTT(u64 newSizeMB) { 
-        tt.clear();
-        u64 numEntries = newSizeMB * (u64)1024 * (u64)1024 / (u64)sizeof(TTEntry); 
-        tt.resize(numEntries);
-    }
-
-    inline void printTTSize() {
-        double bytes = (u64)tt.size() * (u64)sizeof(TTEntry);
-        double megabytes = bytes / (1024.0 * 1024.0);
-
-        std::cout << "TT size: " << round(megabytes) << " MB"
-                  << " (" << tt.size() << " entries)" 
-                  << std::endl;
-    }
+    inline u64 getNodes() { return nodes; }
 
     inline u64 millisecondsElapsed() {
         return (std::chrono::steady_clock::now() - startTime) / std::chrono::milliseconds(1);
     }
 
-    private:
+    inline i32 search(Board &board, i32 maxDepth, auto startTime, i64 softMilliseconds, 
+                      i64 hardMilliseconds, i64 softNodes, i64 hardNodes)
+    { 
+        this->board = board;
+        this->maxDepth = maxDepth = std::clamp(maxDepth, 1, (i32)MAX_DEPTH);
+        this->startTime = startTime;
+        this->softMilliseconds = softMilliseconds = std::max(softMilliseconds, (i64)0);
+        this->hardMilliseconds = hardMilliseconds = std::max(hardMilliseconds, (i64)0);
+        this->softNodes = softNodes = std::max(softNodes, (i64)0);
+        this->hardNodes = hardNodes = std::max(hardNodes, (i64)0);
 
-    inline bool isHardTimeUp() {
-        if (bestMoveRoot() == MOVE_NONE) return false;
-
-        if (hardTimeUp || nodes >= hardNodes) return true;
-
-        // Check time every 1024 nodes
-        if ((nodes % 1024) != 0) return false;
-
-        return hardTimeUp = (millisecondsElapsed() >= hardMilliseconds);
-    }
-
-    inline double bestMoveNodesFraction() {
-        assert(bestMoveRoot() != MOVE_NONE);
-        return (double)movesNodes[bestMoveRoot().encoded()] / (double)nodes;
-    }
-
-    inline void makeMove(Move move, u8 newPly)
-    {
-        // If not a special move, we can probably correctly predict the zobrist hash after the move
-        // and prefetch the TT entry
-        if (move.flag() <= Move::KING_FLAG) 
-        {
-            auto ttEntryIdx = TTEntryIndex(board.roughHashAfter(move), tt.size());
-            __builtin_prefetch(&tt[ttEntryIdx]);
-        }
-
-        board.makeMove(move);
-        nodes++;
-
-        if (move != MOVE_NONE)
-            accumulators[++accumulatorIdx].updated = false;
-        
-        pliesData[newPly].pvLength = 0;
-        pliesData[newPly].eval = INF;
-
-        // Update seldepth
-        if (newPly > maxPlyReached) maxPlyReached = newPly;
-    }
-
-    inline void setEval(PlyData &plyData) 
-    {
-        assert(accumulators[accumulatorIdx == 0 ? 0 : accumulatorIdx - 1].updated);
-
-        if (!accumulators[accumulatorIdx].updated) 
-            accumulators[accumulatorIdx].update(
-                accumulators[accumulatorIdx-1], board.oppSide(), board.lastMove(), board.captured());
-
-        if (plyData.eval == INF && !board.inCheck())
-            plyData.eval = evaluate(accumulators[accumulatorIdx], board, true);
-    }
-
-    public:
-
-    inline std::pair<Move, i32> search(u8 maxDepth, i64 milliseconds, u64 incrementMs, u64 movesToGo, 
-                                       bool isMoveTime, u64 softNodes, u64 hardNodes, bool printInfo)
-    {
-        // init/reset stuff
-
-        startTime = std::chrono::steady_clock::now();
-
-        this->maxDepth = maxDepth = std::clamp(maxDepth, (u8)1, MAX_DEPTH);
-        this->softNodes = softNodes;
-        this->hardNodes = hardNodes;
-
-        nodes = maxPlyReached = 0;
-        hardTimeUp = false;
-
-        pliesData[0] = PlyData();
-
-        accumulatorIdx = 0;
+        accumulatorPtr = &accumulators[0];
         accumulators[0] = Accumulator(board);
-        setEval(pliesData[0]);
 
+        plyDataPtr = &pliesData[0];
+        plyDataPtr->pvLine[0] = MOVE_NONE; // reset best move root
+        plyDataPtr->pvLength = 0;
+        plyDataPtr->eval = board.inCheck() ? INF : evaluate(accumulatorPtr, board, true);
+
+        nodes = 0;
         movesNodes = {};
 
-        // Set time limits
-
-        assert(movesToGo > 0);
-        milliseconds = std::max((i64)0, milliseconds);
-        u64 maxHardMilliseconds = std::max((i64)0, milliseconds - OVERHEAD_MILLISECONDS);
-
-        if (isMoveTime || maxHardMilliseconds <= 0) {
-            hardMilliseconds = maxHardMilliseconds;
-            softMilliseconds = U64_MAX;
-        }
-        else {
-            hardMilliseconds = maxHardMilliseconds * hardTimePercentage.value;
-            softMilliseconds = (maxHardMilliseconds / movesToGo + incrementMs * 0.6666) * softTimePercentage.value;
-            softMilliseconds = std::min(softMilliseconds, hardMilliseconds);
-        }
+        i32 score = 0;
 
         // ID (Iterative deepening)
-        i32 score = 0;
-        for (i32 iterationDepth = 1; iterationDepth <= maxDepth; iterationDepth++)
+        for (i32 iterationDepth = 1; iterationDepth <= this->maxDepth; iterationDepth++)
         {
             maxPlyReached = 0;
 
             i32 iterationScore = iterationDepth >= aspMinDepth.value 
                                  ? aspiration(iterationDepth, score)
-                                 : search(iterationDepth, 0, -INF, INF, 
-                                          DOUBLE_EXTENSIONS_MAX, false);
+                                 : search(iterationDepth, 0, -INF, INF, DOUBLE_EXTENSIONS_MAX, false);
                                  
-            if (isHardTimeUp()) break;
+            if (stopSearch()) break;
 
             score = iterationScore;
-            u64 msElapsed = millisecondsElapsed();
 
-            if (printInfo) {
-                std::cout << "info depth " << iterationDepth
-                          << " seldepth " << (int)maxPlyReached
-                          << " time " << msElapsed
-                          << " nodes " << nodes
-                          << " nps " << nodes * 1000 / std::max(msElapsed, (u64)1);
+            if (this != mainThread) continue;
 
-                if (abs(score) < MIN_MATE_SCORE)
-                    std::cout << " score cp " << score;
-                else
-                {
-                    i32 pliesToMate = INF - abs(score);
-                    i32 movesTillMate = round(pliesToMate / 2.0);
-                    std::cout << " score mate " << (score > 0 ? movesTillMate : -movesTillMate);
-                }
+            // Print uci info
 
-                std::cout << " pv " << bestMoveRoot().toUci();
-                for (int i = 1; i < pliesData[0].pvLength; i++)
-                    std::cout << " " << pliesData[0].pvLine[i].toUci();
+            std::cout << "info"
+                      << " depth "    << iterationDepth
+                      << " seldepth " << (int)maxPlyReached;
 
-                std::cout << std::endl;
+            if (abs(score) < MIN_MATE_SCORE)
+                std::cout << " score cp " << score;
+            else
+            {
+                i32 pliesToMate = INF - abs(score);
+                i32 movesTillMate = round(pliesToMate / 2.0);
+                std::cout << " score mate " << (score > 0 ? movesTillMate : -movesTillMate);
             }
 
+            u64 nodes = totalNodes();
+            u64 msElapsed = millisecondsElapsed();
+
+            std::cout << " nodes " << nodes
+                      << " nps "   << nodes * 1000 / std::max(msElapsed, (u64)1)
+                      << " time "  << msElapsed
+                      << " pv "    << pliesData[0].pvString()
+                      << std::endl;
+
             // Check soft limits
-            if (nodes >= softNodes
-            || msElapsed >= (iterationDepth >= nodesTmMinDepth.value
-                             ? softMilliseconds * nodesTmMultiplier.value
-                               * (nodesTmBase.value - bestMoveNodesFraction()) 
-                             : softMilliseconds))
+            if (nodes >= this->softNodes
+            || millisecondsElapsed() >= (iterationDepth >= nodesTmMinDepth.value
+                                         ? softMilliseconds * nodesTmMultiplier.value
+                                           * (nodesTmBase.value - bestMoveNodesFraction()) 
+                                         : softMilliseconds))
                 break;
         }
 
-        return { bestMoveRoot(), score };
+        // Signal secondary threads to stop
+        if (this == mainThread) searchStopped = true;
+
+        return score;
     }
 
     private:
+
+    inline bool stopSearch()
+    {
+        // Only check time in main thread
+
+        if (searchStopped) return true;
+
+        if (this != mainThread) return false;
+
+        if (bestMoveRoot() == MOVE_NONE) return false;
+
+        if (hardNodes != I64_MAX && totalNodes() >= hardNodes) 
+            return searchStopped = true;
+
+        // Check time every N nodes
+        return searchStopped = (nodes % 1024 == 0 && millisecondsElapsed() >= hardMilliseconds);
+    }
+
+    inline double bestMoveNodesFraction() {
+        return (double)movesNodes[bestMoveRoot().encoded()] / std::max((double)nodes, 1.0);
+    }
+
+    inline void makeMove(Move move)
+    {
+        // If not a special move, we can probably correctly predict the zobrist hash after the move
+        // and prefetch the TT entry
+        if (move.flag() <= Move::KING_FLAG) 
+        {
+            auto ttEntryIdx = TTEntryIndex(board.roughHashAfter(move), tt->size());
+            __builtin_prefetch(&(*tt)[ttEntryIdx]);
+        }
+
+        board.makeMove(move);
+        nodes++;
+
+        plyDataPtr++;
+        plyDataPtr->pvLength = 0;
+        plyDataPtr->eval = INF;
+
+        if (move != MOVE_NONE) {
+            accumulatorPtr++;
+            accumulatorPtr->updated = false;
+        }
+    }
+
+    inline void undoMove()
+    {
+        if (board.lastMove() != MOVE_NONE)
+            accumulatorPtr--;
+
+        board.undoMove();
+        plyDataPtr--;
+    }
+
+    inline i32 updateAccumulatorAndEvaluate() 
+    {
+        assert(accumulatorPtr == &accumulators[0] ? accumulatorPtr->updated : (accumulatorPtr - 1)->updated);
+
+        if (!accumulatorPtr->updated) 
+            accumulatorPtr->update(accumulatorPtr - 1, board.oppSide(), board.lastMove(), board.captured());
+
+        if (plyDataPtr->eval == INF && !board.inCheck())
+            plyDataPtr->eval = evaluate(accumulatorPtr, board, true);
+
+        return plyDataPtr->eval;
+    }
 
     inline i32 aspiration(i32 iterationDepth, i32 score)
     {
@@ -267,7 +281,7 @@ class Searcher {
         while (true) {
             score = search(depth, 0, alpha, beta, DOUBLE_EXTENSIONS_MAX, false);
 
-            if (isHardTimeUp()) return 0;
+            if (stopSearch()) return 0;
 
             if (score > bestScore) bestScore = score;
 
@@ -291,17 +305,19 @@ class Searcher {
         return score;
     }
 
-    inline i32 search(i32 depth, u8 ply, i32 alpha, i32 beta, 
+    inline i32 search(i32 depth, i32 ply, i32 alpha, i32 beta, 
                       u8 doubleExtsLeft, bool cutNode, bool singular = false)
     { 
-        assert(ply <= maxDepth);
+        assert(ply >= 0 && ply <= maxDepth);
         assert(alpha >= -INF && alpha <= INF);
         assert(beta >= -INF && beta <= INF);
         assert(alpha < beta);
 
         if (depth <= 0) return qSearch(ply, alpha, beta);
 
-        if (isHardTimeUp()) return 0;
+        if (stopSearch()) return 0;
+
+        if (ply > maxPlyReached) maxPlyReached = ply; // update seldepth
 
         if (depth > maxDepth) depth = maxDepth;
 
@@ -309,8 +325,8 @@ class Searcher {
         if (pvNode) assert(!cutNode);
 
         // Probe TT
-        auto ttEntryIdx = TTEntryIndex(board.zobristHash(), tt.size());
-        TTEntry ttEntry = tt[ttEntryIdx];
+        auto ttEntryIdx = TTEntryIndex(board.zobristHash(), tt->size());
+        TTEntry ttEntry = (*tt)[ttEntryIdx];
         bool ttHit = board.zobristHash() == ttEntry.zobristHash;
 
         // TT cutoff
@@ -323,26 +339,25 @@ class Searcher {
 
         if (ply >= maxDepth && board.inCheck()) return 0;
 
-        PlyData &plyData = pliesData[ply];
-        setEval(plyData);
+        i32 eval = updateAccumulatorAndEvaluate();
 
-        if (ply >= maxDepth) return plyData.eval;
+        if (ply >= maxDepth) return eval;
 
         Color stm = board.sideToMove();
 
         // If in check 2 plies ago, then pliesData[ply-2].eval is INF, and improving is false
-        bool improving = ply > 1 && !board.inCheck() && plyData.eval > pliesData[ply-2].eval;
+        bool improving = ply > 1 && !board.inCheck() && eval > pliesData[ply-2].eval;
 
         if (!pvNode && !singular && !board.inCheck())
         {
             // RFP (Reverse futility pruning) / Static NMP
             if (depth <= rfpMaxDepth.value 
-            && plyData.eval >= beta + (depth - improving) * rfpMultiplier.value)
-                return (plyData.eval + beta) / 2;
+            && eval >= beta + (depth - improving) * rfpMultiplier.value)
+                return (eval + beta) / 2;
 
             // Razoring
             if (depth <= razoringMaxDepth.value 
-            && plyData.eval + depth * razoringMultiplier.value < alpha)
+            && eval + depth * razoringMultiplier.value < alpha)
             {
                 i32 score = qSearch(ply, alpha, beta);
                 if (score <= alpha) return score;
@@ -351,28 +366,28 @@ class Searcher {
             // NMP (Null move pruning)
             if (depth >= nmpMinDepth.value 
             && board.lastMove() != MOVE_NONE 
-            && plyData.eval >= beta
+            && eval >= beta
             && !(ttHit && ttEntry.getBound() == Bound::UPPER && ttEntry.score < beta)
             && board.hasNonPawnMaterial(stm))
             {
-                makeMove(MOVE_NONE, ply + 1);
+                makeMove(MOVE_NONE);
 
                 i32 score = 0;
 
                 if (!board.isDraw()) {
                     i32 nmpDepth = depth - nmpBaseReduction.value - depth / nmpReductionDivisor.value
-                                   - std::min((plyData.eval-beta) / nmpEvalBetaDivisor.value, nmpEvalBetaMax.value);
+                                   - std::min((eval-beta) / nmpEvalBetaDivisor.value, nmpEvalBetaMax.value);
 
                     score = -search(nmpDepth, ply + 1, -beta, -alpha, doubleExtsLeft, !cutNode);
                 }
 
-                board.undoMove();
+                undoMove();
 
                 if (score >= MIN_MATE_SCORE) return beta;
                 if (score >= beta) return score;
             }
 
-            if (isHardTimeUp()) return 0;
+            if (stopSearch()) return 0;
         }
 
         if (!ttHit) ttEntry.move = MOVE_NONE;
@@ -382,10 +397,7 @@ class Searcher {
             depth--;
 
         // genenerate and score all moves except underpromotions
-        if (!singular) {
-            board.pseudolegalMoves(plyData.moves, false, false);
-            scoreMoves(plyData, ttEntry.move);
-        }
+        if (!singular) genAndScoreMoves(false, ttEntry.move);
 
         u64 pinned = board.pinned();
         int legalMovesSeen = 0;
@@ -397,9 +409,9 @@ class Searcher {
         std::array<HistoryEntry*, 256> failLowsHistoryEntry;
         int failLowQuiets = 0, failLowNoisies = 0;
 
-        for (int i = 0; i < plyData.moves.size(); i++)
+        for (int i = 0; i < plyDataPtr->moves.size(); i++)
         {
-            auto [move, moveScore] = plyData.moves.incrementalSort(plyData.movesScores, i);
+            auto [move, moveScore] = plyDataPtr->nextMove(i);
 
             // Don't search TT move in singular search
             if (move == ttEntry.move && singular) continue;
@@ -426,7 +438,7 @@ class Searcher {
                 // FP (Futility pruning)
                 if (lmrDepth <= fpMaxDepth.value 
                 && alpha < MIN_MATE_SCORE
-                && alpha > plyData.eval + fpBase.value + lmrDepth * fpMultiplier.value)
+                && alpha > eval + fpBase.value + lmrDepth * fpMultiplier.value)
                     break;
 
                 // SEE pruning
@@ -488,7 +500,7 @@ class Searcher {
             skipExtensions:
 
             u64 nodesBefore = nodes;
-            makeMove(move, ply + 1);
+            makeMove(move);
 
     	    // PVS (Principal variation search)
 
@@ -527,10 +539,9 @@ class Searcher {
 
             moveSearched:
 
-            board.undoMove();
-            accumulatorIdx--;
+            undoMove();
 
-            if (isHardTimeUp()) return 0;
+            if (stopSearch()) return 0;
 
             if (ply == 0) movesNodes[move.encoded()] += nodes - nodesBefore;
 
@@ -549,12 +560,12 @@ class Searcher {
             
             // Update PV
             if (pvNode) {
-                plyData.pvLength = 1 + pliesData[ply+1].pvLength;
-                plyData.pvLine[0] = move;
+                plyDataPtr->pvLength = 1 + pliesData[ply+1].pvLength;
+                plyDataPtr->pvLine[0] = move;
 
                 // Copy child's PV
                 for (int idx = 0; idx < pliesData[ply+1].pvLength; idx++)
-                    plyData.pvLine[idx + 1] = pliesData[ply+1].pvLine[idx];            
+                    plyDataPtr->pvLine[idx + 1] = pliesData[ply+1].pvLine[idx];            
             }
 
             if (score < beta) continue;
@@ -568,7 +579,7 @@ class Searcher {
 
             if (isQuiet) {
                 // This fail high quiet is now a killer move
-                plyData.killer = move; 
+                plyDataPtr->killer = move; 
 
                 // This fail high quiet is now a countermove
                 if (board.lastMove() != MOVE_NONE) {
@@ -595,27 +606,29 @@ class Searcher {
         }
 
         if (legalMovesSeen == 0) 
-            return board.inCheck() ? -INF + (i32)ply : 0;
+            return board.inCheck() ? -INF + ply : 0;
 
         if (!singular)
-            tt[ttEntryIdx].update(board.zobristHash(), depth, ply, bestScore, bestMove, bound);
+            (*tt)[ttEntryIdx].update(board.zobristHash(), depth, ply, bestScore, bestMove, bound);
 
         return bestScore;
     }
 
     // Quiescence search
-    inline i32 qSearch(u8 ply, i32 alpha, i32 beta)
+    inline i32 qSearch(i32 ply, i32 alpha, i32 beta)
     {
         assert(ply > 0 && ply <= maxDepth);
         assert(alpha >= -INF && alpha <= INF);
         assert(beta >= -INF && beta <= INF);
         assert(alpha < beta);
 
-        if (isHardTimeUp()) return 0;
+        if (stopSearch()) return 0;
+
+        if (ply > maxPlyReached) maxPlyReached = ply; // update seldepth
 
         // Probe TT
-        auto ttEntryIdx = TTEntryIndex(board.zobristHash(), tt.size());
-        TTEntry *ttEntry = &tt[ttEntryIdx];
+        auto ttEntryIdx = TTEntryIndex(board.zobristHash(), tt->size());
+        TTEntry *ttEntry = tt->data() + ttEntryIdx;
         bool ttHit = board.zobristHash() == ttEntry->zobristHash;
 
         // TT cutoff
@@ -627,31 +640,28 @@ class Searcher {
 
         if (ply >= maxDepth && board.inCheck()) return 0;
 
-        PlyData &plyData = pliesData[ply];
-        setEval(plyData);
+        i32 eval = updateAccumulatorAndEvaluate();
 
         if (!board.inCheck()) 
         {
-            if (ply >= maxDepth || plyData.eval >= beta) 
-                return plyData.eval; 
+            if (ply >= maxDepth || eval >= beta) return eval; 
 
-            if (plyData.eval > alpha) alpha = plyData.eval;
+            if (eval > alpha) alpha = eval;
         }
 
         // if in check, generate all moves, else only noisy moves
         // never generate underpromotions
-        board.pseudolegalMoves(plyData.moves, !board.inCheck(), false);
-        scoreMoves(plyData, ttHit ? ttEntry->move : MOVE_NONE);
-        
+        genAndScoreMoves(!board.inCheck(), ttHit ? ttEntry->move : MOVE_NONE);
+
         u64 pinned = board.pinned();
         int legalMovesPlayed = 0;
-        i32 bestScore = board.inCheck() ? -INF : plyData.eval;
+        i32 bestScore = board.inCheck() ? -INF : eval;
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::UPPER;
 
-        for (int i = 0; i < plyData.moves.size(); i++)
+        for (int i = 0; i < plyDataPtr->moves.size(); i++)
         {
-            auto [move, moveScore] = plyData.moves.incrementalSort(plyData.movesScores, i);
+            auto [move, moveScore] = plyDataPtr->nextMove(i);
 
             // SEE pruning (skip bad noisy moves)
             if (!board.inCheck() && moveScore < 0) break;
@@ -659,15 +669,14 @@ class Searcher {
             // skip illegal moves
             if (!board.isPseudolegalLegal(move, pinned)) continue;
 
-            makeMove(move, ply + 1);
+            makeMove(move);
             legalMovesPlayed++;
 
             i32 score = board.isDraw() ? 0 : -qSearch(ply + 1, -beta, -alpha);
 
-            board.undoMove();
-            accumulatorIdx--;
+            undoMove();
 
-            if (isHardTimeUp()) return 0;
+            if (stopSearch()) return 0;
 
             if (score <= bestScore) continue;
 
@@ -684,32 +693,38 @@ class Searcher {
 
         if (legalMovesPlayed == 0 && board.inCheck()) 
             // checkmate
-            return -INF + (i32)ply; 
+            return -INF + ply; 
 
         ttEntry->update(board.zobristHash(), 0, ply, bestScore, bestMove, bound);
 
         return bestScore;
     }
 
-    const i32 GOOD_QUEEN_PROMO_SCORE = 1'600'000'000,
-              GOOD_NOISY_SCORE       = 1'500'000'000,
-              KILLER_SCORE           = 1'000'000'000,
-              COUNTERMOVE_SCORE      = 500'000'000;
+    const static i32 GOOD_QUEEN_PROMO_SCORE = 1'600'000'000,
+                     GOOD_NOISY_SCORE       = 1'500'000'000,
+                     KILLER_SCORE           = 1'000'000'000,
+                     COUNTERMOVE_SCORE      = 500'000'000;
 
-    inline void scoreMoves(PlyData &plyData, Move ttMove)
+    inline void genAndScoreMoves(bool noisiesOnly, Move ttMove)
     {
+        // never generate underpromotions in search
+        board.pseudolegalMoves(plyDataPtr->moves, noisiesOnly, false);
+
         int stm = (int)board.sideToMove();
         int nstm = (int)board.oppSide();
 
-        Move countermove = board.lastMove() == MOVE_NONE
-                           ? MOVE_NONE : countermoves[nstm][board.lastMove().encoded()];
+        Move countermove = countermoves[nstm][board.lastMove().encoded()];
 
-        for (int i = 0; i < plyData.moves.size(); i++)
+        if (board.lastMove() == MOVE_NONE) 
+            assert(countermove == MOVE_NONE);
+
+        for (int i = 0; i < plyDataPtr->moves.size(); i++)
         {
-            Move move = plyData.moves[i];
+            Move move = plyDataPtr->moves[i];
+            i32 *moveScore = &(plyDataPtr->movesScores[i]);
 
             if (move == ttMove) {
-                plyData.movesScores[i] = I32_MAX;
+                *moveScore = I32_MAX;
                 continue;
             }
 
@@ -718,32 +733,41 @@ class Searcher {
             int pt = (int)move.pieceType();
             HistoryEntry *historyEntry = &historyTable[stm][pt][move.to()];
 
-            // Starzix doesn't generate underpromotions in search
-
             if (captured != PieceType::NONE)
             {
-                plyData.movesScores[i] = SEE(board, move) 
-                                         ? (promotion == PieceType::QUEEN
-                                            ? GOOD_QUEEN_PROMO_SCORE 
-                                            : GOOD_NOISY_SCORE)
-                                         : -GOOD_NOISY_SCORE;
+                *moveScore = SEE(board, move) 
+                             ? (promotion == PieceType::QUEEN
+                                ? GOOD_QUEEN_PROMO_SCORE 
+                                : GOOD_NOISY_SCORE)
+                             : -GOOD_NOISY_SCORE;
 
-                plyData.movesScores[i] += ((i32)captured + 1) * 1'000'000; // MVV (most valuable victim)
-                plyData.movesScores[i] += historyEntry->noisyHistory(captured);
+                *moveScore += ((i32)captured + 1) * 1'000'000; // MVV (most valuable victim)
+                *moveScore += historyEntry->noisyHistory(captured);
             }
             else if (promotion == PieceType::QUEEN)
             {
-                plyData.movesScores[i] = SEE(board, move) ? GOOD_QUEEN_PROMO_SCORE : -GOOD_NOISY_SCORE;
-                plyData.movesScores[i] += historyEntry->noisyHistory(captured);
+                *moveScore = SEE(board, move) ? GOOD_QUEEN_PROMO_SCORE : -GOOD_NOISY_SCORE;
+                *moveScore += historyEntry->noisyHistory(captured);
             }
-            else if (move == plyData.killer)
-                plyData.movesScores[i] = KILLER_SCORE;
+            else if (move == plyDataPtr->killer)
+                *moveScore = KILLER_SCORE;
             else if (move == countermove)
-                plyData.movesScores[i] = COUNTERMOVE_SCORE;
+                *moveScore = COUNTERMOVE_SCORE;
             else
-                plyData.movesScores[i] = historyEntry->quietHistory(board);
+                *moveScore = historyEntry->quietHistory(board);
             
         }
     }
 
-}; // class Searcher
+}; // class SearchThread
+
+std::vector<SearchThread> searchThreads; // the main thread is created in main()
+
+inline u64 totalNodes() {
+    u64 nodes = 0;
+
+    for (SearchThread &searchThread : searchThreads)
+        nodes += searchThread.getNodes();
+
+    return nodes;
+}

@@ -81,3 +81,28 @@ inline u64 TTEntryIndex(u64 zobristHash, auto numEntries)
 {
     return ((u128)zobristHash * (u128)numEntries) >> 64;
 }
+
+inline void printTTSize(std::vector<TTEntry> &tt) 
+{
+    double bytes = (u64)tt.size() * (u64)sizeof(TTEntry);
+    double megabytes = bytes / (1024.0 * 1024.0);
+
+    std::cout << "TT size: " << round(megabytes) << " MB"
+            << " (" << tt.size() << " entries)" 
+            << std::endl;
+}
+
+inline void resizeTT(std::vector<TTEntry> &tt, i64 newSizeMB) 
+{
+    u64 numEntries = std::clamp(newSizeMB, (i64)1, (i64)65536) * (u64)1024 * (u64)1024 / (u64)sizeof(TTEntry); 
+    tt.clear(); // remove all elements
+    tt.resize(numEntries);
+    tt.shrink_to_fit();
+}
+
+inline void resetTT(std::vector<TTEntry> &tt) {
+    auto numEntries = tt.size();
+    tt.clear(); // remove all elements
+    tt.resize(numEntries);
+    tt.shrink_to_fit();
+}

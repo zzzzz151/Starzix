@@ -2,26 +2,29 @@
 
 #pragma once
 
-#include "bench.hpp"
+#include <thread>
+#include "board.hpp"
 #include "perft.hpp"
+#include "search.hpp"
+#include "bench.hpp"
 
 namespace uci { // Universal chess interface
 
 inline void uci();
-inline void setoption(Searcher &searcher, std::vector<std::string> &tokens);
-inline void position(Board &board, std::vector<std::string> &tokens);
-inline void go(Searcher &searcher, std::vector<std::string> &tokens);
+inline void setoption(std::vector<std::string> &tokens, std::vector<TTEntry> &tt);
+inline void position(std::vector<std::string> &tokens, Board &board);
+inline void go(std::vector<std::string> &tokens, Board &board);
 
-inline void uciLoop()
+inline void uciLoop(std::vector<TTEntry> &tt)
 {
-    Searcher searcher = Searcher();
-    searcher.printTTSize();
+    Board board = Board(START_FEN);
 
     while (true) {
         std::string received = "";
         getline(std::cin, received);
         trim(received);
         std::vector<std::string> tokens = splitString(received, ' ');
+
         if (received == "" || tokens.size() == 0)
             continue;
 
@@ -32,22 +35,29 @@ inline void uciLoop()
         else if (received == "uci")
             uci();
         else if (tokens[0] == "setoption") // e.g. "setoption name Hash value 32"
-            setoption(searcher, tokens);
+            setoption(tokens, tt);
         else if (received == "ucinewgame")
-            searcher.ucinewgame();
+        {
+            resetTT(tt);
+
+            for (auto &searchThread : searchThreads)
+                searchThread.reset();
+        }
         else if (received == "isready")
             std::cout << "readyok" << std::endl;
         else if (tokens[0] == "position")
-            position(searcher.board, tokens);
+            position(tokens, board);
         else if (tokens[0] == "go")
-            go(searcher, tokens);
+            go(tokens, board);
         else if (tokens[0] == "print" || tokens[0] == "d"
         || tokens[0] == "display" || tokens[0] == "show")
-            searcher.board.print();
-        else if (tokens[0] == "eval") {
-            Accumulator acc = Accumulator(searcher.board);
-            std::cout << "eval " << evaluate(acc, searcher.board, false)
-                      << " scaled "  << evaluate(acc, searcher.board, true)
+            board.print();
+        else if (tokens[0] == "eval") 
+        {
+            Accumulator acc = Accumulator(board);
+
+            std::cout << "eval " << evaluate(&acc, board, false)
+                      << " scaled "  << evaluate(&acc, board, true)
                       << std::endl;
         }
         else if (tokens[0] == "bench")
@@ -62,42 +72,24 @@ inline void uciLoop()
         else if (tokens[0] == "perft" || (tokens[0] == "go" && tokens[1] == "perft"))
         {
             int depth = stoi(tokens.back());
-            perftBench(searcher.board, depth);
+            perftBench(board, depth);
         }
         else if (tokens[0] == "perftsplit" || tokens[0] == "splitperft" 
         || tokens[0] == "perftdivide" || tokens[0] == "divideperft")
         {
             int depth = stoi(tokens[1]);
-            perftSplit(searcher.board, depth);
+            perftSplit(board, depth);
         }
         else if (tokens[0] == "makemove")
         {
             if ((tokens[1] == "0000" || tokens[1] == "null" || tokens[1] == "none")
-            && !searcher.board.inCheck())
-                searcher.board.makeMove(MOVE_NONE);
+            && !board.inCheck())
+                board.makeMove(MOVE_NONE);
             else
-                searcher.board.makeMove(tokens[1]);
+                board.makeMove(tokens[1]);
         }
         else if (tokens[0] == "undomove")
-            searcher.board.undoMove();
-        else if (tokens[0] == "islegal")
-        {
-            Move move = searcher.board.uciToMove(tokens[1]);
-            u64 pinned = searcher.board.pinned();
-            std::cout << searcher.board.isPseudolegalLegal(move, pinned) << std::endl;
-        }
-        else if (tokens[0] == "moves") {
-            MovesList moves = MovesList();
-            searcher.board.pseudolegalMoves(moves);
-            std::cout << "Pseudolegals: " << (int)moves.size() << std::endl;
-
-            u8 legals = 0;
-            u64 pinned = searcher.board.pinned();
-            for (int i = 0; i < moves.size(); i++)
-                legals += searcher.board.isPseudolegalLegal(moves[i], pinned);
-
-            std::cout << "Legals: " << (int)legals << std::endl;
-        }
+            board.undoMove();
         else if (received == "paramsjson")
             printParamsAsJson();
 
@@ -112,7 +104,8 @@ inline void uciLoop()
 inline void uci() {
     std::cout << "id name Starzix" << std::endl;
     std::cout << "id author zzzzz" << std::endl;
-    std::cout << "option name Hash type spin default 32 min 1 max 1024" << std::endl;
+    std::cout << "option name Hash type spin default 32 min 1 max 65536" << std::endl;
+    std::cout << "option name Threads type spin default 1 min 1 max 256" << std::endl;
 
     /*
     for (auto [paramName, tunableParam] : tunableParams) {
@@ -143,7 +136,7 @@ inline void uci() {
     std::cout << "uciok" << std::endl;
 }
 
-inline void setoption(Searcher &searcher, std::vector<std::string> &tokens)
+inline void setoption(std::vector<std::string> &tokens, std::vector<TTEntry> &tt)
 {
     std::string optionName = tokens[2];
     trim(optionName);
@@ -152,8 +145,25 @@ inline void setoption(Searcher &searcher, std::vector<std::string> &tokens)
 
     if (optionName == "Hash" || optionName == "hash")
     {
-        searcher.resizeTT(stoll(optionValue));
-        searcher.printTTSize();
+        resizeTT(tt, stoll(optionValue));
+        printTTSize(tt);
+    }
+    else if (optionName == "Threads" || optionName == "threads")
+    {
+        int numThreads = std::clamp(stoi(optionValue), 1, 256);
+
+        // Remove all threads except main thread
+        while (searchThreads.size() > 1)
+            searchThreads.pop_back();
+
+        while ((int)searchThreads.size() < numThreads)
+            searchThreads.push_back(SearchThread(&tt));
+
+        searchThreads.shrink_to_fit();
+
+        mainThread = &searchThreads[0]; // push_back() or shrink_to_fit() may reallocate
+
+        std::cout << "Threads set to " << numThreads << std::endl;
     }
     else if (tunableParams.count(optionName) > 0) 
     {
@@ -177,12 +187,12 @@ inline void setoption(Searcher &searcher, std::vector<std::string> &tokens)
     }
 }
 
-inline void position(Board &board, std::vector<std::string> &tokens)
+inline void position(std::vector<std::string> &tokens, Board &board)
 {
     int movesTokenIndex = -1;
 
     if (tokens[1] == "startpos") {
-        board = START_BOARD;
+        board = Board(START_FEN);
         movesTokenIndex = 2;
     }
     else if (tokens[1] == "fen")
@@ -200,45 +210,75 @@ inline void position(Board &board, std::vector<std::string> &tokens)
         board.makeMove(tokens[i]);
 }
 
-inline void go(Searcher &searcher, std::vector<std::string> &tokens)
+inline void go(std::vector<std::string> &tokens, Board &board)
 {
-    u8 maxDepth = MAX_DEPTH;
+    std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
+
+    i32 maxDepth = MAX_DEPTH;
     i64 milliseconds = I64_MAX;
-    u64 incrementMs = 0;
-    u64 movesToGo = defaultMovesToGo.value;
+    i64 incrementMs = 0;
+    i64 movesToGo = defaultMovesToGo.value;
     bool isMoveTime = false;
-    u64 maxNodes = U64_MAX;
+    i64 maxNodes = I64_MAX;
 
     for (int i = 1; i < (int)tokens.size() - 1; i += 2)
     {
         i64 value = std::stoll(tokens[i + 1]);
 
-        if ((tokens[i] == "wtime" && searcher.board.sideToMove() == Color::WHITE) 
-        ||  (tokens[i] == "btime" && searcher.board.sideToMove() == Color::BLACK))
-            milliseconds = value;
+        if ((tokens[i] == "wtime" && board.sideToMove() == Color::WHITE) 
+        ||  (tokens[i] == "btime" && board.sideToMove() == Color::BLACK))
+            milliseconds = std::max(value, (i64)0);
 
-        else if ((tokens[i] == "winc" && searcher.board.sideToMove() == Color::WHITE) 
-        ||       (tokens[i] == "binc" && searcher.board.sideToMove() == Color::BLACK))
-            incrementMs = value;
+        else if ((tokens[i] == "winc" && board.sideToMove() == Color::WHITE) 
+        ||       (tokens[i] == "binc" && board.sideToMove() == Color::BLACK))
+            incrementMs = std::max(value, (i64)0);
 
         else if (tokens[i] == "movestogo")
-            movesToGo = value;
+            movesToGo = std::max(value, (i64)1);
         else if (tokens[i] == "movetime")
         {
-            milliseconds = value;
+            milliseconds = std::max(value, (i64)0);
             isMoveTime = true;
         }
         else if (tokens[i] == "depth")
-            maxDepth = std::clamp(value, (i64)1, (i64)MAX_DEPTH);
+            maxDepth = value;
         else if (tokens[i] == "nodes")
             maxNodes = value;
     }
 
-    auto [bestMove, score] = searcher.search(maxDepth, milliseconds, incrementMs, movesToGo, 
-                                             isMoveTime, maxNodes, maxNodes, true);
+    // Calculate search time limits
 
-    assert(bestMove != MOVE_NONE);
-    std::cout << "bestmove " + bestMove.toUci() << std::endl;
+    i64 maxHardMilliseconds = std::max((i64)0, milliseconds - 10);
+    i64 hardMilliseconds, softMilliseconds;
+
+    if (isMoveTime || maxHardMilliseconds <= 0) {
+        hardMilliseconds = maxHardMilliseconds;
+        softMilliseconds = I64_MAX;
+    }
+    else {
+        hardMilliseconds = maxHardMilliseconds * hardTimePercentage.value;
+        softMilliseconds = ((double)maxHardMilliseconds / (double)movesToGo + (double)incrementMs * 0.6666) * softTimePercentage.value;
+        softMilliseconds = std::min(softMilliseconds, hardMilliseconds);
+    }
+
+    SearchThread::searchStopped = false;
+    std::vector<std::thread> threads;
+
+    // Start secondary threads search
+    for (u64 i = 1; i < searchThreads.size(); i++)
+        threads.emplace_back([&, i]() {
+            searchThreads[i].search(
+                board, maxDepth, startTime, softMilliseconds, hardMilliseconds, I64_MAX, maxNodes);
+        });
+
+    // Main thread search
+    mainThread->search(board, maxDepth, startTime, softMilliseconds, hardMilliseconds, I64_MAX, maxNodes);
+
+    // Wait for secondary threads
+    for (auto &thread : threads)
+        thread.join();
+
+    std::cout << "bestmove " << mainThread->bestMoveRoot().toUci() << std::endl;
 }
 
 } // namespace uci
