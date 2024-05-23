@@ -13,7 +13,7 @@ inline u64 totalNodes();
 
 constexpr u8 MAX_DEPTH = 100;
 
-std::array<std::array<u8, 256>, MAX_DEPTH> LMR_TABLE; // [depth][moveIndex]
+std::array<std::array<i32, 256>, MAX_DEPTH+1> LMR_TABLE; // [depth][moveIndex]
 
 constexpr void initLmrTable()
 {
@@ -433,7 +433,7 @@ class SearchThread {
                 if (legalMovesSeen >= lmpMinMoves.value + depth * depth * lmpMultiplier.value / (improving ? 1 : 2))
                     break;
 
-                i32 lmrDepth = std::max(0, depth - (i32)LMR_TABLE[depth][legalMovesSeen] - !improving);
+                i32 lmrDepth = std::max(0, depth - LMR_TABLE[depth][legalMovesSeen] - !improving);
 
                 // FP (Futility pruning)
                 if (lmrDepth <= fpMaxDepth.value 
