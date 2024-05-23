@@ -595,7 +595,7 @@ class SearchThread {
                     failLowsHistoryEntry[j]->updateQuietHistory(historyMalus, board);
             }
             else 
-                // Increaes history of this fail high noisy move
+                // Increase history of this fail high noisy move
                 historyEntry->updateNoisyHistory(historyBonus, captured);
 
             // History malus: decrease history of fail low noisy moves
@@ -606,6 +606,7 @@ class SearchThread {
         }
 
         if (legalMovesSeen == 0) 
+            // checkmate or stalemate
             return board.inCheck() ? -INF + ply : 0;
 
         if (!singular)
@@ -628,7 +629,7 @@ class SearchThread {
 
         // Probe TT
         auto ttEntryIdx = TTEntryIndex(board.zobristHash(), tt->size());
-        TTEntry *ttEntry = tt->data() + ttEntryIdx;
+        TTEntry *ttEntry = &(*tt)[ttEntryIdx];
         bool ttHit = board.zobristHash() == ttEntry->zobristHash;
 
         // TT cutoff

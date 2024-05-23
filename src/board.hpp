@@ -348,7 +348,7 @@ class Board {
     }
 
     inline bool isDraw() {
-        if (isRepetition() || state->pliesSincePawnOrCapture >= 100)
+        if (state->pliesSincePawnOrCapture >= 100)
             return true;
 
         // K vs K
@@ -357,9 +357,11 @@ class Board {
 
         // KB vs K
         // KN vs K
-        return numPieces == 3 
-               && (bitboard(PieceType::KNIGHT) > 0 
-               || bitboard(PieceType::BISHOP) > 0);
+       if (numPieces == 3 
+       && (bitboard(PieceType::KNIGHT) > 0 || bitboard(PieceType::BISHOP) > 0))
+            return true;
+
+        return isRepetition();
     }
 
     inline bool isSquareAttacked(Square square, Color colorAttacking, u64 occupied = 0) {
