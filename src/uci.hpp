@@ -104,7 +104,7 @@ inline void uciLoop(std::vector<TTEntry> &tt)
 }
 
 inline void uci() {
-    std::cout << "id name Starzix" << std::endl;
+    std::cout << "id name Starzix 5.0" << std::endl;
     std::cout << "id author zzzzz" << std::endl;
     std::cout << "option name Hash type spin default 32 min 1 max 65536" << std::endl;
     std::cout << "option name Threads type spin default 1 min 1 max 256" << std::endl;
