@@ -25,13 +25,13 @@ inline bool SEE(Board &board, Move move, i32 threshold = 0)
     assert(move != MOVE_NONE);
 
     const std::array<i32, 7> SEE_PIECE_VALUES = {
-        seePawnValue.value,  // Pawn
-        seeMinorValue.value, // Knight
-        seeMinorValue.value, // Bishop
-        seeRookValue.value,  // Rook
-        seeQueenValue.value, // Queen
-        0,                   // King
-        0                    // None
+        seePawnValue(),  // Pawn
+        seeMinorValue(), // Knight
+        seeMinorValue(), // Bishop
+        seeRookValue(),  // Rook
+        seeQueenValue(), // Queen
+        0,               // King
+        0                // None
     };
 
     i32 score = -threshold;

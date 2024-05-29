@@ -219,7 +219,7 @@ inline void go(std::vector<std::string> &tokens, Board &board)
     i32 maxDepth = MAX_DEPTH;
     i64 milliseconds = I64_MAX;
     i64 incrementMs = 0;
-    i64 movesToGo = defaultMovesToGo.value;
+    i64 movesToGo = defaultMovesToGo();
     bool isMoveTime = false;
     i64 maxNodes = I64_MAX;
 
@@ -258,8 +258,8 @@ inline void go(std::vector<std::string> &tokens, Board &board)
         softMilliseconds = I64_MAX;
     }
     else {
-        hardMilliseconds = maxHardMilliseconds * hardTimePercentage.value;
-        softMilliseconds = ((double)maxHardMilliseconds / (double)movesToGo + (double)incrementMs * 0.6666) * softTimePercentage.value;
+        hardMilliseconds = maxHardMilliseconds * hardTimePercentage();
+        softMilliseconds = ((double)maxHardMilliseconds / (double)movesToGo + (double)incrementMs * 0.6666) * softTimePercentage();
         softMilliseconds = std::min(softMilliseconds, hardMilliseconds);
     }
 

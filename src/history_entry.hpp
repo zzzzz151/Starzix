@@ -17,12 +17,12 @@ struct HistoryEntry {
     inline i32 quietHistory(Board &board)
     {
         // Add main history
-        float total = (float)mainHistory * mainHistoryWeight.value;
+        float total = (float)mainHistory * mainHistoryWeight();
 
         // Add continuation histories
 
         std::array<Move, 3> moves = { board.nthToLastMove(1), board.nthToLastMove(2), board.nthToLastMove(4) };
-        std::array<float, 3> weights = { onePlyContHistWeight.value, twoPlyContHistWeight.value, fourPlyContHistWeight.value };
+        std::array<float, 3> weights = { onePlyContHistWeight(), twoPlyContHistWeight(), fourPlyContHistWeight() };
 
         for (int i = 0; i < 3; i++) 
             if (moves[i] != MOVE_NONE) 
@@ -42,7 +42,7 @@ struct HistoryEntry {
     inline void updateQuietHistory(i32 bonus, Board &board)
     {
         // Update main history
-        mainHistory += bonus - abs(bonus) * (i32)mainHistory / historyMax.value;
+        mainHistory += bonus - abs(bonus) * (i32)mainHistory / historyMax();
 
         // Update continuation histories
 
@@ -53,13 +53,13 @@ struct HistoryEntry {
             {
                 int pt = (int)moves[i].pieceType();
                 auto &history = continuationHistories[i][pt][moves[i].to()];
-                history += bonus - abs(bonus) * (i32)history / historyMax.value;
+                history += bonus - abs(bonus) * (i32)history / historyMax();
             }
     }
 
     inline void updateNoisyHistory(i32 bonus, PieceType captured) 
     {
-        noisyHist[(int)captured] += bonus - abs(bonus) * (i32)noisyHist[(int)captured] / historyMax.value;
+        noisyHist[(int)captured] += bonus - abs(bonus) * (i32)noisyHist[(int)captured] / historyMax();
     }
 
 }; // struct HistoryEntry

@@ -213,7 +213,7 @@ inline i32 evaluate(Accumulator *accumulator, Board &board, bool materialScale)
         constexpr i32 MATERIAL_MAX = 62;
 
         // Linear lerp from evalMaterialScaleMin to evalMaterialScaleMax as material goes from 0 to MATERIAL_MAX
-        eval *= evalMaterialScaleMin.value + (evalMaterialScaleMax.value - evalMaterialScaleMin.value) * material / MATERIAL_MAX;
+        eval *= evalMaterialScaleMin() + (evalMaterialScaleMax() - evalMaterialScaleMin()) * material / MATERIAL_MAX;
     }
 
     return std::clamp(eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);

@@ -21,7 +21,7 @@ constexpr void initLmrTable()
 
     for (u64 depth = 1; depth < LMR_TABLE.size(); depth++)
         for (u64 move = 1; move < LMR_TABLE[0].size(); move++)
-            LMR_TABLE[depth][move] = round(lmrBase.value + ln(depth) * ln(move) * lmrMultiplier.value);
+            LMR_TABLE[depth][move] = round(lmrBase() + ln(depth) * ln(move) * lmrMultiplier());
 }
 
 struct PlyData {
@@ -150,7 +150,7 @@ class SearchThread {
         {
             maxPlyReached = 0;
 
-            i32 iterationScore = iterationDepth >= aspMinDepth.value 
+            i32 iterationScore = iterationDepth >= aspMinDepth() 
                                  ? aspiration(iterationDepth, score)
                                  : search(iterationDepth, 0, -INF, INF, DOUBLE_EXTENSIONS_MAX, false);
                                  
@@ -186,9 +186,9 @@ class SearchThread {
 
             // Check soft limits
             if (nodes >= this->softNodes
-            || millisecondsElapsed() >= (iterationDepth >= nodesTmMinDepth.value
-                                         ? softMilliseconds * nodesTmMultiplier.value
-                                           * (nodesTmBase.value - bestMoveNodesFraction()) 
+            || millisecondsElapsed() >= (iterationDepth >= nodesTmMinDepth()
+                                         ? softMilliseconds * nodesTmMultiplier()
+                                           * (nodesTmBase() - bestMoveNodesFraction()) 
                                          : softMilliseconds))
                 break;
         }
@@ -272,7 +272,7 @@ class SearchThread {
         // Aspiration Windows
         // Search with a small window, adjusting it and researching until the score is inside the window
 
-        i32 delta = aspInitialDelta.value;
+        i32 delta = aspInitialDelta();
         i32 alpha = std::max(-INF, score - delta);
         i32 beta = std::min(INF, score + delta);
         i32 depth = iterationDepth;
@@ -299,7 +299,7 @@ class SearchThread {
             else
                 break;
 
-            delta *= aspDeltaMultiplier.value;
+            delta *= aspDeltaMultiplier();
         }
 
         return score;
@@ -351,20 +351,20 @@ class SearchThread {
         if (!pvNode && !singular && !board.inCheck())
         {
             // RFP (Reverse futility pruning) / Static NMP
-            if (depth <= rfpMaxDepth.value 
-            && eval >= beta + (depth - improving) * rfpMultiplier.value)
+            if (depth <= rfpMaxDepth() 
+            && eval >= beta + (depth - improving) * rfpMultiplier())
                 return (eval + beta) / 2;
 
             // Razoring
-            if (depth <= razoringMaxDepth.value 
-            && eval + depth * razoringMultiplier.value < alpha)
+            if (depth <= razoringMaxDepth() 
+            && eval + depth * razoringMultiplier() < alpha)
             {
                 i32 score = qSearch(ply, alpha, beta);
                 if (score <= alpha) return score;
             }
 
             // NMP (Null move pruning)
-            if (depth >= nmpMinDepth.value 
+            if (depth >= nmpMinDepth() 
             && board.lastMove() != MOVE_NONE 
             && eval >= beta
             && !(ttHit && ttEntry.getBound() == Bound::UPPER && ttEntry.score < beta)
@@ -375,8 +375,8 @@ class SearchThread {
                 i32 score = 0;
 
                 if (!board.isDraw()) {
-                    i32 nmpDepth = depth - nmpBaseReduction.value - depth / nmpReductionDivisor.value
-                                   - std::min((eval-beta) / nmpEvalBetaDivisor.value, nmpEvalBetaMax.value);
+                    i32 nmpDepth = depth - nmpBaseReduction() - depth / nmpReductionDivisor()
+                                   - std::min((eval-beta) / nmpEvalBetaDivisor(), nmpEvalBetaMax());
 
                     score = -search(nmpDepth, ply + 1, -beta, -alpha, doubleExtsLeft, !cutNode);
                 }
@@ -393,7 +393,7 @@ class SearchThread {
         if (!ttHit) ttEntry.move = MOVE_NONE;
 
         // IIR (Internal iterative reduction)
-        if (depth >= iirMinDepth.value && ttEntry.move == MOVE_NONE && (pvNode || cutNode))
+        if (depth >= iirMinDepth() && ttEntry.move == MOVE_NONE && (pvNode || cutNode))
             depth--;
 
         // genenerate and score all moves except underpromotions
@@ -427,27 +427,29 @@ class SearchThread {
             PieceType pt = move.pieceType();
             HistoryEntry *historyEntry = &historyTable[(int)stm][(int)pt][move.to()];
 
-            if (bestScore > -MIN_MATE_SCORE && !pvNode && !board.inCheck() && moveScore < COUNTERMOVE_SCORE)
+            if (ply > 0 && bestScore > -MIN_MATE_SCORE && moveScore < COUNTERMOVE_SCORE)
             {
                 // LMP (Late move pruning)
-                if (legalMovesSeen >= lmpMinMoves.value + depth * depth * lmpMultiplier.value / (improving ? 1 : 2))
+                if (legalMovesSeen >= lmpMinMoves() + pvNode + board.inCheck()
+                                      + depth * depth * lmpMultiplier() / (improving ? 1 : 2))
                     break;
 
                 i32 lmrDepth = std::max(0, depth - LMR_TABLE[depth][legalMovesSeen] - !improving);
 
                 // FP (Futility pruning)
-                if (lmrDepth <= fpMaxDepth.value 
+                if (lmrDepth <= fpMaxDepth() 
+                && !board.inCheck()
                 && alpha < MIN_MATE_SCORE
-                && alpha > eval + fpBase.value + lmrDepth * fpMultiplier.value)
+                && alpha > eval + fpBase() + lmrDepth * fpMultiplier())
                     break;
 
                 // SEE pruning
-                if (depth <= seePruningMaxDepth.value) 
+                if (depth <= seePruningMaxDepth()) 
                 {
-                    i32 threshold = isQuiet ? lmrDepth * seeQuietThreshold.value 
-                                              - moveScore / seeQuietHistoryDiv.value
-                                            : depth * depth * seeNoisyThreshold.value 
-                                              - historyEntry->noisyHistory(captured) / seeNoisyHistoryDiv.value;
+                    i32 threshold = isQuiet ? lmrDepth * seeQuietThreshold() 
+                                              - moveScore / seeQuietHistoryDiv()
+                                            : depth * depth * seeNoisyThreshold() 
+                                              - historyEntry->noisyHistory(captured) / seeNoisyHistoryDiv();
 
                     if (!SEE(board, move, std::min(threshold, -1))) continue;
                 }
@@ -458,21 +460,21 @@ class SearchThread {
 
             // SE (Singular extensions)
             if (move == ttEntry.move
-            && depth >= singularMinDepth.value
+            && depth >= singularMinDepth()
             && abs(ttEntry.score) < MIN_MATE_SCORE
-            && (i32)ttEntry.depth >= depth - singularDepthMargin.value
+            && (i32)ttEntry.depth >= depth - singularDepthMargin()
             && ttEntry.getBound() != Bound::UPPER)
             {
                 // Singular search: before searching any move, 
                 // search this node at a shallower depth with TT move excluded
 
-                i32 singularBeta = std::max(-INF, (i32)ttEntry.score - i32(depth * singularBetaMultiplier.value));
+                i32 singularBeta = std::max(-INF, (i32)ttEntry.score - i32(depth * singularBetaMultiplier()));
 
                 i32 singularScore = search((depth - 1) / 2, ply, singularBeta - 1, singularBeta, 
                                            doubleExtsLeft, cutNode, true);
 
                 // Double extension
-                if (singularScore < singularBeta - doubleExtensionMargin.value 
+                if (singularScore < singularBeta - doubleExtensionMargin() 
                 && !pvNode 
                 && doubleExtsLeft > 0)
                 {
@@ -514,7 +516,7 @@ class SearchThread {
             }
 
             // LMR (Late move reductions)
-            if (depth >= 3 && legalMovesSeen >= lmrMinMoves.value && moveScore < COUNTERMOVE_SCORE)
+            if (depth >= 3 && legalMovesSeen >= lmrMinMoves() && moveScore < COUNTERMOVE_SCORE)
             {
                 lmr = LMR_TABLE[depth][legalMovesSeen];
                 lmr -= pvNode;          // reduce pv nodes less
@@ -523,8 +525,8 @@ class SearchThread {
                 lmr += 2 * cutNode;     // reduce more if we expect to fail high
                 
                 // reduce moves with good history less and vice versa
-                lmr -= round(isQuiet ? (float)moveScore / (float)lmrQuietHistoryDiv.value
-                                     : (float)historyEntry->noisyHistory(captured) / (float)lmrNoisyHistoryDiv.value);
+                lmr -= round(isQuiet ? (float)moveScore / (float)lmrQuietHistoryDiv()
+                                     : (float)historyEntry->noisyHistory(captured) / (float)lmrNoisyHistoryDiv());
 
                 lmr = std::clamp(lmr, 0, depth - 2); // dont extend or reduce into qsearch
             }
@@ -574,8 +576,8 @@ class SearchThread {
 
             bound = Bound::LOWER;
 
-            i32 historyBonus = std::clamp(depth * historyBonusMultiplier.value, 0, historyBonusMax.value);
-            i32 historyMalus = -std::clamp(depth * historyMalusMultiplier.value, 0, historyMalusMax.value);
+            i32 historyBonus = std::clamp(depth * historyBonusMultiplier(), 0, historyBonusMax());
+            i32 historyMalus = -std::clamp(depth * historyMalusMultiplier(), 0, historyMalusMax());
 
             if (isQuiet) {
                 // This fail high quiet is now a killer move

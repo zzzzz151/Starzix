@@ -5,11 +5,16 @@
 #include <variant>
 
 template <typename T> struct TunableParam {
-
+    public:
     T value, min, max, step;
 
     inline TunableParam(T value, T min, T max, T step) 
     : value(value), min(min), max(max), step(step) { }
+
+    // overload function operator
+    inline T operator () () const {
+        return value;
+    }
 };
 
 // Eval scale with material / game phase

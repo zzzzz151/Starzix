@@ -764,9 +764,7 @@ class Board {
             return (slidingAttackersTo & them()) == 0;
         }
 
-        PieceType pieceType = move.pieceType();
-
-        if (pieceType == PieceType::KING)
+        if (move.pieceType() == PieceType::KING)
             return !isSquareAttacked(to, oppSide, occupancy() ^ (1ULL << from));
 
         if (std::popcount(state->checkers) > 1) 
