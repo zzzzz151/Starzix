@@ -456,10 +456,10 @@ class SearchThread {
             }
 
             i32 extension = 0;
-            if (ply == 0) goto skipExtensions;
 
             // SE (Singular extensions)
             if (move == ttEntry.move
+            && ply > 0
             && depth >= singularMinDepth()
             && abs(ttEntry.score) < MIN_MATE_SCORE
             && (i32)ttEntry.depth >= depth - singularDepthMargin()
@@ -495,14 +495,12 @@ class SearchThread {
                     extension -= cutNode; 
                 }
             }
-            // Check extension if no singular extensions
-            else if (board.inCheck())
-                extension = 1;
-
-            skipExtensions:
 
             u64 nodesBefore = nodes;
             makeMove(move);
+
+            // Check extension if no singular extensions
+            if (extension == 0) extension = board.inCheck();
 
     	    // PVS (Principal variation search)
 
