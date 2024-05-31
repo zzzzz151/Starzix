@@ -26,7 +26,7 @@ struct alignas(ALIGNMENT) Net {
     i16                                                 outputBias;
 };
 
-INCBIN(NetFile, "src/net.nnue");
+INCBIN(NetFile, "src/net.bin");
 const Net *NET = reinterpret_cast<const Net*>(gNetFileData);
 
 struct alignas(ALIGNMENT) Accumulator
