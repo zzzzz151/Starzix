@@ -89,12 +89,12 @@ TunableParam<i32> historyMax = TunableParam<i32>(8254, 8192, 24576, 2048);
 
 // History bonus
 TunableParam<i32> historyBonusMultiplier = TunableParam<i32>(194, 50, 600, 50);
-TunableParam<i32> historyBonusOffset = TunableParam<i32>(240, 0, 500, 100);
+TunableParam<i32> historyBonusOffset = TunableParam<i32>(0, 0, 500, 100);
 TunableParam<i32> historyBonusMax = TunableParam<i32>(1570, 500, 2500, 200);
 
 // History malus
 TunableParam<i32> historyMalusMultiplier = TunableParam<i32>(369, 50, 600, 50);
-TunableParam<i32> historyMalusOffset = TunableParam<i32>(136, 0, 500, 100);
+TunableParam<i32> historyMalusOffset = TunableParam<i32>(0, 0, 500, 100);
 TunableParam<i32> historyMalusMax = TunableParam<i32>(1430, 500, 2500, 200);
 
 // History weights

@@ -102,11 +102,6 @@ class SearchThread {
     }
 
     inline void reset() {
-        pliesData[0] = PlyData();
-
-        for (PlyData &plyData : pliesData)
-            plyData.killer = MOVE_NONE;
-
         historyTable = {};
         countermoves = {};
     }
@@ -132,13 +127,13 @@ class SearchThread {
         this->softNodes = softNodes = std::max(softNodes, (i64)0);
         this->hardNodes = hardNodes = std::max(hardNodes, (i64)0);
 
-        accumulatorPtr = &accumulators[0];
-        accumulators[0] = Accumulator(board);
-
+        pliesData[0] = PlyData();
         plyDataPtr = &pliesData[0];
-        plyDataPtr->pvLine[0] = MOVE_NONE; // reset best move root
-        plyDataPtr->pvLength = 0;
-        plyDataPtr->eval = board.inCheck() ? INF : evaluate(accumulatorPtr, board, true);
+        
+        accumulators[0] = Accumulator(board);
+        accumulatorPtr = &accumulators[0];
+
+        updateAccumulatorAndEval();
 
         nodes = 0;
         movesNodes = {};
@@ -254,14 +249,16 @@ class SearchThread {
         plyDataPtr--;
     }
 
-    inline i32 updateAccumulatorAndEvaluate() 
+    inline i32 updateAccumulatorAndEval() 
     {
         assert(accumulatorPtr == &accumulators[0] ? accumulatorPtr->updated : (accumulatorPtr - 1)->updated);
 
         if (!accumulatorPtr->updated) 
             accumulatorPtr->update(accumulatorPtr - 1, board.oppSide(), board.lastMove(), board.captured());
 
-        if (plyDataPtr->eval == INF && !board.inCheck())
+        if (board.inCheck())
+            plyDataPtr->eval = INF;
+        else if (plyDataPtr->eval == INF)
             plyDataPtr->eval = evaluate(accumulatorPtr, board, true);
 
         return plyDataPtr->eval;
@@ -339,14 +336,15 @@ class SearchThread {
 
         if (ply >= maxDepth && board.inCheck()) return 0;
 
-        i32 eval = updateAccumulatorAndEvaluate();
+        i32 eval = updateAccumulatorAndEval();
 
         if (ply >= maxDepth) return eval;
 
         Color stm = board.sideToMove();
+        (plyDataPtr + 1)->killer = MOVE_NONE;
 
         // If in check 2 plies ago, then pliesData[ply-2].eval is INF, and improving is false
-        bool improving = ply > 1 && !board.inCheck() && eval > pliesData[ply-2].eval;
+        bool improving = ply > 1 && !board.inCheck() && eval > (plyDataPtr - 2)->eval;
 
         if (!pvNode && !singular && !board.inCheck())
         {
@@ -560,12 +558,12 @@ class SearchThread {
             
             // Update PV
             if (pvNode) {
-                plyDataPtr->pvLength = 1 + pliesData[ply+1].pvLength;
+                plyDataPtr->pvLength = 1 + (plyDataPtr + 1)->pvLength;
                 plyDataPtr->pvLine[0] = move;
 
                 // Copy child's PV
-                for (int idx = 0; idx < pliesData[ply+1].pvLength; idx++)
-                    plyDataPtr->pvLine[idx + 1] = pliesData[ply+1].pvLine[idx];            
+                for (int idx = 0; idx < (plyDataPtr + 1)->pvLength; idx++)
+                    plyDataPtr->pvLine[idx + 1] = (plyDataPtr + 1)->pvLine[idx];            
             }
 
             if (score < beta) continue;
@@ -574,8 +572,8 @@ class SearchThread {
 
             bound = Bound::LOWER;
 
-            i32 historyBonus = std::clamp(depth * historyBonusMultiplier(), 0, historyBonusMax());
-            i32 historyMalus = -std::clamp(depth * historyMalusMultiplier(), 0, historyMalusMax());
+            i32 historyBonus = std::clamp(depth * historyBonusMultiplier() - historyBonusOffset(), 0, historyBonusMax());
+            i32 historyMalus = -std::clamp(depth * historyMalusMultiplier() - historyMalusOffset(), 0, historyMalusMax());
 
             if (isQuiet) {
                 // This fail high quiet is now a killer move
@@ -641,7 +639,7 @@ class SearchThread {
 
         if (ply >= maxDepth && board.inCheck()) return 0;
 
-        i32 eval = updateAccumulatorAndEvaluate();
+        i32 eval = updateAccumulatorAndEval();
 
         if (!board.inCheck()) 
         {
@@ -649,6 +647,8 @@ class SearchThread {
 
             if (eval > alpha) alpha = eval;
         }
+
+        (plyDataPtr + 1)->killer = MOVE_NONE;
 
         // if in check, generate all moves, else only noisy moves
         // never generate underpromotions
