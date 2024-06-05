@@ -254,7 +254,7 @@ class SearchThread {
         assert(accumulatorPtr == &accumulators[0] ? accumulatorPtr->updated : (accumulatorPtr - 1)->updated);
 
         if (!accumulatorPtr->updated) 
-            accumulatorPtr->update(accumulatorPtr - 1, board.oppSide(), board.lastMove(), board.captured());
+            accumulatorPtr->update(accumulatorPtr - 1, board);
 
         if (board.inCheck())
             plyDataPtr->eval = INF;

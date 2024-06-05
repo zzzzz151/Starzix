@@ -10,6 +10,7 @@
 #include "3rdparty/incbin.h"
 
 #include "board.hpp"
+#include "search_params.hpp"
 #include "simd.hpp"
 using namespace SIMD;
 
@@ -76,35 +77,39 @@ struct alignas(ALIGNMENT) Accumulator
         }
     }
 
-    inline void update(Accumulator *oldAcc, Color stm, Move move, PieceType captured)
+    inline void update(Accumulator *oldAcc, Board &board)
     {
         assert(oldAcc->updated && !updated);
+
+        int stm = (int)board.oppSide(); // side that moved
+
+        Move move = board.lastMove();
         assert(move != MOVE_NONE);
 
         auto moveFlag = move.flag();
-        Square from = move.from();
-        Square to = move.to();
+        int from = move.from();
+        int to = move.to();
         PieceType pieceType = move.pieceType();
         PieceType promotion = move.promotion();
         PieceType place = promotion != PieceType::NONE ? promotion : pieceType;
 
         // Remove piece from origin
-        int sub1WhiteIdx = (int)stm * 384 + (int)pieceType * 64 + (int)from;
-        int sub1BlackIdx = !int(stm)* 384 + (int)pieceType * 64 + int(from ^ 56);
+        int sub1WhiteIdx = stm * 384 + (int)pieceType * 64 + from;
+        int sub1BlackIdx = !stm* 384 + (int)pieceType * 64 + (from ^ 56);
 
         // Put piece on destination
-        int add1WhiteIdx = (int)stm * 384 + (int)place * 64 + (int)to;
-        int add1BlackIdx = !int(stm)* 384 + (int)place * 64 + int(to ^ 56);
+        int add1WhiteIdx = stm * 384 + (int)place * 64 + to;
+        int add1BlackIdx = !stm* 384 + (int)place * 64 + (to ^ 56);
 
-        if (captured != PieceType::NONE)
+        if (board.captured() != PieceType::NONE)
         {
-            Square capturedPieceSq = moveFlag == Move::EN_PASSANT_FLAG 
-                                     ? (stm == Color::WHITE ? to - 8 : to + 8)
-                                     : to;
+            int capturedPieceSq = moveFlag == Move::EN_PASSANT_FLAG 
+                                  ? ((Color)stm == Color::WHITE ? to - 8 : to + 8)
+                                  : to;
 
             // Remove captured piece
-            int sub2WhiteIdx = !int(stm) * 384 + (int)captured * 64 + (int)capturedPieceSq;
-            int sub2BlackIdx = (int)stm * 384 + (int)captured * 64 + int(capturedPieceSq ^ 56);
+            int sub2WhiteIdx = !stm * 384 + (int)board.captured() * 64 + capturedPieceSq;
+            int sub2BlackIdx = stm * 384 + (int)board.captured() * 64 + (capturedPieceSq ^ 56);
 
             for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
             {
@@ -124,12 +129,12 @@ struct alignas(ALIGNMENT) Accumulator
             auto [rookFrom, rookTo] = CASTLING_ROOK_FROM_TO[to];
 
             // Remove rook from origin
-            int sub2WhiteIdx = (int)stm * 384 + (int)PieceType::ROOK * 64 + (int)rookFrom;
-            int sub2BlackIdx = !int(stm) * 384 + (int)PieceType::ROOK * 64 + int(rookFrom ^ 56);
+            int sub2WhiteIdx = stm * 384 + (int)PieceType::ROOK * 64 + (int)rookFrom;
+            int sub2BlackIdx = !stm * 384 + (int)PieceType::ROOK * 64 + int(rookFrom ^ 56);
 
             // Place rook on destination
-            int add2WhiteIdx = (int)stm * 384 + (int)PieceType::ROOK * 64 + (int)rookTo;
-            int add2BlackIdx = !int(stm) * 384 + (int)PieceType::ROOK * 64 + int(rookTo ^ 56);
+            int add2WhiteIdx = stm * 384 + (int)PieceType::ROOK * 64 + (int)rookTo;
+            int add2BlackIdx = !stm * 384 + (int)PieceType::ROOK * 64 + int(rookTo ^ 56);
 
             for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
             {

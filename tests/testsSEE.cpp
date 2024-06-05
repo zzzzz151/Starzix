@@ -1,7 +1,7 @@
 // clang-format off
 #include <fstream>
-#include "../src-test/board.hpp"
-#include "../src-test/see.hpp"
+#include "../src/board.hpp"
+#include "../src/see.hpp"
 
 int main() {
     attacks::init();

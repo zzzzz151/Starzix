@@ -6,13 +6,11 @@
 **/*.exe
 **/starzix
 src/starzix
+testsNNUE
+testsSEE
 
 src-test
 src-test/
-nets
-nets/
-data
-data/
 
 games.txt
 games.pgn
@@ -23,6 +21,4 @@ stderr.txt
 sprt.py
 *.epd
 *.pgn
-
-countLines.py
 

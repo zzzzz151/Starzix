@@ -1,12 +1,12 @@
 # Starzix - C++ chess engine
 
-# Elo (4.0)
+# Elo
 
-[CCRL Blitz](https://www.computerchess.org.uk/ccrl/404/cgi/compare_engines.cgi?class=Single-CPU+engines&only_best_in_class=on&num_best_in_class=1&print=Rating+list&profile_step=50&profile_numbers=1&print=Results+table&print=LOS+table&table_size=100&ct_from_elo=0&ct_to_elo=10000&match_length=30&cross_tables_for_best_versions_only=1&sort_tables=by+rating&diag=0&reference_list=None&recalibrate=no): 3555 (#32/733)
+[CCRL Blitz](https://www.computerchess.org.uk/ccrl/404/cgi/compare_engines.cgi?class=Single-CPU+engines&only_best_in_class=on&num_best_in_class=1&print=Rating+list&profile_step=50&profile_numbers=1&print=Results+table&print=LOS+table&table_size=100&ct_from_elo=0&ct_to_elo=10000&match_length=30&cross_tables_for_best_versions_only=1&sort_tables=by+rating&diag=0&reference_list=None&recalibrate=no): 3625 (#18/733)
 
-[CCRL Rapid](https://www.computerchess.org.uk/ccrl/4040/cgi/compare_engines.cgi?class=Single-CPU+engines&only_best_in_class=on&num_best_in_class=1&print=Rating+list&profile_step=50&profile_numbers=1&print=Results+table&print=LOS+table&table_size=100&ct_from_elo=0&ct_to_elo=10000&match_length=30&cross_tables_for_best_versions_only=1&sort_tables=by+rating&diag=0&reference_list=None&recalibrate=no): 3479 (#30/585)
+[Ipman Bullet](https://ipmanchess.yolasite.com/r9-7945hx.php): 3427 (#27/51)
 
-[Ipman Bullet](https://ipmanchess.yolasite.com/r9-7945hx.php): 3334 (#48/51)
+[Stefan Pohl SPCC](https://www.sp-cc.de/files/uho_full_list.txt): 3567 (#44/59)
 
 # How to compile
 

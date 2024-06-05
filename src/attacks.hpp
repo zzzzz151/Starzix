@@ -18,7 +18,7 @@ std::array<u64, 64> rookAttacksEmptyBoardNoEdges;   // [square]
 std::array<std::array<u64, 1ULL << 9ULL>, 64> bishopAttacksTable; // [square][index]
 std::array<std::array<u64, 1ULL << 12ULL>, 64> rookAttacksTable;  // [square][index]
 
-constexpr u64 pawnAttacksSlow(Color color, Square square)
+constexpr u64 pawnAttacksSlow(Square square, Color color)
 {
     const int SQUARE_DIAGONAL_LEFT  = square + (color == Color::WHITE ? 7 : -9),
               SQUARE_DIAGONAL_RIGHT = square + (color == Color::WHITE ? 9 : -7);
@@ -207,8 +207,8 @@ constexpr void init()
     for (int square = 0; square < 64; square++)
     {
         // Pawn
-        pawnAttacks[0][square] = pawnAttacksSlow(Color::WHITE, square);
-        pawnAttacks[1][square] = pawnAttacksSlow(Color::BLACK, square);
+        internal::pawnAttacks[0][square] = pawnAttacksSlow(square, Color::WHITE);
+        internal::pawnAttacks[1][square] = pawnAttacksSlow(square, Color::BLACK);
 
         // Knight
         u64 n = 1ULL << square;
@@ -255,16 +255,12 @@ constexpr void init()
 
 }
 
-inline u64 pawnAttacks(Color color, Square square) {
+inline u64 pawnAttacks(Square square, Color color) {
     return internal::pawnAttacks[(int)color][square];
 }
 
 inline u64 knightAttacks(Square square)  { 
     return internal::knightAttacks[square];
-}
-
-inline u64 kingAttacks(Square square)  {        
-    return internal::kingAttacks[square]; 
 }
 
 inline u64 bishopAttacks(Square square, u64 occupancy)
@@ -285,6 +281,10 @@ inline u64 rookAttacks(Square square, u64 occupancy)
 
 inline u64 queenAttacks(Square square, u64 occupancy) {
     return bishopAttacks(square, occupancy) | rookAttacks(square, occupancy);
+}
+
+inline u64 kingAttacks(Square square)  {        
+    return internal::kingAttacks[square]; 
 }
 
 } // namespace attacks

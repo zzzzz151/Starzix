@@ -63,10 +63,10 @@ inline bool SEE(Board &board, Move move, i32 threshold = 0)
     attackers |= bishops & attacks::bishopAttacks(square, occupancy);
 
     attackers |= board.bitboard(Color::BLACK, PieceType::PAWN) 
-                 & attacks::pawnAttacks(Color::WHITE, square);
+                 & attacks::pawnAttacks(square, Color::WHITE);
 
     attackers |= board.bitboard(Color::WHITE, PieceType::PAWN) 
-                 & attacks::pawnAttacks(Color::BLACK, square);
+                 & attacks::pawnAttacks(square, Color::BLACK);
 
     attackers |= board.bitboard(PieceType::KNIGHT) & attacks::knightAttacks(square);
     attackers |= board.bitboard(PieceType::KING) & attacks::kingAttacks(square);

@@ -368,7 +368,7 @@ class Board {
          // Idea: put a super piece in this square and see if its attacks intersect with an enemy piece
 
         // Pawn
-        if (attacks::pawnAttacks(oppColor(colorAttacking), square) 
+        if (attacks::pawnAttacks(square, oppColor(colorAttacking)) 
         & bitboard(colorAttacking, PieceType::PAWN))
             return true;
 
@@ -409,7 +409,7 @@ class Board {
         u64 attackerKing = bitboard(attacker, PieceType::KING);
         u64 occ = occupancy();
 
-       return (attackerPawns          & attacks::pawnAttacks(oppColor(attacker), sq))
+       return (attackerPawns          & attacks::pawnAttacks(sq, oppColor(attacker)))
               | (attackerKnights      & attacks::knightAttacks(sq))
               | (attackerBishopQueens & attacks::bishopAttacks(sq, occ))
               | (attackerRookQueens   & attacks::rookAttacks(sq, occ))
@@ -613,7 +613,7 @@ class Board {
         // En passant
         if (state->enPassantSquare != SQUARE_NONE)
         {   
-            u64 ourEnPassantPawns = attacks::pawnAttacks(enemyColor, state->enPassantSquare) & ourPawns;
+            u64 ourEnPassantPawns = attacks::pawnAttacks(state->enPassantSquare, enemyColor) & ourPawns;
             while (ourEnPassantPawns > 0) {
                 Square ourPawnSquare = poplsb(ourEnPassantPawns);
                 moves.add(Move(ourPawnSquare, state->enPassantSquare, Move::EN_PASSANT_FLAG));
@@ -634,7 +634,7 @@ class Board {
             }
 
             // Generate this pawn's captures
-            u64 pawnAttacks = attacks::pawnAttacks(sideToMove(), sq) & them;
+            u64 pawnAttacks = attacks::pawnAttacks(sq, sideToMove()) & them;
             while (pawnAttacks > 0) {
                 Square targetSquare = poplsb(pawnAttacks);
                 if (willPromote) 
