@@ -16,15 +16,16 @@ using namespace SIMD;
 
 namespace nnue {
 
-const int HIDDEN_LAYER_SIZE = 1024;
-const i32 SCALE = 400, QA = 255, QB = 64;
+constexpr int HIDDEN_LAYER_SIZE = 1024;
+constexpr i32 SCALE = 400, QA = 255, QB = 64;
 constexpr int WEIGHTS_PER_VEC = sizeof(Vec) / sizeof(i16);
 
 struct alignas(ALIGNMENT) Net {
-    std::array<std::array<i16, HIDDEN_LAYER_SIZE>, 768> featureWeights;
-    std::array<i16, HIDDEN_LAYER_SIZE>                  featureBiases;
-    std::array<std::array<i16, HIDDEN_LAYER_SIZE>, 2>   outputWeights;
-    i16                                                 outputBias;
+    public:
+    Array3D<i16, 2, 768, HIDDEN_LAYER_SIZE> featuresWeights; // [color][feature][hiddenNeuron]
+    Array2D<i16, 2, HIDDEN_LAYER_SIZE>      hiddenBiases;    // [color][hiddenNeuron]
+    Array2D<i16, 2, HIDDEN_LAYER_SIZE>      outputWeights;   // [color][hiddenNeuron]
+    i16                                     outputBias;
 };
 
 INCBIN(NetFile, "src/net.bin");
@@ -33,47 +34,31 @@ const Net *NET = reinterpret_cast<const Net*>(gNetFileData);
 struct alignas(ALIGNMENT) Accumulator
 {
     public:
-    std::array<i16, HIDDEN_LAYER_SIZE> white = NET->featureBiases;
-    std::array<i16, HIDDEN_LAYER_SIZE> black = NET->featureBiases;
+    Array2D<i16, 2, HIDDEN_LAYER_SIZE> accumulators = NET->hiddenBiases;
     bool updated = false;
 
     inline Accumulator() = default;
 
     inline Accumulator(const Board &board) {
-        white = black = NET->featureBiases;
+        accumulators = NET->hiddenBiases;
 
         for (Color color : {Color::WHITE, Color::BLACK})
             for (int pt = (int)PieceType::PAWN; pt <= (int)PieceType::KING; pt++)
                 {
                     u64 bb = board.bitboard(color, (PieceType)pt);
-                    while (bb > 0) {
-                        Square sq = poplsb(bb);
-                        activate(color, (PieceType)pt, sq);
-                    }
+                    activateAll(bb, (color == Color::BLACK) * 384 + pt * 64);
                 }
 
         updated = true;
     }
 
-    inline void activate(Color color, PieceType pieceType, Square square)
-    {
-        int whiteIdx = (int)color * 384 + (int)pieceType * 64 + (int)square;
-        int blackIdx = !int(color) * 384 + (int)pieceType * 64 + int(square ^ 56);
+    inline void activateAll(u64 bitboard, int feature) {
+        while (bitboard > 0) {
+            int square = poplsb(bitboard);
 
-        for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) {
-            white[i] += NET->featureWeights[whiteIdx][i];
-            black[i] += NET->featureWeights[blackIdx][i];
-        }
-    }
-
-    inline void deactivate(Color color, PieceType pieceType, Square square)
-    {
-        int whiteIdx = (int)color * 384 + (int)pieceType * 64 + (int)square;
-        int blackIdx = !int(color) * 384 + (int)pieceType * 64 + int(square ^ 56);
-
-        for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) {
-            white[i] -= NET->featureWeights[whiteIdx][i];
-            black[i] -= NET->featureWeights[blackIdx][i];
+            for (int color : {WHITE, BLACK})
+                for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
+                    accumulators[color][i] += NET->featuresWeights[color][feature + square][i];
         }
     }
 
@@ -81,87 +66,58 @@ struct alignas(ALIGNMENT) Accumulator
     {
         assert(oldAcc->updated && !updated);
 
-        int stm = (int)board.oppSide(); // side that moved
+        const int stm = (int)board.oppSide(); // side that moved
 
         Move move = board.lastMove();
         assert(move != MOVE_NONE);
 
-        auto moveFlag = move.flag();
-        int from = move.from();
-        int to = move.to();
-        PieceType pieceType = move.pieceType();
-        PieceType promotion = move.promotion();
-        PieceType place = promotion != PieceType::NONE ? promotion : pieceType;
+        const auto moveFlag = move.flag();
+        const int from = move.from();
+        const int to = move.to();
+        const PieceType pieceType = move.pieceType();
+        const PieceType promotion = move.promotion();
+        const PieceType place = promotion != PieceType::NONE ? promotion : pieceType;
 
-        // Remove piece from origin
-        int sub1WhiteIdx = stm * 384 + (int)pieceType * 64 + from;
-        int sub1BlackIdx = !stm* 384 + (int)pieceType * 64 + (from ^ 56);
-
-        // Put piece on destination
-        int add1WhiteIdx = stm * 384 + (int)place * 64 + to;
-        int add1BlackIdx = !stm* 384 + (int)place * 64 + (to ^ 56);
+        const int subPieceFeature = stm * 384 + (int)pieceType * 64 + from;
+        const int addPieceFeature = stm * 384 + (int)place * 64 + to;
 
         if (board.captured() != PieceType::NONE)
         {
-            int capturedPieceSq = moveFlag == Move::EN_PASSANT_FLAG 
-                                  ? ((Color)stm == Color::WHITE ? to - 8 : to + 8)
-                                  : to;
+            const int capturedPieceSq = moveFlag == Move::EN_PASSANT_FLAG 
+                                        ? (to > from ? to - 8 : to + 8)
+                                        : to;
 
-            // Remove captured piece
-            int sub2WhiteIdx = !stm * 384 + (int)board.captured() * 64 + capturedPieceSq;
-            int sub2BlackIdx = stm * 384 + (int)board.captured() * 64 + (capturedPieceSq ^ 56);
+            const int subCapturedFeature = !stm * 384 + (int)board.captured() * 64 + capturedPieceSq;
 
-            for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
-            {
-                white[i] = oldAcc->white[i] 
-                           - NET->featureWeights[sub1WhiteIdx][i]  // Remove piece from origin
-                           - NET->featureWeights[sub2WhiteIdx][i]  // Remove captured piece
-                           + NET->featureWeights[add1WhiteIdx][i]; // Put piece on destination
+            for (int color : {WHITE, BLACK})
+                for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
+                    accumulators[color][i] = oldAcc->accumulators[color][i]
+                        - NET->featuresWeights[color][subPieceFeature][i]  
+                        + NET->featuresWeights[color][addPieceFeature][i]
+                        - NET->featuresWeights[color][subCapturedFeature][i];
 
-                black[i] = oldAcc->black[i] 
-                           - NET->featureWeights[sub1BlackIdx][i]  // Remove piece from origin
-                           - NET->featureWeights[sub2BlackIdx][i]  // Remove captured piece
-                           + NET->featureWeights[add1BlackIdx][i]; // Put piece on destination
-            }
         }
         else if (moveFlag == Move::CASTLING_FLAG)
         {
             auto [rookFrom, rookTo] = CASTLING_ROOK_FROM_TO[to];
+            const int subRookFeature = stm * 384 + (int)PieceType::ROOK * 64 + (int)rookFrom;
+            const int addRookFeature = stm * 384 + (int)PieceType::ROOK * 64 + (int)rookTo;
 
-            // Remove rook from origin
-            int sub2WhiteIdx = stm * 384 + (int)PieceType::ROOK * 64 + (int)rookFrom;
-            int sub2BlackIdx = !stm * 384 + (int)PieceType::ROOK * 64 + int(rookFrom ^ 56);
-
-            // Place rook on destination
-            int add2WhiteIdx = stm * 384 + (int)PieceType::ROOK * 64 + (int)rookTo;
-            int add2BlackIdx = !stm * 384 + (int)PieceType::ROOK * 64 + int(rookTo ^ 56);
-
-            for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
-            {
-                white[i] = oldAcc->white[i] 
-                           - NET->featureWeights[sub1WhiteIdx][i]  // Remove king from origin
-                           + NET->featureWeights[add1WhiteIdx][i]  // Put king on destination
-                           - NET->featureWeights[sub2WhiteIdx][i]  // Remove rook from origin
-                           + NET->featureWeights[add2WhiteIdx][i]; // Put rook on destination
-
-                black[i] = oldAcc->black[i] 
-                           - NET->featureWeights[sub1BlackIdx][i]  // Remove king from origin
-                           + NET->featureWeights[add1BlackIdx][i]  // Put king on destination
-                           - NET->featureWeights[sub2BlackIdx][i]  // Remove rook from origin
-                           + NET->featureWeights[add2BlackIdx][i]; // Put rook on destination
-            }           
+            for (int color : {WHITE, BLACK})
+                for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
+                    accumulators[color][i] = oldAcc->accumulators[color][i] 
+                        - NET->featuresWeights[color][subPieceFeature][i]  
+                        + NET->featuresWeights[color][addPieceFeature][i]
+                        - NET->featuresWeights[color][subRookFeature][i]  
+                        + NET->featuresWeights[color][addRookFeature][i]; 
+         
         }
         else {
-            for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
-            {
-                white[i] = oldAcc->white[i] 
-                           - NET->featureWeights[sub1WhiteIdx][i]  // Remove piece from origin
-                           + NET->featureWeights[add1WhiteIdx][i]; // Put piece on destination
-
-                black[i] = oldAcc->black[i] 
-                           - NET->featureWeights[sub1BlackIdx][i]  // Remove piece from origin
-                           + NET->featureWeights[add1BlackIdx][i]; // Put piece on destination
-            }        
+            for (int color : {WHITE, BLACK})
+                for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
+                    accumulators[color][i] = oldAcc->accumulators[color][i]
+                        - NET->featuresWeights[color][subPieceFeature][i]  
+                        + NET->featuresWeights[color][addPieceFeature][i];     
         }
 
         updated = true;
@@ -173,15 +129,9 @@ inline i32 evaluate(Accumulator *accumulator, Board &board, bool materialScale)
 {
     assert(accumulator->updated);
 
-    Vec *stmAccumulator, *oppAccumulator;
-    if (board.sideToMove() == Color::WHITE) {
-        stmAccumulator = (Vec*)&accumulator->white;
-        oppAccumulator = (Vec*)&accumulator->black;
-    }
-    else {
-        stmAccumulator = (Vec*)&accumulator->black;
-        oppAccumulator = (Vec*)&accumulator->white;
-    }
+    int stm = (int)board.sideToMove();
+    Vec *stmAccumulator = (Vec*) &(accumulator->accumulators[stm]);
+    Vec *oppAccumulator = (Vec*) &(accumulator->accumulators[!stm]);
 
     Vec *stmWeights = (Vec*) &(NET->outputWeights[0]);
     Vec *oppWeights = (Vec*) &(NET->outputWeights[1]);

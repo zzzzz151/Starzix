@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <string>
+#include <array>
 
 using u8 = uint8_t;
 using u16 = uint16_t;
@@ -18,6 +19,12 @@ using i64 = int64_t;
 constexpr i32 I32_MAX = 2147483647;
 //constexpr u64 U64_MAX = 9223372036854775807;
 constexpr i64 I64_MAX = 9223372036854775807;
+
+template <typename T, std::size_t A, std::size_t B>
+using Array2D = std::array<std::array<T, B>, A>;
+
+template <typename T, std::size_t A, std::size_t B, std::size_t C>
+using Array3D = std::array<std::array<std::array<T, C>, B>, A>;
 
 const std::string START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -35,6 +42,9 @@ enum class Color : i8
     BLACK = 1,
     NONE = -1
 };
+
+constexpr int WHITE = (int)Color::WHITE;
+constexpr int BLACK = (int)Color::BLACK;
 
 enum class PieceType : u8
 {
