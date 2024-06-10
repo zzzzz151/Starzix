@@ -171,7 +171,7 @@ inline i32 evaluate(Accumulator *accumulator, Board &board, bool materialScale)
         eval *= evalMaterialScaleMin() + (evalMaterialScaleMax() - evalMaterialScaleMin()) * material / MATERIAL_MAX;
     }
 
-    return std::clamp(eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
+    return eval;
 }
 
 } // namespace nnue

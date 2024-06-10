@@ -41,8 +41,9 @@ struct BoardState {
     Square enPassantSquare = SQUARE_NONE;
     u8 pliesSincePawnOrCapture = 0;
     u16 currentMoveCounter = 1;
-    u64 zobristHash = 0;
     u64 checkers = 0;
+    u64 zobristHash = 0;
+    u64 pawnHash = 0;
     Move lastMove = MOVE_NONE;
     PieceType captured = PieceType::NONE;
 };
@@ -147,18 +148,6 @@ class Board {
 
     inline Color oppSide() { return oppColor(state->colorToMove); }
 
-    inline u64 zobristHash() { return state->zobristHash; }
-
-    inline Move lastMove() { return state->lastMove; }
-
-    inline Move nthToLastMove(int n) {
-        assert(n >= 1);
-        return (int)states.size() - n < 0 
-               ? MOVE_NONE : states[states.size() - n].lastMove;
-    }
-
-    inline PieceType captured() { return state->captured; }
-
     inline u64 bitboard(PieceType pieceType) const {   
         return state->piecesBitboards[(int)pieceType];
     }
@@ -209,36 +198,58 @@ class Board {
                 {
                     Color color = sqBitboard & state->colorBitboard[(int)Color::WHITE]
                                   ? Color::WHITE : Color::BLACK;
+
                     return makePiece((PieceType)i, color);
                 }
 
         return Piece::NONE;
-     }
+    }
+
+    inline u64 zobristHash() { return state->zobristHash; }
+
+    inline u64 pawnHash() { return state->pawnHash; }
+
+    inline Move lastMove() { return state->lastMove; }
+
+    inline Move nthToLastMove(int n) {
+        assert(n >= 1);
+
+        return (int)states.size() - n < 0 
+               ? MOVE_NONE : states[states.size() - n].lastMove;
+    }
+
+    inline PieceType captured() { return state->captured; }
 
     private:
 
-    inline void placePiece(Color color, PieceType pieceType, Square square) {
-        placePieceNoZobrist(color, pieceType, square);
-        state->zobristHash ^= ZOBRIST_PIECES[(int)color][(int)pieceType][square];
-    }
-
-    inline void removePiece(Color color, PieceType pieceType, Square square) {
-        removePieceNoZobrist(color, pieceType, square);
-        state->zobristHash ^= ZOBRIST_PIECES[(int)color][(int)pieceType][square];
-    }
-
-    inline void placePieceNoZobrist(Color color, PieceType pieceType, Square square) {
+    inline void placePiece(Color color, PieceType pieceType, Square square) 
+    {
         assert(!isOccupied(square));
+
         u64 sqBitboard = 1ULL << square;
         state->colorBitboard[(int)color] |= sqBitboard;
         state->piecesBitboards[(int)pieceType] |= sqBitboard;
+
+        updateHashes(color, pieceType, square);
     }
 
-    inline void removePieceNoZobrist(Color color, PieceType pieceType, Square square) {
+    inline void removePiece(Color color, PieceType pieceType, Square square) 
+    {
         assert(pieceAt(square) == makePiece(pieceType, color));
+
         u64 sqBitboard = 1ULL << square;
         state->colorBitboard[(int)color] ^= sqBitboard;
         state->piecesBitboards[(int)pieceType] ^= sqBitboard;
+
+        updateHashes(color, pieceType, square);
+    }
+
+    inline void updateHashes(Color color, PieceType pieceType, Square square)
+    {
+        state->zobristHash ^= ZOBRIST_PIECES[(int)color][(int)pieceType][square];
+
+        if (pieceType == PieceType::PAWN)
+            state->pawnHash ^= ZOBRIST_PIECES[(int)color][(int)pieceType][square];
     }
 
     public:

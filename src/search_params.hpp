@@ -103,6 +103,11 @@ TunableParam<float> onePlyContHistWeight = TunableParam<float>(1.42, 0.25, 4.0, 
 TunableParam<float> twoPlyContHistWeight = TunableParam<float>(1.07, 0.25, 4.0, 0.25);
 TunableParam<float> fourPlyContHistWeight = TunableParam<float>(0.42, 0.25, 4.0, 0.25);
 
+// Correction history
+TunableParam<i32> corrHistNewWeightMin = TunableParam<i32>(16, 8, 24, 4);
+TunableParam<i32> corrHistScale = TunableParam<i32>(256, 50, 750, 100);
+TunableParam<i32> corrHistMax = TunableParam<i32>(8192, 2048, 16384, 2048);
+
 // SEE piece values
 TunableParam<i32> seePawnValue = TunableParam<i32>(167, 0, 200, 50);
 TunableParam<i32> seeMinorValue = TunableParam<i32>(222, 150, 450, 50);

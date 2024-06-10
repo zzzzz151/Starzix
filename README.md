@@ -73,6 +73,7 @@
 - Late move reductions
 - Singular extensions (with negative and double extensions)
 - Check extension
+- Correction history
 - Multithreading / Lazy SMP
 
 ### Move ordering
