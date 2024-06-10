@@ -75,7 +75,7 @@ TunableParam<i32> singularMinDepth = TunableParam<i32>(7, 6, 10, 1);
 TunableParam<i32> singularDepthMargin = TunableParam<i32>(3, 1, 5, 1);
 TunableParam<i32> singularBetaMultiplier = TunableParam<i32>(1, 1, 3, 1);
 TunableParam<i32> doubleExtensionMargin = TunableParam<i32>(35, 2, 42, 10);
-const u8 DOUBLE_EXTENSIONS_MAX = 10;
+constexpr u8 DOUBLE_EXTENSIONS_MAX = 10;
 
 // LMR (Late move reductions)
 TunableParam<double> lmrBase = TunableParam<double>(0.72, 0.4, 1.2, 0.1);

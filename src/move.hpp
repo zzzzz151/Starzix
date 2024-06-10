@@ -13,20 +13,21 @@ struct Move {
 
     public:
 
-    const static u16 NULL_FLAG = 0x0000,
-                     PAWN_FLAG = 0x0001,
-                     KNIGHT_FLAG = 0x0002,
-                     BISHOP_FLAG = 0x0003,
-                     ROOK_FLAG = 0x0004,
-                     QUEEN_FLAG = 0x0005,
-                     KING_FLAG = 0x0006,
-                     PAWN_TWO_UP_FLAG = 0x0007,
-                     EN_PASSANT_FLAG = 0x0008,
-                     KNIGHT_PROMOTION_FLAG = 0x000A,
-                     BISHOP_PROMOTION_FLAG = 0x000B,
-                     ROOK_PROMOTION_FLAG = 0x000C,
-                     QUEEN_PROMOTION_FLAG = 0x000D,
-                     CASTLING_FLAG = 0x000F;
+    constexpr static u16 
+        NULL_FLAG = 0x0000,
+        PAWN_FLAG = 0x0001,
+        KNIGHT_FLAG = 0x0002,
+        BISHOP_FLAG = 0x0003,
+        ROOK_FLAG = 0x0004,
+        QUEEN_FLAG = 0x0005,
+        KING_FLAG = 0x0006,
+        PAWN_TWO_UP_FLAG = 0x0007,
+        EN_PASSANT_FLAG = 0x0008,
+        KNIGHT_PROMOTION_FLAG = 0x000A,
+        BISHOP_PROMOTION_FLAG = 0x000B,
+        ROOK_PROMOTION_FLAG = 0x000C,
+        QUEEN_PROMOTION_FLAG = 0x000D,
+        CASTLING_FLAG = 0x000F;
 
     inline Move() = default;
 

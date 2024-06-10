@@ -335,19 +335,25 @@ class Board {
                : pieceTypeAt(move.to());
     }
 
-    inline bool isRepetition() {
+    inline bool isRepetition(int searchPly = 100000) {
+        assert(searchPly >= 0);
+        
         if (states.size() <= 4) return false;
+
+        int rootStateIdx = (int)states.size() - searchPly - 1;
+        int count = 0;
 
         for (int i = (int)states.size() - 3; 
         i >= 0 && i >= (int)states.size() - (int)state->pliesSincePawnOrCapture - 2; 
         i -= 2)
-            if (states[i].zobristHash == state->zobristHash)
+            if (states[i].zobristHash == state->zobristHash
+            && (i > rootStateIdx || ++count == 2))
                 return true;
 
         return false;
     }
 
-    inline bool isDraw() {
+    inline bool isDraw(int searchPly) {
         if (state->pliesSincePawnOrCapture >= 100)
             return true;
 
@@ -357,11 +363,11 @@ class Board {
 
         // KB vs K
         // KN vs K
-       if (numPieces == 3 
-       && (bitboard(PieceType::KNIGHT) > 0 || bitboard(PieceType::BISHOP) > 0))
+        if (numPieces == 3 
+        && (bitboard(PieceType::KNIGHT) > 0 || bitboard(PieceType::BISHOP) > 0))
             return true;
 
-        return isRepetition();
+        return isRepetition(searchPly);
     }
 
     inline bool isSquareAttacked(Square square, Color colorAttacking, u64 occupied = 0) {

@@ -29,7 +29,7 @@ struct alignas(ALIGNMENT) Net {
 };
 
 INCBIN(NetFile, "src/net.bin");
-const Net *NET = reinterpret_cast<const Net*>(gNetFileData);
+const Net *NET = (const Net*)(gNetFileData);
 
 struct alignas(ALIGNMENT) Accumulator
 {
@@ -66,8 +66,6 @@ struct alignas(ALIGNMENT) Accumulator
     {
         assert(oldAcc->updated && !updated);
 
-        const int stm = (int)board.oppSide(); // side that moved
-
         Move move = board.lastMove();
         assert(move != MOVE_NONE);
 
@@ -77,6 +75,8 @@ struct alignas(ALIGNMENT) Accumulator
         const PieceType pieceType = move.pieceType();
         const PieceType promotion = move.promotion();
         const PieceType place = promotion != PieceType::NONE ? promotion : pieceType;
+
+        const int stm = (int)board.oppSide(); // side that moved
 
         const int subPieceFeature = stm * 384 + (int)pieceType * 64 + from;
         const int addPieceFeature = stm * 384 + (int)place * 64 + to;

@@ -5,6 +5,16 @@
 
 #include "search_params.hpp"
 
+std::array<i32, 7> SEE_PIECE_VALUES = {
+        seePawnValue(),  // Pawn
+        seeMinorValue(), // Knight
+        seeMinorValue(), // Bishop
+        seeRookValue(),  // Rook
+        seeQueenValue(), // Queen
+        0,               // King
+        0                // None
+};
+
 inline PieceType popLeastValuable(Board &board, u64 &occ, u64 attackers, Color color)
 {
     for (int pt = 0; pt <= 5; pt++)
@@ -23,16 +33,6 @@ inline PieceType popLeastValuable(Board &board, u64 &occ, u64 attackers, Color c
 inline bool SEE(Board &board, Move move, i32 threshold = 0)
 {
     assert(move != MOVE_NONE);
-
-    const std::array<i32, 7> SEE_PIECE_VALUES = {
-        seePawnValue(),  // Pawn
-        seeMinorValue(), // Knight
-        seeMinorValue(), // Bishop
-        seeRookValue(),  // Rook
-        seeQueenValue(), // Queen
-        0,               // King
-        0                // None
-    };
 
     i32 score = -threshold;
 

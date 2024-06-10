@@ -372,7 +372,7 @@ class SearchThread {
 
                 i32 score = 0;
 
-                if (!board.isDraw()) {
+                if (!board.isDraw(ply)) {
                     i32 nmpDepth = depth - nmpBaseReduction() - depth / nmpReductionDivisor()
                                    - std::min((eval-beta) / nmpEvalBetaDivisor(), nmpEvalBetaMax());
 
@@ -504,7 +504,7 @@ class SearchThread {
 
             i32 score = 0, lmr = 0;
 
-            if (board.isDraw()) goto moveSearched;
+            if (board.isDraw(ply)) goto moveSearched;
 
             if (legalMovesSeen == 1) {
                 score = -search(depth - 1 + extension, ply + 1, -beta, -alpha, doubleExtsLeft, false);
@@ -673,7 +673,7 @@ class SearchThread {
             makeMove(move);
             legalMovesPlayed++;
 
-            i32 score = board.isDraw() ? 0 : -qSearch(ply + 1, -beta, -alpha);
+            i32 score = board.isDraw(ply) ? 0 : -qSearch(ply + 1, -beta, -alpha);
 
             undoMove();
 
@@ -701,10 +701,11 @@ class SearchThread {
         return bestScore;
     }
 
-    const static i32 GOOD_QUEEN_PROMO_SCORE = 1'600'000'000,
-                     GOOD_NOISY_SCORE       = 1'500'000'000,
-                     KILLER_SCORE           = 1'000'000'000,
-                     COUNTERMOVE_SCORE      = 500'000'000;
+    constexpr static i32 
+        GOOD_QUEEN_PROMO_SCORE = 1'600'000'000,
+        GOOD_NOISY_SCORE       = 1'500'000'000,
+        KILLER_SCORE           = 1'000'000'000,
+        COUNTERMOVE_SCORE      = 500'000'000;
 
     inline void genAndScoreMoves(bool noisiesOnly, Move ttMove)
     {

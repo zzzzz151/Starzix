@@ -183,6 +183,19 @@ inline void setoption(std::vector<std::string> &tokens, std::vector<TTEntry> &tt
 
             if (optionName == stringify(lmrBase) || optionName == stringify(lmrMultiplier))
                 initLmrTable();
+            else if (optionName == stringify(seePawnValue)
+            || optionName == stringify(seeMinorValue)
+            || optionName == stringify(seeRookValue)
+            || optionName == stringify(seeQueenValue))
+                SEE_PIECE_VALUES = {
+                    seePawnValue(),  // Pawn
+                    seeMinorValue(), // Knight
+                    seeMinorValue(), // Bishop
+                    seeRookValue(),  // Rook
+                    seeQueenValue(), // Queen
+                    0,               // King
+                    0                // None
+                };
 
             std::cout << optionName << " set to " << myParam->value << std::endl;
         }, tunableParam);

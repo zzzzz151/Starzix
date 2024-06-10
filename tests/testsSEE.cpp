@@ -11,10 +11,8 @@ int main() {
     std::ifstream inputFile("tests/SEE.txt");
     assert(inputFile.is_open());
 
-    seePawnValue.value = 100;
-    seeMinorValue.value = 300;
-    seeRookValue.value = 500;
-    seeQueenValue.value = 900;
+    //                   P    N    B    R    Q    K  NONE
+    SEE_PIECE_VALUES = { 100, 300, 300, 500, 900, 0, 0 };
 
     int failed = 0, passed = 0;
 
