@@ -13,7 +13,7 @@ inline u64 totalNodes();
 
 constexpr u8 MAX_DEPTH = 100;
 
-std::array<std::array<i32, 256>, MAX_DEPTH+1> LMR_TABLE; // [depth][moveIndex]
+MultiArray<i32, MAX_DEPTH+1, 256> LMR_TABLE; // [depth][moveIndex]
 
 constexpr void initLmrTable()
 {
@@ -86,10 +86,10 @@ class SearchThread {
     Accumulator *accumulatorPtr = &accumulators[0];
 
     std::array<u64, 1ULL << 17> movesNodes; // [move]
-    std::array<std::array<Move, 1ULL << 17>, 2> countermoves = {}; // [nstm][lastMove]
+    MultiArray<Move, 2, 1ULL << 17> countermoves = {}; // [nstm][lastMove]
 
     // [color][pieceType][targetSquare]
-    std::array<std::array<std::array<HistoryEntry, 64>, 6>, 2> historyTable = {};
+    MultiArray<HistoryEntry, 2, 6, 64> historyTable = {};
 
     std::vector<TTEntry> *tt = nullptr;
 

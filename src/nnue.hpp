@@ -22,10 +22,10 @@ constexpr int WEIGHTS_PER_VEC = sizeof(Vec) / sizeof(i16);
 
 struct alignas(ALIGNMENT) Net {
     public:
-    Array3D<i16, 2, 768, HIDDEN_LAYER_SIZE> featuresWeights; // [color][feature][hiddenNeuron]
-    Array2D<i16, 2, HIDDEN_LAYER_SIZE>      hiddenBiases;    // [color][hiddenNeuron]
-    Array2D<i16, 2, HIDDEN_LAYER_SIZE>      outputWeights;   // [color][hiddenNeuron]
-    i16                                     outputBias;
+    MultiArray<i16, 2, 768, HIDDEN_LAYER_SIZE> featuresWeights; // [color][feature][hiddenNeuron]
+    MultiArray<i16, 2, HIDDEN_LAYER_SIZE>      hiddenBiases;    // [color][hiddenNeuron]
+    MultiArray<i16, 2, HIDDEN_LAYER_SIZE>      outputWeights;   // [color][hiddenNeuron]
+    i16                                        outputBias;
 };
 
 INCBIN(NetFile, "src/net.bin");
@@ -34,7 +34,7 @@ const Net *NET = reinterpret_cast<const Net*>(gNetFileData);
 struct alignas(ALIGNMENT) Accumulator
 {
     public:
-    Array2D<i16, 2, HIDDEN_LAYER_SIZE> accumulators = NET->hiddenBiases;
+    MultiArray<i16, 2, HIDDEN_LAYER_SIZE> accumulators = NET->hiddenBiases;
     bool updated = false;
 
     inline Accumulator() = default;

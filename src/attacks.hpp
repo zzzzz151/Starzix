@@ -9,14 +9,14 @@ namespace attacks {
 
 namespace internal {
     
-std::array<std::array<u64, 64>, 2> pawnAttacks; // [color][square]
+MultiArray<u64, 2, 64> pawnAttacks; // [color][square]
 std::array<u64, 64> knightAttacks; // [square]
 std::array<u64, 64> kingAttacks;   // [square]
 
 std::array<u64, 64> bishopAttacksEmptyBoardNoEdges; // [square]
 std::array<u64, 64> rookAttacksEmptyBoardNoEdges;   // [square]
-std::array<std::array<u64, 1ULL << 9ULL>, 64> bishopAttacksTable; // [square][index]
-std::array<std::array<u64, 1ULL << 12ULL>, 64> rookAttacksTable;  // [square][index]
+MultiArray<u64, 64, 1ULL << 9ULL> bishopAttacksTable; // [square][index]
+MultiArray<u64, 64, 1ULL << 12ULL> rookAttacksTable;  // [square][index]
 
 constexpr u64 pawnAttacksSlow(Square square, Color color)
 {

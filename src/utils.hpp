@@ -228,7 +228,7 @@ inline auto millisecondsElapsed(std::chrono::steady_clock::time_point start)
 }
 
 // [color][CASTLE_SHORT or CASTLE_LONG or isLongCastle]
-const static std::array<std::array<u64, 2>, 2> CASTLING_MASKS = {{
+constexpr MultiArray<u64, 2, 2> CASTLING_MASKS = {{
     // White short and long castle
     { 1ULL << 7, 1ULL },
     // Black short and long castle
@@ -237,8 +237,7 @@ const static std::array<std::array<u64, 2>, 2> CASTLING_MASKS = {{
 
 std::array<std::pair<Square, Square>, 64> CASTLING_ROOK_FROM_TO = {};
 
-std::array<std::array<u64, 64>, 64> BETWEEN = {},
-                                    LINE_THROUGH = {};
+MultiArray<u64, 64, 64> BETWEEN = {}, LINE_THROUGH = {};
 
 #include "attacks.hpp"
 

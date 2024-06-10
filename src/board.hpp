@@ -10,7 +10,7 @@
 #include "attacks.hpp"
 
 std::array<u64, 2> ZOBRIST_COLOR; // [color]
-std::array<std::array<std::array<u64, 64>, 6>, 2> ZOBRIST_PIECES; // [color][pieceType][square]
+MultiArray<u64, 2, 6, 64> ZOBRIST_PIECES; // [color][pieceType][square]
 std::array<u64, 8> ZOBRIST_FILES; // [file]
 
 inline void initZobrist()

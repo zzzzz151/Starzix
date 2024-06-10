@@ -8,7 +8,7 @@ struct HistoryEntry {
     i16 mainHistory = 0;
 
     // [0 = 1ply, 1 = 2ply, 2 = 4ply][pieceType][targetSquare]
-    std::array<std::array<std::array<i16, 64>, 6>, 3> continuationHistories = { };
+    MultiArray<i16, 3, 6, 64> continuationHistories = { };
 
     std::array<i16, 7> noisyHist = { }; // [pieceTypeCaptured]
 

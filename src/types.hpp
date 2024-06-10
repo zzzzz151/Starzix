@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <string>
 #include <array>
+#include <type_traits>
 
 using u8 = uint8_t;
 using u16 = uint16_t;
@@ -16,15 +17,24 @@ using i16 = int16_t;
 using i32 = int32_t;
 using i64 = int64_t;
 
+template <typename T, u64 N, u64... Ns>
+struct MultiArrayImpl
+{
+    using Type = std::array<typename MultiArrayImpl<T, Ns...>::Type, N>;
+};
+
+template <typename T, u64 N>
+struct MultiArrayImpl<T, N>
+{
+    using Type = std::array<T, N>;
+};
+
+template <typename T, u64... Ns>
+using MultiArray = typename MultiArrayImpl<T, Ns...>::Type;
+
 constexpr i32 I32_MAX = 2147483647;
 //constexpr u64 U64_MAX = 9223372036854775807;
 constexpr i64 I64_MAX = 9223372036854775807;
-
-template <typename T, std::size_t A, std::size_t B>
-using Array2D = std::array<std::array<T, B>, A>;
-
-template <typename T, std::size_t A, std::size_t B, std::size_t C>
-using Array3D = std::array<std::array<std::array<T, C>, B>, A>;
 
 const std::string START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
