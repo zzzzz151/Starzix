@@ -9,17 +9,16 @@
 #include "move.hpp"
 #include "attacks.hpp"
 
-std::array<u64, 2> ZOBRIST_COLOR; // [color]
-MultiArray<u64, 2, 6, 64> ZOBRIST_PIECES; // [color][pieceType][square]
-std::array<u64, 8> ZOBRIST_FILES; // [file]
+u64 ZOBRIST_COLOR = 0;
+MultiArray<u64, 2, 6, 64> ZOBRIST_PIECES = {}; // [color][pieceType][square]
+std::array<u64, 8> ZOBRIST_FILES = {}; // [file]
 
 inline void initZobrist()
 {
     std::mt19937_64 gen(12345); // 64 bit Mersenne Twister rng with seed 12345
     std::uniform_int_distribution<u64> distribution; // distribution(gen) returns random u64
 
-    ZOBRIST_COLOR[0] = distribution(gen);
-    ZOBRIST_COLOR[1] = distribution(gen);
+    ZOBRIST_COLOR = distribution(gen);
 
     for (int pt = 0; pt < 6; pt++)
         for (int sq = 0; sq < 64; sq++)
@@ -83,7 +82,9 @@ class Board {
 
         // Parse color to move
         state->colorToMove = fenSplit[1] == "b" ? Color::BLACK : Color::WHITE;
-        state->zobristHash = ZOBRIST_COLOR[(int)state->colorToMove];
+
+        if (state->colorToMove == Color::BLACK)
+            state->zobristHash ^= ZOBRIST_COLOR;
 
         // Parse pieces
         memset(state->colorBitboard.data(), 0, sizeof(state->colorBitboard));
@@ -349,14 +350,13 @@ class Board {
     inline bool isRepetition(int searchPly = 100000) {
         assert(searchPly >= 0);
         
-        if (states.size() <= 4) return false;
+        if (states.size() <= 4 || state->pliesSincePawnOrCapture < 4) return false;
 
+        int stateIdxAfterPawnOrCapture = std::max(0, (int)states.size() - (int)state->pliesSincePawnOrCapture - 1);
         int rootStateIdx = (int)states.size() - searchPly - 1;
         int count = 0;
 
-        for (int i = (int)states.size() - 3; 
-        i >= 0 && i >= (int)states.size() - (int)state->pliesSincePawnOrCapture - 2; 
-        i -= 2)
+        for (int i = (int)states.size() - 3; i >= stateIdxAfterPawnOrCapture; i -= 2)
             if (states[i].zobristHash == state->zobristHash
             && (i > rootStateIdx || ++count == 2))
                 return true;
@@ -511,17 +511,17 @@ class Board {
         if (move == MOVE_NONE) {
             assert(!inCheck());
 
+            state->colorToMove = oppSide;
+            state->zobristHash ^= ZOBRIST_COLOR;
+
             if (state->enPassantSquare != SQUARE_NONE)
             {
                 state->zobristHash ^= ZOBRIST_FILES[(int)squareFile(state->enPassantSquare)];
                 state->enPassantSquare = SQUARE_NONE;
             }
 
-            state->zobristHash ^= ZOBRIST_COLOR[(int)state->colorToMove];
-            state->colorToMove = oppSide;
-            state->zobristHash ^= ZOBRIST_COLOR[(int)state->colorToMove];
-
             state->pliesSincePawnOrCapture++;
+
             if (sideToMove() == Color::WHITE)
                 state->currentMoveCounter++;
 
@@ -589,9 +589,8 @@ class Board {
             state->zobristHash ^= ZOBRIST_FILES[(int)squareFile(state->enPassantSquare)];
         }
 
-        state->zobristHash ^= ZOBRIST_COLOR[(int)state->colorToMove];
         state->colorToMove = oppSide;
-        state->zobristHash ^= ZOBRIST_COLOR[(int)state->colorToMove];
+        state->zobristHash ^= ZOBRIST_COLOR;
 
         if (pieceType == PieceType::PAWN || state->captured != PieceType::NONE)
             state->pliesSincePawnOrCapture = 0;
@@ -818,7 +817,7 @@ class Board {
         int stm = (int)sideToMove();
         int nstm = (int)oppSide();
 
-        u64 hashAfter = zobristHash() ^ ZOBRIST_COLOR[stm] ^ ZOBRIST_COLOR[nstm];
+        u64 hashAfter = zobristHash() ^ ZOBRIST_COLOR;
 
         if (move == MOVE_NONE) return hashAfter;
 
