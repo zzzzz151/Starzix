@@ -19,6 +19,7 @@ int main()
     initZobrist();
     attacks::init();
     initUtils();
+    cuckoo::init();
     initLmrTable();
 
     std::vector<TTEntry> tt;

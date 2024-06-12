@@ -237,6 +237,7 @@ constexpr MultiArray<u64, 2, 2> CASTLING_MASKS = {{
 
 std::array<std::pair<Square, Square>, 64> CASTLING_ROOK_FROM_TO = {};
 
+// [from][to] (BETWEEN excludes from and to)
 MultiArray<u64, 64, 64> BETWEEN = {}, LINE_THROUGH = {};
 
 #include "attacks.hpp"

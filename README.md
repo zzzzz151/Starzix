@@ -74,6 +74,7 @@
 - Singular extensions (with negative and double extensions)
 - Check extension
 - Correction history
+- Cuckoo (detect upcoming repetition)
 - Multithreading / Lazy SMP
 
 ### Move ordering

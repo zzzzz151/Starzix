@@ -91,6 +91,7 @@ class SearchThread {
     // [color][pieceType][targetSquare]
     MultiArray<HistoryEntry, 2, 6, 64> historyTable = {};
 
+    // [color][pawnHash % 16384]
     MultiArray<i32, 2, 16384> correctionHistory = {};
 
     std::vector<TTEntry> *tt = nullptr;
@@ -325,6 +326,12 @@ class SearchThread {
         if (stopSearch()) return 0;
 
         if (ply > maxPlyReached) maxPlyReached = ply; // update seldepth
+
+        if (ply > 0 && alpha < 0 && board.hasUpcomingRepetition(ply)) 
+        {
+            alpha = 0;
+            if (alpha >= beta) return alpha;
+        }
 
         if (depth > maxDepth) depth = maxDepth;
 
@@ -652,6 +659,11 @@ class SearchThread {
         if (stopSearch()) return 0;
 
         if (ply > maxPlyReached) maxPlyReached = ply; // update seldepth
+
+        if (alpha < 0 && board.hasUpcomingRepetition(ply)) {
+            alpha = 0;
+            if (alpha >= beta) return alpha;
+        }
 
         // Probe TT
         auto ttEntryIdx = TTEntryIndex(board.zobristHash(), tt->size());

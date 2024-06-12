@@ -13,6 +13,8 @@ u64 ZOBRIST_COLOR = 0;
 MultiArray<u64, 2, 6, 64> ZOBRIST_PIECES = {}; // [color][pieceType][square]
 std::array<u64, 8> ZOBRIST_FILES = {}; // [file]
 
+#include "cuckoo.hpp"
+
 inline void initZobrist()
 {
     std::mt19937_64 gen(12345); // 64 bit Mersenne Twister rng with seed 12345
@@ -829,6 +831,52 @@ class Board {
 
         int pieceType = (int)move.pieceType();
         return hashAfter ^ ZOBRIST_PIECES[stm][pieceType][move.from()] ^ ZOBRIST_PIECES[stm][pieceType][to];
+    }
+
+    // Cuckoo
+    inline bool hasUpcomingRepetition(int ply) {
+        //int stateIdxAfterPawnOrCapture = std::max(0, (int)states.size() - (int)state->pliesSincePawnOrCapture - 1);
+        //int rootStateIdx = (int)states.size() - ply - 1;
+
+        int end = std::min((int)state->pliesSincePawnOrCapture, (int)states.size() - 1);
+        if (end < 3) return false;
+
+        u64 occ = occupancy();
+
+        for (int i = 3; i <= end; i += 2)
+        {
+            assert((int)states.size() - 1 - i >= 0);
+            u64 moveKey = zobristHash() ^ states[(int)states.size() - 1 - i].zobristHash;
+
+            int cuckooIdx;
+
+            if (cuckoo::KEYS[cuckooIdx = cuckoo::h1(moveKey)] == moveKey 
+            ||  cuckoo::KEYS[cuckooIdx = cuckoo::h2(moveKey)] == moveKey)
+            {
+                Move move = cuckoo::MOVES[cuckooIdx];
+                Square from = move.from();
+                Square to = move.to();
+                u64 fromBitboard = 1ULL << from;
+                u64 toBitboard = 1ULL << to;
+
+                if (((BETWEEN[from][to] | toBitboard) ^ toBitboard) & occ)
+                    continue;
+
+                if (ply > i) return true; // Repetition after root
+
+                Color pieceColor = state->colorBitboard[WHITE] & (occ & fromBitboard ? fromBitboard : toBitboard) 
+                                   ? Color::WHITE : Color::BLACK;
+
+                if (pieceColor != sideToMove()) continue;
+
+                // Require one more repetition at and before root
+                for (int j = i + 4; j <= end; j += 2)
+                    if (states[(int)states.size() - 1 - i].zobristHash == states[(int)states.size() - 1 - j].zobristHash)
+                        return true;
+            }
+        }
+
+        return false;
     }
 
 }; // class Board

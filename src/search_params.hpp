@@ -207,6 +207,11 @@ tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
     {stringify(twoPlyContHistWeight), &twoPlyContHistWeight},
     {stringify(fourPlyContHistWeight), &fourPlyContHistWeight},
 
+    // Correction history
+    {stringify(corrHistNewWeightMin), &corrHistNewWeightMin},
+    {stringify(corrHistScale), &corrHistScale},
+    {stringify(corrHistMax), &corrHistMax},
+
     // SEE piece values
     {stringify(seePawnValue), &seePawnValue},
     {stringify(seeMinorValue), &seeMinorValue},
