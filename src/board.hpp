@@ -47,7 +47,7 @@ struct BoardState {
     u64 pawnHash = 0;
     Move lastMove = MOVE_NONE;
     PieceType captured = PieceType::NONE;
-};
+} __attribute__((packed));
 
 class Board {
     private:

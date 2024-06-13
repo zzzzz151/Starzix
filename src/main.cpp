@@ -4,7 +4,7 @@
 #include "search.hpp"
 #include "uci.hpp"
 
-int main()
+int main(int argc, char* argv[])
 {
     std::cout << "Starzix by zzzzz" << std::endl;
 
@@ -22,6 +22,8 @@ int main()
     cuckoo::init();
     initLmrTable();
 
+    Board board = Board(START_FEN);
+
     std::vector<TTEntry> tt;
     resizeTT(tt, 32);
     printTTSize(tt);
@@ -29,7 +31,26 @@ int main()
     searchThreads = { SearchThread(&tt) };
     mainThread = &searchThreads[0];
 
-    uci::uciLoop(tt);
+    // If a command is passed in program args, run it and exit
+
+    std::string command = "";
+
+    for (int i = 1; i < argc; i++)
+        command += (std::string)argv[i] + " ";
+
+    trim(command);
+
+    if (command != "") {
+        uci::runCommand(command, board, tt);
+        return 0;
+    }
+
+    // UCI loop
+    while (true) {
+        std::getline(std::cin, command);
+        uci::runCommand(command, board, tt);
+    }
+
     return 0;
 }
 

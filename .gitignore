@@ -1,11 +1,8 @@
 .vscode/
 .vscode
-.ipynb_checkpoints/
-.ipynb_checkpoints
 
 **/*.exe
 **/starzix
-src/starzix
 testsNNUE
 testsSEE
 

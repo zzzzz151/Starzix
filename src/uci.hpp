@@ -15,92 +15,79 @@ inline void setoption(std::vector<std::string> &tokens, std::vector<TTEntry> &tt
 inline void position(std::vector<std::string> &tokens, Board &board);
 inline void go(std::vector<std::string> &tokens, Board &board);
 
-inline void uciLoop(std::vector<TTEntry> &tt)
+inline void runCommand(std::string &command, Board &board, std::vector<TTEntry> &tt)
 {
-    Board board = Board(START_FEN);
+    trim(command);
+    std::vector<std::string> tokens = splitString(command, ' ');
 
-    while (true) {
-        std::string received = "";
-        getline(std::cin, received);
-        trim(received);
-        std::vector<std::string> tokens = splitString(received, ' ');
+    if (!std::cin.good())
+        exit(EXIT_FAILURE);
+    else if (command == "" || tokens.size() == 0)
+        return;
+    else if (command == "quit")
+        exit(EXIT_SUCCESS);
+    else if (command == "uci")
+        uci();
+    else if (tokens[0] == "setoption") // e.g. "setoption name Hash value 32"
+        setoption(tokens, tt);
+    else if (command == "ucinewgame")
+    {
+        board = Board(START_FEN);
+        
+        resetTT(tt);
 
-        if (received == "" || tokens.size() == 0)
-            continue;
+        for (auto &searchThread : searchThreads)
+            searchThread.reset();
+    }
+    else if (command == "isready")
+        std::cout << "readyok" << std::endl;
+    else if (tokens[0] == "position")
+        position(tokens, board);
+    else if (tokens[0] == "go")
+        go(tokens, board);
+    else if (tokens[0] == "print" || tokens[0] == "d"
+    || tokens[0] == "display" || tokens[0] == "show")
+        board.print();
+    else if (tokens[0] == "eval") 
+    {
+        Accumulator acc = Accumulator(board);
 
-        try {
-
-        if (received == "quit" || !std::cin.good())
-            break;
-        else if (received == "uci")
-            uci();
-        else if (tokens[0] == "setoption") // e.g. "setoption name Hash value 32"
-            setoption(tokens, tt);
-        else if (received == "ucinewgame")
-        {
-            board = Board(START_FEN);
-            
-            resetTT(tt);
-
-            for (auto &searchThread : searchThreads)
-                searchThread.reset();
-        }
-        else if (received == "isready")
-            std::cout << "readyok" << std::endl;
-        else if (tokens[0] == "position")
-            position(tokens, board);
-        else if (tokens[0] == "go")
-            go(tokens, board);
-        else if (tokens[0] == "print" || tokens[0] == "d"
-        || tokens[0] == "display" || tokens[0] == "show")
-            board.print();
-        else if (tokens[0] == "eval") 
-        {
-            Accumulator acc = Accumulator(board);
-
-            std::cout << "eval " << evaluate(&acc, board, false)
-                      << " scaled "  << evaluate(&acc, board, true)
-                      << std::endl;
-        }
-        else if (tokens[0] == "bench")
-        {
-            if (tokens.size() == 1)
-                bench();
-            else {
-                int depth = stoi(tokens[1]);
-                bench(depth);
-            }
-        }
-        else if (tokens[0] == "perft" || (tokens[0] == "go" && tokens[1] == "perft"))
-        {
-            int depth = stoi(tokens.back());
-            perftBench(board, depth);
-        }
-        else if (tokens[0] == "perftsplit" || tokens[0] == "splitperft" 
-        || tokens[0] == "perftdivide" || tokens[0] == "divideperft")
-        {
+        std::cout << "eval " << evaluate(&acc, board, false)
+                    << " scaled "  << evaluate(&acc, board, true)
+                    << std::endl;
+    }
+    else if (tokens[0] == "bench")
+    {
+        if (tokens.size() == 1)
+            bench();
+        else {
             int depth = stoi(tokens[1]);
-            perftSplit(board, depth);
-        }
-        else if (tokens[0] == "makemove")
-        {
-            if ((tokens[1] == "0000" || tokens[1] == "null" || tokens[1] == "none")
-            && !board.inCheck())
-                board.makeMove(MOVE_NONE);
-            else
-                board.makeMove(tokens[1]);
-        }
-        else if (tokens[0] == "undomove")
-            board.undoMove();
-        else if (received == "paramsjson")
-            printParamsAsJson();
-
-        } 
-        catch (const char* errorMessage)
-        {
-
+            bench(depth);
         }
     }
+    else if (tokens[0] == "perft" || (tokens[0] == "go" && tokens[1] == "perft"))
+    {
+        int depth = stoi(tokens.back());
+        perftBench(board, depth);
+    }
+    else if (tokens[0] == "perftsplit" || tokens[0] == "splitperft" 
+    || tokens[0] == "perftdivide" || tokens[0] == "divideperft")
+    {
+        int depth = stoi(tokens[1]);
+        perftSplit(board, depth);
+    }
+    else if (tokens[0] == "makemove")
+    {
+        if ((tokens[1] == "0000" || tokens[1] == "null" || tokens[1] == "none")
+        && !board.inCheck())
+            board.makeMove(MOVE_NONE);
+        else
+            board.makeMove(tokens[1]);
+    }
+    else if (tokens[0] == "undomove")
+        board.undoMove();
+    else if (command == "paramsjson")
+        printParamsAsJson();
 }
 
 inline void uci() {
@@ -141,9 +128,7 @@ inline void uci() {
 inline void setoption(std::vector<std::string> &tokens, std::vector<TTEntry> &tt)
 {
     std::string optionName = tokens[2];
-    trim(optionName);
     std::string optionValue = tokens[4];
-    trim(optionValue);
 
     if (optionName == "Hash" || optionName == "hash")
     {

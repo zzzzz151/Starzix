@@ -68,13 +68,9 @@ inline void trim(std::string &str) {
     size_t first = str.find_first_not_of(" \t\n\r");
     size_t last = str.find_last_not_of(" \t\n\r");
     
-    if (first == std::string::npos) // The string is empty or contains only whitespace characters
-    {
-        str = "";
-        return;
-    }
-    
-    str = str.substr(first, (last - first + 1));
+    str = first == std::string::npos 
+          ? "" 
+          : str.substr(first, (last - first + 1));
 }
 
 inline std::vector<std::string> splitString(std::string &str, char delimiter)
@@ -86,7 +82,7 @@ inline std::vector<std::string> splitString(std::string &str, char delimiter)
     std::stringstream ss(str);
     std::string token;
 
-    while (getline(ss, token, delimiter))
+    while (getline(ss, token, delimiter)) 
     {
         trim(token);
         strSplit.push_back(token);

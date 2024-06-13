@@ -59,10 +59,6 @@ inline void bench(int depth = 14)
 {
     depth = std::clamp(depth, 1, (int)MAX_DEPTH);
 
-    std::cout << "Running bench depth " << depth
-              << " on " << BENCH_FENS.size() << " positions" 
-              << std::endl;
-
     std::vector<TTEntry> benchTT;
     resizeTT(benchTT, 32);
 
@@ -84,10 +80,7 @@ inline void bench(int depth = 14)
         resetTT(benchTT);
     }
 
-    std::cout << "bench"
-              << " depth " << depth
-              << " nodes " << totalNodes
-              << " nps "   << totalNodes * 1000 / std::max((u64)totalMilliseconds, (u64)1)
-              << " time "  << totalMilliseconds
+    std::cout << totalNodes << " nodes "
+              << totalNodes * 1000 / std::max((u64)totalMilliseconds, (u64)1) << " nps"
               << std::endl;
 }

@@ -10,13 +10,7 @@
 
 # How to compile
 
-### Windows
-
-```clang++ -std=c++20 -march=native -O3 -DNDEBUG -Wl,/STACK:16777216 src/main.cpp -o Starzix.exe```
-
-### Linux
-
-```clang++ -std=c++20 -lstdc++ -lm -march=native -O3 -DNDEBUG src/main.cpp -o starzix```
+Have clang++ installed and run ```make```
 
 # UCI (Universal Chess Interface)
 
