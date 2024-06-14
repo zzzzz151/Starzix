@@ -50,6 +50,7 @@ class SearchThread {
     Accumulator* mAccumulatorPtr = &mAccumulators[0];
 
     std::array<u64, 1ULL << 17> mMovesNodes; // [move]
+    
     MultiArray<Move, 2, 1ULL << 17> mCountermoves = {}; // [nstm][lastMove]
 
     // [color][pieceType][targetSquare]
