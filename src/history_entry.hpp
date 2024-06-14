@@ -2,6 +2,8 @@
 
 #pragma once
 
+std::array<float, 3> CONT_HISTS_WEIGHTS = { onePlyContHistWeight(), twoPlyContHistWeight(), fourPlyContHistWeight() };
+
 struct HistoryEntry {
     private:
 
@@ -14,21 +16,19 @@ struct HistoryEntry {
 
     public:
 
-    inline i32 quietHistory(std::array<Move, 4> moves)
+    inline i32 quietHistory(std::array<Move, 3> moves)
     {
         // Add main history
         float total = (float)mMainHistory * mainHistoryWeight();
 
         // Add continuation histories
 
-        std::array<float, 3> weights = { onePlyContHistWeight(), twoPlyContHistWeight(), fourPlyContHistWeight() };
-
-        for (std::size_t i = 1; i < moves.size(); i++)
-            if (moves[i] != MOVE_NONE) 
+        Move move;
+        for (std::size_t i = 0; i < 3; i++)
+            if ((move = moves[i]) != MOVE_NONE) 
             {
-                PieceType pt = moves[i].pieceType();
-                Square to = moves[i].to();
-                total += (float)mContHists[i-1][(int)pt][to] * weights[i];
+                int pt = (int)move.pieceType();
+                total += (float)mContHists[i][pt][move.to()] * CONT_HISTS_WEIGHTS[i];
             }
        
         return total;
@@ -38,20 +38,19 @@ struct HistoryEntry {
         return mNoisyHistory[(int)captured];
     }
 
-    inline void updateQuietHistory(i32 bonus, std::array<Move, 4> moves)
+    inline void updateQuietHistory(i32 bonus, std::array<Move, 3> moves)
     {
         // Update main history
         mMainHistory += bonus - abs(bonus) * (i32)mMainHistory / historyMax();
 
         // Update continuation histories
 
-        for (std::size_t i = 1; i < moves.size(); i++)
-            if (moves[i] != MOVE_NONE) 
+        Move move;
+        for (std::size_t i = 0; i < 3; i++)
+            if ((move = moves[i]) != MOVE_NONE) 
             {
-                PieceType pt = moves[i].pieceType();
-                Square to = moves[i].to();
-
-                auto &history = mContHists[i-1][(int)pt][to];
+                int pt = (int)move.pieceType();
+                auto &history = mContHists[i][pt][move.to()];
                 history += bonus - abs(bonus) * (i32)history / historyMax();
             }
     }

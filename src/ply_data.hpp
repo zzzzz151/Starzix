@@ -47,13 +47,13 @@ struct PlyData {
 
         int stm = (int)board.sideToMove();
 
-        std::array<Move, 4> lastMoves = {
-            MOVE_NONE, board.nthToLastMove(1), board.nthToLastMove(2), board.nthToLastMove(4)
+        std::array<Move, 3> lastMoves = {
+            board.nthToLastMove(1), board.nthToLastMove(2), board.nthToLastMove(4)
         };
 
         for (std::size_t i = 0; i < mMoves.size(); i++)
         {
-            Move move = lastMoves[0] = mMoves[i];
+            Move move = mMoves[i];
 
             if (move == ttMove) {
                 mMovesScores[i] = I32_MAX;

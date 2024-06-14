@@ -559,8 +559,8 @@ class SearchThread {
                 if (mBoard.lastMove() != MOVE_NONE)
                     countermove = move;
 
-                std::array<Move, 4> moves = {
-                    move, mBoard.nthToLastMove(1), mBoard.nthToLastMove(2), mBoard.nthToLastMove(4)
+                std::array<Move, 3> moves = {
+                    mBoard.nthToLastMove(1), mBoard.nthToLastMove(2), mBoard.nthToLastMove(4)
                 };
 
                 // Increase history of this fail high quiet move

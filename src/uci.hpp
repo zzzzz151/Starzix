@@ -168,6 +168,10 @@ inline void setoption(std::vector<std::string> &tokens, std::vector<TTEntry> &tt
 
             if (optionName == stringify(lmrBase) || optionName == stringify(lmrMultiplier))
                 initLmrTable();
+            else if (optionName == stringify(onePlyContHistWeight)
+            || optionName == stringify(twoPlyContHistWeight)
+            || optionName == stringify(fourPlyContHistWeight))
+                CONT_HISTS_WEIGHTS = { onePlyContHistWeight(), twoPlyContHistWeight(), fourPlyContHistWeight() };
             else if (optionName == stringify(seePawnValue)
             || optionName == stringify(seeMinorValue)
             || optionName == stringify(seeRookValue)
