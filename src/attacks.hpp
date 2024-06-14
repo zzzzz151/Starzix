@@ -9,20 +9,18 @@ namespace attacks {
 
 namespace internal {
     
-MultiArray<u64, 2, 64> pawnAttacks; // [color][square]
-std::array<u64, 64> knightAttacks; // [square]
-std::array<u64, 64> kingAttacks;   // [square]
+MultiArray<u64, 2, 64> PAWN_ATTACKS; // [color][square]
+std::array<u64, 64> KNIGHT_ATTACKS;  // [square]
+std::array<u64, 64> KING_ATTACKS;    // [square]
 
-std::array<u64, 64> bishopAttacksEmptyBoardNoEdges; // [square]
-std::array<u64, 64> rookAttacksEmptyBoardNoEdges;   // [square]
-MultiArray<u64, 64, 1ULL << 9ULL> bishopAttacksTable; // [square][index]
-MultiArray<u64, 64, 1ULL << 12ULL> rookAttacksTable;  // [square][index]
+std::array<u64, 64> BISHOP_ATKS_EMPTY_BOARD_NO_EDGES; // [square]
+std::array<u64, 64> ROOK_ATKS_EMPTY_BOARD_NO_EDGES;   // [square]
+
+MultiArray<u64, 64, 1ULL << 9ULL> BISHOP_ATTACKS_TABLE; // [square][index]
+MultiArray<u64, 64, 1ULL << 12ULL> ROOK_ATTACKS_TABLE;  // [square][index]
 
 constexpr u64 pawnAttacksSlow(Square square, Color color)
 {
-    const int SQUARE_DIAGONAL_LEFT  = square + (color == Color::WHITE ? 7 : -9),
-              SQUARE_DIAGONAL_RIGHT = square + (color == Color::WHITE ? 9 : -7);
-
     Rank rank = squareRank(square);
 
     if ((color == Color::WHITE && rank == Rank::RANK_8) 
@@ -31,9 +29,12 @@ constexpr u64 pawnAttacksSlow(Square square, Color color)
 
     File file = squareFile(square);
 
-    return file == File::A ? 1ULL << SQUARE_DIAGONAL_RIGHT
-           : file == File::H ? 1ULL << SQUARE_DIAGONAL_LEFT
-           : (1ULL << SQUARE_DIAGONAL_LEFT) | (1ULL << SQUARE_DIAGONAL_RIGHT);
+    u64 squareDiagonalLeft  = toBitboard(square + (color == Color::WHITE ? 7 : -9)),
+        squareDiagonalRight = toBitboard(square + (color == Color::WHITE ? 9 : -7));
+
+    return file == File::A ? squareDiagonalRight
+         : file == File::H ? squareDiagonalLeft
+         : squareDiagonalLeft | squareDiagonalRight;
 }
 
 constexpr u64 bishopAttacksSlow(Square sq, u64 occupied, bool excludeEdges = false)
@@ -207,19 +208,19 @@ constexpr void init()
     for (int square = 0; square < 64; square++)
     {
         // Pawn
-        internal::pawnAttacks[0][square] = pawnAttacksSlow(square, Color::WHITE);
-        internal::pawnAttacks[1][square] = pawnAttacksSlow(square, Color::BLACK);
+        internal::PAWN_ATTACKS[0][square] = pawnAttacksSlow(square, Color::WHITE);
+        internal::PAWN_ATTACKS[1][square] = pawnAttacksSlow(square, Color::BLACK);
 
         // Knight
         u64 n = 1ULL << square;
         u64 h1 = ((n >> 1ULL) & 0x7f7f7f7f7f7f7f7fULL) | ((n << 1ULL) & 0xfefefefefefefefeULL);
         u64 h2 = ((n >> 2ULL) & 0x3f3f3f3f3f3f3f3fULL) | ((n << 2ULL) & 0xfcfcfcfcfcfcfcfcULL);
-        knightAttacks[square] = (h1 << 16ULL) | (h1 >> 16ULL) | (h2 << 8ULL) | (h2 >> 8ULL);
+        KNIGHT_ATTACKS[square] = (h1 << 16ULL) | (h1 >> 16ULL) | (h2 << 8ULL) | (h2 >> 8ULL);
 
         // King
         u64 attacks = shiftLeft(king) | shiftRight(king) | king;
         attacks = (attacks | shiftUp(attacks) | shiftDown(attacks)) ^ king;
-        kingAttacks[square] = attacks;
+        KING_ATTACKS[square] = attacks;
         king <<= 1ULL;
     }
 
@@ -227,56 +228,56 @@ constexpr void init()
     for (Square sq = 0; sq < 64; sq++)
     {
         // last arg true = exclude last square of each direction
-        bishopAttacksEmptyBoardNoEdges[sq] = bishopAttacksSlow(sq, 0ULL, true);
-        rookAttacksEmptyBoardNoEdges[sq] = rookAttacksSlow(sq, 0ULL, true);
+        BISHOP_ATKS_EMPTY_BOARD_NO_EDGES[sq] = bishopAttacksSlow(sq, 0ULL, true);
+        ROOK_ATKS_EMPTY_BOARD_NO_EDGES[sq] = rookAttacksSlow(sq, 0ULL, true);
     }
 
     // Init slider tables
     for (Square sq = 0; sq < 64; sq++)
     {
         // Bishop
-        u64 numBlockersArrangements = 1ULL << std::popcount(bishopAttacksEmptyBoardNoEdges[sq]);
+        u64 numBlockersArrangements = 1ULL << std::popcount(BISHOP_ATKS_EMPTY_BOARD_NO_EDGES[sq]);
         for (u64 n = 0; n < numBlockersArrangements; n++)
         {
-            u64 blockersArrangement = pdep(n, bishopAttacksEmptyBoardNoEdges[sq]);
+            u64 blockersArrangement = pdep(n, BISHOP_ATKS_EMPTY_BOARD_NO_EDGES[sq]);
             u64 index = (blockersArrangement * BISHOP_MAGICS[sq]) >> BISHOP_SHIFTS[sq];
-            bishopAttacksTable[sq][index] = bishopAttacksSlow(sq, blockersArrangement);
+            BISHOP_ATTACKS_TABLE[sq][index] = bishopAttacksSlow(sq, blockersArrangement);
         }
 
         // Rook
-        numBlockersArrangements = 1ULL << std::popcount(rookAttacksEmptyBoardNoEdges[sq]);
+        numBlockersArrangements = 1ULL << std::popcount(ROOK_ATKS_EMPTY_BOARD_NO_EDGES[sq]);
         for (u64 n = 0; n < numBlockersArrangements; n++)
         {
-            u64 blockersArrangement = pdep(n, rookAttacksEmptyBoardNoEdges[sq]);
+            u64 blockersArrangement = pdep(n, ROOK_ATKS_EMPTY_BOARD_NO_EDGES[sq]);
             u64 index = (blockersArrangement * ROOK_MAGICS[sq]) >> ROOK_SHIFTS[sq];
-            rookAttacksTable[sq][index] = rookAttacksSlow(sq, blockersArrangement);
+            ROOK_ATTACKS_TABLE[sq][index] = rookAttacksSlow(sq, blockersArrangement);
         }
     }
 
 }
 
 inline u64 pawnAttacks(Square square, Color color) {
-    return internal::pawnAttacks[(int)color][square];
+    return internal::PAWN_ATTACKS[(int)color][square];
 }
 
 inline u64 knightAttacks(Square square)  { 
-    return internal::knightAttacks[square];
+    return internal::KNIGHT_ATTACKS[square];
 }
 
 inline u64 bishopAttacks(Square square, u64 occupancy)
 {
     using namespace internal;
-    u64 blockers = occupancy & bishopAttacksEmptyBoardNoEdges[square];
+    u64 blockers = occupancy & BISHOP_ATKS_EMPTY_BOARD_NO_EDGES[square];
     u64 index = (blockers * BISHOP_MAGICS[square]) >> BISHOP_SHIFTS[square];
-    return bishopAttacksTable[square][index];
+    return BISHOP_ATTACKS_TABLE[square][index];
 }
 
 inline u64 rookAttacks(Square square, u64 occupancy)
 {
     using namespace internal;
-    u64 blockers = occupancy & rookAttacksEmptyBoardNoEdges[square];
+    u64 blockers = occupancy & ROOK_ATKS_EMPTY_BOARD_NO_EDGES[square];
     u64 index = (blockers * ROOK_MAGICS[square]) >> ROOK_SHIFTS[square];
-    return rookAttacksTable[square][index];
+    return ROOK_ATTACKS_TABLE[square][index];
 }
 
 inline u64 queenAttacks(Square square, u64 occupancy) {
@@ -284,7 +285,7 @@ inline u64 queenAttacks(Square square, u64 occupancy) {
 }
 
 inline u64 kingAttacks(Square square)  {        
-    return internal::kingAttacks[square]; 
+    return internal::KING_ATTACKS[square]; 
 }
 
 } // namespace attacks

@@ -28,8 +28,8 @@ int main(int argc, char* argv[])
     resizeTT(tt, 32);
     printTTSize(tt);
     
-    searchThreads = { SearchThread(&tt) };
-    mainThread = &searchThreads[0];
+    gSearchThreads = { SearchThread(&tt) };
+    gMainThread = &gSearchThreads[0];
 
     // If a command is passed in program args, run it and exit
 

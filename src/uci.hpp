@@ -36,7 +36,7 @@ inline void runCommand(std::string &command, Board &board, std::vector<TTEntry> 
         
         resetTT(tt);
 
-        for (auto &searchThread : searchThreads)
+        for (auto &searchThread : gSearchThreads)
             searchThread.reset();
     }
     else if (command == "isready")
@@ -140,15 +140,15 @@ inline void setoption(std::vector<std::string> &tokens, std::vector<TTEntry> &tt
         int numThreads = std::clamp(stoi(optionValue), 1, 256);
 
         // Remove all threads except main thread
-        while (searchThreads.size() > 1)
-            searchThreads.pop_back();
+        while (gSearchThreads.size() > 1)
+            gSearchThreads.pop_back();
 
-        while ((int)searchThreads.size() < numThreads)
-            searchThreads.push_back(SearchThread(&tt));
+        while ((int)gSearchThreads.size() < numThreads)
+            gSearchThreads.push_back(SearchThread(&tt));
 
-        searchThreads.shrink_to_fit();
+        gSearchThreads.shrink_to_fit();
 
-        mainThread = &searchThreads[0]; // push_back() or shrink_to_fit() may reallocate
+        gMainThread = &gSearchThreads[0]; // push_back() or shrink_to_fit() may reallocate
 
         std::cout << "Threads set to " << numThreads << std::endl;
     }
@@ -261,24 +261,24 @@ inline void go(std::vector<std::string> &tokens, Board &board)
         softMilliseconds = std::min(softMilliseconds, hardMilliseconds);
     }
 
-    SearchThread::searchStopped = false;
+    SearchThread::sSearchStopped = false;
     std::vector<std::thread> threads;
 
     // Start secondary threads search
-    for (u64 i = 1; i < searchThreads.size(); i++)
+    for (u64 i = 1; i < gSearchThreads.size(); i++)
         threads.emplace_back([&, i]() {
-            searchThreads[i].search(
+            gSearchThreads[i].search(
                 board, maxDepth, startTime, softMilliseconds, hardMilliseconds, I64_MAX, maxNodes);
         });
 
     // Main thread search
-    mainThread->search(board, maxDepth, startTime, softMilliseconds, hardMilliseconds, I64_MAX, maxNodes);
+    gMainThread->search(board, maxDepth, startTime, softMilliseconds, hardMilliseconds, I64_MAX, maxNodes);
 
     // Wait for secondary threads
     for (auto &thread : threads)
         thread.join();
 
-    std::cout << "bestmove " << mainThread->bestMoveRoot().toUci() << std::endl;
+    std::cout << "bestmove " << gMainThread->bestMoveRoot().toUci() << std::endl;
 }
 
 } // namespace uci

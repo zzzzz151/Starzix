@@ -2,35 +2,31 @@
 
 #pragma once
 
-#include <chrono>
 #include "board.hpp"
 
 inline u64 perft(Board &board, int depth)
 {
     if (depth <= 0) return 1;
 
-    MovesList moves = MovesList();
+    ArrayVec<Move, 256> moves;
     board.pseudolegalMoves(moves);
     u64 nodes = 0;
     u64 pinned = board.pinned();
 
     if (depth == 1) {
-         for (int i = 0; i < moves.size(); i++)
-            nodes += board.isPseudolegalLegal(moves[i], pinned);
+         for (Move move : moves)
+            nodes += board.isPseudolegalLegal(move, pinned);
 
         return nodes;
     }
 
-    for (int i = 0; i < moves.size(); i++) 
-    {
-        Move move = moves[i];
+    for (Move move : moves)
         if (board.isPseudolegalLegal(move, pinned))
         {
             board.makeMove(move);
             nodes += perft(board, depth - 1);
             board.undoMove();
         }
-    }
 
     return nodes;
 }
@@ -43,27 +39,20 @@ inline void perftSplit(Board &board, int depth)
               << " on " << board.fen() 
               << std::endl;
 
-    MovesList moves = MovesList();
+    ArrayVec<Move, 256> moves;
     board.pseudolegalMoves(moves);
     u64 totalNodes = 0;
     u64 pinned = board.pinned();
 
     if (depth == 1) {
-        for (int i = 0; i < moves.size(); i++) 
-        {
-            Move move = moves[i];
-
-            if (!board.isPseudolegalLegal(move, pinned)) continue;
-
-            std::cout << move.toUci() << ": 1" << std::endl;   
-        }
+        for (Move move : moves)
+            if (board.isPseudolegalLegal(move, pinned))
+                std::cout << move.toUci() << ": 1" << std::endl;   
 
         return;
     }
 
-    for (int i = 0; i < moves.size(); i++) 
-    {
-        Move move = moves[i];
+    for (Move move : moves) 
         if (board.isPseudolegalLegal(move, pinned))
         {
             board.makeMove(move);
@@ -72,7 +61,6 @@ inline void perftSplit(Board &board, int depth)
             totalNodes += nodes;
             board.undoMove();
         }
-    }
 
     std::cout << "Total: " << totalNodes << std::endl;
 }

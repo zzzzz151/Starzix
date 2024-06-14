@@ -53,7 +53,7 @@ constexpr void init()
     int count = 0;
 
     for (Color color : {Color::WHITE, Color::BLACK})
-        for (int pt = (int)PieceType::KNIGHT; pt <= (int)PieceType::KING; pt++)
+        for (int pt = KNIGHT; pt <= KING; pt++)
             count += initPiece(color, (PieceType)pt);
 
     assert(count == 3668);

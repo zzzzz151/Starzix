@@ -7,6 +7,7 @@
 #include <array>
 #include <type_traits>
 
+using size_t = std::size_t;
 using u8 = uint8_t;
 using u16 = uint16_t;
 using u32 = uint32_t;
@@ -17,28 +18,13 @@ using i16 = int16_t;
 using i32 = int32_t;
 using i64 = int64_t;
 
-template <typename T, u64 N, u64... Ns>
-struct MultiArrayImpl
-{
-    using Type = std::array<typename MultiArrayImpl<T, Ns...>::Type, N>;
-};
-
-template <typename T, u64 N>
-struct MultiArrayImpl<T, N>
-{
-    using Type = std::array<T, N>;
-};
-
-template <typename T, u64... Ns>
-using MultiArray = typename MultiArrayImpl<T, Ns...>::Type;
-
 constexpr i32 I32_MAX = 2147483647;
 //constexpr u64 U64_MAX = 9223372036854775807;
 constexpr i64 I64_MAX = 9223372036854775807;
 
-const std::string START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+constexpr u64 ONES = 0xffff'ffff'ffff'ffff;
 
-constexpr u8 CASTLE_SHORT = 0, CASTLE_LONG = 1;
+const std::string START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 constexpr i32 INF = 32000, 
               MIN_MATE_SCORE = INF - 256;
@@ -53,8 +39,8 @@ enum class Color : i8
     NONE = -1
 };
 
-constexpr int WHITE = (int)Color::WHITE;
-constexpr int BLACK = (int)Color::BLACK;
+constexpr int WHITE = 0;
+constexpr int BLACK = 1;
 
 enum class PieceType : u8
 {
@@ -66,6 +52,8 @@ enum class PieceType : u8
     KING   = 5,
     NONE   = 6
 };
+
+constexpr int PAWN = 0, KNIGHT = 1, BISHOP = 2, ROOK = 3, QUEEN = 4, KING = 5;
 
 enum class Piece : u8
 {

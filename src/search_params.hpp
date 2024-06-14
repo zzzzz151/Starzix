@@ -17,6 +17,13 @@ template <typename T> struct TunableParam {
     }
 };
 
+constexpr u8 MAX_DEPTH = 100;
+
+constexpr i32 GOOD_QUEEN_PROMO_SCORE = 1'600'000'000,
+              GOOD_NOISY_SCORE       = 1'500'000'000,
+              KILLER_SCORE           = 1'000'000'000,
+              COUNTERMOVE_SCORE      = 500'000'000;
+
 // Eval scale with material / game phase
 TunableParam<float> evalMaterialScaleMin = TunableParam<float>(0.78, 0.5, 1.0, 0.1);
 TunableParam<float> evalMaterialScaleMax = TunableParam<float>(1.05, 1.0, 1.5, 0.1);

@@ -34,22 +34,22 @@ const Net *NET = (const Net*)(gNetFileData);
 struct alignas(ALIGNMENT) Accumulator
 {
     public:
-    MultiArray<i16, 2, HIDDEN_LAYER_SIZE> accumulators = NET->hiddenBiases;
-    bool updated = false;
+    MultiArray<i16, 2, HIDDEN_LAYER_SIZE> mAccumulators = NET->hiddenBiases;
+    bool mUpdated = false;
 
     inline Accumulator() = default;
 
     inline Accumulator(const Board &board) {
-        accumulators = NET->hiddenBiases;
+        mAccumulators = NET->hiddenBiases;
 
         for (Color color : {Color::WHITE, Color::BLACK})
-            for (int pt = (int)PieceType::PAWN; pt <= (int)PieceType::KING; pt++)
+            for (int pt = PAWN; pt <= KING; pt++)
                 {
-                    u64 bb = board.bitboard(color, (PieceType)pt);
+                    u64 bb = board.getBb(color, (PieceType)pt);
                     activateAll(bb, (color == Color::BLACK) * 384 + pt * 64);
                 }
 
-        updated = true;
+        mUpdated = true;
     }
 
     inline void activateAll(u64 bitboard, int feature) {
@@ -58,13 +58,13 @@ struct alignas(ALIGNMENT) Accumulator
 
             for (int color : {WHITE, BLACK})
                 for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
-                    accumulators[color][i] += NET->featuresWeights[color][feature + square][i];
+                    mAccumulators[color][i] += NET->featuresWeights[color][feature + square][i];
         }
     }
 
     inline void update(Accumulator *oldAcc, Board &board)
     {
-        assert(oldAcc->updated && !updated);
+        assert(oldAcc->mUpdated && !mUpdated);
 
         Move move = board.lastMove();
         assert(move != MOVE_NONE);
@@ -91,7 +91,7 @@ struct alignas(ALIGNMENT) Accumulator
 
             for (int color : {WHITE, BLACK})
                 for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
-                    accumulators[color][i] = oldAcc->accumulators[color][i]
+                    mAccumulators[color][i] = oldAcc->mAccumulators[color][i]
                         - NET->featuresWeights[color][subPieceFeature][i]  
                         + NET->featuresWeights[color][addPieceFeature][i]
                         - NET->featuresWeights[color][subCapturedFeature][i];
@@ -100,12 +100,12 @@ struct alignas(ALIGNMENT) Accumulator
         else if (moveFlag == Move::CASTLING_FLAG)
         {
             auto [rookFrom, rookTo] = CASTLING_ROOK_FROM_TO[to];
-            const int subRookFeature = stm * 384 + (int)PieceType::ROOK * 64 + (int)rookFrom;
-            const int addRookFeature = stm * 384 + (int)PieceType::ROOK * 64 + (int)rookTo;
+            const int subRookFeature = stm * 384 + ROOK * 64 + (int)rookFrom;
+            const int addRookFeature = stm * 384 + ROOK * 64 + (int)rookTo;
 
             for (int color : {WHITE, BLACK})
                 for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
-                    accumulators[color][i] = oldAcc->accumulators[color][i] 
+                    mAccumulators[color][i] = oldAcc->mAccumulators[color][i] 
                         - NET->featuresWeights[color][subPieceFeature][i]  
                         + NET->featuresWeights[color][addPieceFeature][i]
                         - NET->featuresWeights[color][subRookFeature][i]  
@@ -115,23 +115,23 @@ struct alignas(ALIGNMENT) Accumulator
         else {
             for (int color : {WHITE, BLACK})
                 for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
-                    accumulators[color][i] = oldAcc->accumulators[color][i]
+                    mAccumulators[color][i] = oldAcc->mAccumulators[color][i]
                         - NET->featuresWeights[color][subPieceFeature][i]  
                         + NET->featuresWeights[color][addPieceFeature][i];     
         }
 
-        updated = true;
+        mUpdated = true;
     }
 
 }; // struct Accumulator
 
 inline i32 evaluate(Accumulator *accumulator, Board &board, bool materialScale)
 {
-    assert(accumulator->updated);
+    assert(accumulator->mUpdated);
 
     int stm = (int)board.sideToMove();
-    Vec *stmAccumulator = (Vec*) &(accumulator->accumulators[stm]);
-    Vec *oppAccumulator = (Vec*) &(accumulator->accumulators[!stm]);
+    Vec *stmAccumulator = (Vec*) &(accumulator->mAccumulators[stm]);
+    Vec *oppAccumulator = (Vec*) &(accumulator->mAccumulators[!stm]);
 
     Vec *stmWeights = (Vec*) &(NET->outputWeights[0]);
     Vec *oppWeights = (Vec*) &(NET->outputWeights[1]);
@@ -160,10 +160,10 @@ inline i32 evaluate(Accumulator *accumulator, Board &board, bool materialScale)
 
     // Scale eval with material / game phase
     if (materialScale) {
-        i32 material = 3 * std::popcount(board.bitboard(PieceType::KNIGHT))
-                     + 3 * std::popcount(board.bitboard(PieceType::BISHOP))
-                     + 5 * std::popcount(board.bitboard(PieceType::ROOK))
-                     + 9 * std::popcount(board.bitboard(PieceType::QUEEN));
+        i32 material = 3 * std::popcount(board.getBb(PieceType::KNIGHT))
+                     + 3 * std::popcount(board.getBb(PieceType::BISHOP))
+                     + 5 * std::popcount(board.getBb(PieceType::ROOK))
+                     + 9 * std::popcount(board.getBb(PieceType::QUEEN));
 
         constexpr i32 MATERIAL_MAX = 62;
 

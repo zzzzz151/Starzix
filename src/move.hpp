@@ -9,7 +9,7 @@ struct Move {
     private:
 
     // 16 bits: ffffff tttttt FFFF (f = from, t = to, F = flag)  
-    u16 moveEncoded = 0;
+    u16 mMove = 0;
 
     public:
 
@@ -32,27 +32,27 @@ struct Move {
     inline Move() = default;
 
     inline bool operator==(const Move &other) const {
-        return moveEncoded == other.moveEncoded;
+        return mMove == other.mMove;
     }
 
     inline bool operator!=(const Move &other) const {
-        return moveEncoded != other.moveEncoded;
+        return mMove != other.mMove;
     }
 
     inline Move(Square from, Square to, u16 flag)
     {
-        moveEncoded = ((u16)from << 10);
-        moveEncoded |= ((u16)to << 4);
-        moveEncoded |= flag;
+        mMove = ((u16)from << 10);
+        mMove |= ((u16)to << 4);
+        mMove |= flag;
     }
 
-    inline u16 encoded() { return moveEncoded; }
+    inline u16 encoded() { return mMove; }
 
-    inline Square from() { return (moveEncoded >> 10) & 0b111111; }
+    inline Square from() { return (mMove >> 10) & 0b111111; }
 
-    inline Square to() { return (moveEncoded >> 4) & 0b111111; }
+    inline Square to() { return (mMove >> 4) & 0b111111; }
 
-    inline u16 flag() { return moveEncoded & 0x000F; }
+    inline u16 flag() { return mMove & 0x000F; }
 
     inline PieceType pieceType()
     {
@@ -94,39 +94,3 @@ struct Move {
 }; // struct Move
 
 constexpr Move MOVE_NONE = Move();
-
-struct MovesList
-{
-    private:
-
-    std::array<Move, 256> moves;
-    u8 numMoves = 0;
-
-    public:
-
-    inline MovesList() = default;
-
-    inline void add(Move move) { 
-        assert(numMoves < 255);
-        moves[numMoves++] = move; 
-    }
-
-    inline Move operator[](int i) {
-        assert(i >= 0 && i < numMoves);
-        return moves[i];
-    }
-
-    inline u8 size() { return numMoves; }
-
-    inline void clear() { numMoves = 0; }
-
-    inline void swap(int i, int j)
-    {
-    	assert(i >= 0 && j >= 0 && i < numMoves && j < numMoves);
-        Move temp = moves[i];
-        moves[i] = moves[j];
-        moves[j] = temp;
-    }
-
-}; // struct MovesList
-

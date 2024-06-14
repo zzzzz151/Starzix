@@ -50,7 +50,7 @@ void testAccumulatorUpdate(Board board, Move move)
         return;
     }
     
-    acc.updated = false;
+    acc.mUpdated = false;
     acc.update(&oldAcc, board);
 
     auto eval = evaluate(&acc, board, false);
@@ -94,12 +94,12 @@ int main()
     board = Board("r3k2b/6P1/8/1pP5/8/8/4P3/4K2R w Kq b6 0 1");
     u64 pinned = board.pinned();
 
-    MovesList moves;
+    ArrayVec<Move, 256> moves;
     board.pseudolegalMoves(moves);
 
-    for (int i = 0; i < moves.size(); i++) 
-        if (board.isPseudolegalLegal(moves[i], pinned)) 
-            testAccumulatorUpdate(board, moves[i]);
+    for (Move move : moves)
+        if (board.isPseudolegalLegal(move, pinned)) 
+            testAccumulatorUpdate(board, move);
 
     return 0;
 }
