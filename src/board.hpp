@@ -561,7 +561,8 @@ class Board {
     inline void makeMove(Move move)
     {
         assert(mStates.size() >= 1 && mState == &mStates.back());
-        mStates.push_back(*mState);
+        BoardState copy = *mState;
+        mStates.push_back(copy);
         mState = &mStates.back();
 
         Color oppSide = this->oppSide();

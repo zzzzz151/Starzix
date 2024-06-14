@@ -28,7 +28,7 @@ struct HistoryEntry {
             {
                 PieceType pt = moves[i].pieceType();
                 Square to = moves[i].to();
-                total += (float)mContHists[i][(int)pt][to] * weights[i];
+                total += (float)mContHists[i-1][(int)pt][to] * weights[i];
             }
        
         return total;
