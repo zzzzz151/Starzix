@@ -59,6 +59,11 @@ struct ArrayVec
 
     inline void clear() { mSize = 0; }
 
+    inline void resize(std::size_t newSize) {
+        assert(newSize <= N);
+        mSize = newSize;
+    }
+
     inline void push_back(T elem) { 
         assert(mSize < N);
         mArr[mSize++] = elem;

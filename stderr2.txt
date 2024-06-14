@@ -1,0 +1,2 @@
+Assertion failed: plyDataPtr->mMoves[0] == ttEntry.move, file src\search.hpp, line 376
+Assertion failed: !singular || ttHit, file src\search.hpp, line 298

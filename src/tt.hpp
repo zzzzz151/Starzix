@@ -12,9 +12,9 @@ enum class Bound {
 struct TTEntry {
     public:
     u64 zobristHash = 0;
+    u8 depth = 0; 
     i16 score = 0;
     Move move = MOVE_NONE;
-    u8 depth = 0; 
     u8 boundAndAge = 0; // lowest 2 bits for bound, highest 6 bits for age
 
     inline i16 adjustedScore(i16 ply)

@@ -39,6 +39,10 @@ struct Move {
         return mMove != other.mMove;
     }
 
+    inline operator bool() const {
+        return mMove != 0;
+    }
+
     inline Move(Square from, Square to, u16 flag)
     {
         mMove = ((u16)from << 10);

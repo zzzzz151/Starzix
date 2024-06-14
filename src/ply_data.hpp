@@ -5,19 +5,35 @@
 struct PlyData {
     public:
 
-    std::array<Move, MAX_DEPTH+1> mPvLine = { MOVE_NONE };
-    u8 mPvLength = 0;
+    ArrayVec<Move, MAX_DEPTH+1> mPvLine;
     Move mKiller = MOVE_NONE;
     i32 mEval = INF;
     ArrayVec<Move, 256> mMoves;
     std::array<i32, 256> mMovesScores;
+    int mCurrentMoveIdx = -1;
+
+    inline void updatePV(Move move) 
+    {
+        // This function is called from SearchThread in search.cpp, which has a
+        // std::array<PlyData, MAX_DEPTH+1> mPliesData
+        // so the data is continuous and we can fetch the next ply data
+        // by incrementing this pointer
+        PlyData* nextPlyData = this + 1;
+
+        mPvLine.resize(1 + nextPlyData->mPvLine.size());
+        mPvLine[0] = move;
+
+        // Copy child's PV
+        for (std::size_t i = 0; i < nextPlyData->mPvLine.size(); i++)
+            mPvLine[i + 1] = nextPlyData->mPvLine[i];    
+    }
 
     inline std::string pvString() {
-        if (mPvLength == 0) return "";
+        if (mPvLine.size() == 0) return "";
 
         std::string pvStr = mPvLine[0].toUci();
 
-        for (u8 i = 1; i < mPvLength; i++)
+        for (std::size_t i = 1; i < mPvLine.size(); i++)
             pvStr += " " + mPvLine[i].toUci();
 
         return pvStr;
@@ -73,21 +89,27 @@ struct PlyData {
                 mMovesScores[i] = COUNTERMOVE_SCORE;
             else
                 mMovesScores[i] = historyEntry.quietHistory(lastMoves);
-            
         }
-    }
 
-    inline std::pair<Move, i32> nextMove(std::size_t idx)
+        mCurrentMoveIdx = -1; // prepare for moves loop
+    }
+    
+    inline std::pair<Move, i32> nextMove()
     {
+        mCurrentMoveIdx++;
+
+        if (mCurrentMoveIdx >= (int)mMoves.size())
+            return { MOVE_NONE, 0 };
+
         // Incremental sort
-        for (std::size_t j = idx + 1; j < mMoves.size(); j++)
-            if (mMovesScores[j] > mMovesScores[idx])
+        for (std::size_t j = mCurrentMoveIdx + 1; j < mMoves.size(); j++)
+            if (mMovesScores[j] > mMovesScores[mCurrentMoveIdx])
             {
-                mMoves.swap(idx, j);
-                std::swap(mMovesScores[idx], mMovesScores[j]);
+                mMoves.swap(mCurrentMoveIdx, j);
+                std::swap(mMovesScores[mCurrentMoveIdx], mMovesScores[j]);
             }
 
-        return { mMoves[idx], mMovesScores[idx] };
+        return { mMoves[mCurrentMoveIdx], mMovesScores[mCurrentMoveIdx] };
     }
 
 }; // struct PlyData

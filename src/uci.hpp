@@ -36,7 +36,7 @@ inline void runCommand(std::string &command, Board &board, std::vector<TTEntry> 
         
         resetTT(tt);
 
-        for (auto &searchThread : gSearchThreads)
+        for (auto &searchThread : gSearchThreads) 
             searchThread.reset();
     }
     else if (command == "isready")
@@ -52,9 +52,9 @@ inline void runCommand(std::string &command, Board &board, std::vector<TTEntry> 
     {
         Accumulator acc = Accumulator(board);
 
-        std::cout << "eval " << evaluate(&acc, board, false)
-                    << " scaled "  << evaluate(&acc, board, true)
-                    << std::endl;
+        std::cout << "eval "    << evaluate(&acc, board, false)
+                  << " scaled " << evaluate(&acc, board, true)
+                  << std::endl;
     }
     else if (tokens[0] == "bench")
     {
@@ -249,15 +249,16 @@ inline void go(std::vector<std::string> &tokens, Board &board)
     // Calculate search time limits
 
     i64 maxHardMilliseconds = std::max((i64)0, milliseconds - 10);
-    i64 hardMilliseconds, softMilliseconds;
+    u64 hardMilliseconds, softMilliseconds;
 
     if (isMoveTime || maxHardMilliseconds <= 0) {
         hardMilliseconds = maxHardMilliseconds;
         softMilliseconds = I64_MAX;
     }
     else {
-        hardMilliseconds = maxHardMilliseconds * hardTimePercentage();
-        softMilliseconds = ((double)maxHardMilliseconds / (double)movesToGo + (double)incrementMs * 0.6666) * softTimePercentage();
+        hardMilliseconds = round(maxHardMilliseconds * hardTimePercentage());
+        double softMs = (double)maxHardMilliseconds / (double)movesToGo + (double)incrementMs * 0.6666;
+        softMilliseconds = round(softMs * softTimePercentage());
         softMilliseconds = std::min(softMilliseconds, hardMilliseconds);
     }
 
