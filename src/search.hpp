@@ -372,12 +372,8 @@ class SearchThread {
         if (!singularMove) 
             // genenerate and score all moves except underpromotions
             plyDataPtr->genAndScoreMoves(mBoard, false, ttEntry.move, countermove, mHistoryTable);
-        else {
-            // usually currentMoveIdx is initialized to -1
-            // but in singular search we exclude TT move (index 0)
-            assert(plyDataPtr->mMoves[0] == singularMove);
-            plyDataPtr->mCurrentMoveIdx = 0;
-        }
+
+        assert(!singularMove || (plyDataPtr->mCurrentMoveIdx == 0 && plyDataPtr->mMoves[0] == singularMove));
 
         u64 pinned = mBoard.pinned();
         int legalMovesSeen = 0;
@@ -475,6 +471,8 @@ class SearchThread {
                     // reduce TT move search more if we expect to fail high
                     extension -= cutNode; 
                 }
+
+                plyDataPtr->mCurrentMoveIdx = 0; // reset since the singular search used this
             }
 
             u64 nodesBefore = mNodes;
