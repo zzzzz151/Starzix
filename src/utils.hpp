@@ -15,6 +15,7 @@
 #include <unordered_map>
 #include "3rdparty/ordered_map.h"
 #include "types.hpp"
+#include "array_extensions.hpp"
 
 #if defined(__GNUC__) // GCC, Clang, ICC
 

@@ -17,6 +17,13 @@ template <typename T> struct TunableParam {
     }
 };
 
+constexpr u8 MAX_DEPTH = 100;
+
+constexpr i32 GOOD_QUEEN_PROMO_SCORE = 1'600'000'000,
+              GOOD_NOISY_SCORE       = 1'500'000'000,
+              KILLER_SCORE           = 1'000'000'000,
+              COUNTERMOVE_SCORE      = 500'000'000;
+
 // Eval scale with material / game phase
 TunableParam<float> evalMaterialScaleMin = TunableParam<float>(0.78, 0.5, 1.0, 0.1);
 TunableParam<float> evalMaterialScaleMax = TunableParam<float>(1.05, 1.0, 1.5, 0.1);
@@ -218,66 +225,3 @@ tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
     {stringify(seeRookValue), &seeRookValue},
     {stringify(seeQueenValue), &seeQueenValue}
 };
-
-inline void printParamsAsJson() {
-    /*
-    {
-        "Param": {
-            "value": 50,
-            "min_value": 0,
-            "max_value": 100,
-            "step": 10
-        }
-    }
-    */
-
-    std::string indent = "    "; // 4 spaces
-    std::cout << "{" << std::endl;
-
-    for (auto [paramName, tunableParam] : tunableParams) {
-        std::cout << indent << "\"" << paramName << "\"" << ": {" << std::endl;
-
-        std::visit([&] (auto *myParam) 
-        {
-            if (myParam == nullptr) return;
-
-            std::cout << indent << indent 
-                      << "\"value\": " 
-                      << (std::is_same<decltype(myParam->value), double>::value
-                         || std::is_same<decltype(myParam->value), float>::value
-                         ? round(myParam->value * 100.0)
-                         : myParam->value)
-                      << "," << std::endl;
-
-            std::cout << indent << indent 
-                      << "\"min_value\": " 
-                      << (std::is_same<decltype(myParam->min), double>::value
-                         || std::is_same<decltype(myParam->min), float>::value
-                         ? round(myParam->min * 100.0)
-                         : myParam->min)
-                      << "," << std::endl;
-
-            std::cout << indent << indent 
-                      << "\"max_value\": " 
-                      << (std::is_same<decltype(myParam->max), double>::value
-                         || std::is_same<decltype(myParam->max), float>::value
-                         ? round(myParam->max * 100.0)
-                         : myParam->max)
-                      << "," << std::endl;
-
-            std::cout << indent << indent 
-                      << "\"step\": " 
-                      << (std::is_same<decltype(myParam->step), double>::value
-                         || std::is_same<decltype(myParam->step), float>::value
-                         ? round(myParam->step * 100.0)
-                         : myParam->step)
-                      << std::endl;
-
-            std::cout << indent << "}," << std::endl;
-        }, tunableParam);
-    }
-
-    std::cout << "}" << std::endl;
-}
-
-

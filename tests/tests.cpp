@@ -30,7 +30,7 @@ int main()
 
     // Move tests
 
-    assert(sizeof(Move) == 2ULL);
+    assert(sizeof(Move) == 2); // 2 bytes
     
     Move move = Move(49, 55, Move::NULL_FLAG);
     assert(move.from() == 49);
@@ -47,6 +47,8 @@ int main()
     assert(move.toUci() == "b7c8b");
     assert(move.pieceType() == PieceType::PAWN);
     assert(move.promotion() == PieceType::BISHOP);
+
+    // Board tests
     
     // fen()
     Board board = Board(START_FEN);
@@ -61,8 +63,8 @@ int main()
     assert(board.occupancy() == 18446462598732906495ULL);
     assert(board.us() == 65535ULL);
     assert(board.them() == 18446462598732840960ULL);
-    assert(board.bitboard(PieceType::KNIGHT) == 4755801206503243842ULL);
-    assert(board.bitboard(board.sideToMove(), PieceType::KNIGHT) == 66ULL);
+    assert(board.getBb(PieceType::KNIGHT) == 4755801206503243842ULL);
+    assert(board.getBb(board.sideToMove(), PieceType::KNIGHT) == 66ULL);
     
     // Pawn double push creates enpassant square
     board = Board("rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/2P2P2/RqBQ1RK1 b kq - 1 10");
@@ -99,11 +101,26 @@ int main()
     assert(board.isSquareAttacked(strToSquare("e2"), nstm));
     assert(!board.isSquareAttacked(strToSquare("h2"), nstm));
 
+    // attackers()
+    board = Board("r1b1kbnr/ppp2ppp/2np4/1B2p1q1/3P2P1/1P2PP2/P1P4P/RNBQK1NR b KQkq - 0 5");
+    assert(board.attackers(strToSquare("f5")) == 288230652103360512ULL);
+
+    // attacks()
+    board = Board("5k2/2p5/2r5/8/1N6/3K4/8/8 w - - 0 1");
+    assert(board.attacks(Color::WHITE) == 5532389481728ULL);
+    assert(board.attacks(Color::BLACK) == 5797534614998483972ULL);
+
     // Test inCheck()
     board = Board("rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/p1P2P2/RNBQK2R b KQkq - 5 9");
     assert(!board.inCheck());
     board = Board("rnbqkbnr/pppp2pp/5pQ1/4p3/3P4/8/PPP1PPPP/RNB1KBNR b KQkq - 1 3");
     assert(board.inCheck());
+
+    // checkers()
+    board = Board("6k1/4r3/8/2n5/4K3/8/8/8 w - - 0 1");
+    assert(board.checkers() == 4503616807239680ULL);
+    board.makeMove("e4f4");
+    assert(board.checkers() == 0);
 
     // Test null move
     board = Board("1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 w Qk f6 0 15");
@@ -143,9 +160,6 @@ int main()
     // pinned
     board = Board("r1b1kbnr/ppp2ppp/2np4/1B2p1q1/3P4/1P2PP2/P1P3PP/RNBQK1NR b KQkq - 0 5");
     assert(board.pinned() == (1ULL << 42));
-
-    // attackersTo()
-    assert(board.attackersTo(strToSquare("f5"), Color::BLACK) == 288230651029618688ULL);
 
     // zobristHashAfter()
     move = Move(strToSquare("g5"), strToSquare("e3"), Move::QUEEN_FLAG);

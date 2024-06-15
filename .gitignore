@@ -3,11 +3,13 @@
 
 **/*.exe
 **/starzix
-testsNNUE
-testsSEE
 
-src-test
-src-test/
+./testsGeneral
+./testsSEE
+./testsNNUE
+testsGeneral.exe
+testsSEE.exe
+testsNNUE.exe
 
 games.txt
 games.pgn

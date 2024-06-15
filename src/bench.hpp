@@ -70,7 +70,7 @@ inline void bench(int depth = 14)
     {
         Board board = Board(fen);
 
-        SearchThread::searchStopped = false;
+        SearchThread::sSearchStopped = false;
         searchThread.search(board, depth, std::chrono::steady_clock::now(), I64_MAX, I64_MAX, I64_MAX, I64_MAX);
 
         totalMilliseconds += searchThread.millisecondsElapsed();

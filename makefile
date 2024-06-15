@@ -16,3 +16,8 @@ endif
 # Build rule
 all:
 	$(command)
+
+test:
+	clang++ -O3 -std=c++20 -O3 -march=native tests/tests.cpp -o testsGeneral$(SUFFIX)
+	clang++ -O3 -std=c++20 -O3 -march=native tests/testsSEE.cpp -o testsSEE$(SUFFIX)
+	clang++ -O3 -std=c++20 -O3 -march=native tests/testsNNUE.cpp -o testsNNUE$(SUFFIX)
