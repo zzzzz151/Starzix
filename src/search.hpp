@@ -295,7 +295,7 @@ class SearchThread {
         // Probe TT
         u64 ttEntryIdx = TTEntryIndex(mBoard.zobristHash(), ttPtr->size());
         TTEntry ttEntry = singularMove ? TTEntry() : (*ttPtr)[ttEntryIdx];
-        bool ttHit = mBoard.zobristHash() == ttEntry.zobristHash && ttEntry.getBound() != Bound::INVALID;
+        bool ttHit = mBoard.zobristHash() == ttEntry.zobristHash && ttEntry.getBound() != Bound::NONE;
 
         // TT cutoff (not done in singular searches since ttHit is false)
         if (ttHit 
@@ -624,7 +624,7 @@ class SearchThread {
         // Probe TT
         auto ttEntryIdx = TTEntryIndex(mBoard.zobristHash(), ttPtr->size());
         TTEntry* ttEntry = &(*ttPtr)[ttEntryIdx];
-        bool ttHit = mBoard.zobristHash() == ttEntry->zobristHash && ttEntry->getBound() != Bound::INVALID;
+        bool ttHit = mBoard.zobristHash() == ttEntry->zobristHash && ttEntry->getBound() != Bound::NONE;
 
         // TT cutoff
         if (ttHit

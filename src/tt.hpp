@@ -3,7 +3,7 @@
 #pragma once
 
 enum class Bound {
-    INVALID = 0,
+    NONE = 0,
     EXACT = 1,
     LOWER = 2,
     UPPER = 3
@@ -11,6 +11,7 @@ enum class Bound {
 
 struct TTEntry {
     public:
+    
     u64 zobristHash = 0;
     u8 depth = 0; 
     i16 score = 0;
