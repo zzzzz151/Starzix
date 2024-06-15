@@ -17,7 +17,7 @@ std::array<i32, 7> SEE_PIECE_VALUES = {
 
 inline PieceType popLeastValuable(Board &board, u64 &occ, u64 attackers, Color color)
 {
-    for (int pt = 0; pt <= 5; pt++)
+    for (int pt = PAWN; pt <= KING; pt++)
     {
         u64 bb = attackers & board.getBb(color, (PieceType)pt);
         if (bb > 0) {
@@ -80,7 +80,8 @@ inline bool SEE(Board &board, Move move, i32 threshold = 0)
         us = oppColor(us);
 
         // if our only attacker is our king, but the opponent still has defenders
-        if (score >= 0 && next == PieceType::KING 
+        if (score >= 0 
+        && next == PieceType::KING 
         && (attackers & board.getBb(us)) > 0)
             us = oppColor(us);
 

@@ -878,12 +878,12 @@ class Board {
 
     inline u64 roughHashAfter(Move move) 
     {
-        int stm = (int)sideToMove();
-        int nstm = (int)oppSide();
-
         u64 hashAfter = zobristHash() ^ ZOBRIST_COLOR;
 
         if (move == MOVE_NONE) return hashAfter;
+        
+        int stm = (int)sideToMove();
+        int nstm = (int)oppSide();
 
         Square to = move.to();
         PieceType captured = pieceTypeAt(to);

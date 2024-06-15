@@ -272,7 +272,7 @@ class SearchThread {
     { 
         assert(ply >= 0 && ply <= mMaxDepth);
         assert(alpha >= -INF && alpha <= INF);
-        assert(beta >= -INF && beta <= INF);
+        assert(beta  >= -INF && beta  <= INF);
         assert(alpha < beta);
 
         if (depth <= 0) return qSearch(ply, alpha, beta);
@@ -297,7 +297,7 @@ class SearchThread {
         TTEntry ttEntry = singularMove ? TTEntry() : (*ttPtr)[ttEntryIdx];
         bool ttHit = mBoard.zobristHash() == ttEntry.zobristHash && ttEntry.getBound() != Bound::INVALID;
 
-        // TT cutoff
+        // TT cutoff (not done in singular searches since ttHit is false)
         if (ttHit 
         && !pvNode
         && ttEntry.depth >= depth 
@@ -438,7 +438,7 @@ class SearchThread {
             i32 extension = 0;
 
             // SE (Singular extensions)
-            // In singular searches, ttEntry.move = MOVE_NONE, which prevents SE in singular searches
+            // In singular searches, ttEntry.move = MOVE_NONE, which prevents SE
             if (move == ttEntry.move
             && ply > 0
             && depth >= singularMinDepth()
@@ -548,7 +548,7 @@ class SearchThread {
 
             bound = Bound::LOWER;
 
-            i32 historyBonus = std::clamp(depth * historyBonusMultiplier() - historyBonusOffset(), 0, historyBonusMax());
+            i32 historyBonus =  std::clamp(depth * historyBonusMultiplier() - historyBonusOffset(), 0, historyBonusMax());
             i32 historyMalus = -std::clamp(depth * historyMalusMultiplier() - historyMalusOffset(), 0, historyMalusMax());
 
             if (isQuiet) {
@@ -611,7 +611,7 @@ class SearchThread {
     {
         assert(ply > 0 && ply <= mMaxDepth);
         assert(alpha >= -INF && alpha <= INF);
-        assert(beta >= -INF && beta <= INF);
+        assert(beta  >= -INF && beta  <= INF);
         assert(alpha < beta);
 
         if (stopSearch()) return 0;
@@ -625,8 +625,8 @@ class SearchThread {
 
         // Probe TT
         auto ttEntryIdx = TTEntryIndex(mBoard.zobristHash(), ttPtr->size());
-        TTEntry *ttEntry = &(*ttPtr)[ttEntryIdx];
-        bool ttHit = mBoard.zobristHash() == ttEntry->zobristHash;
+        TTEntry* ttEntry = &(*ttPtr)[ttEntryIdx];
+        bool ttHit = mBoard.zobristHash() == ttEntry->zobristHash && ttEntry->getBound() != Bound::INVALID;
 
         // TT cutoff
         if (ttHit

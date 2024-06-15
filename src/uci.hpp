@@ -86,8 +86,6 @@ inline void runCommand(std::string &command, Board &board, std::vector<TTEntry> 
     }
     else if (tokens[0] == "undomove")
         board.undoMove();
-    else if (command == "paramsjson")
-        printParamsAsJson();
 }
 
 inline void uci() {
