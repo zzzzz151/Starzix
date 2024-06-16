@@ -494,6 +494,7 @@ class Board {
         Square kingSquare = lsb(getBb(color, PieceType::KING));
         attacksBb |= attacks::kingAttacks(kingSquare);
 
+        assert(attacksBb > 0);
         return attacksBb;
     } 
 
