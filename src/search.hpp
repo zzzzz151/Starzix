@@ -183,28 +183,6 @@ class SearchThread {
         return (double)mMovesNodes[bestMoveRoot().encoded()] / std::max((double)mNodes, 1.0);
     }
 
-    inline void makeMove(Move move, PlyData* plyDataPtr)
-    {
-        // If not a special move, we can probably correctly predict the zobrist hash after the move
-        // and prefetch the TT entry
-        if (move.flag() <= Move::KING_FLAG) 
-        {
-            auto ttEntryIdx = TTEntryIndex(mBoard.roughHashAfter(move), ttPtr->size());
-            __builtin_prefetch(&(*ttPtr)[ttEntryIdx]);
-        }
-
-        mBoard.makeMove(move);
-        mNodes++;
-
-        (plyDataPtr + 1)->mPvLine.resize(0);
-        (plyDataPtr + 1)->mEval = INF;
-
-        if (move != MOVE_NONE) {
-            mAccumulatorPtr++;
-            mAccumulatorPtr->mUpdated = false;
-        }
-    }
-
     inline i32 updateAccumulatorAndEval(PlyData* plyDataPtr) 
     {
         assert(mAccumulatorPtr == &mAccumulators[0] 
@@ -227,6 +205,28 @@ class SearchThread {
         }
 
         return plyDataPtr->mEval;
+    }
+
+    inline void makeMove(Move move, PlyData* plyDataPtr)
+    {
+        // If not a special move, we can probably correctly predict the zobrist hash after the move
+        // and prefetch the TT entry
+        if (move.flag() <= Move::KING_FLAG) 
+        {
+            auto ttEntryIdx = TTEntryIndex(mBoard.roughHashAfter(move), ttPtr->size());
+            __builtin_prefetch(&(*ttPtr)[ttEntryIdx]);
+        }
+
+        mBoard.makeMove(move);
+        mNodes++;
+
+        (plyDataPtr + 1)->mPvLine.resize(0);
+        (plyDataPtr + 1)->mEval = INF;
+
+        if (move != MOVE_NONE) {
+            mAccumulatorPtr++;
+            mAccumulatorPtr->mUpdated = false;
+        }
     }
 
     inline i32 aspiration(i32 iterationDepth, i32 score)

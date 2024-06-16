@@ -17,42 +17,15 @@
 #include "types.hpp"
 #include "array_extensions.hpp"
 
-#if defined(__GNUC__) // GCC, Clang, ICC
+inline u8 lsb(u64 bitboard) {
+    return std::countr_zero(bitboard);
+}
 
-    inline u8 lsb(u64 b)
-    {
-        assert(b);
-        return u8(__builtin_ctzll(b));
-    }
-    inline u8 msb(u64 b)
-    {
-        assert(b);
-        return u8(63 ^ __builtin_clzll(b));
-    }
-
-#else // Assume MSVC Windows 64
-
-    #include <intrin.h>
-    inline u8 lsb(u64 b)
-    {
-        unsigned long idx;
-        _BitScanForward64(&idx, b);
-        return (u8)idx;
-    }
-    inline u8 msb(u64 b)
-    {
-        unsigned long idx;
-        _BitScanReverse64(&idx, b);
-        return (u8)idx;
-    }
-
-#endif
-
-inline u8 poplsb(u64 &mask)
+inline u8 poplsb(u64 &bitboard)
 {
-    u8 s = lsb(mask);
-    mask &= mask - 1; // compiler optimizes this to _blsr_u64
-    return u8(s);
+    auto idx = lsb(bitboard);
+    bitboard &= bitboard - 1; // compiler optimizes this to _blsr_u64
+    return idx;
 }
 
 inline u64 pdep(u64 val, u64 mask) {

@@ -5,12 +5,12 @@
 struct PlyData {
     public:
 
-    ArrayVec<Move, MAX_DEPTH+1> mPvLine;
-    Move mKiller = MOVE_NONE;
-    i32 mEval = INF;
     ArrayVec<Move, 256> mMoves;
     std::array<i32, 256> mMovesScores;
     int mCurrentMoveIdx = -1;
+    ArrayVec<Move, MAX_DEPTH+1> mPvLine;
+    Move mKiller = MOVE_NONE;
+    i32 mEval = INF;
 
     inline void updatePV(Move move) 
     {

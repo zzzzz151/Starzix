@@ -53,7 +53,7 @@ struct BoardState {
 class Board {
     private:
     std::vector<BoardState> mStates = {};
-    BoardState *mState = nullptr;
+    BoardState* mState = nullptr;
 
     public:
 
