@@ -4,10 +4,18 @@
 
 std::array<float, 3> CONT_HISTS_WEIGHTS = { onePlyContHistWeight(), twoPlyContHistWeight(), fourPlyContHistWeight() };
 
+inline void updateHistory(i16 &history, i32 bonus) {
+    history += bonus - abs(bonus) * (i32)history / historyMax();
+}
+
+inline void updateHistory(i16* history, i32 bonus) {
+    updateHistory(*history, bonus);
+}
+
 struct HistoryEntry {
     private:
 
-    i16 mMainHistory = 0;
+    MultiArray<i16, 2, 2> mMainHistory = { }; // [enemyAttacksOrigin][enemyAttacksDestination]
 
     // Continuation histories 
     // [0 = 1ply, 1 = 2ply, 2 = 4ply][pieceType][targetSquare]
@@ -17,10 +25,10 @@ struct HistoryEntry {
 
     public:
 
-    inline i32 quietHistory(std::array<Move, 3> moves)
+    inline i32 quietHistory(bool enemyAttacksOrigin, bool enemyAttacksDst, std::array<Move, 3> moves)
     {
         // Add main history
-        float total = (float)mMainHistory * mainHistoryWeight();
+        float total = (float)mMainHistory[enemyAttacksOrigin][enemyAttacksDst] * mainHistoryWeight();
 
         // Add continuation histories
 
@@ -35,14 +43,10 @@ struct HistoryEntry {
         return total;
     }
 
-    inline i32 noisyHistory(PieceType captured) {
-        return mNoisyHistory[(int)captured];
-    }
-
-    inline void updateQuietHistory(i32 bonus, std::array<Move, 3> moves)
+    inline void updateQuietHistory(i32 bonus, bool enemyAttacksOrigin, bool enemyAttacksDst, std::array<Move, 3> moves)
     {
         // Update main history
-        mMainHistory += bonus - abs(bonus) * (i32)mMainHistory / historyMax();
+        updateHistory(mMainHistory[enemyAttacksOrigin][enemyAttacksDst], bonus);
 
         // Update continuation histories
 
@@ -51,14 +55,20 @@ struct HistoryEntry {
             if ((move = moves[i]) != MOVE_NONE) 
             {
                 int pt = (int)move.pieceType();
-                auto &history = mContHists[i][pt][move.to()];
-                history += bonus - abs(bonus) * (i32)history / historyMax();
+                updateHistory(mContHists[i][pt][move.to()], bonus);
             }
     }
 
-    inline void updateNoisyHistory(i32 bonus, PieceType captured) 
-    {
-        mNoisyHistory[(int)captured] += bonus - abs(bonus) * (i32)mNoisyHistory[(int)captured] / historyMax();
+    inline i32 noisyHistory(PieceType captured) {
+        return mNoisyHistory[(int)captured];
+    }
+
+    inline i16* noisyHistoryPtr(PieceType captured) {
+        return &mNoisyHistory[(int)captured];
+    }
+
+    inline void updateNoisyHistory(i32 bonus, PieceType captured) {
+        updateHistory(mNoisyHistory[(int)captured], bonus);
     }
 
 }; // struct HistoryEntry

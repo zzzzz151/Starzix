@@ -383,13 +383,13 @@ class SearchThread {
         bool isBestMoveQuiet = false;
         Bound bound = Bound::UPPER;
 
-        ArrayVec<HistoryEntry*, 256> quietFailLowsHistoryEntries, noisyFailLowsHistoryEntries;
-        ArrayVec<PieceType, 256> noisyFailLowsCaptures;
+        ArrayVec<Move, 256> quietFailLows;
+        ArrayVec<i16*, 256> noisyFailLowsHistory;
 
         // Moves loop
         for (auto [move, moveScore] = plyDataPtr->nextMove(); 
-        move != MOVE_NONE; 
-        std::tie(move, moveScore) = plyDataPtr->nextMove())
+             move != MOVE_NONE; 
+             std::tie(move, moveScore) = plyDataPtr->nextMove())
         {
             assert(move != singularMove); // Must not search TT move in a singular search
 
@@ -401,8 +401,8 @@ class SearchThread {
             PieceType captured = mBoard.captured(move);
             bool isQuiet = captured == PieceType::NONE && move.promotion() == PieceType::NONE;
 
-            PieceType pt = move.pieceType();
-            HistoryEntry* historyEntry = &mHistoryTable[(int)stm][(int)pt][move.to()];
+            int pt = (int)move.pieceType();
+            HistoryEntry &historyEntry = mHistoryTable[(int)stm][pt][move.to()];
 
             if (ply > 0 && bestScore > -MIN_MATE_SCORE && moveScore < COUNTERMOVE_SCORE)
             {
@@ -426,7 +426,7 @@ class SearchThread {
                     i32 threshold = isQuiet ? lmrDepth * seeQuietThreshold() 
                                               - moveScore / seeQuietHistoryDiv()
                                             : depth * depth * seeNoisyThreshold() 
-                                              - historyEntry->noisyHistory(captured) / seeNoisyHistoryDiv();
+                                              - historyEntry.noisyHistory(captured) / seeNoisyHistoryDiv();
 
                     if (!SEE(mBoard, move, std::min(threshold, -1))) continue;
                 }
@@ -503,8 +503,8 @@ class SearchThread {
                 lmr += 2 * cutNode;      // reduce more if we expect to fail high
                 
                 // reduce moves with good history less and vice versa
-                lmr -= round(isQuiet ? (float)moveScore / (float)lmrQuietHistoryDiv()
-                                     : (float)historyEntry->noisyHistory(captured) / (float)lmrNoisyHistoryDiv());
+                lmr -= round(isQuiet ? moveScore / (float)lmrQuietHistoryDiv()
+                                     : historyEntry.noisyHistory(captured) / (float)lmrNoisyHistoryDiv());
 
                 lmr = std::clamp(lmr, 0, depth - 2); // dont extend or reduce into qsearch
             }
@@ -530,12 +530,10 @@ class SearchThread {
 
             // Fail low
             if (score <= alpha) {
-                if (isQuiet)
-                    quietFailLowsHistoryEntries.push_back(historyEntry);
-                else {
-                    noisyFailLowsHistoryEntries.push_back(historyEntry);
-                    noisyFailLowsCaptures.push_back(captured);
-                }
+                if (isQuiet) 
+                    quietFailLows.push_back(move);
+                else 
+                    noisyFailLowsHistory.push_back(historyEntry.noisyHistoryPtr(captured));
 
                 continue;
             }
@@ -569,19 +567,30 @@ class SearchThread {
                 };
 
                 // Increase history of this fail high quiet move
-                historyEntry->updateQuietHistory(historyBonus, moves);
+                historyEntry.updateQuietHistory(
+                    historyBonus, 
+                    plyDataPtr->mEnemyAttacks & (1ULL << move.from()),
+                    plyDataPtr->mEnemyAttacks & (1ULL << move.to()),
+                    moves);
 
                 // History malus: decrease history of fail low quiets
-                for (HistoryEntry* failLowHistoryEntry : quietFailLowsHistoryEntries)
-                    failLowHistoryEntry->updateQuietHistory(historyMalus, moves);
+                for (Move failLow : quietFailLows) {
+                    pt = (int)failLow.pieceType();
+
+                    mHistoryTable[(int)stm][pt][failLow.to()].updateQuietHistory(
+                        historyMalus, 
+                        plyDataPtr->mEnemyAttacks & (1ULL << failLow.from()),
+                        plyDataPtr->mEnemyAttacks & (1ULL << failLow.to()),
+                        moves);
+                }
             }
             else 
                 // Increase history of this fail high noisy move
-                historyEntry->updateNoisyHistory(historyBonus, captured);
+                historyEntry.updateNoisyHistory(historyBonus, captured);
 
             // History malus: decrease history of fail low noisy moves
-            for (std::size_t i = 0; i < noisyFailLowsHistoryEntries.size(); i++)
-                noisyFailLowsHistoryEntries[i]->updateNoisyHistory(historyMalus, noisyFailLowsCaptures[i]);
+            for (i16* noisyHist : noisyFailLowsHistory)
+                updateHistory(noisyHist, historyMalus);
 
             break; // Fail high / beta cutoff
         }
@@ -599,12 +608,12 @@ class SearchThread {
             && !(bound == Bound::LOWER && bestScore <= eval)
             && !(bound == Bound::UPPER && bestScore >= eval))
             {
-                i32* corrHist = &mCorrectionHistory[(int)stm][mBoard.pawnHash() % 16384];
+                i32 &corrHist = mCorrectionHistory[(int)stm][mBoard.pawnHash() % 16384];
                 i32 newWeight = std::min(depth + 1, corrHistNewWeightMin());
-
-                *corrHist *= corrHistScale() - newWeight;
-                *corrHist += (bestScore - eval) * corrHistScale() * newWeight;
-                *corrHist = std::clamp(*corrHist / corrHistScale(), -corrHistMax(), corrHistMax());
+                
+                corrHist *= corrHistScale() - newWeight;
+                corrHist += (bestScore - eval) * corrHistScale() * newWeight;
+                corrHist = std::clamp(corrHist / corrHistScale(), -corrHistMax(), corrHistMax());
             }
         }
 
@@ -668,8 +677,8 @@ class SearchThread {
 
         // Moves loop
         for (auto [move, moveScore] = plyDataPtr->nextMove(); 
-        move != MOVE_NONE; 
-        std::tie(move, moveScore) = plyDataPtr->nextMove())
+             move != MOVE_NONE; 
+             std::tie(move, moveScore) = plyDataPtr->nextMove())
         {
             // SEE pruning (skip bad noisy moves)
             if (!mBoard.inCheck() && moveScore < 0) break;
