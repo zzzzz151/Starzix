@@ -677,8 +677,8 @@ class SearchThread {
 
         // Moves loop
         for (auto [move, moveScore] = plyDataPtr->nextMove(); 
-        move != MOVE_NONE; 
-        std::tie(move, moveScore) = plyDataPtr->nextMove())
+             move != MOVE_NONE; 
+             std::tie(move, moveScore) = plyDataPtr->nextMove())
         {
             // SEE pruning (skip bad noisy moves)
             if (!mBoard.inCheck() && moveScore < 0) break;
