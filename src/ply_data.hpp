@@ -17,10 +17,17 @@ struct PlyData {
     ArrayVec<Move, MAX_DEPTH+1> mPvLine;
     Move mKiller = MOVE_NONE;
     i32 mEval = INF;
+    u64 mEnemyAttacks = 0;
 
     inline void genAndScoreMoves(Board &board, bool noisiesOnly, Move ttMove, Move countermove, 
                                  MultiArray<HistoryEntry, 2, 6, 64> &historyTable)
     {
+        // Generate enemy attacks if not already generated
+        if (mMovesGenerated == MoveGenType::NONE)
+            mEnemyAttacks = board.attacks(board.oppSide());
+
+        assert(mMovesGenerated == MoveGenType::NONE || mEnemyAttacks == board.attacks(board.oppSide()));
+
         // Generate moves if not already generated
         // Never generate underpromotions in search
         if (mMovesGenerated != (MoveGenType)noisiesOnly) {
@@ -74,7 +81,10 @@ struct PlyData {
             else if (move == countermove)
                 mMovesScores[i] = COUNTERMOVE_SCORE;
             else
-                mMovesScores[i] = historyEntry.quietHistory(lastMoves);
+                mMovesScores[i] = historyEntry.quietHistory(
+                    mEnemyAttacks & (1ULL << move.from()),
+                    mEnemyAttacks & (1ULL << move.to()),
+                    lastMoves);
         }
 
         mCurrentMoveIdx = -1; // prepare for moves loop

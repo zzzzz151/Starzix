@@ -29,7 +29,7 @@ struct alignas(ALIGNMENT) Net {
 };
 
 INCBIN(NetFile, "src/net.bin");
-const Net *NET = (const Net*)(gNetFileData);
+const Net* NET = (const Net*)(gNetFileData);
 
 struct alignas(ALIGNMENT) Accumulator
 {
@@ -62,7 +62,7 @@ struct alignas(ALIGNMENT) Accumulator
         }
     }
 
-    inline void update(Accumulator *oldAcc, Board &board)
+    inline void update(Accumulator* oldAcc, Board &board)
     {
         assert(oldAcc->mUpdated && !mUpdated);
 
@@ -125,7 +125,7 @@ struct alignas(ALIGNMENT) Accumulator
 
 }; // struct Accumulator
 
-inline i32 evaluate(Accumulator *accumulator, Board &board, bool materialScale)
+inline i32 evaluate(Accumulator* accumulator, Board &board, bool materialScale)
 {
     assert(accumulator->mUpdated);
 
