@@ -220,7 +220,8 @@ class SearchThread {
         mBoard.makeMove(move);
         mNodes++;
 
-        (plyDataPtr + 1)->mPvLine.resize(0);
+        (plyDataPtr + 1)->mMovesGenerated = MoveGenType::NONE;
+        (plyDataPtr + 1)->mPvLine.clear();
         (plyDataPtr + 1)->mEval = INF;
 
         if (move != MOVE_NONE) {
@@ -382,8 +383,8 @@ class SearchThread {
         bool isBestMoveQuiet = false;
         Bound bound = Bound::UPPER;
 
-        constexpr u8 NOISY = 0, QUIET = 1;
-        std::array<ArrayVec<HistoryEntry*, 256>, 2> failLowsHistoryEntries;
+        ArrayVec<HistoryEntry*, 256> quietFailLowsHistoryEntries, noisyFailLowsHistoryEntries;
+        ArrayVec<PieceType, 256> noisyFailLowsCaptures;
 
         // Moves loop
         for (auto [move, moveScore] = plyDataPtr->nextMove(); 
@@ -529,7 +530,13 @@ class SearchThread {
 
             // Fail low
             if (score <= alpha) {
-                failLowsHistoryEntries[isQuiet].push_back(historyEntry);
+                if (isQuiet)
+                    quietFailLowsHistoryEntries.push_back(historyEntry);
+                else {
+                    noisyFailLowsHistoryEntries.push_back(historyEntry);
+                    noisyFailLowsCaptures.push_back(captured);
+                }
+
                 continue;
             }
 
@@ -565,7 +572,7 @@ class SearchThread {
                 historyEntry->updateQuietHistory(historyBonus, moves);
 
                 // History malus: decrease history of fail low quiets
-                for (HistoryEntry* failLowHistoryEntry : failLowsHistoryEntries[QUIET])
+                for (HistoryEntry* failLowHistoryEntry : quietFailLowsHistoryEntries)
                     failLowHistoryEntry->updateQuietHistory(historyMalus, moves);
             }
             else 
@@ -573,8 +580,8 @@ class SearchThread {
                 historyEntry->updateNoisyHistory(historyBonus, captured);
 
             // History malus: decrease history of fail low noisy moves
-            for (HistoryEntry* failLowHistoryEntry : failLowsHistoryEntries[NOISY])
-                failLowHistoryEntry->updateNoisyHistory(historyMalus, captured);
+            for (std::size_t i = 0; i < noisyFailLowsHistoryEntries.size(); i++)
+                noisyFailLowsHistoryEntries[i]->updateNoisyHistory(historyMalus, noisyFailLowsCaptures[i]);
 
             break; // Fail high / beta cutoff
         }

@@ -2,48 +2,33 @@
 
 #pragma once
 
+enum class MoveGenType : i8 {
+    NONE = -1, ALL = 0, NOISIES_ONLY = 1
+};
+
 struct PlyData {
     public:
 
+    MoveGenType mMovesGenerated = MoveGenType::NONE;
     ArrayVec<Move, 256> mMoves;
     std::array<i32, 256> mMovesScores;
     int mCurrentMoveIdx = -1;
+    
     ArrayVec<Move, MAX_DEPTH+1> mPvLine;
     Move mKiller = MOVE_NONE;
     i32 mEval = INF;
 
-    inline void updatePV(Move move) 
-    {
-        // This function is called from SearchThread in search.cpp, which has a
-        // std::array<PlyData, MAX_DEPTH+1> mPliesData
-        // so the data is continuous and we can fetch the next ply data
-        // by incrementing this pointer
-        PlyData* nextPlyData = this + 1;
-
-        mPvLine.resize(1 + nextPlyData->mPvLine.size());
-        mPvLine[0] = move;
-
-        // Copy child's PV
-        for (std::size_t i = 0; i < nextPlyData->mPvLine.size(); i++)
-            mPvLine[i + 1] = nextPlyData->mPvLine[i];    
-    }
-
-    inline std::string pvString() {
-        if (mPvLine.size() == 0) return "";
-
-        std::string pvStr = mPvLine[0].toUci();
-
-        for (std::size_t i = 1; i < mPvLine.size(); i++)
-            pvStr += " " + mPvLine[i].toUci();
-
-        return pvStr;
-    }
-
     inline void genAndScoreMoves(Board &board, bool noisiesOnly, Move ttMove, Move countermove, 
                                  MultiArray<HistoryEntry, 2, 6, 64> &historyTable)
     {
-        // never generate underpromotions in search
-        board.pseudolegalMoves(mMoves, noisiesOnly, false);
+        // Generate moves if not already generated
+        // Never generate underpromotions in search
+        if (mMovesGenerated != (MoveGenType)noisiesOnly) {
+            board.pseudolegalMoves(mMoves, noisiesOnly, false);
+            mMovesGenerated = (MoveGenType)noisiesOnly;
+        }
+
+        // Score moves
 
         int stm = (int)board.sideToMove();
 
@@ -62,6 +47,7 @@ struct PlyData {
 
             PieceType captured = board.captured(move);
             PieceType promotion = move.promotion();
+            
             int pt = (int)move.pieceType();
             HistoryEntry &historyEntry = historyTable[stm][pt][move.to()];
 
@@ -110,6 +96,33 @@ struct PlyData {
             }
 
         return { mMoves[mCurrentMoveIdx], mMovesScores[mCurrentMoveIdx] };
+    }
+
+    inline void updatePV(Move move) 
+    {
+        // This function is called from SearchThread in search.cpp, which has a
+        // std::array<PlyData, MAX_DEPTH+1> mPliesData
+        // so the data is continuous and we can fetch the next ply data
+        // by incrementing this pointer
+        PlyData* nextPlyData = this + 1;
+
+        mPvLine.clear();
+        mPvLine.push_back(move);
+
+        // Copy child's PV
+        for (Move move : nextPlyData->mPvLine)
+            mPvLine.push_back(move);
+    }
+
+    inline std::string pvString() {
+        if (mPvLine.size() == 0) return "";
+
+        std::string pvStr = mPvLine[0].toUci();
+
+        for (std::size_t i = 1; i < mPvLine.size(); i++)
+            pvStr += " " + mPvLine[i].toUci();
+
+        return pvStr;
     }
 
 }; // struct PlyData

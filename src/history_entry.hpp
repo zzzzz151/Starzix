@@ -9,6 +9,7 @@ struct HistoryEntry {
 
     i16 mMainHistory = 0;
 
+    // Continuation histories 
     // [0 = 1ply, 1 = 2ply, 2 = 4ply][pieceType][targetSquare]
     MultiArray<i16, 3, 6, 64> mContHists = { };
 
