@@ -604,6 +604,7 @@ class SearchThread {
 
             // Update correction history
             if (!mBoard.inCheck()
+            && abs(bestScore) < MIN_MATE_SCORE
             && (bestMove == MOVE_NONE || isBestMoveQuiet)
             && !(bound == Bound::LOWER && bestScore <= eval)
             && !(bound == Bound::UPPER && bestScore >= eval))
