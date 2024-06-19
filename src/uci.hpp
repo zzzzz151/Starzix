@@ -86,6 +86,25 @@ inline void runCommand(std::string &command, Board &board, std::vector<TTEntry> 
     }
     else if (tokens[0] == "undomove")
         board.undoMove();
+    else if (command == "spsainput") 
+    {
+        for (auto [paramName, tunableParam] : tunableParams) 
+            std::visit([&] (auto *myParam) 
+            {
+                if (myParam == nullptr) return;
+
+                std::cout << paramName 
+                          << ", " << (myParam->floatOrDouble() ? "float" : "int")
+                          << ", " << myParam->value
+                          << ", " << myParam->min
+                          << ", " << myParam->max
+                          << ", " << myParam->step
+                          << ", 0.002"
+                          << std::endl;
+
+            }, tunableParam);
+    }
+
 }
 
 inline void uci() {
@@ -94,31 +113,21 @@ inline void uci() {
     std::cout << "option name Hash type spin default 32 min 1 max 65536" << std::endl;
     std::cout << "option name Threads type spin default 1 min 1 max 256" << std::endl;
 
-    /*
-    for (auto [paramName, tunableParam] : tunableParams) {
-        std::cout << "option name " << paramName;
-
+    for (auto [paramName, tunableParam] : tunableParams) 
+    {
         std::visit([&] (auto *myParam) 
         {
             if (myParam == nullptr) return;
 
-            if (std::is_same<decltype(myParam->value), double>::value
-            || std::is_same<decltype(myParam->value), float>::value)
-            {
-                std::cout << " type spin default " << round(myParam->value * 100.0)
-                          << " min " << round(myParam->min * 100.0)
-                          << " max " << round(myParam->max * 100.0);
-            }
-            else {
-                std::cout << " type spin default " << myParam->value
-                          << " min " << myParam->min
-                          << " max " << myParam->max;
-            }
+            std::cout << "option name " << paramName 
+                      << " type string"
+                      << " default " << myParam->value
+                      << " min "     << myParam->min
+                      << " max "     << myParam->max
+                      << std::endl;
+            
         }, tunableParam);
-
-        std::cout << std::endl;
     }
-    */
 
     std::cout << "uciok" << std::endl;
 }
@@ -153,16 +162,12 @@ inline void setoption(std::vector<std::string> &tokens, std::vector<TTEntry> &tt
     else if (tunableParams.count(optionName) > 0) 
     {
         auto tunableParam = tunableParams[optionName];
-        i64 newValue = stoll(optionValue);
 
-        std::visit([optionName, newValue] (auto *myParam) 
+        std::visit([optionName, optionValue] (auto *myParam) 
         {
             if (myParam == nullptr) return;
 
-            myParam->value = std::is_same<decltype(myParam->value), double>::value 
-                             || std::is_same<decltype(myParam->value), float>::value 
-                             ? (double)newValue / 100.0 
-                             : newValue;
+            myParam->value = std::stod(optionValue);
 
             if (optionName == stringify(lmrBase) || optionName == stringify(lmrMultiplier))
                 initLmrTable();

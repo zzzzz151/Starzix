@@ -15,6 +15,12 @@ template <typename T> struct TunableParam {
     inline T operator () () const {
         return value;
     }
+
+    inline bool floatOrDouble() {
+        return std::is_same<decltype(value), double>::value
+               || std::is_same<decltype(value), float>::value;
+    }
+
 };
 
 constexpr u8 MAX_DEPTH = 100;
