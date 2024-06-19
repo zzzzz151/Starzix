@@ -4,31 +4,103 @@
 
 #define stringify(myVar) (std::string)#myVar
 
-#include <array>
+#include <iostream>
+#include <string>
 #include <vector>
 #include <sstream>
-#include <iostream>
+#include <cassert>
 #include <algorithm>
 #include <bitset>
-#include <cassert>
 #include <chrono>
 #include <unordered_map>
-#include "3rdparty/ordered_map.h"
-#include "types.hpp"
+#include <type_traits>
 #include "array_extensions.hpp"
+#include "3rdparty/ordered_map.h"
 
-inline u8 lsb(u64 bitboard) {
-    return std::countr_zero(bitboard);
+using size_t = size_t;
+using u8 = uint8_t;
+using u16 = uint16_t;
+using u32 = uint32_t;
+using u64 = uint64_t;
+using u128 = unsigned __int128;
+using i8 = int8_t;
+using i16 = int16_t;
+using i32 = int32_t;
+using i64 = int64_t;
+
+constexpr i32 I32_MAX = 2147483647;
+constexpr i64 I64_MAX = 9223372036854775807;
+
+constexpr u64 ONES = 0xffff'ffff'ffff'ffff;
+
+const std::string START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+using Square = u8;
+constexpr Square SQUARE_NONE = 255;
+
+enum class Color : i8 {
+    NONE = -1, WHITE = 0, BLACK = 1
+};
+
+constexpr int WHITE = 0, BLACK = 1;
+
+enum class PieceType : u8 {
+    PAWN = 0, KNIGHT = 1, BISHOP = 2, ROOK = 3, QUEEN = 4, KING = 5, NONE = 6
+};
+
+constexpr int PAWN = 0, KNIGHT = 1, BISHOP = 2, ROOK = 3, QUEEN = 4, KING = 5;
+
+enum class Rank : u8 {
+    RANK_1 = 0, RANK_2 = 1, RANK_3 = 2, RANK_4 = 3,
+    RANK_5 = 4, RANK_6 = 5, RANK_7 = 6, RANK_8 = 7
+};
+
+enum class File : u8 {
+    A = 0, B = 1, C = 2, D = 3, E = 4, F = 5, G = 6, H = 7
+};
+
+const std::string SQUARE_TO_STR[64] = {
+    "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1",
+    "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2",
+    "a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3",
+    "a4", "b4", "c4", "d4", "e4", "f4", "g4", "h4",
+    "a5", "b5", "c5", "d5", "e5", "f5", "g5", "h5",
+    "a6", "b6", "c6", "d6", "e6", "f6", "g6", "h6",
+    "a7", "b7", "c7", "d7", "e7", "f7", "g7", "h7",
+    "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8",
+};
+
+inline Square strToSquare(std::string strSquare) {
+    return (strSquare[0] - 'a') + (strSquare[1] - '1') * 8;
 }
 
-inline u8 poplsb(u64 &bitboard)
+constexpr Color oppColor(Color color) { 
+    assert(color != Color::NONE);
+    return color == Color::WHITE ? Color::BLACK : Color::WHITE;
+}
+
+constexpr Rank squareRank(Square square) { return (Rank)(square / 8); }
+
+constexpr File squareFile(Square square) { return (File)(square % 8); }
+
+constexpr u64 bitboard(Square sq) { 
+    assert(sq >= 0 && sq <= 63);
+    return 1ULL << sq; 
+}
+
+constexpr u8 lsb(u64 bb) {
+    assert(bb > 0);
+    return std::countr_zero(bb);
+}
+
+constexpr u8 poplsb(u64 &bb)
 {
-    auto idx = lsb(bitboard);
-    bitboard &= bitboard - 1; // compiler optimizes this to _blsr_u64
+    auto idx = lsb(bb);
+    bb &= bb - 1; // compiler optimizes this to _blsr_u64
     return idx;
 }
 
-inline u64 pdep(u64 val, u64 mask) {
+constexpr u64 pdep(u64 val, u64 mask) {
     u64 res = 0;
     for (u64 bb = 1; mask; bb += bb) {
         if (val & bb)
@@ -36,6 +108,32 @@ inline u64 pdep(u64 val, u64 mask) {
         mask &= mask - 1;
     }
     return res;
+}
+
+constexpr u64 shiftRight(u64 bb) {
+	return (bb << 1ULL) & 0xfefefefefefefefeULL;
+}
+
+constexpr u64 shiftLeft(u64 bb) {
+	return (bb >> 1ULL) & 0x7f7f7f7f7f7f7f7fULL;
+}
+
+constexpr u64 shiftUp(u64 bb) { return bb << 8ULL; }
+
+constexpr u64 shiftDown(u64 bb) { return bb >> 8ULL; }
+
+inline void printBitboard(u64 bb)
+{
+    std::bitset<64> b(bb);
+    std::string str_bitset = b.to_string(); 
+    for (int i = 0; i < 64; i += 8)
+    {
+        std::string x = str_bitset.substr(i, 8);
+        reverse(x.begin(), x.end());
+        for (u64 j = 0; j < x.length(); j++)
+            std::cout << std::string(1, x[j]) << " ";
+        std::cout << std::endl;
+    }
 }
 
 inline void trim(std::string &str) {
@@ -65,131 +163,11 @@ inline std::vector<std::string> splitString(std::string &str, char delimiter)
     return strSplit;
 }
 
-inline u64 toBitboard(Square sq) { return 1ULL << sq; }
+constexpr int charToInt(char myChar) { return myChar - '0'; }
 
-inline void printBitboard(u64 bb)
-{
-    std::bitset<64> b(bb);
-    std::string str_bitset = b.to_string(); 
-    for (int i = 0; i < 64; i += 8)
-    {
-        std::string x = str_bitset.substr(i, 8);
-        reverse(x.begin(), x.end());
-        for (u64 j = 0; j < x.length(); j++)
-            std::cout << std::string(1, x[j]) << " ";
-        std::cout << std::endl;
-    }
-}
-
-inline int charToInt(char myChar) { return myChar - '0'; }
-
-inline double ln(u64 x) {
+constexpr double ln(u64 x) {
     assert(x > 0);
     return log(x);
-}
-
-inline u64 shiftRight(u64 bb) {
-	return (bb << 1ULL) & 0xfefefefefefefefeULL;
-}
-
-inline u64 shiftLeft(u64 bb) {
-	return (bb >> 1ULL) & 0x7f7f7f7f7f7f7f7fULL;
-}
-
-inline u64 shiftUp(u64 bb) { return bb << 8ULL; }
-
-inline u64 shiftDown(u64 bb) { return bb >> 8ULL; }
-
-inline Color oppColor(Color color)
-{
-    assert(color != Color::NONE);
-    return color == Color::WHITE ? Color::BLACK : Color::WHITE;
-}
-
-inline Rank squareRank(Square square) { return (Rank)(square / 8); }
-
-inline File squareFile(Square square) { return (File)(square % 8); }
-
-const std::string SQUARE_TO_STR[64] = {
-    "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1",
-    "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2",
-    "a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3",
-    "a4", "b4", "c4", "d4", "e4", "f4", "g4", "h4",
-    "a5", "b5", "c5", "d5", "e5", "f5", "g5", "h5",
-    "a6", "b6", "c6", "d6", "e6", "f6", "g6", "h6",
-    "a7", "b7", "c7", "d7", "e7", "f7", "g7", "h7",
-    "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8",
-};
-
-inline Square strToSquare(std::string strSquare) {
-    return (strSquare[0] - 'a') + (strSquare[1] - '1') * 8;
-}
-
-std::unordered_map<char, Piece> CHAR_TO_PIECE = {
-    {'P', Piece::WHITE_PAWN},
-    {'N', Piece::WHITE_KNIGHT},
-    {'B', Piece::WHITE_BISHOP},
-    {'R', Piece::WHITE_ROOK},
-    {'Q', Piece::WHITE_QUEEN},
-    {'K', Piece::WHITE_KING},
-    {'p', Piece::BLACK_PAWN},
-    {'n', Piece::BLACK_KNIGHT},
-    {'b', Piece::BLACK_BISHOP},
-    {'r', Piece::BLACK_ROOK},
-    {'q', Piece::BLACK_QUEEN},
-    {'k', Piece::BLACK_KING},
-};
-
-std::unordered_map<char, PieceType> CHAR_TO_PIECE_TYPE = {
-    {'P', PieceType::PAWN},
-    {'N', PieceType::KNIGHT},
-    {'B', PieceType::BISHOP},
-    {'R', PieceType::ROOK},
-    {'Q', PieceType::QUEEN},
-    {'K', PieceType::KING},
-    {'p', PieceType::PAWN},
-    {'n', PieceType::KNIGHT},
-    {'b', PieceType::BISHOP},
-    {'r', PieceType::ROOK},
-    {'q', PieceType::QUEEN},
-    {'k', PieceType::KING},
-};
-
-std::unordered_map<Piece, char> PIECE_TO_CHAR = {
-    {Piece::WHITE_PAWN,   'P'},
-    {Piece::WHITE_KNIGHT, 'N'},
-    {Piece::WHITE_BISHOP, 'B'},
-    {Piece::WHITE_ROOK,   'R'},
-    {Piece::WHITE_QUEEN,  'Q'},
-    {Piece::WHITE_KING,   'K'},
-    {Piece::BLACK_PAWN,   'p'},
-    {Piece::BLACK_KNIGHT, 'n'},
-    {Piece::BLACK_BISHOP, 'b'},
-    {Piece::BLACK_ROOK,   'r'},
-    {Piece::BLACK_QUEEN,  'q'},
-    {Piece::BLACK_KING,   'k'}
-};
-
-inline PieceType pieceToPieceType(Piece piece)
-{
-    if (piece == Piece::NONE) return PieceType::NONE;
-
-    int intPiece = (int)piece;
-    return intPiece <= 5 ? (PieceType)intPiece : (PieceType)(intPiece - 6);
-}
-
-inline Color pieceColor(Piece piece)
-{
-    return (int)piece <= 5 ? Color::WHITE
-           : (int)piece <= 11 ? Color::BLACK
-           : Color::NONE;
-}
-
-inline Piece makePiece(PieceType pieceType, Color color)
-{
-    assert(pieceType != PieceType::NONE);
-    int pt = (int)pieceType;
-    return color == Color::WHITE ? (Piece)pt : (Piece)(pt+6);
 }
 
 inline auto millisecondsElapsed(std::chrono::steady_clock::time_point start)
@@ -200,9 +178,9 @@ inline auto millisecondsElapsed(std::chrono::steady_clock::time_point start)
 // [color][CASTLE_SHORT or CASTLE_LONG or isLongCastle]
 constexpr MultiArray<u64, 2, 2> CASTLING_MASKS = {{
     // White short and long castle
-    { 1ULL << 7, 1ULL },
+    { bitboard(7), bitboard(0) },
     // Black short and long castle
-    { 1ULL << 63, 1ULL << 56 } 
+    { bitboard(63), bitboard(56) } 
 }};
 
 std::array<std::pair<Square, Square>, 64> CASTLING_ROOK_FROM_TO = {};
@@ -213,6 +191,8 @@ MultiArray<u64, 64, 64> BETWEEN = {}, LINE_THROUGH = {};
 #include "attacks.hpp"
 
 constexpr void initUtils() {
+    attacks::init();
+
     CASTLING_ROOK_FROM_TO[6] = {7, 5};    // White short castle
     CASTLING_ROOK_FROM_TO[2] = {0, 3};    // White long castle
     CASTLING_ROOK_FROM_TO[62] = {63, 61}; // Black short castle
@@ -223,18 +203,16 @@ constexpr void initUtils() {
         {
             if (sq1 == sq2) continue;
 
-            u64 bbSq1 = 1ULL << sq1;
-            u64 bbSq2 = 1ULL << sq2;
-            LINE_THROUGH[sq1][sq2] = bbSq1 | bbSq2;
+            LINE_THROUGH[sq1][sq2] = bitboard(sq1) | bitboard(sq2);
 
-            if (attacks::bishopAttacks(sq1, 0) & bbSq2) 
+            if (attacks::bishopAttacks(sq1, 0) & bitboard(sq2)) 
             {
-                BETWEEN[sq1][sq2] = attacks::bishopAttacks(sq1, bbSq2) & attacks::bishopAttacks(sq2, bbSq1);
+                BETWEEN[sq1][sq2] = attacks::bishopAttacks(sq1, bitboard(sq2)) & attacks::bishopAttacks(sq2, bitboard(sq1));
                 LINE_THROUGH[sq1][sq2] |= attacks::bishopAttacks(sq1, 0) & attacks::bishopAttacks(sq2, 0);
             }
-            else  if (attacks::rookAttacks(sq1, 0) & bbSq2) 
+            else  if (attacks::rookAttacks(sq1, 0) & bitboard(sq2)) 
             {
-                BETWEEN[sq1][sq2] = attacks::rookAttacks(sq1, bbSq2) & attacks::rookAttacks(sq2, bbSq1);
+                BETWEEN[sq1][sq2] = attacks::rookAttacks(sq1, bitboard(sq2)) & attacks::rookAttacks(sq2, bitboard(sq1));
                 LINE_THROUGH[sq1][sq2] |= attacks::rookAttacks(sq1, 0) & attacks::rookAttacks(sq2, 0);
             }
 

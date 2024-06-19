@@ -21,7 +21,7 @@ inline PieceType popLeastValuable(Board &board, u64 &occ, u64 attackers, Color c
     {
         u64 bb = attackers & board.getBb(color, (PieceType)pt);
         if (bb > 0) {
-            occ ^= 1ULL << lsb(bb);
+            occ ^= bitboard(lsb(bb));
             return (PieceType)pt;
         }
     }
@@ -57,7 +57,7 @@ inline bool SEE(Board &board, Move move, i32 threshold = 0)
     u64 bishopsQueens = board.getBb(PieceType::BISHOP) | board.getBb(PieceType::QUEEN);
     u64 rooksQueens   = board.getBb(PieceType::ROOK)   | board.getBb(PieceType::QUEEN);
 
-    u64 occupancy = board.occupancy() ^ (1ULL << from) ^ (1ULL << square);
+    u64 occupancy = board.occupancy() ^ bitboard(from) ^ bitboard(square);
     u64 attackers = board.attackers(square, occupancy);
 
     Color us = board.oppSide();

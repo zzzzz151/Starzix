@@ -26,7 +26,7 @@ constexpr int initPiece(Color color, PieceType pieceType)
                         : pieceType == PieceType::QUEEN  ? attacks::queenAttacks(sq1, 0)
                         : attacks::kingAttacks(sq1);
 
-            if ((attacks & (1ULL << sq2)) == 0) continue;
+            if ((attacks & bitboard(sq2)) == 0) continue;
 
             Move move = Move(sq1, sq2, (u16)pieceType + 1);
 

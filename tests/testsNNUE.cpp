@@ -64,7 +64,6 @@ void testAccumulatorUpdate(Board board, Move move)
 
 int main()
 {
-    attacks::init();
     initUtils();
     initZobrist();
 

@@ -33,7 +33,7 @@ struct HistoryEntry {
         // Add continuation histories
 
         Move move;
-        for (std::size_t i = 0; i < 3; i++)
+        for (size_t i = 0; i < 3; i++)
             if ((move = moves[i]) != MOVE_NONE) 
             {
                 int pt = (int)move.pieceType();
@@ -51,7 +51,7 @@ struct HistoryEntry {
         // Update continuation histories
 
         Move move;
-        for (std::size_t i = 0; i < 3; i++)
+        for (size_t i = 0; i < 3; i++)
             if ((move = moves[i]) != MOVE_NONE) 
             {
                 int pt = (int)move.pieceType();

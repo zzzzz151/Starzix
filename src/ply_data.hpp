@@ -43,7 +43,7 @@ struct PlyData {
             board.nthToLastMove(1), board.nthToLastMove(2), board.nthToLastMove(4)
         };
 
-        for (std::size_t i = 0; i < mMoves.size(); i++)
+        for (size_t i = 0; i < mMoves.size(); i++)
         {
             Move move = mMoves[i];
 
@@ -82,8 +82,8 @@ struct PlyData {
                 mMovesScores[i] = COUNTERMOVE_SCORE;
             else
                 mMovesScores[i] = historyEntry.quietHistory(
-                    mEnemyAttacks & (1ULL << move.from()),
-                    mEnemyAttacks & (1ULL << move.to()),
+                    mEnemyAttacks & bitboard(move.from()),
+                    mEnemyAttacks & bitboard(move.to()),
                     lastMoves);
         }
 
@@ -98,7 +98,7 @@ struct PlyData {
             return { MOVE_NONE, 0 };
 
         // Incremental sort
-        for (std::size_t j = mCurrentMoveIdx + 1; j < mMoves.size(); j++)
+        for (size_t j = mCurrentMoveIdx + 1; j < mMoves.size(); j++)
             if (mMovesScores[j] > mMovesScores[mCurrentMoveIdx])
             {
                 mMoves.swap(mCurrentMoveIdx, j);
@@ -124,15 +124,14 @@ struct PlyData {
             mPvLine.push_back(move);
     }
 
-    inline std::string pvString() {
-        if (mPvLine.size() == 0) return "";
+    inline std::string pvString() 
+    {
+        std::string str = "";
+        for (Move move : mPvLine)
+            str += move.toUci() + " ";
 
-        std::string pvStr = mPvLine[0].toUci();
-
-        for (std::size_t i = 1; i < mPvLine.size(); i++)
-            pvStr += " " + mPvLine[i].toUci();
-
-        return pvStr;
+        trim(str);
+        return str;
     }
 
 }; // struct PlyData

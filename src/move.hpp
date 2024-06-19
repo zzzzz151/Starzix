@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "types.hpp"
 #include "utils.hpp"
 
 struct Move {
@@ -49,6 +48,9 @@ struct Move {
         mMove |= ((u16)to << 4);
         mMove |= flag;
     }
+
+    inline Move(std::string from, std::string to, u16 flag) 
+    : Move(strToSquare(from), strToSquare(to), flag) { }
 
     inline u16 encoded() { return mMove; }
 

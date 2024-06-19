@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "types.hpp"
 #include "utils.hpp"
 
 namespace attacks {
@@ -29,12 +28,12 @@ constexpr u64 pawnAttacksSlow(Square square, Color color)
 
     File file = squareFile(square);
 
-    u64 squareDiagonalLeft  = toBitboard(square + (color == Color::WHITE ? 7 : -9)),
-        squareDiagonalRight = toBitboard(square + (color == Color::WHITE ? 9 : -7));
+    int squareDiagonalLeft  = (int)square + (color == Color::WHITE ? 7 : -9),
+        squareDiagonalRight = (int)square + (color == Color::WHITE ? 9 : -7);
 
-    return file == File::A ? squareDiagonalRight
-         : file == File::H ? squareDiagonalLeft
-         : squareDiagonalLeft | squareDiagonalRight;
+    return file == File::A ? bitboard(squareDiagonalRight)
+         : file == File::H ? bitboard(squareDiagonalLeft)
+         : bitboard(squareDiagonalLeft) | bitboard(squareDiagonalRight);
 }
 
 constexpr u64 bishopAttacksSlow(Square sq, u64 occupied, bool excludeEdges = false)
@@ -48,9 +47,9 @@ constexpr u64 bishopAttacksSlow(Square sq, u64 occupied, bool excludeEdges = fal
     {
         if (excludeEdges && (f == 7 || r == 7))
             break;
-        Square s = r * 8 + f;
-        attacks |= (1ULL << s);
-        if (occupied & (1ULL << s))
+        Square sq = r * 8 + f;
+        attacks |= bitboard(sq);
+        if (occupied & bitboard(sq))
             break;
     }
 
@@ -58,9 +57,9 @@ constexpr u64 bishopAttacksSlow(Square sq, u64 occupied, bool excludeEdges = fal
     {
         if (excludeEdges && (r == 0 || f == 7))
             break;
-        Square s = r * 8 + f;
-        attacks |= (1ULL << s);
-        if (occupied & (1ULL << s))
+        Square sq = r * 8 + f;
+        attacks |= bitboard(sq);
+        if (occupied & bitboard(sq))
             break;
     }
 
@@ -68,9 +67,9 @@ constexpr u64 bishopAttacksSlow(Square sq, u64 occupied, bool excludeEdges = fal
     {
         if (excludeEdges && (r == 7 || f == 0))
             break;
-        Square s = r * 8 + f;
-        attacks |= (1ULL << s);
-        if (occupied & (1ULL << s))
+        Square sq = r * 8 + f;
+        attacks |= bitboard(sq);
+        if (occupied & bitboard(sq))
             break;
     }
 
@@ -78,9 +77,9 @@ constexpr u64 bishopAttacksSlow(Square sq, u64 occupied, bool excludeEdges = fal
     {
         if (excludeEdges && (r == 0 || f == 0))
             break;
-        Square s = r * 8 + f;
-        attacks |= (1ULL << s);
-        if (occupied & (1ULL << s))
+        Square sq = r * 8 + f;
+        attacks |= bitboard(sq);
+        if (occupied & bitboard(sq))
             break;
     }
 
@@ -98,9 +97,9 @@ constexpr u64 rookAttacksSlow(Square sq, u64 occupied, bool excludeEdges = false
     {
         if (excludeEdges && r == 7)
             break;
-        Square s = r * 8 + rf;
-        attacks |= (1ULL << s);
-        if (occupied & (1ULL << s))
+        Square sq = r * 8 + rf;
+        attacks |= bitboard(sq);
+        if (occupied & bitboard(sq))
             break;
     }
 
@@ -108,9 +107,9 @@ constexpr u64 rookAttacksSlow(Square sq, u64 occupied, bool excludeEdges = false
     {
         if (excludeEdges && r == 0)
             break;
-        Square s = r * 8 + rf;
-        attacks |= (1ULL << s);
-        if (occupied & (1ULL << s))
+        Square sq = r * 8 + rf;
+        attacks |= bitboard(sq);
+        if (occupied & bitboard(sq))
             break;
     }
 
@@ -118,9 +117,9 @@ constexpr u64 rookAttacksSlow(Square sq, u64 occupied, bool excludeEdges = false
     {
         if (excludeEdges && f == 7)
             break;
-        Square s = rr * 8 + f;
-        attacks |= (1ULL << s);
-        if (occupied & (1ULL << s))
+        Square sq = rr * 8 + f;
+        attacks |= bitboard(sq);
+        if (occupied & bitboard(sq))
             break;
     }
 
@@ -128,9 +127,9 @@ constexpr u64 rookAttacksSlow(Square sq, u64 occupied, bool excludeEdges = false
     {
         if (excludeEdges && f == 0)
             break;
-        Square s = rr * 8 + f;
-        attacks |= (1ULL << s);
-        if (occupied & (1ULL << s))
+        Square sq = rr * 8 + f;
+        attacks |= bitboard(sq);
+        if (occupied & bitboard(sq))
             break;
     }
 
@@ -212,7 +211,7 @@ constexpr void init()
         internal::PAWN_ATTACKS[1][square] = pawnAttacksSlow(square, Color::BLACK);
 
         // Knight
-        u64 n = 1ULL << square;
+        u64 n = bitboard(square);
         u64 h1 = ((n >> 1ULL) & 0x7f7f7f7f7f7f7f7fULL) | ((n << 1ULL) & 0xfefefefefefefefeULL);
         u64 h2 = ((n >> 2ULL) & 0x3f3f3f3f3f3f3f3fULL) | ((n << 2ULL) & 0xfcfcfcfcfcfcfcfcULL);
         KNIGHT_ATTACKS[square] = (h1 << 16ULL) | (h1 >> 16ULL) | (h2 << 8ULL) | (h2 >> 8ULL);

@@ -52,9 +52,9 @@ struct alignas(ALIGNMENT) Accumulator
         mUpdated = true;
     }
 
-    inline void activateAll(u64 bitboard, int feature) {
-        while (bitboard > 0) {
-            int square = poplsb(bitboard);
+    inline void activateAll(u64 bb, int feature) {
+        while (bb > 0) {
+            int square = poplsb(bb);
 
             for (int color : {WHITE, BLACK})
                 for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 

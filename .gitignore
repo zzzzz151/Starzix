@@ -3,13 +3,14 @@
 
 **/*.exe
 **/starzix
+**/*.pdb
 
-./testsGeneral
-./testsSEE
-./testsNNUE
 testsGeneral.exe
 testsSEE.exe
 testsNNUE.exe
+testsGeneral
+testsSEE
+testsNNUE
 
 games.txt
 games.pgn

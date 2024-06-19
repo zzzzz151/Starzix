@@ -3,7 +3,6 @@
 #pragma once
 
 #include <random>
-#include "types.hpp"
 #include "utils.hpp"
 #include "move.hpp"
 #include "attacks.hpp"
@@ -110,9 +109,17 @@ class Board {
                 currentFile += charToInt(thisChar);
             else
             {
-                Color color = isupper(thisChar) ? Color::WHITE : Color::BLACK;
-                PieceType pt = CHAR_TO_PIECE_TYPE[thisChar];
                 Square sq = currentRank * 8 + currentFile;
+                Color color = isupper(thisChar) ? Color::WHITE : Color::BLACK;
+                thisChar = std::tolower(thisChar);
+
+                PieceType pt = thisChar == 'p' ? PieceType::PAWN 
+                             : thisChar == 'n' ? PieceType::KNIGHT 
+                             : thisChar == 'b' ? PieceType::BISHOP 
+                             : thisChar == 'r' ? PieceType::ROOK
+                             : thisChar == 'q' ? PieceType::QUEEN
+                             : PieceType::KING;
+                             
                 placePiece(color, pt, sq);
                 currentFile++;
             }
@@ -189,7 +196,7 @@ class Board {
     }
 
     inline bool isOccupied(Square square) {
-        return occupancy() & (1ULL << square);
+        return occupancy() & bitboard(square);
     }
 
     inline u64 checkers() { return mState->checkers; }
@@ -213,28 +220,11 @@ class Board {
     { 
         if (!isOccupied(square)) return PieceType::NONE;
 
-        u64 sqBitboard = 1ULL << square;
-
         for (int pt = PAWN; pt <= KING; pt++)
-            if (sqBitboard & getBb((PieceType)pt))
+            if (bitboard(square) & getBb((PieceType)pt))
                 return (PieceType)pt;
 
         return PieceType::NONE;
-    }
-
-    inline Piece pieceAt(Square square) { 
-        u64 sqBitboard = 1ULL << square;
-
-        for (int pt = PAWN; pt <= KING; pt++)
-            if (sqBitboard & getBb((PieceType)pt))
-                {
-                    Color color = sqBitboard & getBb(Color::WHITE)
-                                  ? Color::WHITE : Color::BLACK;
-
-                    return makePiece((PieceType)pt, color);
-                }
-
-        return Piece::NONE;
     }
 
     private:
@@ -243,18 +233,18 @@ class Board {
     {
         assert(!isOccupied(square));
 
-        mState->colorBitboard[(int)color] |= 1ULL << square;
-        mState->piecesBitboards[(int)pieceType] |= 1ULL << square;
+        mState->colorBitboard[(int)color] |= bitboard(square);
+        mState->piecesBitboards[(int)pieceType] |= bitboard(square);
 
         updateHashes(color, pieceType, square);
     }
 
     inline void removePiece(Color color, PieceType pieceType, Square square) 
     {
-        assert(pieceAt(square) == makePiece(pieceType, color));
+        assert(getBb(color, pieceType) & bitboard(square));
 
-        mState->colorBitboard[(int)color] ^= 1ULL << square;
-        mState->piecesBitboards[(int)pieceType] ^= 1ULL << square;
+        mState->colorBitboard[(int)color] ^= bitboard(square);
+        mState->piecesBitboards[(int)pieceType] ^= bitboard(square);
 
         updateHashes(color, pieceType, square);
     }
@@ -279,10 +269,8 @@ class Board {
             for (int file = 0; file < 8; file++)
             {
                 Square square = rank * 8 + file;
-                Piece piece = pieceAt(square);
 
-                if (piece == Piece::NONE)
-                {
+                if (!isOccupied(square)) {
                     emptySoFar++;
                     continue;
                 }
@@ -290,7 +278,20 @@ class Board {
                 if (emptySoFar > 0) 
                     myFen += std::to_string(emptySoFar);
 
-                myFen += std::string(1, PIECE_TO_CHAR[piece]);
+                PieceType pt = pieceTypeAt(square);
+                
+                char piece = pt == PieceType::PAWN   ? 'p'
+                           : pt == PieceType::KNIGHT ? 'n'
+                           : pt == PieceType::BISHOP ? 'b'
+                           : pt == PieceType::ROOK   ? 'r'
+                           : pt == PieceType::QUEEN  ? 'q'
+                           : pt == PieceType::KING   ? 'k'
+                           : '.';
+
+                if (getBb(Color::WHITE) & bitboard(square))
+                    piece = std::toupper(piece);
+
+                myFen += std::string(1, piece);
                 emptySoFar = 0;
             }
 
@@ -336,12 +337,20 @@ class Board {
             for (int j = 0; j < 8; j++) 
             {
                 int square = i * 8 + j;
+                PieceType pt = pieceTypeAt(square);
+                
+                char piece = pt == PieceType::PAWN   ? 'p'
+                           : pt == PieceType::KNIGHT ? 'n'
+                           : pt == PieceType::BISHOP ? 'b'
+                           : pt == PieceType::ROOK   ? 'r'
+                           : pt == PieceType::QUEEN  ? 'q'
+                           : pt == PieceType::KING   ? 'k'
+                           : '.';
+                           
+                if (pt != PieceType::NONE && (getBb(Color::WHITE) & bitboard(square)))
+                    piece = std::toupper(piece);
 
-                str += pieceAt(square) == Piece::NONE 
-                       ? "." 
-                       : std::string(1, PIECE_TO_CHAR[pieceAt(square)]);
-
-                str += " ";
+                str += std::string(1, piece) + " ";
             }
             str += "\n";
         }
@@ -349,8 +358,6 @@ class Board {
         std::cout << str << std::endl;
         std::cout << fen() << std::endl;
         std::cout << "Zobrist hash: " << mState->zobristHash << std::endl;
-        std::cout << "Checkers: " << mState->checkers << std::endl;
-        std::cout << "Pinned: " << pinned() << std::endl;
 
         if (lastMove() != MOVE_NONE)
             std::cout << "Last move: " << lastMove().toUci() << std::endl;
@@ -631,10 +638,10 @@ class Board {
             mState->castlingRights &= ~CASTLING_MASKS[(int)sideToMove()][CASTLE_SHORT]; 
             mState->castlingRights &= ~CASTLING_MASKS[(int)sideToMove()][CASTLE_LONG]; 
         }
-        else if ((1ULL << from) & mState->castlingRights)
-            mState->castlingRights &= ~(1ULL << from);
-        if ((1ULL << to) & mState->castlingRights)
-            mState->castlingRights &= ~(1ULL << to); 
+        else if (bitboard(from) & mState->castlingRights)
+            mState->castlingRights &= ~bitboard(from);
+        if (bitboard(to) & mState->castlingRights)
+            mState->castlingRights &= ~bitboard(to);
 
         mState->zobristHash ^= mState->castlingRights; // XOR new castling rights in
 
@@ -834,7 +841,7 @@ class Board {
         if (moveFlag == Move::EN_PASSANT_FLAG) 
         {
             Square capturedSq = sideToMove() == Color::WHITE ? to - 8 : to + 8;
-            u64 occAfter = occupancy() ^ (1ULL << from) ^ (1ULL << capturedSq) ^ (1ULL << to);
+            u64 occAfter = occupancy() ^ bitboard(from) ^ bitboard(capturedSq) ^ bitboard(to);
 
             u64 bishopsQueens = getBb(PieceType::BISHOP) | getBb(PieceType::QUEEN);
             u64 rooksQueens   = getBb(PieceType::ROOK)   | getBb(PieceType::QUEEN);
@@ -846,18 +853,18 @@ class Board {
         }
 
         if (move.pieceType() == PieceType::KING)
-            return !isSquareAttacked(to, oppSide, occupancy() ^ (1ULL << from));
+            return !isSquareAttacked(to, oppSide, occupancy() ^ bitboard(from));
 
         if (std::popcount(mState->checkers) > 1) 
             return false;
 
-        if ((pinned & (1ULL << from)) > 0 && (LINE_THROUGH[from][to] & (1ULL << kingSquare)) == 0)
+        if ((pinned & bitboard(from)) > 0 && (LINE_THROUGH[from][to] & bitboard(kingSquare)) == 0)
             return false;
 
         // 1 checker
         if (mState->checkers > 0) {
             Square checkerSquare = lsb(mState->checkers);
-            return (1ULL << to) & (BETWEEN[kingSquare][checkerSquare] | mState->checkers);
+            return bitboard(to) & (BETWEEN[kingSquare][checkerSquare] | mState->checkers);
         }
 
         return true;
@@ -919,15 +926,13 @@ class Board {
                 Move move = cuckoo::MOVES[cuckooIdx];
                 Square from = move.from();
                 Square to = move.to();
-                u64 fromBitboard = 1ULL << from;
-                u64 toBitboard = 1ULL << to;
 
-                if (((BETWEEN[from][to] | toBitboard) ^ toBitboard) & occ)
+                if (((BETWEEN[from][to] | bitboard(to)) ^ bitboard(to)) & occ)
                     continue;
 
                 if (ply > i) return true; // Repetition after root
 
-                Color pieceColor = getBb(Color::WHITE) & (occ & fromBitboard ? fromBitboard : toBitboard) 
+                Color pieceColor = getBb(Color::WHITE) & (occ & bitboard(from) ? bitboard(from) : bitboard(to)) 
                                    ? Color::WHITE : Color::BLACK;
 
                 if (pieceColor != sideToMove()) continue;

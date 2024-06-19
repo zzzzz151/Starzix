@@ -6,54 +6,54 @@
 
 // MultiArray
 
-template <typename T, std::size_t N, std::size_t... Ns>
+template <typename T, size_t N, size_t... Ns>
 struct MultiArrayImpl
 {
     using Type = std::array<typename MultiArrayImpl<T, Ns...>::Type, N>;
 };
 
-template <typename T, std::size_t N>
+template <typename T, size_t N>
 struct MultiArrayImpl<T, N>
 {
     using Type = std::array<T, N>;
 };
 
-template <typename T, std::size_t... Ns>
+template <typename T, size_t... Ns>
 using MultiArray = typename MultiArrayImpl<T, Ns...>::Type;
 
 // ArrayVec
 
-template <typename T, std::size_t N>
+template <typename T, size_t N>
 struct ArrayVec
 {
     private:
 
     std::array<T, N> mArr;
-    std::size_t mSize = 0;
+    size_t mSize = 0;
 
     public:
 
     inline ArrayVec() = default;
 
-    inline T operator[](std::size_t i) const
+    inline T operator[](size_t i) const
     {
         assert(i < mSize);
         return mArr[i];
     }
 
-    inline T& operator[](std::size_t i)
+    inline T& operator[](size_t i)
     {
         assert(i < mSize);
         return mArr[i];
     }
 
-    inline T* ptr(std::size_t i) const
+    inline T* ptr(size_t i) const
     {
         assert(i < mSize);
         return &mArr[i];
     }
 
-    inline std::size_t size() const { 
+    inline size_t size() const { 
         return mSize; 
     }
 
@@ -64,7 +64,7 @@ struct ArrayVec
         mArr[mSize++] = elem;
     }
 
-    inline void swap(std::size_t i, std::size_t j) 
+    inline void swap(size_t i, size_t j) 
     {
         assert(i < mSize && j < mSize);
         std::swap(mArr[i], mArr[j]);

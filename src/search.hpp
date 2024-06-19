@@ -2,6 +2,9 @@
 
 #pragma once
 
+constexpr i32 INF = 32000, 
+              MIN_MATE_SCORE = INF - 256;
+
 #include "board.hpp"
 #include "search_params.hpp"
 #include "tt.hpp"
@@ -100,8 +103,6 @@ class SearchThread {
         
         mAccumulators[0] = Accumulator(mBoard);
         mAccumulatorPtr = &mAccumulators[0];
-
-        updateAccumulatorAndEval(&mPliesData[0]);
 
         mNodes = 0;
         mMovesNodes = {};
@@ -317,7 +318,7 @@ class SearchThread {
         Color stm = mBoard.sideToMove();
         (plyDataPtr + 1)->mKiller = MOVE_NONE;
 
-        // If in check 2 plies ago, then pliesData[ply-2].eval is INF, and improving is false
+        // If in check 2 plies ago, then (plyDataPtr - 2)->mEval is INF, and improving is false
         bool improving = ply > 1 && !mBoard.inCheck() && eval > (plyDataPtr - 2)->mEval;
 
         if (!pvNode && !mBoard.inCheck() && !singularMove)
@@ -569,8 +570,8 @@ class SearchThread {
                 // Increase history of this fail high quiet move
                 historyEntry.updateQuietHistory(
                     historyBonus, 
-                    plyDataPtr->mEnemyAttacks & (1ULL << move.from()),
-                    plyDataPtr->mEnemyAttacks & (1ULL << move.to()),
+                    plyDataPtr->mEnemyAttacks & bitboard(move.from()),
+                    plyDataPtr->mEnemyAttacks & bitboard(move.to()),
                     moves);
 
                 // History malus: decrease history of fail low quiets
@@ -579,8 +580,8 @@ class SearchThread {
 
                     mHistoryTable[(int)stm][pt][failLow.to()].updateQuietHistory(
                         historyMalus, 
-                        plyDataPtr->mEnemyAttacks & (1ULL << failLow.from()),
-                        plyDataPtr->mEnemyAttacks & (1ULL << failLow.to()),
+                        plyDataPtr->mEnemyAttacks & bitboard(failLow.from()),
+                        plyDataPtr->mEnemyAttacks & bitboard(failLow.to()),
                         moves);
                 }
             }
@@ -610,7 +611,7 @@ class SearchThread {
             && !(bound == Bound::UPPER && bestScore >= eval))
             {
                 i32 &corrHist = mCorrectionHistory[(int)stm][mBoard.pawnHash() % 16384];
-                i32 newWeight = std::min(depth + 1, corrHistNewWeightMin());
+                i32 newWeight = std::min(depth + 1, corrHistNewWeightMax());
                 
                 corrHist *= corrHistScale() - newWeight;
                 corrHist += (bestScore - eval) * corrHistScale() * newWeight;

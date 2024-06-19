@@ -4,7 +4,6 @@
 #include "../src/see.hpp"
 
 int main() {
-    attacks::init();
     initUtils();
     initZobrist();
 

@@ -10,23 +10,20 @@ const std::string POSITION5 = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w 
 
 int main()
 {   
-    attacks::init();
     initUtils();
     initZobrist();
 
     // Test utils.hpp
 
-    assert(1ULL << lsb((i64)12) == 4);
+    assert(bitboard(lsb(12)) == 4);
 
     assert(strToSquare("b7") == 49);
 
     assert(squareFile(9) == File::B);
     assert(squareRank(41) == Rank::RANK_6);
 
-    assert(BETWEEN[32][59] == (toBitboard(41) | toBitboard(50)));
-    assert(LINE_THROUGH[41][50] == (toBitboard(32) | toBitboard(41) | toBitboard(50) | toBitboard(59)));
-
-    assert(makePiece(PieceType::PAWN, Color::WHITE) == Piece::WHITE_PAWN);
+    assert(BETWEEN[32][59] == (bitboard(41) | bitboard(50)));
+    assert(LINE_THROUGH[41][50] == (bitboard(32) | bitboard(41) | bitboard(50) | bitboard(59)));
 
     // Move tests
 
@@ -37,13 +34,13 @@ int main()
     assert(move.to() == 55);
     assert(move.flag() == Move::NULL_FLAG);
 
-    move = Move(strToSquare("e1"), strToSquare("g1"), Move::CASTLING_FLAG);
+    move = Move("e1", "g1", Move::CASTLING_FLAG);
     assert(SQUARE_TO_STR[move.from()] == "e1");
     assert(SQUARE_TO_STR[move.to()] == "g1");
     assert(move.flag() == Move::CASTLING_FLAG);
     assert(move.pieceType() == PieceType::KING);
 
-    move = Move(strToSquare("b7"), strToSquare("c8"), Move::BISHOP_PROMOTION_FLAG);
+    move = Move("b7", "c8", Move::BISHOP_PROMOTION_FLAG);
     assert(move.toUci() == "b7c8b");
     assert(move.pieceType() == PieceType::PAWN);
     assert(move.promotion() == PieceType::BISHOP);
@@ -133,17 +130,17 @@ int main()
 
     // makeMove()
     board = Board("rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/p1P2P2/RNBQK2R b KQkq - 5 9");
-    board.makeMove("a2b1q"); // black promotes to queen | rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/2P2P2/RqBQK2R w KQkq - 0 10
+    board.makeMove("a2b1q"); // black promotes to queen
     assert(board.fen() == "rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/2P2P2/RqBQK2R w KQkq - 0 10");
-    board.makeMove("e1g1");  // white castles short | rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/2P2P2/RqBQ1RK1 b kq - 1 10
+    board.makeMove("e1g1");  // white castles short
     assert(board.fen() == "rnbqkb1r/4pppp/1p1p1n2/2p4P/2BP2P1/4PN2/2P2P2/RqBQ1RK1 b kq - 1 10");
-    board.makeMove("g7g5");  // black allows enpassant | rnbqkb1r/4pp1p/1p1p1n2/2p3pP/2BP2P1/4PN2/2P2P2/RqBQ1RK1 w kq g6 0 11
+    board.makeMove("g7g5");  // black allows enpassant
     assert(board.fen() == "rnbqkb1r/4pp1p/1p1p1n2/2p3pP/2BP2P1/4PN2/2P2P2/RqBQ1RK1 w kq g6 0 11");
-    board.makeMove("h5g6");  // white takes on passant | rnbqkb1r/4pp1p/1p1p1nP1/2p5/2BP2P1/4PN2/2P2P2/RqBQ1RK1 b kq - 0 11
+    board.makeMove("h5g6");  // white takes on passant 
     assert(board.fen() == "rnbqkb1r/4pp1p/1p1p1nP1/2p5/2BP2P1/4PN2/2P2P2/RqBQ1RK1 b kq - 0 11");
-    board.makeMove("f6g4");  // black captures white pawn with black knight | rnbqkb1r/4pp1p/1p1p2P1/2p5/2BP2n1/4PN2/2P2P2/RqBQ1RK1 w kq - 0 12
+    board.makeMove("f6g4");  // black captures white pawn with black knight 
     assert(board.fen() == "rnbqkb1r/4pp1p/1p1p2P1/2p5/2BP2n1/4PN2/2P2P2/RqBQ1RK1 w kq - 0 12");
-    board.makeMove("a1a2");  // white moves rook up (test 50move counter) | rnbqkb1r/4pp1p/1p1p2P1/2p5/2BP2n1/4PN2/R1P2P2/1qBQ1RK1 b kq - 1 12
+    board.makeMove("a1a2");  // white moves rook up (test 50move counter) 
     assert(board.fen() == "rnbqkb1r/4pp1p/1p1p2P1/2p5/2BP2n1/4PN2/R1P2P2/1qBQ1RK1 b kq - 1 12");
 
     u64 hashAfter = board.zobristHash();
@@ -159,10 +156,10 @@ int main()
 
     // pinned
     board = Board("r1b1kbnr/ppp2ppp/2np4/1B2p1q1/3P4/1P2PP2/P1P3PP/RNBQK1NR b KQkq - 0 5");
-    assert(board.pinned() == (1ULL << 42));
+    assert(board.pinned() == bitboard(42));
 
     // zobristHashAfter()
-    move = Move(strToSquare("g5"), strToSquare("e3"), Move::QUEEN_FLAG);
+    move = Move("g5", "e3", Move::QUEEN_FLAG);
     hashAfter = board.roughHashAfter(move);
     board.makeMove(move);
     assert(hashAfter == board.zobristHash());
