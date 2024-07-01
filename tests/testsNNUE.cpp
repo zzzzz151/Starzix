@@ -100,5 +100,7 @@ int main()
         if (board.isPseudolegalLegal(move, pinned)) 
             testAccumulatorUpdate(board, move);
 
+    std::cout << "Finished" << std::endl;
+
     return 0;
 }

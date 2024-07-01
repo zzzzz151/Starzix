@@ -1,23 +1,31 @@
+CXXFLAGS = -std=c++20 -march=native -O3 -Wunused -Wall -Wextra
+SUFFIX =
+
 ifeq ($(OS), Windows_NT)
 	EXE ?= Starzix
+	CLANG_PLUS_PLUS_18 = $(shell where clang++-18 > NUL 2>&1)
+	CXXFLAGS += -Wl,/STACK:16777216
 
 	ENDS_WITH := exe
-	SUFFIX :=
 	ifneq ($(patsubst %$(ENDS_WITH),,$(lastword $(EXE))),)
-		SUFFIX := .exe
+		SUFFIX = .exe
 	endif
-
-	command := clang++ -O3 -std=c++20 -march=native -Wl,/STACK:16777216 -Wunused -Wall -Wextra -DNDEBUG src/main.cpp -o $(EXE)$(SUFFIX)
 else
 	EXE ?= starzix
-	command := clang++ -O3 -std=c++20 -lstdc++ -lm -march=native -Wunused -Wall -Wextra -DNDEBUG src/main.cpp -o $(EXE)
+	CLANG_PLUS_PLUS_18 = $(shell command -v clang++-18 2>/dev/null)
+	CXXFLAGS += -lstdc++ -lm
 endif
 
-# Build rule
+ifeq ($(strip $(CLANG_PLUS_PLUS_18)),)
+    COMPILER = clang++
+else
+    COMPILER = clang++-18
+endif
+
 all:
-	$(command)
+	$(COMPILER) $(CXXFLAGS) -DNDEBUG src/*.cpp -o $(EXE)$(SUFFIX)
 
 test:
-	clang++ -O3 -std=c++20 -O3 -march=native tests/tests.cpp -o testsGeneral$(SUFFIX)
-	clang++ -O3 -std=c++20 -O3 -march=native tests/testsSEE.cpp -o testsSEE$(SUFFIX)
-	clang++ -O3 -std=c++20 -O3 -march=native tests/testsNNUE.cpp -o testsNNUE$(SUFFIX)
+	$(COMPILER) $(CXXFLAGS) tests/tests.cpp -o testsCore$(SUFFIX)
+	$(COMPILER) $(CXXFLAGS) tests/testsSEE.cpp -o testsSEE$(SUFFIX)
+	$(COMPILER) $(CXXFLAGS) tests/testsNNUE.cpp -o testsNNUE$(SUFFIX)

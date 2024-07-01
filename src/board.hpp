@@ -45,7 +45,7 @@ struct BoardState {
     u64 checkers = 0;
     u64 zobristHash = 0;
     u64 pawnHash = 0;
-    Move lastMove = MOVE_NONE;
+    u16 lastMove = MOVE_NONE.encoded();
     PieceType captured = PieceType::NONE;
 } __attribute__((packed));
 
@@ -56,21 +56,20 @@ class Board {
 
     public:
 
-    inline Board() = default;
-
-    // Copy constructor
-    Board(const Board& other) {
-        mStates = other.mStates;
-        mState = mStates.empty() ? nullptr : &mStates.back();
-    }
-
     // Copy assignment operator
-    Board& operator=(const Board& other) {
+    Board& operator=(const Board &other) {
         if (this != &other) {
             mStates = other.mStates;
             mState = mStates.empty() ? nullptr : &mStates.back();
         }
         return *this;
+    }
+
+    inline Board() = default;
+
+    Board(const Board &other) {
+        mStates = other.mStates;
+        mState = mStates.empty() ? nullptr : &mStates.back();
     }
 
     inline Board(std::string fen)
@@ -210,8 +209,11 @@ class Board {
     inline Move lastMove() { return mState->lastMove; }
 
     inline Move nthToLastMove(int n) {
+        assert(n >= 1);
+
         return (int)mStates.size() - n < 0 
-               ? MOVE_NONE : mStates[mStates.size() - n].lastMove;
+               ? MOVE_NONE 
+               : Move(mStates[mStates.size() - n].lastMove);
     }
 
     inline PieceType captured() { return mState->captured; }
@@ -574,7 +576,7 @@ class Board {
         mState = &mStates.back();
 
         Color oppSide = this->oppSide();
-        mState->lastMove = move;
+        mState->lastMove = move.encoded();
 
         if (move == MOVE_NONE) {
             assert(!inCheck());

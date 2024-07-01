@@ -88,8 +88,11 @@ inline void runCommand(std::string &command, Board &board, std::vector<TTEntry> 
         board.undoMove();
     else if (command == "spsainput") 
     {
-        for (auto [paramName, tunableParam] : tunableParams) 
-            std::visit([&] (auto *myParam) 
+        for (auto &pair : tunableParams) {
+            std::string paramName = pair.first;
+            auto &tunableParam = pair.second;
+
+            std::visit([&paramName] (auto *myParam) 
             {
                 if (myParam == nullptr) return;
 
@@ -101,8 +104,8 @@ inline void runCommand(std::string &command, Board &board, std::vector<TTEntry> 
                           << ", " << myParam->step
                           << ", 0.002"
                           << std::endl;
-
             }, tunableParam);
+        }
     }
 
 }
@@ -113,9 +116,12 @@ inline void uci() {
     std::cout << "option name Hash type spin default 32 min 1 max 65536" << std::endl;
     std::cout << "option name Threads type spin default 1 min 1 max 256" << std::endl;
 
-    for (auto [paramName, tunableParam] : tunableParams) 
-    {
-        std::visit([&] (auto *myParam) 
+    /*
+    for (auto &pair : tunableParams) {
+        std::string paramName = pair.first;
+        auto &tunableParam = pair.second;
+
+        std::visit([&paramName] (auto *myParam) 
         {
             if (myParam == nullptr) return;
 
@@ -128,6 +134,7 @@ inline void uci() {
             
         }, tunableParam);
     }
+    */
 
     std::cout << "uciok" << std::endl;
 }

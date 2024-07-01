@@ -26,8 +26,6 @@ int main()
     assert(LINE_THROUGH[41][50] == (bitboard(32) | bitboard(41) | bitboard(50) | bitboard(59)));
 
     // Move tests
-
-    assert(sizeof(Move) == 2); // 2 bytes
     
     Move move = Move(49, 55, Move::NULL_FLAG);
     assert(move.from() == 49);

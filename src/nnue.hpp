@@ -130,11 +130,11 @@ inline i32 evaluate(Accumulator* accumulator, Board &board, bool materialScale)
     assert(accumulator->mUpdated);
 
     int stm = (int)board.sideToMove();
-    Vec *stmAccumulator = (Vec*) &(accumulator->mAccumulators[stm]);
-    Vec *oppAccumulator = (Vec*) &(accumulator->mAccumulators[!stm]);
+    Vec* stmAccumulator = (Vec*) &(accumulator->mAccumulators[stm]);
+    Vec* oppAccumulator = (Vec*) &(accumulator->mAccumulators[!stm]);
 
-    Vec *stmWeights = (Vec*) &(NET->outputWeights[0]);
-    Vec *oppWeights = (Vec*) &(NET->outputWeights[1]);
+    Vec* stmWeights = (Vec*) &(NET->outputWeights[0]);
+    Vec* oppWeights = (Vec*) &(NET->outputWeights[1]);
     const Vec vecZero = vecSetZero();
     const Vec vecQA = vecSet1Epi16(QA);
     Vec sum = vecSetZero();

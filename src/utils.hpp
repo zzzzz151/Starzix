@@ -183,6 +183,7 @@ constexpr MultiArray<u64, 2, 2> CASTLING_MASKS = {{
     { bitboard(63), bitboard(56) } 
 }};
 
+// [kingTargetSquare]
 std::array<std::pair<Square, Square>, 64> CASTLING_ROOK_FROM_TO = {};
 
 // [from][to] (BETWEEN excludes from and to)

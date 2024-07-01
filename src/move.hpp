@@ -28,31 +28,29 @@ struct Move {
         QUEEN_PROMOTION_FLAG = 0x000D,
         CASTLING_FLAG = 0x000F;
 
-    inline Move() = default;
-
-    inline bool operator==(const Move &other) const {
+    inline bool operator==(const Move other) const {
         return mMove == other.mMove;
     }
 
-    inline bool operator!=(const Move &other) const {
+    inline bool operator!=(const Move other) const {
         return mMove != other.mMove;
     }
 
-    inline operator bool() const {
-        return mMove != 0;
-    }
+    inline Move() = default;
+
+    inline Move(u16 move) { mMove = move; }
 
     inline Move(Square from, Square to, u16 flag)
     {
-        mMove = ((u16)from << 10);
-        mMove |= ((u16)to << 4);
+        mMove = (u16)from << 10;
+        mMove |= (u16)to << 4;
         mMove |= flag;
     }
 
     inline Move(std::string from, std::string to, u16 flag) 
     : Move(strToSquare(from), strToSquare(to), flag) { }
 
-    inline u16 encoded() { return mMove; }
+    inline u16 encoded() const { return mMove; }
 
     inline Square from() { return (mMove >> 10) & 0b111111; }
 
@@ -98,5 +96,7 @@ struct Move {
     }
     
 }; // struct Move
+
+static_assert(sizeof(Move) == 2); // 2 bytes
 
 constexpr Move MOVE_NONE = Move();

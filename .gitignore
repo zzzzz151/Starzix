@@ -5,10 +5,7 @@
 **/starzix
 **/*.pdb
 
-testsGeneral.exe
-testsSEE.exe
-testsNNUE.exe
-testsGeneral
+testsCore
 testsSEE
 testsNNUE
 

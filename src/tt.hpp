@@ -15,7 +15,7 @@ struct TTEntry {
     u64 zobristHash = 0;
     u8 depth = 0; 
     i16 score = 0;
-    Move move = MOVE_NONE;
+    u16 move = MOVE_NONE.encoded();
     u8 boundAndAge = 0; // lowest 2 bits for bound, highest 6 bits for age
 
     inline i16 adjustedScore(i16 ply)
@@ -62,8 +62,8 @@ struct TTEntry {
                       : score;
 
         // If bound != Bound::UPPER, then bestMove != MOVE_NONE
-        if (this->move == MOVE_NONE || bound != Bound::UPPER)
-            this->move = bestMove;
+        if (Move(this->move) == MOVE_NONE || bound != Bound::UPPER)
+            this->move = bestMove.encoded();
     }
 
     inline void update(u64 zobristHash, u8 depth, u8 ply,  i16 score, 
@@ -77,6 +77,8 @@ struct TTEntry {
     }
 
 } __attribute__((packed)); // struct TTEntry
+
+static_assert(sizeof(TTEntry) == 8 + 1 + 2 + 2 + 1);
 
 inline u64 TTEntryIndex(u64 zobristHash, auto numEntries) 
 {
