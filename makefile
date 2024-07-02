@@ -1,4 +1,4 @@
-CXXFLAGS = -std=c++20 -march=native -O3 -Wunused -Wall -Wextra
+CXXFLAGS = -std=c++20 -march=native -O3 -funroll-loops -flto -fuse-ld=lld -fno-exceptions -Wunused -Wall -Wextra
 SUFFIX =
 
 ifeq ($(OS), Windows_NT)
