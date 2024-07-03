@@ -165,7 +165,7 @@ inline std::vector<std::string> splitString(std::string &str, char delimiter)
 
 constexpr int charToInt(char myChar) { return myChar - '0'; }
 
-constexpr double ln(u64 x) {
+constexpr double ln(double x) {
     assert(x > 0);
     return log(x);
 }
