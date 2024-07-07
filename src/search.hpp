@@ -204,7 +204,9 @@ class SearchThread {
         i32 bestScore = -INF;
 
         // Moves loop
-        for (Move move : plyDataPtr->mMoves)
+        for (auto [move, moveScore] = plyDataPtr->nextMove(); 
+             move != MOVE_NONE; 
+             std::tie(move, moveScore) = plyDataPtr->nextMove())
         {
             // skip illegal moves
             if (!mBoard.isPseudolegalLegal(move, pinned)) continue;
