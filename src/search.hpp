@@ -230,6 +230,10 @@ class SearchThread {
 
         Move ttMove = ttHit ? Move(ttEntry.move) : MOVE_NONE;
 
+        // IIR (Internal iterative reduction)
+        if (depth >= iirMinDepth() && ttMove == MOVE_NONE)
+            depth--;
+
         plyDataPtr->genAndScoreMoves(mBoard, false, ttMove);
 
         u64 pinned = mBoard.pinned();
