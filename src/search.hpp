@@ -88,7 +88,7 @@ class SearchThread {
         mPliesData[0] = PlyData();
         mNodes = 0;
 
-        search(1, 0);
+        search(2, 0);
 
         return 0;
     }
