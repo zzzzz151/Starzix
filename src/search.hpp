@@ -63,30 +63,16 @@ class SearchThread {
 
     }
 
-    inline Move bestMoveRoot() {
-        return mPliesData[0].mPvLine.size() == 0 
-               ? MOVE_NONE : mPliesData[0].mPvLine[0];
-    }
-
     inline u64 getNodes() { return mNodes; }
 
     inline u64 millisecondsElapsed() {
         return (std::chrono::steady_clock::now() - mStartTime) / std::chrono::milliseconds(1);
     }
 
-    inline i32 eval() {
-        return   100 * std::popcount(mBoard.getBb(mBoard.sideToMove(), PieceType::PAWN))
-               + 300 * std::popcount(mBoard.getBb(mBoard.sideToMove(), PieceType::KNIGHT))
-               + 300 * std::popcount(mBoard.getBb(mBoard.sideToMove(), PieceType::BISHOP))
-               + 500 * std::popcount(mBoard.getBb(mBoard.sideToMove(), PieceType::ROOK))
-               + 900 * std::popcount(mBoard.getBb(mBoard.sideToMove(), PieceType::QUEEN))
-               - 100 * std::popcount(mBoard.getBb(mBoard.oppSide(), PieceType::PAWN))
-               - 300 * std::popcount(mBoard.getBb(mBoard.oppSide(), PieceType::KNIGHT))
-               - 300 * std::popcount(mBoard.getBb(mBoard.oppSide(), PieceType::BISHOP))
-               - 500 * std::popcount(mBoard.getBb(mBoard.oppSide(), PieceType::ROOK))
-               - 900 * std::popcount(mBoard.getBb(mBoard.oppSide(), PieceType::QUEEN))
-               + i32(randomU64() % 51)
-               - 25;
+    inline Move bestMoveRoot() {
+        return mPliesData[0].mPvLine.size() == 0 
+               ? MOVE_NONE 
+               : mPliesData[0].mPvLine[0];
     }
 
     inline i32 search(Board &board, i32 maxDepth, auto startTime, i64 hardMilliseconds, i64 maxNodes)
@@ -102,25 +88,7 @@ class SearchThread {
         mPliesData[0] = PlyData();
         mNodes = 0;
 
-        ArrayVec<Move, 256> moves;
-        mBoard.pseudolegalMoves(moves, false, false);
-
-        u64 pinned = mBoard.pinned();
-        mPliesData[0].mPvLine.push_back(MOVE_NONE);
-        i32 bestEval = -INF;
-
-        for (Move move : moves)
-            if (mBoard.isPseudolegalLegal(move, pinned))
-            {
-                mBoard.makeMove(move);
-
-                if (-eval() > bestEval) {
-                    bestEval = -eval();
-                    mPliesData[0].mPvLine[0] = move;
-                }
-                         
-                mBoard.undoMove();
-            }
+        search(1, 0);
 
         return 0;
     }
@@ -144,8 +112,75 @@ class SearchThread {
         return sSearchStopped = (mNodes % 1024 == 0 && millisecondsElapsed() >= mHardMilliseconds);
     }
 
+    inline void makeMove(Move move, PlyData* plyDataPtr)
+    {
+        mBoard.makeMove(move);
+        mNodes++;
+
+        (plyDataPtr + 1)->mMovesGenerated = MoveGenType::NONE;
+        (plyDataPtr + 1)->mPvLine.clear();
+    }
+
+    inline i32 eval() {
+        return   100 * std::popcount(mBoard.getBb(mBoard.sideToMove(), PieceType::PAWN))
+               + 300 * std::popcount(mBoard.getBb(mBoard.sideToMove(), PieceType::KNIGHT))
+               + 300 * std::popcount(mBoard.getBb(mBoard.sideToMove(), PieceType::BISHOP))
+               + 500 * std::popcount(mBoard.getBb(mBoard.sideToMove(), PieceType::ROOK))
+               + 900 * std::popcount(mBoard.getBb(mBoard.sideToMove(), PieceType::QUEEN))
+               - 100 * std::popcount(mBoard.getBb(mBoard.oppSide(), PieceType::PAWN))
+               - 300 * std::popcount(mBoard.getBb(mBoard.oppSide(), PieceType::KNIGHT))
+               - 300 * std::popcount(mBoard.getBb(mBoard.oppSide(), PieceType::BISHOP))
+               - 500 * std::popcount(mBoard.getBb(mBoard.oppSide(), PieceType::ROOK))
+               - 900 * std::popcount(mBoard.getBb(mBoard.oppSide(), PieceType::QUEEN))
+               + i32(randomU64() % 51)
+               - 25;
+    }
+
     inline i32 search(i32 depth, i32 ply) {
         assert(ply >= 0 && ply <= mMaxDepth);
+
+        if (depth <= 0) return eval();
+
+        if (ply > mMaxPlyReached) mMaxPlyReached = ply; // update seldepth
+
+        if (ply >= mMaxDepth) return eval();
+
+        if (depth > mMaxDepth) depth = mMaxDepth;
+
+        PlyData* plyDataPtr = &mPliesData[ply];
+        plyDataPtr->genAndScoreMoves(mBoard, false);
+
+        u64 pinned = mBoard.pinned();
+        int legalMovesSeen = 0;
+        i32 bestScore = -INF;
+
+        // Moves loop
+        for (Move move : plyDataPtr->mMoves)
+        {
+            // skip illegal moves
+            if (!mBoard.isPseudolegalLegal(move, pinned)) continue;
+
+            legalMovesSeen++;
+
+            makeMove(move, plyDataPtr);
+
+            i32 score = -search(depth - 1, ply + 1);
+
+            mBoard.undoMove();
+
+            if (score <= bestScore) continue;
+
+            bestScore = score;
+
+            plyDataPtr->mPvLine.clear();
+            plyDataPtr->mPvLine.push_back(move);
+        }
+
+        if (legalMovesSeen == 0) 
+            // checkmate or stalemate
+            return mBoard.inCheck() ? -INF + ply : 0;
+
+        return bestScore;
     }
 
 
