@@ -325,6 +325,11 @@ class SearchThread {
              move != MOVE_NONE; 
              std::tie(move, moveScore) = plyDataPtr->nextMove())
         {
+            assert(mBoard.captured(move) != PieceType::NONE || move.promotion() != PieceType::NONE);
+
+            // SEE pruning (skip bad noisy moves)
+            if (moveScore < 0) break;
+
             // skip illegal moves
             if (!mBoard.isPseudolegalLegal(move, pinned)) continue;
 
