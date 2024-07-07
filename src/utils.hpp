@@ -13,6 +13,8 @@
 #include <algorithm>
 #include <bitset>
 #include <chrono>
+#include <bit>
+#include <cmath>
 #include <type_traits>
 
 using size_t = size_t;
