@@ -213,7 +213,7 @@ class SearchThread {
 
             makeMove(move, plyDataPtr);
 
-            i32 score = mBoard.isRepetition(ply) ? 0 : -search(depth - 1, ply + 1, -beta, -alpha);
+            i32 score = mBoard.isRepetition(ply) ? 0 : -search(depth - 1 + mBoard.inCheck(), ply + 1, -beta, -alpha);
 
             mBoard.undoMove();
 
