@@ -74,6 +74,21 @@ class SearchThread {
         return (std::chrono::steady_clock::now() - mStartTime) / std::chrono::milliseconds(1);
     }
 
+    inline i32 eval() {
+        return   100 * std::popcount(mBoard.getBb(mBoard.sideToMove(), PieceType::PAWN))
+               + 300 * std::popcount(mBoard.getBb(mBoard.sideToMove(), PieceType::KNIGHT))
+               + 300 * std::popcount(mBoard.getBb(mBoard.sideToMove(), PieceType::BISHOP))
+               + 500 * std::popcount(mBoard.getBb(mBoard.sideToMove(), PieceType::ROOK))
+               + 900 * std::popcount(mBoard.getBb(mBoard.sideToMove(), PieceType::QUEEN))
+               - 100 * std::popcount(mBoard.getBb(mBoard.oppSide(), PieceType::PAWN))
+               - 300 * std::popcount(mBoard.getBb(mBoard.oppSide(), PieceType::KNIGHT))
+               - 300 * std::popcount(mBoard.getBb(mBoard.oppSide(), PieceType::BISHOP))
+               - 500 * std::popcount(mBoard.getBb(mBoard.oppSide(), PieceType::ROOK))
+               - 900 * std::popcount(mBoard.getBb(mBoard.oppSide(), PieceType::QUEEN))
+               + i32(randomU64() % 51)
+               - 25;
+    }
+
     inline i32 search(Board &board, i32 maxDepth, auto startTime, i64 hardMilliseconds, i64 maxNodes)
     { 
         resetRng();
@@ -88,18 +103,23 @@ class SearchThread {
         mNodes = 0;
 
         ArrayVec<Move, 256> moves;
-        board.pseudolegalMoves(moves, false, false);
+        mBoard.pseudolegalMoves(moves, false, false);
 
-        for (std::size_t i = 0; i < moves.mSize; i++)
-            moves.swap(i, randomU64() % (u64)moves.mSize);
-
-        u64 pinned = board.pinned();
+        u64 pinned = mBoard.pinned();
+        mPliesData[0].mPvLine.push_back(MOVE_NONE);
+        i32 bestEval = -INF;
 
         for (Move move : moves)
-            if (board.isPseudolegalLegal(move, pinned))
+            if (mBoard.isPseudolegalLegal(move, pinned))
             {
-                mPliesData[0].mPvLine.push_back(move);
-                return 0;
+                mBoard.makeMove(move);
+
+                if (-eval() > bestEval) {
+                    bestEval = -eval();
+                    mPliesData[0].mPvLine[0] = move;
+                }
+                         
+                mBoard.undoMove();
             }
 
         return 0;
@@ -123,6 +143,11 @@ class SearchThread {
         // Check time every N nodes
         return sSearchStopped = (mNodes % 1024 == 0 && millisecondsElapsed() >= mHardMilliseconds);
     }
+
+    inline i32 search(i32 depth, i32 ply) {
+        assert(ply >= 0 && ply <= mMaxDepth);
+    }
+
 
 }; // class SearchThread
 
