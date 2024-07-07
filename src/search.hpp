@@ -100,11 +100,7 @@ class SearchThread {
 
             i32 iterationScore = search(iterationDepth, 0, -INF, INF);
 
-            if (stopSearch()) {
-                mPliesData[0].mPvLine.clear();
-                mPliesData[0].mPvLine.push_back(moveBefore);
-                break;
-            }
+            if (stopSearch()) break;
 
             score = iterationScore;
 
