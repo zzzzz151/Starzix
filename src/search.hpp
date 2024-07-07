@@ -7,9 +7,9 @@ constexpr i32 INF = 32000,
 
 #include "board.hpp"
 #include "search_params.hpp"
+#include "see.hpp"
 #include "ply_data.hpp"
 #include "tt.hpp"
-#include "see.hpp"
 #include "nnue.hpp"
 
 inline u64 totalNodes();
