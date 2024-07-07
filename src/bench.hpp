@@ -57,5 +57,5 @@ constexpr std::array BENCH_FENS {
 
 inline void bench(int depth = 14)
 {
-    std::cout << "0 nodes 1200000 nps" << std::endl;
+    std::cout << "1 nodes 1200000 nps" << std::endl;
 }
