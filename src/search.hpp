@@ -96,7 +96,7 @@ class SearchThread {
             mMaxPlyReached = 0;
             Move moveBefore = bestMoveRoot();
 
-            i32 iterationScore = search(iterationDepth, 0);
+            i32 iterationScore = search(iterationDepth, 0, -INF, INF);
 
             if (stopSearch()) {
                 mPliesData[0].mPvLine.clear();
@@ -180,8 +180,11 @@ class SearchThread {
                - 25;
     }
 
-    inline i32 search(i32 depth, i32 ply) {
+    inline i32 search(i32 depth, i32 ply, i32 alpha, i32 beta) {
         assert(ply >= 0 && ply <= mMaxDepth);
+        assert(alpha >= -INF && alpha <= INF);
+        assert(beta  >= -INF && beta  <= INF);
+        assert(alpha < beta);
 
         if (stopSearch()) return 0;
 
@@ -210,18 +213,25 @@ class SearchThread {
 
             makeMove(move, plyDataPtr);
 
-            i32 score = -search(depth - 1, ply + 1);
+            i32 score = -search(depth - 1, ply + 1, -beta, -alpha);
 
             mBoard.undoMove();
 
             if (stopSearch()) return 0;
 
-            if (score <= bestScore) continue;
+            if (score > bestScore) bestScore = score;
 
-            bestScore = score;
+            // Fail low?
+            if (score <= alpha) continue;
+
+            alpha = score;
 
             plyDataPtr->mPvLine.clear();
             plyDataPtr->mPvLine.push_back(move);
+
+            if (score < beta) continue;
+
+            break;
         }
 
         if (legalMovesSeen == 0) 
