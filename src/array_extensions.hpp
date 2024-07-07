@@ -3,6 +3,7 @@
 #pragma once
 
 #include <array>
+#include <cassert>
 
 // MultiArray
 
@@ -26,7 +27,7 @@ using MultiArray = typename MultiArrayImpl<T, Ns...>::Type;
 template <typename T, size_t N>
 struct ArrayVec
 {
-    private:
+    public:
 
     std::array<T, N> mArr;
     size_t mSize = 0;

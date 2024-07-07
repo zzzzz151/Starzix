@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "3rdparty/ordered_map.h"
 #include <variant>
 
 template <typename T> struct TunableParam {
@@ -35,7 +36,7 @@ TunableParam<float> evalMaterialScaleMin = TunableParam<float>(0.71, 0.5, 1.0, 0
 TunableParam<float> evalMaterialScaleMax = TunableParam<float>(1.03, 1.0, 1.5, 0.1);
 
 // Time management
-TunableParam<u64> defaultMovesToGo = TunableParam<u64>(20, 20, 26, 3);
+TunableParam<u64> defaultMovesToGo = TunableParam<u64>(25, 20, 26, 3);
 TunableParam<double> hardTimePercentage = TunableParam<double>(0.5, 0.3, 0.6, 0.15);
 TunableParam<double> softTimePercentage = TunableParam<double>(0.7, 0.5, 0.7, 0.1);
 

@@ -2,11 +2,11 @@
 
 #pragma once
 
-#include <thread>
 #include "board.hpp"
 #include "perft.hpp"
 #include "search.hpp"
 #include "bench.hpp"
+#include <thread>
 
 namespace uci { // Universal chess interface
 
@@ -178,10 +178,6 @@ inline void setoption(std::vector<std::string> &tokens, std::vector<TTEntry> &tt
 
             if (optionName == stringify(lmrBase) || optionName == stringify(lmrMultiplier))
                 initLmrTable();
-            else if (optionName == stringify(onePlyContHistWeight)
-            || optionName == stringify(twoPlyContHistWeight)
-            || optionName == stringify(fourPlyContHistWeight))
-                CONT_HISTS_WEIGHTS = { onePlyContHistWeight(), twoPlyContHistWeight(), fourPlyContHistWeight() };
             else if (optionName == stringify(seePawnValue)
             || optionName == stringify(seeMinorValue)
             || optionName == stringify(seeRookValue)
@@ -260,21 +256,8 @@ inline void go(std::vector<std::string> &tokens, Board &board)
             maxNodes = value;
     }
 
-    // Calculate search time limits
-
-    i64 maxHardMilliseconds = std::max((i64)0, milliseconds - 10);
-    u64 hardMilliseconds, softMilliseconds;
-
-    if (isMoveTime || maxHardMilliseconds <= 0) {
-        hardMilliseconds = maxHardMilliseconds;
-        softMilliseconds = I64_MAX;
-    }
-    else {
-        hardMilliseconds = round(maxHardMilliseconds * hardTimePercentage());
-        double softMs = (double)maxHardMilliseconds / (double)movesToGo + (double)incrementMs * 0.6666;
-        softMilliseconds = round(softMs * softTimePercentage());
-        softMilliseconds = std::min(softMilliseconds, hardMilliseconds);
-    }
+    // Calculate search time limit
+    u64 hardMilliseconds = isMoveTime ? I64_MAX : std::max((i64)0, milliseconds - 10) / movesToGo;
 
     SearchThread::sSearchStopped = false;
     std::vector<std::thread> threads;
@@ -283,15 +266,16 @@ inline void go(std::vector<std::string> &tokens, Board &board)
     for (u64 i = 1; i < gSearchThreads.size(); i++)
         threads.emplace_back([&, i]() {
             gSearchThreads[i].search(
-                board, maxDepth, startTime, softMilliseconds, hardMilliseconds, I64_MAX, maxNodes);
+                board, maxDepth, startTime, hardMilliseconds, maxNodes);
         });
 
     // Main thread search
-    gMainThread->search(board, maxDepth, startTime, softMilliseconds, hardMilliseconds, I64_MAX, maxNodes);
+    gMainThread->search(board, maxDepth, startTime, hardMilliseconds, maxNodes);
 
     // Wait for secondary threads
     for (auto &thread : threads)
-        thread.join();
+        if (thread.joinable())
+            thread.join();
 
     std::cout << "bestmove " << gMainThread->bestMoveRoot().toUci() << std::endl;
 }

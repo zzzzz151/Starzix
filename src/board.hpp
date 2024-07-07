@@ -2,10 +2,8 @@
 
 #pragma once
 
-#include <random>
 #include "utils.hpp"
 #include "move.hpp"
-#include "attacks.hpp"
 
 constexpr u8 CASTLE_SHORT = 0, CASTLE_LONG = 1;
 
@@ -17,20 +15,17 @@ std::array<u64, 8> ZOBRIST_FILES = {}; // [file]
 
 inline void initZobrist()
 {
-    std::mt19937_64 gen(12345); // 64 bit Mersenne Twister rng with seed 12345
-    std::uniform_int_distribution<u64> distribution; // distribution(gen) returns random u64
-
-    ZOBRIST_COLOR = distribution(gen);
+    ZOBRIST_COLOR = randomU64();
 
     for (int pt = 0; pt < 6; pt++)
         for (int sq = 0; sq < 64; sq++)
         {
-            ZOBRIST_PIECES[WHITE][pt][sq] = distribution(gen);
-            ZOBRIST_PIECES[BLACK][pt][sq] = distribution(gen);
+            ZOBRIST_PIECES[WHITE][pt][sq] = randomU64();
+            ZOBRIST_PIECES[BLACK][pt][sq] = randomU64();
         }
 
     for (int file = 0; file < 8; file++)
-        ZOBRIST_FILES[file] = distribution(gen);
+        ZOBRIST_FILES[file] = randomU64();
 }
 
 struct BoardState {
