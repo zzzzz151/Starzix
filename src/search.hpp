@@ -114,8 +114,8 @@ class SearchThread {
             {
                 mBoard.makeMove(move);
 
-                if (eval() > bestEval) {
-                    bestEval = eval();
+                if (-eval() > bestEval) {
+                    bestEval = -eval();
                     mPliesData[0].mPvLine[0] = move;
                 }
                          
