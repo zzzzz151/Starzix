@@ -279,16 +279,14 @@ class SearchThread {
 
         i32 eval = updateAccumulatorAndEval(plyDataPtr->mEval);
 
-        if (!mBoard.inCheck()) {
-            if (eval >= beta) return eval; 
-            if (eval > alpha) alpha = eval;
-        }
+        if (eval >= beta) return eval; 
+        if (eval > alpha) alpha = eval;
 
         // generate noisy moves except underpromotions
         plyDataPtr->genAndScoreMoves(mBoard, true);
 
         u64 pinned = mBoard.pinned();
-        i32 bestScore = eval;
+        i32 bestScore = mBoard.inCheck() ? -INF + ply : eval;
 
         // Moves loop
         for (auto [move, moveScore] = plyDataPtr->nextMove(); 
