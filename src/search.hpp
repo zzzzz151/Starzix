@@ -77,8 +77,6 @@ class SearchThread {
 
     inline i32 search(Board &board, i32 maxDepth, auto startTime, i64 hardMilliseconds, i64 maxNodes)
     { 
-        resetRng();
-
         mBoard = board;
         mStartTime = startTime;
         mHardMilliseconds = std::max(hardMilliseconds, (i64)0);
@@ -165,7 +163,7 @@ class SearchThread {
         (plyDataPtr + 1)->mPvLine.clear();
     }
 
-    inline i32 eval() {
+    inline i32 evaluate() {
         return   100 * std::popcount(mBoard.getBb(mBoard.sideToMove(), PieceType::PAWN))
                + 300 * std::popcount(mBoard.getBb(mBoard.sideToMove(), PieceType::KNIGHT))
                + 300 * std::popcount(mBoard.getBb(mBoard.sideToMove(), PieceType::BISHOP))
@@ -188,11 +186,11 @@ class SearchThread {
 
         if (stopSearch()) return 0;
 
-        if (depth <= 0) return eval();
+        if (depth <= 0) return qSearch(ply, alpha, beta);
 
         if (ply > mMaxPlyReached) mMaxPlyReached = ply; // update seldepth
 
-        if (ply >= mMaxDepth) return eval();
+        if (ply >= mMaxDepth) return evaluate();
 
         if (depth > mMaxDepth) depth = mMaxDepth;
 
@@ -239,6 +237,59 @@ class SearchThread {
         if (legalMovesSeen == 0) 
             // checkmate or stalemate
             return mBoard.inCheck() ? -INF + ply : 0;
+
+        return bestScore;
+    }
+
+    inline i32 qSearch(i32 ply, i32 alpha, i32 beta)
+    {
+        assert(ply > 0 && ply <= mMaxDepth);
+        assert(alpha >= -INF && alpha <= INF);
+        assert(beta  >= -INF && beta  <= INF);
+        assert(alpha < beta);
+
+        if (stopSearch()) return 0;
+
+        if (ply > mMaxPlyReached) mMaxPlyReached = ply; // update seldepth
+
+        if (ply >= mMaxDepth) return evaluate();
+
+        i32 eval = evaluate();
+
+        if (eval >= beta) return eval; 
+        if (eval > alpha) alpha = eval;
+
+        // generate noisy moves except underpromotions
+        PlyData* plyDataPtr = &mPliesData[ply];
+        plyDataPtr->genAndScoreMoves(mBoard, true);
+
+        u64 pinned = mBoard.pinned();
+        i32 bestScore = eval;
+
+        // Moves loop
+        for (auto [move, moveScore] = plyDataPtr->nextMove(); 
+             move != MOVE_NONE; 
+             std::tie(move, moveScore) = plyDataPtr->nextMove())
+        {
+            // skip illegal moves
+            if (!mBoard.isPseudolegalLegal(move, pinned)) continue;
+
+            makeMove(move, plyDataPtr);
+
+            i32 score = -qSearch(ply + 1, -beta, -alpha);
+
+            mBoard.undoMove();
+
+            if (stopSearch()) return 0;
+
+            if (score <= bestScore) continue;
+
+            bestScore = score;
+
+            if (bestScore >= beta) break; // Fail high / beta cutoff
+            
+            if (bestScore > alpha) alpha = bestScore;
+        }
 
         return bestScore;
     }
