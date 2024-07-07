@@ -21,4 +21,30 @@ struct PlyData {
             mMovesGenerated = (MoveGenType)noisiesOnly;
         }
     }
+
+    inline void updatePV(Move move) 
+    {
+        // This function is called from SearchThread in search.cpp, which has a
+        // std::array<PlyData, MAX_DEPTH+1> mPliesData
+        // so the data is continuous and we can fetch the next ply data
+        // by incrementing this pointer
+        PlyData* nextPlyData = this + 1;
+
+        mPvLine.clear();
+        mPvLine.push_back(move);
+
+        // Copy child's PV
+        for (Move move : nextPlyData->mPvLine)
+            mPvLine.push_back(move);
+    }
+
+    inline std::string pvString() 
+    {
+        std::string str = "";
+        for (Move move : mPvLine)
+            str += move.toUci() + " ";
+
+        trim(str);
+        return str;
+    }
 };

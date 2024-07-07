@@ -88,9 +88,53 @@ class SearchThread {
         mPliesData[0] = PlyData();
         mNodes = 0;
 
-        search(2, 0);
+        i32 score = 0;
 
-        return 0;
+        // ID (Iterative deepening)
+        for (i32 iterationDepth = 1; iterationDepth <= mMaxDepth; iterationDepth++)
+        {
+            mMaxPlyReached = 0;
+            Move moveBefore = bestMoveRoot();
+
+            i32 iterationScore = search(iterationDepth, 0);
+
+            if (stopSearch()) {
+                mPliesData[0].mPvLine.clear();
+                mPliesData[0].mPvLine.push_back(moveBefore);
+                break;
+            }
+
+            score = iterationScore;
+
+            if (this != gMainThread) continue;
+
+            // Print uci info
+
+            std::cout << "info"
+                      << " depth "    << iterationDepth
+                      << " seldepth " << (int)mMaxPlyReached;
+
+            if (abs(score) < MIN_MATE_SCORE)
+                std::cout << " score cp " << score;
+            else {
+                i32 movesTillMate = round((INF - abs(score)) / 2.0);
+                std::cout << " score mate " << (score > 0 ? movesTillMate : -movesTillMate);
+            }
+
+            u64 nodes = totalNodes();
+            u64 msElapsed = millisecondsElapsed();
+
+            std::cout << " nodes " << nodes
+                      << " nps "   << nodes * 1000 / std::max(msElapsed, (u64)1)
+                      << " time "  << msElapsed
+                      << " pv "    << mPliesData[0].pvString()
+                      << std::endl;
+        }
+
+        // Signal secondary threads to stop
+        if (this == gMainThread) sSearchStopped = true;
+
+        return score;
     }
 
     private:
@@ -139,6 +183,8 @@ class SearchThread {
     inline i32 search(i32 depth, i32 ply) {
         assert(ply >= 0 && ply <= mMaxDepth);
 
+        if (stopSearch()) return 0;
+
         if (depth <= 0) return eval();
 
         if (ply > mMaxPlyReached) mMaxPlyReached = ply; // update seldepth
@@ -167,6 +213,8 @@ class SearchThread {
             i32 score = -search(depth - 1, ply + 1);
 
             mBoard.undoMove();
+
+            if (stopSearch()) return 0;
 
             if (score <= bestScore) continue;
 

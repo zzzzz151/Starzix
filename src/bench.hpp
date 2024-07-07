@@ -55,7 +55,32 @@ constexpr std::array BENCH_FENS {
     "2r2b2/5p2/5k2/p1r1pP2/P2pB3/1P3P2/K1P3R1/7R w - - 23 93"
 };
 
-inline void bench(int depth = 14)
+inline void bench(int depth = 4)
 {
-    std::cout << "1 nodes 1200000 nps" << std::endl;
+    depth = std::clamp(depth, 1, (int)MAX_DEPTH);
+
+    std::vector<TTEntry> benchTT;
+    resizeTT(benchTT, 32);
+
+    SearchThread searchThread = SearchThread(&benchTT);
+
+    u64 totalNodes = 0, totalMilliseconds = 0;
+
+    for (std::string fen : BENCH_FENS)
+    {
+        Board board = Board(fen);
+
+        SearchThread::sSearchStopped = false;
+        searchThread.search(board, depth, std::chrono::steady_clock::now(), I64_MAX, I64_MAX);
+
+        totalMilliseconds += searchThread.millisecondsElapsed();
+        totalNodes += searchThread.getNodes();
+
+        searchThread.reset();
+        resetTT(benchTT);
+    }
+
+    std::cout << totalNodes << " nodes "
+              << totalNodes * 1000 / std::max((u64)totalMilliseconds, (u64)1) << " nps"
+              << std::endl;
 }
