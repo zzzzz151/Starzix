@@ -84,6 +84,10 @@ class SearchThread {
         mMaxNodes = std::max(maxNodes, (i64)0);
 
         mPliesData[0] = PlyData();
+
+        mAccumulators[0] = Accumulator(mBoard);
+        mAccumulatorPtr = &mAccumulators[0];
+
         mNodes = 0;
 
         i32 score = 0;
@@ -161,21 +165,31 @@ class SearchThread {
 
         (plyDataPtr + 1)->mMovesGenerated = MoveGenType::NONE;
         (plyDataPtr + 1)->mPvLine.clear();
+        (plyDataPtr + 1)->mEval = INF;
+        
+        if (move != MOVE_NONE) {
+            mAccumulatorPtr++;
+            mAccumulatorPtr->mUpdated = false;
+        }
     }
 
-    inline i32 evaluate() {
-        return   100 * std::popcount(mBoard.getBb(mBoard.sideToMove(), PieceType::PAWN))
-               + 300 * std::popcount(mBoard.getBb(mBoard.sideToMove(), PieceType::KNIGHT))
-               + 300 * std::popcount(mBoard.getBb(mBoard.sideToMove(), PieceType::BISHOP))
-               + 500 * std::popcount(mBoard.getBb(mBoard.sideToMove(), PieceType::ROOK))
-               + 900 * std::popcount(mBoard.getBb(mBoard.sideToMove(), PieceType::QUEEN))
-               - 100 * std::popcount(mBoard.getBb(mBoard.oppSide(), PieceType::PAWN))
-               - 300 * std::popcount(mBoard.getBb(mBoard.oppSide(), PieceType::KNIGHT))
-               - 300 * std::popcount(mBoard.getBb(mBoard.oppSide(), PieceType::BISHOP))
-               - 500 * std::popcount(mBoard.getBb(mBoard.oppSide(), PieceType::ROOK))
-               - 900 * std::popcount(mBoard.getBb(mBoard.oppSide(), PieceType::QUEEN))
-               + i32(randomU64() % 51)
-               - 25;
+    inline i32 updateAccumulatorAndEval(i32 &eval) 
+    {
+        assert(mAccumulatorPtr == &mAccumulators[0] 
+               ? mAccumulatorPtr->mUpdated 
+               : (mAccumulatorPtr - 1)->mUpdated);
+
+        if (!mAccumulatorPtr->mUpdated) 
+            mAccumulatorPtr->update(mAccumulatorPtr - 1, mBoard);
+
+        if (mBoard.inCheck())
+            eval = 0;
+        else if (eval == INF) {
+            eval = evaluate(mAccumulatorPtr, mBoard, false);
+            eval = std::clamp(eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
+        }
+
+        return eval;
     }
 
     inline i32 search(i32 depth, i32 ply, i32 alpha, i32 beta) {
@@ -190,11 +204,15 @@ class SearchThread {
 
         if (ply > mMaxPlyReached) mMaxPlyReached = ply; // update seldepth
 
-        if (ply >= mMaxDepth) return evaluate();
+        PlyData* plyDataPtr = &mPliesData[ply];
+
+        if (ply >= mMaxDepth) return updateAccumulatorAndEval(plyDataPtr->mEval);
 
         if (depth > mMaxDepth) depth = mMaxDepth;
 
-        PlyData* plyDataPtr = &mPliesData[ply];
+        if (!mAccumulatorPtr->mUpdated) 
+            mAccumulatorPtr->update(mAccumulatorPtr - 1, mBoard);
+
         plyDataPtr->genAndScoreMoves(mBoard, false);
 
         u64 pinned = mBoard.pinned();
@@ -216,6 +234,7 @@ class SearchThread {
             i32 score = mBoard.isRepetition(ply) ? 0 : -search(depth - 1 + mBoard.inCheck(), ply + 1, -beta, -alpha);
 
             mBoard.undoMove();
+            mAccumulatorPtr--;
 
             if (stopSearch()) return 0;
 
@@ -252,15 +271,15 @@ class SearchThread {
 
         if (ply > mMaxPlyReached) mMaxPlyReached = ply; // update seldepth
 
-        if (ply >= mMaxDepth) return evaluate();
+        PlyData* plyDataPtr = &mPliesData[ply];
+        i32 eval = updateAccumulatorAndEval(plyDataPtr->mEval);
 
-        i32 eval = evaluate();
+        if (eval >= beta || ply >= mMaxDepth) 
+            return eval; 
 
-        if (eval >= beta) return eval; 
         if (eval > alpha) alpha = eval;
 
         // generate noisy moves except underpromotions
-        PlyData* plyDataPtr = &mPliesData[ply];
         plyDataPtr->genAndScoreMoves(mBoard, true);
 
         u64 pinned = mBoard.pinned();
@@ -279,6 +298,7 @@ class SearchThread {
             i32 score = -qSearch(ply + 1, -beta, -alpha);
 
             mBoard.undoMove();
+            mAccumulatorPtr--;
 
             if (stopSearch()) return 0;
 
