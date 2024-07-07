@@ -17,7 +17,7 @@ struct PlyData {
     ArrayVec<Move, MAX_DEPTH+1> mPvLine = {};
     i32 mEval = INF;
 
-    inline void genAndScoreMoves(Board &board, bool noisiesOnly) 
+    inline void genAndScoreMoves(Board &board, bool noisiesOnly, Move ttMove) 
     {
         // Generate moves if not already generated
         // Never generate underpromotions in search
@@ -33,6 +33,12 @@ struct PlyData {
         for (size_t i = 0; i < mMoves.size(); i++)
         {
             Move move = mMoves[i];
+
+            if (move == ttMove) {
+                mMovesScores[i] = I32_MAX;
+                continue;
+            }
+
             PieceType captured = board.captured(move);
             PieceType promotion = move.promotion();
 
