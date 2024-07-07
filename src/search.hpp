@@ -206,7 +206,8 @@ class SearchThread {
 
         PlyData* plyDataPtr = &mPliesData[ply];
 
-        if (ply >= mMaxDepth) return updateAccumulatorAndEval(plyDataPtr->mEval);
+        if (ply >= mMaxDepth) 
+            return mBoard.inCheck() ? 0 : updateAccumulatorAndEval(plyDataPtr->mEval);
 
         if (depth > mMaxDepth) depth = mMaxDepth;
 
@@ -272,12 +273,16 @@ class SearchThread {
         if (ply > mMaxPlyReached) mMaxPlyReached = ply; // update seldepth
 
         PlyData* plyDataPtr = &mPliesData[ply];
+
+        if (ply >= mMaxDepth)
+            return mBoard.inCheck() ? 0 : updateAccumulatorAndEval(plyDataPtr->mEval);
+
         i32 eval = updateAccumulatorAndEval(plyDataPtr->mEval);
 
-        if (eval >= beta || ply >= mMaxDepth) 
-            return eval; 
-
-        if (eval > alpha) alpha = eval;
+        if (!mBoard.inCheck()) {
+            if (eval >= beta) return eval; 
+            if (eval > alpha) alpha = eval;
+        }
 
         // generate noisy moves except underpromotions
         plyDataPtr->genAndScoreMoves(mBoard, true);
