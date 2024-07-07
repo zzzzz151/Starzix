@@ -206,10 +206,24 @@ class SearchThread {
 
         PlyData* plyDataPtr = &mPliesData[ply];
 
+        if (depth > mMaxDepth) depth = mMaxDepth;
+
+        // Probe TT
+        auto ttEntryIdx = TTEntryIndex(mBoard.zobristHash(), ttPtr->size());
+        TTEntry ttEntry = (*ttPtr)[ttEntryIdx];
+        bool ttHit = mBoard.zobristHash() == ttEntry.zobristHash && ttEntry.bound() != Bound::NONE;
+
+        // TT cutoff (not done in singular searches since ttHit is false)
+        if (ttHit 
+        && ply > 0
+        && ttEntry.depth >= depth 
+        && (ttEntry.bound() == Bound::EXACT
+        || (ttEntry.bound() == Bound::LOWER && ttEntry.score >= beta) 
+        || (ttEntry.bound() == Bound::UPPER && ttEntry.score <= alpha)))
+            return ttEntry.adjustedScore(ply);
+
         if (ply >= mMaxDepth) 
             return mBoard.inCheck() ? 0 : updateAccumulatorAndEval(plyDataPtr->mEval);
-
-        if (depth > mMaxDepth) depth = mMaxDepth;
 
         if (!mAccumulatorPtr->mUpdated) 
             mAccumulatorPtr->update(mAccumulatorPtr - 1, mBoard);
@@ -218,7 +232,10 @@ class SearchThread {
 
         u64 pinned = mBoard.pinned();
         int legalMovesSeen = 0;
+
         i32 bestScore = -INF;
+        Move bestMove = MOVE_NONE;
+        Bound bound = Bound::UPPER;
 
         // Moves loop
         for (auto [move, moveScore] = plyDataPtr->nextMove(); 
@@ -245,11 +262,17 @@ class SearchThread {
             if (score <= alpha) continue;
 
             alpha = score;
+            bestMove = move;
+            bound = Bound::EXACT;
 
             plyDataPtr->mPvLine.clear();
             plyDataPtr->mPvLine.push_back(move);
 
             if (score < beta) continue;
+
+            // Fail high / beta cutoff
+
+            bound = Bound::LOWER;
 
             break;
         }
@@ -257,6 +280,9 @@ class SearchThread {
         if (legalMovesSeen == 0) 
             // checkmate or stalemate
             return mBoard.inCheck() ? -INF + ply : 0;
+
+        // Store in TT
+        (*ttPtr)[ttEntryIdx].update(mBoard.zobristHash(), depth, ply, bestScore, bestMove, bound);
 
         return bestScore;
     }
