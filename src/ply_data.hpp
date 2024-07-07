@@ -15,6 +15,7 @@ struct PlyData {
     int mCurrentMoveIdx = -1;
 
     ArrayVec<Move, MAX_DEPTH+1> mPvLine = {};
+    i32 mEval = INF;
 
     inline void genAndScoreMoves(Board &board, bool noisiesOnly) 
     {
