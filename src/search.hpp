@@ -228,7 +228,9 @@ class SearchThread {
         if (!mAccumulatorPtr->mUpdated) 
             mAccumulatorPtr->update(mAccumulatorPtr - 1, mBoard);
 
-        plyDataPtr->genAndScoreMoves(mBoard, false);
+        Move ttMove = ttHit ? Move(ttEntry.move) : MOVE_NONE;
+
+        plyDataPtr->genAndScoreMoves(mBoard, false, ttMove);
 
         u64 pinned = mBoard.pinned();
         int legalMovesSeen = 0;
@@ -309,7 +311,7 @@ class SearchThread {
         if (eval > alpha) alpha = eval;
 
         // generate noisy moves except underpromotions
-        plyDataPtr->genAndScoreMoves(mBoard, true);
+        plyDataPtr->genAndScoreMoves(mBoard, true, MOVE_NONE);
 
         u64 pinned = mBoard.pinned();
         i32 bestScore = mBoard.inCheck() ? -INF + ply : eval;

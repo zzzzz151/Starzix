@@ -55,7 +55,7 @@ constexpr std::array BENCH_FENS {
     "2r2b2/5p2/5k2/p1r1pP2/P2pB3/1P3P2/K1P3R1/7R w - - 23 93"
 };
 
-inline void bench(int depth = 6)
+inline void bench(int depth = 7)
 {
     depth = std::clamp(depth, 1, (int)MAX_DEPTH);
 
