@@ -265,14 +265,14 @@ class SearchThread {
             if (mBoard.isRepetition(ply)) goto moveSearched;
 
             if (legalMovesSeen == 1) {
-                score = -search(depth - 1, ply + 1, -beta, -alpha);
+                score = -search(depth - 1 + mBoard.inCheck(), ply + 1, -beta, -alpha);
                 goto moveSearched;
             }
 
-            score = -search(depth - 1, ply + 1, -alpha - 1, -alpha);
+            score = -search(depth - 1 + mBoard.inCheck(), ply + 1, -alpha - 1, -alpha);
 
             if (score > alpha && score < beta)
-                score = -search(depth - 1, ply + 1, -beta, -alpha);
+                score = -search(depth - 1 + mBoard.inCheck(), ply + 1, -beta, -alpha);
 
             moveSearched:
 
