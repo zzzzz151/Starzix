@@ -17,7 +17,7 @@ struct PlyData {
     ArrayVec<Move, MAX_DEPTH+1> mPvLine = {};
     i32 mEval = INF;
 
-    inline void genAndScoreMoves(Board &board, bool noisiesOnly, Move ttMove) 
+    inline void genAndScoreMoves(Board &board, bool noisiesOnly, Move ttMove, MultiArray<i16, 2, 6, 64> &movesHistory) 
     {
         // Generate moves if not already generated
         // Never generate underpromotions in search
@@ -45,8 +45,6 @@ struct PlyData {
             // Starzix doesnt generate underpromotions in search
             assert(promotion == PieceType::NONE || promotion == PieceType::QUEEN);
 
-            mMovesScores[i] = 0;
-
             if (captured != PieceType::NONE)
             {
                 mMovesScores[i] = SEE(board, move) 
@@ -60,6 +58,10 @@ struct PlyData {
             }
             else if (promotion == PieceType::QUEEN)
                 mMovesScores[i] = SEE(board, move) ? GOOD_QUEEN_PROMO_SCORE : -GOOD_NOISY_SCORE;
+            else {
+                int pt = (int)move.pieceType();
+                mMovesScores[i] = movesHistory[stm][pt][move.to()];
+            }
         }
 
         mCurrentMoveIdx = -1; // prepare for moves loop
