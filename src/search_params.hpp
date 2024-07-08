@@ -33,7 +33,7 @@ constexpr i32 GOOD_QUEEN_PROMO_SCORE = 1'600'000'000,
 
 // Time management
 TunableParam<double> hardTimePercentage = TunableParam<double>(0.5, 0.25, 0.75, 0.1);
-TunableParam<double> softTimePercentage = TunableParam<double>(0.2, 0.05, 0.75, 0.1);
+TunableParam<double> softTimePercentage = TunableParam<double>(0.03, 0.01, 0.05, 0.02);
 
 // Nodes time management (scale soft time based on best move nodes fraction)
 TunableParam<i32> nodesTmMinDepth = TunableParam<i32>(11, 7, 11, 1);
