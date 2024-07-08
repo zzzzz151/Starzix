@@ -45,12 +45,12 @@ class SearchThread {
     u64 mNodes = 0;
     u8 mMaxPlyReached = 0; // seldepth
 
-    std::array<PlyData, MAX_DEPTH+1> mPliesData;
+    std::array<PlyData, MAX_DEPTH+1> mPliesData; /// [ply]
 
     std::array<Accumulator, MAX_DEPTH+1> mAccumulators;
     Accumulator* mAccumulatorPtr = &mAccumulators[0];
 
-    MultiArray<i16, 2, 6, 64> mMovesHistory = {};
+    MultiArray<i16, 2, 6, 64> mMovesHistory = {}; // [stm][pieceType][targetSquare]
 
     std::vector<TTEntry>* ttPtr = nullptr;
     
@@ -205,12 +205,14 @@ class SearchThread {
 
         if (ply > mMaxPlyReached) mMaxPlyReached = ply; // update seldepth
 
+        // Cuckoo / detect upcoming repetition
         if (ply > 0 && alpha < 0 && mBoard.hasUpcomingRepetition(ply)) 
         {
             alpha = 0;
             if (alpha >= beta) return alpha;
         }
 
+        // Quiescence search at leaf nodes
         if (depth <= 0) { 
             assert(!mBoard.inCheck());
             return qSearch(ply, alpha, beta);
@@ -234,15 +236,23 @@ class SearchThread {
 
         PlyData* plyDataPtr = &mPliesData[ply];
 
+        // Max ply cutoff
         if (ply >= mMaxDepth) 
             return mBoard.inCheck() ? 0 : updateAccumulatorAndEval(plyDataPtr->mEval);
 
-        if (!mAccumulatorPtr->mUpdated) 
-            mAccumulatorPtr->update(mAccumulatorPtr - 1, mBoard);
-
         Color stm = mBoard.sideToMove();
         bool pvNode = beta > alpha + 1;
+        i32 eval = updateAccumulatorAndEval(plyDataPtr->mEval);
         (plyDataPtr + 1)->mKiller = MOVE_NONE;
+
+        // Node pruning
+        if (!pvNode && !mBoard.inCheck()) 
+        {
+            // RFP (Reverse futility pruning) / Static NMP
+            if (depth <= rfpMaxDepth() 
+            && eval >= beta + depth * rfpMultiplier())
+                return eval;
+        }
 
         Move ttMove = ttHit ? Move(ttEntry.move) : MOVE_NONE;
 
@@ -250,6 +260,7 @@ class SearchThread {
         if (depth >= iirMinDepth() && ttMove == MOVE_NONE)
             depth--;
 
+        // gen and score all moves, except underpromotions
         plyDataPtr->genAndScoreMoves(mBoard, false, ttMove, mMovesHistory);
 
         u64 pinned = mBoard.pinned();
@@ -272,6 +283,7 @@ class SearchThread {
             PieceType captured = mBoard.captured(move);
             bool isQuiet = captured == PieceType::NONE && move.promotion() == PieceType::NONE;
 
+            // Moves loop pruning
             if (ply > 0 && bestScore > -MIN_MATE_SCORE && moveScore < KILLER_SCORE)
             {
                 // SEE pruning
@@ -290,6 +302,7 @@ class SearchThread {
 
             // PVS (Principal variation search)
 
+            // First move, aka left-most leaf, is a PV node searched with full window
             if (legalMovesSeen == 1) {
                 score = -search(newDepth, ply + 1, -beta, -alpha);
                 goto moveSearched;
@@ -304,8 +317,10 @@ class SearchThread {
                 if (lmr < 0) lmr = 0; // dont extend
             }
 
+            // Reduced, zero window search (non PV node)
             score = -search(newDepth - lmr, ply + 1, -alpha - 1, -alpha);
 
+            // Research (PV node)
             if (score > alpha && (score < beta || lmr > 0))
                 score = -search(newDepth, ply + 1, -beta, -alpha);
 
@@ -325,6 +340,7 @@ class SearchThread {
             bestMove = move;
             bound = Bound::EXACT;
 
+            // Update PV line
             plyDataPtr->mPvLine.clear();
             plyDataPtr->mPvLine.push_back(move);
 
@@ -335,8 +351,10 @@ class SearchThread {
             bound = Bound::LOWER;
 
             if (isQuiet) {
-                plyDataPtr->mKiller = move;
+                // This fail high quiet is now a killer move
+                plyDataPtr->mKiller = move; 
                 
+                // Update this move's history
                 int pt = (int)move.pieceType();
                 i16 &history = mMovesHistory[(int)stm][pt][move.to()];
                 history = std::min((i32)history + depth * depth, 8192);
@@ -368,6 +386,7 @@ class SearchThread {
 
         PlyData* plyDataPtr = &mPliesData[ply];
 
+        // Max ply cutoff
         if (ply >= mMaxDepth)
             return mBoard.inCheck() ? 0 : updateAccumulatorAndEval(plyDataPtr->mEval);
 
