@@ -16,6 +16,7 @@ struct PlyData {
 
     ArrayVec<Move, MAX_DEPTH+1> mPvLine = {};
     i32 mEval = INF;
+    Move mKiller = MOVE_NONE;
 
     inline void genAndScoreMoves(Board &board, bool noisiesOnly, Move ttMove, MultiArray<i16, 2, 6, 64> &movesHistory) 
     {
@@ -58,6 +59,8 @@ struct PlyData {
             }
             else if (promotion == PieceType::QUEEN)
                 mMovesScores[i] = SEE(board, move) ? GOOD_QUEEN_PROMO_SCORE : -GOOD_NOISY_SCORE;
+            else if (move == mKiller)
+                mMovesScores[i] = KILLER_SCORE;
             else {
                 int pt = (int)move.pieceType();
                 mMovesScores[i] = movesHistory[stm][pt][move.to()];
