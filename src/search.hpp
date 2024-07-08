@@ -235,8 +235,10 @@ class SearchThread {
             mAccumulatorPtr->update(mAccumulatorPtr - 1, mBoard);
 
         Color stm = mBoard.sideToMove();
-        Move ttMove = ttHit ? Move(ttEntry.move) : MOVE_NONE;
+        bool pvNode = beta > alpha + 1;
         (plyDataPtr + 1)->mKiller = MOVE_NONE;
+
+        Move ttMove = ttHit ? Move(ttEntry.move) : MOVE_NONE;
 
         // IIR (Internal iterative reduction)
         if (depth >= iirMinDepth() && ttMove == MOVE_NONE)
@@ -280,6 +282,7 @@ class SearchThread {
             if (depth >= 2 && !mBoard.inCheck() && legalMovesSeen >= lmrMinMoves() && moveScore < KILLER_SCORE)
             {
                 lmr = LMR_TABLE[depth][legalMovesSeen];
+                lmr -= pvNode; // reduce pv nodes less
 
                 if (lmr < 0) lmr = 0; // dont extend
             }
