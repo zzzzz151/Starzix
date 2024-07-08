@@ -900,7 +900,7 @@ class Board {
         return hashAfter ^ ZOBRIST_PIECES[stm][pieceType][move.from()] ^ ZOBRIST_PIECES[stm][pieceType][to];
     }
 
-    // Cuckoo
+    // Cuckoo / detect upcoming repetition
     inline bool hasUpcomingRepetition(int ply) {
         //int stateIdxAfterPawnOrCapture = std::max(0, (int)mStates.size() - (int)mState->pliesSincePawnOrCapture - 1);
         //int rootStateIdx = (int)mStates.size() - ply - 1;
