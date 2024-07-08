@@ -123,10 +123,10 @@ TunableParam<i32> corrHistScale = TunableParam<i32>(136, 50, 750, 100);
 TunableParam<i32> corrHistMax = TunableParam<i32>(9479, 2048, 16384, 2048);
 
 // SEE piece values
-TunableParam<i32> seePawnValue = TunableParam<i32>(147, 0, 200, 50);
-TunableParam<i32> seeMinorValue = TunableParam<i32>(287, 150, 450, 50);
-TunableParam<i32> seeRookValue = TunableParam<i32>(399, 300, 700, 50);
-TunableParam<i32> seeQueenValue = TunableParam<i32>(761 , 600, 1200, 100);
+TunableParam<i32> seePawnValue = TunableParam<i32>(100, 0, 200, 50);
+TunableParam<i32> seeMinorValue = TunableParam<i32>(300, 150, 450, 50);
+TunableParam<i32> seeRookValue = TunableParam<i32>(500, 300, 700, 50);
+TunableParam<i32> seeQueenValue = TunableParam<i32>(900 , 600, 1200, 100);
 
 using TunableParamVariant = std::variant<
     TunableParam<u64>*,
