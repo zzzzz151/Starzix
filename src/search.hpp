@@ -45,7 +45,7 @@ class SearchThread {
     u64 mNodes = 0;
     u8 mMaxPlyReached = 0; // seldepth
 
-    std::array<PlyData, MAX_DEPTH+1> mPliesData; /// [ply]
+    std::array<PlyData, MAX_DEPTH+1> mPliesData; // [ply]
 
     std::array<Accumulator, MAX_DEPTH+1> mAccumulators;
     Accumulator* mAccumulatorPtr = &mAccumulators[0];
@@ -252,6 +252,26 @@ class SearchThread {
             if (depth <= rfpMaxDepth() 
             && eval >= beta + depth * rfpMultiplier())
                 return eval;
+
+            // NMP (Null move pruning)
+            if (depth >= nmpMinDepth() 
+            && mBoard.lastMove() != MOVE_NONE 
+            && eval >= beta
+            && mBoard.hasNonPawnMaterial(stm))
+            {
+                makeMove(MOVE_NONE, plyDataPtr);
+
+                i32 score = 0;
+
+                if (!mBoard.isRepetition(ply)) {
+                    i32 nmpDepth = depth - nmpBaseReduction() - depth / nmpReductionDivisor();
+                    score = -search(nmpDepth, ply + 1, -beta, -alpha);
+                }
+
+                mBoard.undoMove();
+
+				if (score >= beta) return score >= MIN_MATE_SCORE ? beta : score;
+            }
         }
 
         Move ttMove = ttHit ? Move(ttEntry.move) : MOVE_NONE;
