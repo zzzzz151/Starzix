@@ -77,10 +77,10 @@ TunableParam<i32> fpBase = TunableParam<i32>(244, 40, 260, 20);
 TunableParam<i32> fpMultiplier = TunableParam<i32>(190, 40, 260, 20);
 
 // SEE pruning
-TunableParam<i32> seePruningMaxDepth = TunableParam<i32>(10, 7, 11, 1);
-TunableParam<i32> seeQuietThreshold = TunableParam<i32>(-78, -101, -1, 20);
+TunableParam<i32> seePruningMaxDepth = TunableParam<i32>(8, 7, 11, 1);
+TunableParam<i32> seeQuietThreshold = TunableParam<i32>(-60, -101, -1, 20);
 TunableParam<i32> seeQuietHistoryDiv = TunableParam<i32>(290, 32, 512, 48);
-TunableParam<i32> seeNoisyThreshold = TunableParam<i32>(-26, -51, -1, 10);
+TunableParam<i32> seeNoisyThreshold = TunableParam<i32>(-110, -161, -1, 20);
 TunableParam<i32> seeNoisyHistoryDiv = TunableParam<i32>(148, 32, 512, 48);
 
 // SE (Singular extensions)
