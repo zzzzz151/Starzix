@@ -203,14 +203,18 @@ class SearchThread {
 
         if (stopSearch()) return 0;
 
+        if (ply > mMaxPlyReached) mMaxPlyReached = ply; // update seldepth
+
+        if (ply > 0 && alpha < 0 && mBoard.hasUpcomingRepetition(ply)) 
+        {
+            alpha = 0;
+            if (alpha >= beta) return alpha;
+        }
+
         if (depth <= 0) { 
             assert(!mBoard.inCheck());
             return qSearch(ply, alpha, beta);
         }
-
-        if (ply > mMaxPlyReached) mMaxPlyReached = ply; // update seldepth
-
-        PlyData* plyDataPtr = &mPliesData[ply];
 
         if (depth > mMaxDepth) depth = mMaxDepth;
 
@@ -227,6 +231,8 @@ class SearchThread {
         || (ttEntry.bound() == Bound::LOWER && ttEntry.score >= beta) 
         || (ttEntry.bound() == Bound::UPPER && ttEntry.score <= alpha)))
             return ttEntry.adjustedScore(ply);
+
+        PlyData* plyDataPtr = &mPliesData[ply];
 
         if (ply >= mMaxDepth) 
             return mBoard.inCheck() ? 0 : updateAccumulatorAndEval(plyDataPtr->mEval);
