@@ -49,6 +49,8 @@ class SearchThread {
     std::array<Accumulator, MAX_DEPTH+1> mAccumulators;
     Accumulator* mAccumulatorPtr = &mAccumulators[0];
 
+    MultiArray<i16, 2, 6, 64> mMovesHistory = {};
+
     std::vector<TTEntry>* ttPtr = nullptr;
     
     public:
@@ -60,7 +62,7 @@ class SearchThread {
     }
 
     inline void reset() {
-
+        mMovesHistory = {};
     }
 
     inline u64 getNodes() { return mNodes; }
@@ -224,13 +226,15 @@ class SearchThread {
         if (!mAccumulatorPtr->mUpdated) 
             mAccumulatorPtr->update(mAccumulatorPtr - 1, mBoard);
 
+        Color stm = mBoard.sideToMove();
+
         Move ttMove = ttHit ? Move(ttEntry.move) : MOVE_NONE;
 
         // IIR (Internal iterative reduction)
         if (depth >= iirMinDepth() && ttMove == MOVE_NONE)
             depth--;
 
-        plyDataPtr->genAndScoreMoves(mBoard, false, ttMove);
+        plyDataPtr->genAndScoreMoves(mBoard, false, ttMove, mMovesHistory);
 
         u64 pinned = mBoard.pinned();
         int legalMovesSeen = 0;
@@ -276,6 +280,13 @@ class SearchThread {
 
             bound = Bound::LOWER;
 
+            if (mBoard.captured(move) == PieceType::NONE && move.promotion() == PieceType::NONE)
+            {
+                int pt = (int)move.pieceType();
+                i16 &history = mMovesHistory[(int)stm][pt][move.to()];
+                history = std::min((i32)history + depth * depth, 8192);
+            }
+
             break;
         }
 
@@ -311,7 +322,7 @@ class SearchThread {
         if (eval > alpha) alpha = eval;
 
         // generate noisy moves except underpromotions
-        plyDataPtr->genAndScoreMoves(mBoard, true, MOVE_NONE);
+        plyDataPtr->genAndScoreMoves(mBoard, true, MOVE_NONE, mMovesHistory);
 
         u64 pinned = mBoard.pinned();
         i32 bestScore = mBoard.inCheck() ? -INF + ply : eval;
