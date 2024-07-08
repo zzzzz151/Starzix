@@ -38,6 +38,7 @@ class SearchThread {
     std::chrono::time_point<std::chrono::steady_clock> mStartTime;
 
     u64 mHardMilliseconds = I64_MAX,
+        mSoftMilliseconds = I64_MAX,
         mMaxNodes = I64_MAX;
 
     u8 mMaxDepth = MAX_DEPTH;
@@ -77,11 +78,13 @@ class SearchThread {
                : mPliesData[0].mPvLine[0];
     }
 
-    inline i32 search(Board &board, i32 maxDepth, auto startTime, i64 hardMilliseconds, i64 maxNodes)
+    inline i32 search(Board &board, i32 maxDepth, auto startTime, 
+        i64 hardMilliseconds, i64 softMilliseconds, i64 maxNodes)
     { 
         mBoard = board;
         mStartTime = startTime;
         mHardMilliseconds = std::max(hardMilliseconds, (i64)0);
+        mSoftMilliseconds = std::max(softMilliseconds, (i64)0);
         mMaxDepth = std::clamp(maxDepth, 1, (i32)MAX_DEPTH);
         mMaxNodes = std::max(maxNodes, (i64)0);
 
@@ -98,7 +101,6 @@ class SearchThread {
         for (i32 iterationDepth = 1; iterationDepth <= mMaxDepth; iterationDepth++)
         {
             mMaxPlyReached = 0;
-            Move moveBefore = bestMoveRoot();
 
             i32 iterationScore = search(iterationDepth, 0, -INF, INF);
 
@@ -129,6 +131,9 @@ class SearchThread {
                       << " time "  << msElapsed
                       << " pv "    << mPliesData[0].pvString()
                       << std::endl;
+
+            /// Check soft time limit
+            if (msElapsed >= mSoftMilliseconds) break;
         }
 
         // Signal secondary threads to stop

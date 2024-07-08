@@ -227,7 +227,7 @@ inline void go(std::vector<std::string> &tokens, Board &board)
     i32 maxDepth = MAX_DEPTH;
     i64 milliseconds = I64_MAX;
     i64 incrementMs = 0;
-    i64 movesToGo = defaultMovesToGo();
+    i64 movesToGo = 0;
     bool isMoveTime = false;
     i64 maxNodes = I64_MAX;
 
@@ -256,8 +256,15 @@ inline void go(std::vector<std::string> &tokens, Board &board)
             maxNodes = value;
     }
 
-    // Calculate search time limit
-    u64 hardMilliseconds = isMoveTime ? I64_MAX : std::max((i64)0, milliseconds - 10) / movesToGo;
+    // Calculate search time limits
+
+    u64 hardMilliseconds = I64_MAX;
+    u64 softMilliseconds = I64_MAX;
+
+    if (!isMoveTime) {
+        hardMilliseconds = std::max((i64)0, milliseconds - 10) * hardTimePercentage();
+        softMilliseconds = hardMilliseconds * softTimePercentage();
+    }
 
     SearchThread::sSearchStopped = false;
     std::vector<std::thread> threads;
@@ -266,11 +273,11 @@ inline void go(std::vector<std::string> &tokens, Board &board)
     for (u64 i = 1; i < gSearchThreads.size(); i++)
         threads.emplace_back([&, i]() {
             gSearchThreads[i].search(
-                board, maxDepth, startTime, hardMilliseconds, maxNodes);
+                board, maxDepth, startTime, hardMilliseconds, softMilliseconds, maxNodes);
         });
 
     // Main thread search
-    gMainThread->search(board, maxDepth, startTime, hardMilliseconds, maxNodes);
+    gMainThread->search(board, maxDepth, startTime, hardMilliseconds, softMilliseconds, maxNodes);
 
     // Wait for secondary threads
     for (auto &thread : threads)

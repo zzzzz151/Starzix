@@ -71,7 +71,9 @@ inline void bench(int depth = 7)
         Board board = Board(fen);
 
         SearchThread::sSearchStopped = false;
-        searchThread.search(board, depth, std::chrono::steady_clock::now(), I64_MAX, I64_MAX);
+        
+        searchThread.search(
+            board, depth, std::chrono::steady_clock::now(), I64_MAX, I64_MAX, I64_MAX);
 
         totalMilliseconds += searchThread.millisecondsElapsed();
         totalNodes += searchThread.getNodes();
