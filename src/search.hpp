@@ -227,8 +227,8 @@ class SearchThread {
             mAccumulatorPtr->update(mAccumulatorPtr - 1, mBoard);
 
         Color stm = mBoard.sideToMove();
-
         Move ttMove = ttHit ? Move(ttEntry.move) : MOVE_NONE;
+        (plyDataPtr + 1)->mKiller = MOVE_NONE;
 
         // IIR (Internal iterative reduction)
         if (depth >= iirMinDepth() && ttMove == MOVE_NONE)
@@ -282,6 +282,8 @@ class SearchThread {
 
             if (mBoard.captured(move) == PieceType::NONE && move.promotion() == PieceType::NONE)
             {
+                plyDataPtr->mKiller = move;
+                
                 int pt = (int)move.pieceType();
                 i16 &history = mMovesHistory[(int)stm][pt][move.to()];
                 history = std::min((i32)history + depth * depth, 8192);
