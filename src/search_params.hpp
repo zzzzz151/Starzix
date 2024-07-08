@@ -91,9 +91,9 @@ TunableParam<i32> doubleExtensionMargin = TunableParam<i32>(26, 2, 42, 10);
 constexpr u8 DOUBLE_EXTENSIONS_MAX = 10;
 
 // LMR (Late move reductions)
-TunableParam<double> lmrBase = TunableParam<double>(0.67, 0.4, 1.2, 0.1);
-TunableParam<double> lmrMultiplier = TunableParam<double>(0.45, 0.2, 0.8, 0.1);
-TunableParam<i32> lmrMinMoves = TunableParam<i32>(2, 2, 4, 1);
+TunableParam<double> lmrBase = TunableParam<double>(0.8, 0.4, 1.2, 0.1);
+TunableParam<double> lmrMultiplier = TunableParam<double>(0.4, 0.2, 0.8, 0.1);
+TunableParam<i32> lmrMinMoves = TunableParam<i32>(3, 2, 4, 1);
 TunableParam<i32> lmrQuietHistoryDiv = TunableParam<i32>(7295, 1024, 16384, 1024);
 TunableParam<i32> lmrNoisyHistoryDiv = TunableParam<i32>(1918, 1024, 16384, 1024);
 

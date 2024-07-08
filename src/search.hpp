@@ -203,7 +203,10 @@ class SearchThread {
 
         if (stopSearch()) return 0;
 
-        if (depth <= 0) return qSearch(ply, alpha, beta);
+        if (depth <= 0) { 
+            assert(!mBoard.inCheck());
+            return qSearch(ply, alpha, beta);
+        }
 
         if (ply > mMaxPlyReached) mMaxPlyReached = ply; // update seldepth
 
@@ -260,19 +263,31 @@ class SearchThread {
 
             makeMove(move, plyDataPtr);
 
-            i32 score = 0, lmr = 0;
+            i32 score = 0;
+            i32 newDepth = depth - 1 + mBoard.inCheck(); // Check extension
+            i32 lmr = 0;
 
             if (mBoard.isRepetition(ply)) goto moveSearched;
 
+            // PVS (Principal variation search)
+
             if (legalMovesSeen == 1) {
-                score = -search(depth - 1 + mBoard.inCheck(), ply + 1, -beta, -alpha);
+                score = -search(newDepth, ply + 1, -beta, -alpha);
                 goto moveSearched;
             }
 
-            score = -search(depth - 1 + mBoard.inCheck(), ply + 1, -alpha - 1, -alpha);
+            // LMR (Late move reductions)
+            if (depth >= 2 && !mBoard.inCheck() && legalMovesSeen >= lmrMinMoves() && moveScore < KILLER_SCORE)
+            {
+                lmr = LMR_TABLE[depth][legalMovesSeen];
 
-            if (score > alpha && score < beta)
-                score = -search(depth - 1 + mBoard.inCheck(), ply + 1, -beta, -alpha);
+                if (lmr < 0) lmr = 0; // dont extend
+            }
+
+            score = -search(newDepth - lmr, ply + 1, -alpha - 1, -alpha);
+
+            if (score > alpha && (score < beta || lmr > 0))
+                score = -search(newDepth, ply + 1, -beta, -alpha);
 
             moveSearched:
 
