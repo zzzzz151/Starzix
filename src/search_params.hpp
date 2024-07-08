@@ -31,19 +31,18 @@ constexpr i32 GOOD_QUEEN_PROMO_SCORE = 1'600'000'000,
               KILLER_SCORE           = 1'000'000'000,
               COUNTERMOVE_SCORE      = 500'000'000;
 
-// Eval scale with material / game phase
-TunableParam<float> evalMaterialScaleMin = TunableParam<float>(0.71, 0.5, 1.0, 0.1);
-TunableParam<float> evalMaterialScaleMax = TunableParam<float>(1.03, 1.0, 1.5, 0.1);
-
 // Time management
-TunableParam<u64> defaultMovesToGo = TunableParam<u64>(25, 20, 26, 3);
-TunableParam<double> hardTimePercentage = TunableParam<double>(0.5, 0.3, 0.6, 0.15);
-TunableParam<double> softTimePercentage = TunableParam<double>(0.7, 0.5, 0.7, 0.1);
+TunableParam<double> hardTimePercentage = TunableParam<double>(0.5, 0.25, 0.75, 0.1);
+TunableParam<double> softTimePercentage = TunableParam<double>(0.03, 0.01, 0.05, 0.02);
 
 // Nodes time management (scale soft time based on best move nodes fraction)
 TunableParam<i32> nodesTmMinDepth = TunableParam<i32>(11, 7, 11, 1);
 TunableParam<double> nodesTmBase = TunableParam<double>(1.59, 1.4, 1.6, 0.1);
 TunableParam<double> nodesTmMultiplier = TunableParam<double>(1.5, 1.3, 1.5, 0.1);
+
+// Eval scale with material / game phase
+TunableParam<float> evalMaterialScaleMin = TunableParam<float>(0.71, 0.5, 1.0, 0.1);
+TunableParam<float> evalMaterialScaleMax = TunableParam<float>(1.03, 1.0, 1.5, 0.1);
 
 // Aspiration windows
 TunableParam<i32> aspMinDepth = TunableParam<i32>(8, 6, 10, 1);
@@ -136,12 +135,7 @@ using TunableParamVariant = std::variant<
 >;
 
 tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
-    // Eval scale with material / game phase
-    {stringify(evalMaterialScaleMin), &evalMaterialScaleMin},
-    {stringify(evalMaterialScaleMax), &evalMaterialScaleMax},
-
     // Time management
-    {stringify(defaultMovesToGo), &defaultMovesToGo},
     {stringify(hardTimePercentage), &hardTimePercentage},
     {stringify(softTimePercentage), &softTimePercentage},
 
@@ -149,6 +143,10 @@ tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
     {stringify(nodesTmMinDepth), &nodesTmMinDepth},
     {stringify(nodesTmBase), &nodesTmBase},
     {stringify(nodesTmMultiplier), &nodesTmMultiplier},
+
+    // Eval scale with material / game phase
+    {stringify(evalMaterialScaleMin), &evalMaterialScaleMin},
+    {stringify(evalMaterialScaleMax), &evalMaterialScaleMax},
 
     // Aspiration windows
     {stringify(aspMinDepth), &aspMinDepth},
