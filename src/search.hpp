@@ -263,6 +263,17 @@ class SearchThread {
 
             legalMovesSeen++;
 
+            PieceType captured = mBoard.captured(move);
+            bool isQuiet = captured == PieceType::NONE && move.promotion() == PieceType::NONE;
+
+            if (ply > 0 && bestScore > -MIN_MATE_SCORE && moveScore < KILLER_SCORE)
+            {
+                // SEE pruning
+                i32 threshold = depth * (isQuiet ? seeQuietThreshold() : seeNoisyThreshold());
+                if (depth <= seePruningMaxDepth() && !SEE(mBoard, move, threshold))
+                    continue;
+            }
+
             makeMove(move, plyDataPtr);
 
             i32 score = 0;
@@ -317,8 +328,7 @@ class SearchThread {
 
             bound = Bound::LOWER;
 
-            if (mBoard.captured(move) == PieceType::NONE && move.promotion() == PieceType::NONE)
-            {
+            if (isQuiet) {
                 plyDataPtr->mKiller = move;
                 
                 int pt = (int)move.pieceType();
