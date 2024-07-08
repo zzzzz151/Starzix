@@ -102,7 +102,9 @@ class SearchThread {
         {
             mMaxPlyReached = 0;
 
-            i32 iterationScore = search(iterationDepth, 0, -INF, INF);
+            i32 iterationScore = iterationDepth >= aspMinDepth() 
+                                 ? aspiration(iterationDepth, score)
+                                 : search(iterationDepth, 0, -INF, INF);
 
             if (stopSearch()) break;
 
@@ -193,6 +195,39 @@ class SearchThread {
         }
 
         return eval;
+    }
+
+    inline i32 aspiration(i32 iterationDepth, i32 score)
+    {
+        // Aspiration Windows
+        // Search with a small window, adjusting it and researching until the score is inside the window
+
+        i32 delta = aspInitialDelta();
+        i32 alpha = std::max(-INF, score - delta);
+        i32 beta = std::min(INF, score + delta);
+        i32 bestScore = score;
+
+        while (true) {
+            score = search(iterationDepth, 0, alpha, beta);
+
+            if (stopSearch()) return 0;
+
+            if (score > bestScore) bestScore = score;
+
+            if (score >= beta)
+                beta = std::min(beta + delta, INF);
+            else if (score <= alpha)
+            {
+                beta = (alpha + beta) / 2;
+                alpha = std::max(alpha - delta, -INF);
+            }
+            else
+                break;
+
+            delta *= aspDeltaMultiplier();
+        }
+
+        return score;
     }
 
     inline i32 search(i32 depth, i32 ply, i32 alpha, i32 beta) {
