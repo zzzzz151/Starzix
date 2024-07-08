@@ -288,6 +288,15 @@ class SearchThread {
             && eval >= beta + depth * rfpMultiplier())
                 return eval;
 
+            // Razoring
+            if (depth <= razoringMaxDepth() 
+            && abs(alpha) < 2000
+            && eval + depth * razoringMultiplier() < alpha)
+            {
+                i32 score = qSearch(ply, alpha, beta);
+                if (score <= alpha) return score;
+            }
+
             // NMP (Null move pruning)
             if (depth >= nmpMinDepth() 
             && mBoard.lastMove() != MOVE_NONE 
