@@ -230,7 +230,7 @@ class SearchThread {
         return score;
     }
 
-    inline i32 search(i32 depth, i32 ply, i32 alpha, i32 beta) {
+    inline i32 search(i32 depth, i32 ply, i32 alpha, i32 beta, bool singular = false) {
         assert(ply >= 0 && ply <= mMaxDepth);
         assert(alpha >= -INF && alpha <= INF);
         assert(beta  >= -INF && beta  <= INF);
@@ -257,7 +257,7 @@ class SearchThread {
 
         // Probe TT
         auto ttEntryIdx = TTEntryIndex(mBoard.zobristHash(), ttPtr->size());
-        TTEntry ttEntry = (*ttPtr)[ttEntryIdx];
+        TTEntry ttEntry = singular ? TTEntry() : (*ttPtr)[ttEntryIdx];
         bool ttHit = mBoard.zobristHash() == ttEntry.zobristHash && ttEntry.bound() != Bound::NONE;
 
         // TT cutoff (not done in singular searches since ttHit is false)
@@ -280,7 +280,7 @@ class SearchThread {
         (plyDataPtr + 1)->mKiller = MOVE_NONE;
 
         // Node pruning
-        if (!pvNode && !mBoard.inCheck()) 
+        if (!pvNode && !mBoard.inCheck() && !singular) 
         {
             // RFP (Reverse futility pruning) / Static NMP
             if (depth <= rfpMaxDepth() 
@@ -320,11 +320,14 @@ class SearchThread {
         Move ttMove = ttHit ? Move(ttEntry.move) : MOVE_NONE;
 
         // IIR (Internal iterative reduction)
-        if (depth >= iirMinDepth() && ttMove == MOVE_NONE)
+        if (depth >= iirMinDepth() && ttMove == MOVE_NONE && !singular)
             depth--;
 
-        // gen and score all moves, except underpromotions
-        plyDataPtr->genAndScoreMoves(mBoard, false, ttMove, mMovesHistory);
+        if (!singular)
+            // gen and score all moves, except underpromotions
+            plyDataPtr->genAndScoreMoves(mBoard, false, ttMove, mMovesHistory);
+
+        assert(!singular || plyDataPtr->mCurrentMoveIdx == 0);
 
         u64 pinned = mBoard.pinned();
         int legalMovesSeen = 0;
@@ -366,13 +369,38 @@ class SearchThread {
                     continue;
             }
 
+            i32 newDepth = depth - 1;
+
+            // SE (Singular extensions)
+            // In singular searches, ttMove = MOVE_NONE, which prevents SE
+
+            i32 singularBeta = (i32)ttEntry.score - depth * singularBetaMultiplier();
+
+            if (move == ttMove
+            && !mBoard.inCheck()
+            && ply > 0
+            && depth >= singularMinDepth()
+            && (i32)ttEntry.depth >= depth - singularDepthMargin()
+            && ttEntry.bound() != Bound::UPPER 
+            && abs(ttEntry.score) < MIN_MATE_SCORE
+            && singularBeta > -MIN_MATE_SCORE + 1)
+            {
+                // Singular search: before searching any move, 
+                // search this node at a shallower depth with TT move excluded
+                i32 singularScore = search((depth - 1) / 2, ply, singularBeta - 1, singularBeta, true);
+
+                newDepth += singularScore < singularBeta;
+
+                plyDataPtr->mCurrentMoveIdx = 0; // reset since the singular search used this
+            }
+
             makeMove(move, plyDataPtr);
 
-            i32 score = 0;
-            i32 newDepth = depth - 1 + mBoard.inCheck(); // Check extension
-            i32 lmr = 0;
+            i32 score = 0, lmr = 0;
 
             if (mBoard.isRepetition(ply)) goto moveSearched;
+
+            newDepth += mBoard.inCheck(); // Check extension
 
             // PVS (Principal variation search)
 
@@ -452,11 +480,13 @@ class SearchThread {
         }
 
         if (legalMovesSeen == 0) 
-            // checkmate or stalemate
-            return mBoard.inCheck() ? -INF + ply : 0;
+            return singular ? alpha 
+                   : mBoard.inCheck() ? -INF + ply // checkmate
+                   : 0; // stalemate
 
         // Store in TT
-        (*ttPtr)[ttEntryIdx].update(mBoard.zobristHash(), depth, ply, bestScore, bestMove, bound);
+        if (!singular)
+            (*ttPtr)[ttEntryIdx].update(mBoard.zobristHash(), depth, ply, bestScore, bestMove, bound);
 
         return bestScore;
     }
