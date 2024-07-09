@@ -7,6 +7,7 @@ constexpr i32 INF = 32000,
 
 #include "board.hpp"
 #include "search_params.hpp"
+#include "history_entry.hpp"
 #include "see.hpp"
 #include "ply_data.hpp"
 #include "tt.hpp"
@@ -50,7 +51,7 @@ class SearchThread {
     std::array<Accumulator, MAX_DEPTH+1> mAccumulators;
     Accumulator* mAccumulatorPtr = &mAccumulators[0];
 
-    MultiArray<i16, 2, 6, 64> mMovesHistory = {}; // [stm][pieceType][targetSquare]
+    MultiArray<HistoryEntry, 2, 6, 64> mMovesHistory = {}; // [stm][pieceType][targetSquare]
 
     std::vector<TTEntry>* ttPtr = nullptr;
     
@@ -474,15 +475,12 @@ class SearchThread {
             i32 bonus = depth * depth;
             
             // History bonus: increase this move's history
-            mMovesHistory[stm][pt][move.to()] 
-                = std::min<i32>(mMovesHistory[stm][pt][move.to()] + bonus * historyBonusMultiplier(), historyMax());
+            mMovesHistory[stm][pt][move.to()].update(bonus * historyBonusMultiplier(), mBoard.lastMove());
 
             // History malus: decrease history of fail low quiets
             for (Move failLow : failLowQuiets) {
                 pt = (int)failLow.pieceType();
-
-                mMovesHistory[stm][pt][failLow.to()] 
-                    = std::max<i32>(mMovesHistory[stm][pt][failLow.to()] - bonus * historyMalusMultiplier(), -historyMax());
+                mMovesHistory[stm][pt][failLow.to()].update(-bonus * historyMalusMultiplier(), mBoard.lastMove());
             }
 
             break;

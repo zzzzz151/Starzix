@@ -101,6 +101,8 @@ TunableParam<i32> lmrNoisyHistoryDiv = TunableParam<i32>(4096, 1024, 16384, 1024
 TunableParam<i32> historyMax = TunableParam<i32>(8192, 2048, 24576, 2048);
 TunableParam<float> historyBonusMultiplier = TunableParam<float>(1.0, 0.25, 4.0, 0.25);
 TunableParam<float> historyMalusMultiplier = TunableParam<float>(1.0, 0.25, 4.0, 0.25);
+TunableParam<float> mainHistoryWeight = TunableParam<float>(1.0, 0.25, 4.0, 0.25);
+TunableParam<float> contHistoryWeight = TunableParam<float>(1.0, 0.25, 4.0, 0.25);
 
 // Correction history
 TunableParam<i32> corrHistNewWeightMax = TunableParam<i32>(16, 8, 24, 4);
@@ -190,6 +192,8 @@ tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
     {stringify(historyMax), &historyMax},
     {stringify(historyBonusMultiplier), &historyBonusMultiplier},
     {stringify(historyMalusMultiplier), &historyMalusMultiplier},
+    {stringify(mainHistoryWeight), &mainHistoryWeight},
+    {stringify(contHistoryWeight), &contHistoryWeight},
 
     // Correction history
     {stringify(corrHistNewWeightMax), &corrHistNewWeightMax},
