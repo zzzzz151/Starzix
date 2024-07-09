@@ -4,26 +4,32 @@
 
 struct HistoryEntry {
     private:
-    i16 mainHistory = 0;
-    MultiArray<i16, 6, 64> contHist = {}; // [previousMovePieceType][previousMoveTo]
+    MultiArray<i16, 2, 2>  mMainHist = {}; // [enemyAttacksOrigin][enemyAttacksDestination]
+    MultiArray<i16, 6, 64> mContHist = {}; // [previousMovePieceType][previousMoveTo]
 
     public:
 
-    inline i32 total(Move prevMove) {
-        if (prevMove == MOVE_NONE) return (float)mainHistory * mainHistoryWeight();
+    inline i32 total(bool enemyAttacksOrigin, bool enemyAttacksDst, Move prevMove) 
+    {
+        if (prevMove == MOVE_NONE) 
+            return mMainHist[enemyAttacksOrigin][enemyAttacksDst] * mainHistoryWeight();
 
         int pt = (int)prevMove.pieceType();
 
-        return (float)mainHistory                 * mainHistoryWeight() 
-             + (float)contHist[pt][prevMove.to()] * contHistoryWeight();
+        return mMainHist[enemyAttacksOrigin][enemyAttacksDst] * mainHistoryWeight() 
+             + mContHist[pt][prevMove.to()]                   * contHistoryWeight();
     }
 
-    inline void update(i32 bonus, Move prevMove) {
-        mainHistory = std::clamp((i32)mainHistory + bonus, -historyMax(), historyMax());
+    inline void update(i32 bonus, bool enemyAttacksOrigin, bool enemyAttacksDst, Move prevMove) 
+    {
+        mMainHist[enemyAttacksOrigin][enemyAttacksDst] 
+            = std::clamp(mMainHist[enemyAttacksOrigin][enemyAttacksDst] + bonus, -historyMax(), historyMax());
 
         if (prevMove != MOVE_NONE) {
             int pt = (int)prevMove.pieceType();
-            contHist[pt][prevMove.to()] = std::clamp((i32)contHist[pt][prevMove.to()] + bonus, -historyMax(), historyMax());
+
+            mContHist[pt][prevMove.to()] 
+                = std::clamp(mContHist[pt][prevMove.to()] + bonus, -historyMax(), historyMax());
         }
     }
 

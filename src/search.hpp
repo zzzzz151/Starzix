@@ -478,12 +478,21 @@ class SearchThread {
             i32 bonus = depth * depth;
             
             // History bonus: increase this move's history
-            mMovesHistory[stm][pt][move.to()].update(bonus * historyBonusMultiplier(), mBoard.lastMove());
+            mMovesHistory[stm][pt][move.to()].update(
+                bonus * historyBonusMultiplier(), 
+                plyDataPtr->mEnemyAttacks & bitboard(move.from()), 
+                plyDataPtr->mEnemyAttacks & bitboard(move.to()), 
+                mBoard.lastMove());
 
             // History malus: decrease history of fail low quiets
             for (Move failLow : failLowQuiets) {
                 pt = (int)failLow.pieceType();
-                mMovesHistory[stm][pt][failLow.to()].update(-bonus * historyMalusMultiplier(), mBoard.lastMove());
+
+                mMovesHistory[stm][pt][failLow.to()].update(
+                    -bonus * historyMalusMultiplier(),
+                    plyDataPtr->mEnemyAttacks & bitboard(failLow.from()), 
+                    plyDataPtr->mEnemyAttacks & bitboard(failLow.to()),  
+                    mBoard.lastMove());
             }
 
             break;
