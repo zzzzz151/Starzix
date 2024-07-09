@@ -350,6 +350,15 @@ class SearchThread {
             // Moves loop pruning
             if (ply > 0 && bestScore > -MIN_MATE_SCORE && moveScore < KILLER_SCORE)
             {
+                i32 lmrDepth = std::max(0, depth - LMR_TABLE[depth][legalMovesSeen]);
+
+                // FP (Futility pruning)
+                if (lmrDepth <= fpMaxDepth() 
+                && !mBoard.inCheck()
+                && alpha < MIN_MATE_SCORE
+                && alpha > eval + fpBase() + lmrDepth * fpMultiplier())
+                    break;
+
                 // SEE pruning
                 i32 threshold = depth * (isQuiet ? seeQuietThreshold() : seeNoisyThreshold());
                 if (depth <= seePruningMaxDepth() && !SEE(mBoard, move, threshold))
@@ -404,9 +413,7 @@ class SearchThread {
             bestMove = move;
             bound = Bound::EXACT;
 
-            // Update PV line
-            plyDataPtr->mPvLine.clear();
-            plyDataPtr->mPvLine.push_back(move);
+            if (pvNode) plyDataPtr->updatePV(move);
 
             if (score < beta) continue;
 

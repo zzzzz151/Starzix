@@ -73,8 +73,8 @@ TunableParam<float> lmpMultiplier = TunableParam<float>(1.0, 0.5, 1.5, 0.1);
 
 // FP (Futility pruning)
 TunableParam<i32> fpMaxDepth = TunableParam<i32>(8, 6, 10, 1);
-TunableParam<i32> fpBase = TunableParam<i32>(200, 40, 260, 20);
-TunableParam<i32> fpMultiplier = TunableParam<i32>(200, 40, 260, 20);
+TunableParam<i32> fpBase = TunableParam<i32>(160, 40, 260, 20);
+TunableParam<i32> fpMultiplier = TunableParam<i32>(160, 40, 260, 20);
 
 // SEE pruning
 TunableParam<i32> seePruningMaxDepth = TunableParam<i32>(8, 7, 11, 1);
