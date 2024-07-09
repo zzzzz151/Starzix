@@ -444,8 +444,8 @@ class SearchThread {
             for (Move failLow : failLowQuiets) 
             {
                 pt = (int)failLow.pieceType();
-                history = mMovesHistory[(int)stm][pt][failLow.to()];
-                history = std::max((i32)history - historyMalus, -historyMax());
+                i16 &hist = mMovesHistory[(int)stm][pt][failLow.to()];
+                hist = std::max((i32)hist - historyMalus, -historyMax());
             }
 
             break;
