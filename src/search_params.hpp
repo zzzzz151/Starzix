@@ -86,7 +86,7 @@ TunableParam<i32> seeNoisyHistoryDiv = TunableParam<i32>(128, 25, 525, 50);
 // SE (Singular extensions)
 TunableParam<i32> singularMinDepth = TunableParam<i32>(7, 6, 10, 1);
 TunableParam<i32> singularDepthMargin = TunableParam<i32>(3, 1, 5, 1);
-TunableParam<i32> singularBetaMultiplier = TunableParam<i32>(2, 1, 3, 1);
+TunableParam<i32> singularBetaMultiplier = TunableParam<i32>(1, 1, 2, 1);
 TunableParam<i32> doubleExtensionMargin = TunableParam<i32>(20, 2, 42, 10);
 constexpr u8 DOUBLE_EXTENSIONS_MAX = 10;
 
