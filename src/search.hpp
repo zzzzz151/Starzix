@@ -275,7 +275,6 @@ class SearchThread {
         if (ply >= mMaxDepth) 
             return mBoard.inCheck() ? 0 : updateAccumulatorAndEval(plyDataPtr->mEval);
 
-        Color stm = mBoard.sideToMove();
         bool pvNode = beta > alpha + 1;
         i32 eval = updateAccumulatorAndEval(plyDataPtr->mEval);
         (plyDataPtr + 1)->mKiller = MOVE_NONE;
@@ -301,7 +300,7 @@ class SearchThread {
             if (depth >= nmpMinDepth() 
             && mBoard.lastMove() != MOVE_NONE 
             && eval >= beta
-            && mBoard.hasNonPawnMaterial(stm))
+            && mBoard.hasNonPawnMaterial(mBoard.sideToMove()))
             {
                 makeMove(MOVE_NONE, plyDataPtr);
 
@@ -333,6 +332,8 @@ class SearchThread {
         i32 bestScore = -INF;
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::UPPER;
+
+        ArrayVec<Move, 256> failLowQuiets;
 
         // Moves loop
         for (auto [move, moveScore] = plyDataPtr->nextMove(); 
@@ -407,7 +408,11 @@ class SearchThread {
             if (score > bestScore) bestScore = score;
 
             // Fail low?
-            if (score <= alpha) continue;
+            if (score <= alpha) {
+                if (isQuiet) failLowQuiets.push_back(move);
+                
+                continue;
+            }
 
             alpha = score;
             bestMove = move;
@@ -421,14 +426,26 @@ class SearchThread {
 
             bound = Bound::LOWER;
 
-            if (isQuiet) {
-                // This fail high quiet is now a killer move
-                plyDataPtr->mKiller = move; 
-                
-                // Update this move's history
-                int pt = (int)move.pieceType();
-                i16 &history = mMovesHistory[(int)stm][pt][move.to()];
-                history = std::min((i32)history + depth * depth, 8192);
+            if (!isQuiet) break;
+
+            // This move is a fail high quiet
+
+            plyDataPtr->mKiller = move;
+
+            int stm = (int)mBoard.sideToMove();
+            int pt = (int)move.pieceType();
+            i32 bonus = depth * depth;
+            
+            // History bonus: increase this move's history
+            mMovesHistory[stm][pt][move.to()] 
+                = std::min<i32>(mMovesHistory[stm][pt][move.to()] + bonus * historyBonusMultiplier(), historyMax());
+
+            // History malus: decrease history of fail low quiets
+            for (Move failLow : failLowQuiets) {
+                pt = (int)failLow.pieceType();
+
+                mMovesHistory[stm][pt][failLow.to()] 
+                    = std::max<i32>(mMovesHistory[stm][pt][failLow.to()] - bonus * historyMalusMultiplier(), -historyMax());
             }
 
             break;
