@@ -400,7 +400,10 @@ class SearchThread {
                 // Normal singular extension
                 else if (singularScore < singularBeta)
                     newDepth++;
-
+                // Multicut
+                else if (singularBeta >= beta) 
+                    return singularBeta;
+                    
                 plyDataPtr->mCurrentMoveIdx = 0; // reset since the singular search used this
             }
 
