@@ -18,7 +18,7 @@ struct PlyData {
     i32 mEval = INF;
     Move mKiller = MOVE_NONE;
 
-    inline void genAndScoreMoves(Board &board, bool noisiesOnly, Move ttMove, MultiArray<i16, 2, 6, 64> &movesHistory) 
+    inline void genAndScoreMoves(Board &board, bool noisiesOnly, Move ttMove, MultiArray<HistoryEntry, 2, 6, 64> &movesHistory) 
     {
         // Generate moves if not already generated
         // Never generate underpromotions in search
@@ -63,7 +63,7 @@ struct PlyData {
                 mMovesScores[i] = KILLER_SCORE;
             else {
                 int pt = (int)move.pieceType();
-                mMovesScores[i] = movesHistory[stm][pt][move.to()];
+                mMovesScores[i] = movesHistory[stm][pt][move.to()].total(board.lastMove());
             }
         }
 
