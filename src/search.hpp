@@ -321,7 +321,7 @@ class SearchThread {
         Move ttMove = ttHit ? Move(ttEntry.move) : MOVE_NONE;
 
         // IIR (Internal iterative reduction)
-        if (depth >= iirMinDepth() && ttMove == MOVE_NONE && !singular)
+        if (depth >= iirMinDepth() && ttMove == MOVE_NONE && pvNode && !singular)
             depth--;
 
         if (!singular)
