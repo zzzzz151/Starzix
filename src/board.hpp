@@ -197,6 +197,12 @@ class Board {
 
     inline bool inCheck() { return mState->checkers > 0; }
 
+    inline bool inCheck2PliesAgo() {
+        assert(mStates.size() > 2);
+        assert(mState == &mStates.back());
+        return (mState - 2)->checkers > 0;
+    }
+
     inline u64 zobristHash() { return mState->zobristHash; }
 
     inline u64 pawnHash() { return mState->pawnHash; }

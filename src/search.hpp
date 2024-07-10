@@ -3,7 +3,8 @@
 #pragma once
 
 constexpr i32 INF = 32000, 
-              MIN_MATE_SCORE = INF - 256;
+              MIN_MATE_SCORE = INF - 256,
+              EVAL_NONE = INF;
 
 #include "board.hpp"
 #include "search_params.hpp"
@@ -186,7 +187,7 @@ class SearchThread {
 
         (plyDataPtr + 1)->mMovesGenerated = MoveGenType::NONE;
         (plyDataPtr + 1)->mPvLine.clear();
-        (plyDataPtr + 1)->mEval = INF;
+        (plyDataPtr + 1)->mEval = EVAL_NONE;
         
         if (move != MOVE_NONE) {
             mAccumulatorPtr++;
@@ -204,8 +205,8 @@ class SearchThread {
             mAccumulatorPtr->update(mAccumulatorPtr - 1, mBoard);
 
         if (mBoard.inCheck())
-            eval = INF;
-        else if (eval == INF) {
+            eval = 0;
+        else if (eval == EVAL_NONE) {
             eval = evaluate(mAccumulatorPtr, mBoard, true);
             eval = std::clamp(eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
         }
@@ -294,7 +295,7 @@ class SearchThread {
         bool pvNode = beta > alpha + 1;
         i32 eval = updateAccumulatorAndEval(plyDataPtr->mEval);
 
-        int improving = ply <= 1 || mBoard.inCheck() || (plyDataPtr - 2)->mEval == INF 
+        int improving = ply <= 1 || mBoard.inCheck() || mBoard.inCheck2PliesAgo()
                         ? 0
                         : eval - (plyDataPtr - 2)->mEval >= improvingThreshold()
                         ? 1
