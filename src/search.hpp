@@ -204,7 +204,7 @@ class SearchThread {
             mAccumulatorPtr->update(mAccumulatorPtr - 1, mBoard);
 
         if (mBoard.inCheck())
-            eval = 0;
+            eval = INF;
         else if (eval == INF) {
             eval = evaluate(mAccumulatorPtr, mBoard, true);
             eval = std::clamp(eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
@@ -293,6 +293,17 @@ class SearchThread {
 
         bool pvNode = beta > alpha + 1;
         i32 eval = updateAccumulatorAndEval(plyDataPtr->mEval);
+
+        /*
+        int improving = ply <= 1 || mBoard.inCheck() || (plyDataPtr - 2)->mEval == INF 
+                        ? 0
+                        : eval - (plyDataPtr - 2)->mEval >= improvingThreshold()
+                        ? 1
+                        : eval - (plyDataPtr - 2)->mEval <= improvingThreshold()
+                        ? -1
+                        : 0;
+        */
+
         (plyDataPtr + 1)->mKiller = MOVE_NONE;
 
         // Node pruning
@@ -548,8 +559,10 @@ class SearchThread {
 
         i32 eval = updateAccumulatorAndEval(plyDataPtr->mEval);
 
-        if (eval >= beta) return eval; 
-        if (eval > alpha) alpha = eval;
+        if (!mBoard.inCheck()) {
+            if (eval >= beta) return eval; 
+            if (eval > alpha) alpha = eval;
+        }
 
         // generate noisy moves except underpromotions
         plyDataPtr->genAndScoreMoves(mBoard, true, MOVE_NONE, mMovesHistory);
