@@ -191,7 +191,7 @@ class SearchThread {
         if (mBoard.inCheck())
             eval = 0;
         else if (eval == INF) {
-            eval = evaluate(mAccumulatorPtr, mBoard, false);
+            eval = evaluate(mAccumulatorPtr, mBoard, true);
             eval = std::clamp(eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
         }
 
