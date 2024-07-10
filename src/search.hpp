@@ -294,15 +294,13 @@ class SearchThread {
         bool pvNode = beta > alpha + 1;
         i32 eval = updateAccumulatorAndEval(plyDataPtr->mEval);
 
-        /*
         int improving = ply <= 1 || mBoard.inCheck() || (plyDataPtr - 2)->mEval == INF 
                         ? 0
                         : eval - (plyDataPtr - 2)->mEval >= improvingThreshold()
                         ? 1
-                        : eval - (plyDataPtr - 2)->mEval <= improvingThreshold()
+                        : eval - (plyDataPtr - 2)->mEval <= -improvingThreshold()
                         ? -1
                         : 0;
-        */
 
         (plyDataPtr + 1)->mKiller = MOVE_NONE;
 
@@ -311,7 +309,7 @@ class SearchThread {
         {
             // RFP (Reverse futility pruning) / Static NMP
             if (depth <= rfpMaxDepth() 
-            && eval >= beta + depth * rfpMultiplier())
+            && eval >= beta + (depth - improving) * rfpMultiplier())
                 return eval;
 
             // Razoring
