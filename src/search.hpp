@@ -53,6 +53,8 @@ class SearchThread {
 
     MultiArray<HistoryEntry, 2, 6, 64> mMovesHistory = {}; // [stm][pieceType][targetSquare]
 
+    std::array<u64, 1ULL << 17> mMovesNodes; // [move]
+
     std::vector<TTEntry>* ttPtr = nullptr;
     
     public:
@@ -95,10 +97,10 @@ class SearchThread {
         mAccumulatorPtr = &mAccumulators[0];
 
         mNodes = 0;
-
-        i32 score = 0;
+        mMovesNodes = {};
 
         // ID (Iterative deepening)
+        i32 score = 0;
         for (i32 iterationDepth = 1; iterationDepth <= mMaxDepth; iterationDepth++)
         {
             mMaxPlyReached = 0;
@@ -135,8 +137,17 @@ class SearchThread {
                       << " pv "    << mPliesData[0].pvString()
                       << std::endl;
 
-            /// Check soft time limit
-            if (msElapsed >= mSoftMilliseconds) break;
+            // Check soft time limit (in case one exists)
+            // Nodes time management: scale soft time limit based on nodes spent on best move
+
+            if (mSoftMilliseconds == I64_MAX) continue;
+
+            double bestMoveNodes = mMovesNodes[bestMoveRoot().encoded()];
+            double bestMoveNodesFraction = bestMoveNodes / std::max<double>(mNodes, 1.0);
+            assert(bestMoveNodesFraction >= 0.0 && bestMoveNodesFraction <= 1.0);
+                         
+            if (msElapsed >= round((double)mSoftMilliseconds * (1.0 - bestMoveNodesFraction))) 
+                break;
         }
 
         // Signal secondary threads to stop
@@ -407,6 +418,7 @@ class SearchThread {
                 plyDataPtr->mCurrentMoveIdx = 0; // reset since the singular search used this
             }
 
+            u64 nodesBefore = mNodes;
             makeMove(move, plyDataPtr);
 
             i32 score = 0, lmr = 0;
@@ -445,6 +457,11 @@ class SearchThread {
             mAccumulatorPtr--;
 
             if (stopSearch()) return 0;
+
+            if (ply == 0) {
+                assert((i64)mNodes - (i64)nodesBefore > 0);
+                mMovesNodes[move.encoded()] += mNodes - nodesBefore;
+            }
 
             if (score > bestScore) bestScore = score;
 
