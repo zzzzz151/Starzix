@@ -138,15 +138,19 @@ class SearchThread {
                       << std::endl;
 
             // Check soft time limit (in case one exists)
-            // Nodes time management: scale soft time limit based on nodes spent on best move
 
             if (mSoftMilliseconds == I64_MAX) continue;
 
-            double bestMoveNodes = mMovesNodes[bestMoveRoot().encoded()];
-            double bestMoveNodesFraction = bestMoveNodes / std::max<double>(mNodes, 1.0);
-            assert(bestMoveNodesFraction >= 0.0 && bestMoveNodesFraction <= 1.0);
+            // Nodes time management: scale soft time limit based on nodes spent on best move
+            auto scaledSoftMs = [&]() -> u64 {
+                double bestMoveNodes = mMovesNodes[bestMoveRoot().encoded()];
+                double bestMoveNodesFraction = bestMoveNodes / std::max<double>(mNodes, 1.0);
+                assert(bestMoveNodesFraction >= 0.0 && bestMoveNodesFraction <= 1.0);
+                
+                return round((double)mSoftMilliseconds * std::max(1.0 - bestMoveNodesFraction, 0.25));
+            };
                          
-            if (msElapsed >= round((double)mSoftMilliseconds * (1.0 - bestMoveNodesFraction))) 
+            if (msElapsed >= (iterationDepth >= aspMinDepth() ? scaledSoftMs() : mSoftMilliseconds))
                 break;
         }
 
@@ -458,11 +462,9 @@ class SearchThread {
 
             if (stopSearch()) return 0;
 
-            if (ply == 0) {
-                assert((i64)mNodes - (i64)nodesBefore > 0);
-                mMovesNodes[move.encoded()] += mNodes - nodesBefore;
-            }
-
+            assert(mNodes > nodesBefore);
+            if (ply == 0) mMovesNodes[move.encoded()] += mNodes - nodesBefore;
+            
             if (score > bestScore) bestScore = score;
 
             // Fail low?
