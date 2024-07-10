@@ -33,12 +33,11 @@ constexpr i32 GOOD_QUEEN_PROMO_SCORE = 1'600'000'000,
 
 // Time management
 TunableParam<double> hardTimePercentage = TunableParam<double>(0.5, 0.25, 0.75, 0.1);
-TunableParam<double> softTimePercentage = TunableParam<double>(0.03, 0.01, 0.05, 0.02);
+TunableParam<double> softTimePercentage = TunableParam<double>(0.03, 0.01, 0.11, 0.02);
 
-// Nodes time management (scale soft time based on best move nodes fraction)
-TunableParam<i32> nodesTmMinDepth = TunableParam<i32>(9, 7, 11, 1);
-TunableParam<double> nodesTmBase = TunableParam<double>(1.5, 1.4, 1.6, 0.1);
-TunableParam<double> nodesTmMultiplier = TunableParam<double>(1.4, 1.3, 1.5, 0.1);
+// Nodes time management (scale soft time limit based on nodes spent on best move)
+TunableParam<double> nodesTmMultiplier = TunableParam<double>(1.5, 1.0, 2.0, 0.2);
+TunableParam<double> nodesTmBase = TunableParam<double>(1.5, 1.25, 1.75, 0.1);
 
 // Eval scale with material / game phase
 TunableParam<float> evalMaterialScaleMin = TunableParam<float>(0.8, 0.5, 1.0, 0.1);
@@ -127,10 +126,9 @@ tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
     {stringify(hardTimePercentage), &hardTimePercentage},
     {stringify(softTimePercentage), &softTimePercentage},
 
-    // Nodes time management (scale soft time based on best move nodes fraction)
-    {stringify(nodesTmMinDepth), &nodesTmMinDepth},
-    {stringify(nodesTmBase), &nodesTmBase},
+    // Nodes time management (scale soft time limit based on nodes spent on best move)
     {stringify(nodesTmMultiplier), &nodesTmMultiplier},
+    {stringify(nodesTmBase), &nodesTmBase},
 
     // Eval scale with material / game phase
     {stringify(evalMaterialScaleMin), &evalMaterialScaleMin},
