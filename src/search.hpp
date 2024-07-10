@@ -307,7 +307,7 @@ class SearchThread {
 
                 i32 score = 0;
 
-                if (!mBoard.isRepetition(ply)) {
+                if (!mBoard.isDraw(ply)) {
                     i32 nmpDepth = depth - nmpBaseReduction() - depth / nmpReductionDivisor();
                     score = -search(nmpDepth, ply + 1, -beta, -alpha, doubleExtsLeft);
                 }
@@ -411,7 +411,7 @@ class SearchThread {
 
             i32 score = 0, lmr = 0;
 
-            if (mBoard.isRepetition(ply)) goto moveSearched;
+            if (mBoard.isDraw(ply)) goto moveSearched;
 
             newDepth += mBoard.inCheck(); // Check extension
 
@@ -553,7 +553,7 @@ class SearchThread {
 
             makeMove(move, plyDataPtr);
 
-            i32 score = -qSearch(ply + 1, -beta, -alpha);
+            i32 score = mBoard.isDraw(ply) ? 0 : -qSearch(ply + 1, -beta, -alpha);
 
             mBoard.undoMove();
             mAccumulatorPtr--;
