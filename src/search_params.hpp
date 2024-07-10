@@ -48,6 +48,9 @@ TunableParam<i32> aspMinDepth = TunableParam<i32>(6, 6, 10, 1);
 TunableParam<i32> aspInitialDelta = TunableParam<i32>(20, 5, 25, 5);
 TunableParam<double> aspDeltaMultiplier = TunableParam<double>(1.5, 1.2, 2.0, 0.1);
 
+// Improving flag
+TunableParam<i32> improvingThreshold = TunableParam<i32>(5, 0, 50, 5);
+
 // RFP (Reverse futility pruning)
 TunableParam<i32> rfpMaxDepth = TunableParam<i32>(8, 6, 10, 1);
 TunableParam<i32> rfpMultiplier = TunableParam<i32>(75, 40, 130, 10);
@@ -122,83 +125,53 @@ using TunableParamVariant = std::variant<
 >;
 
 tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
-    // Time management
     {stringify(hardTimePercentage), &hardTimePercentage},
     {stringify(softTimePercentage), &softTimePercentage},
-
-    // Nodes time management (scale soft time limit based on nodes spent on best move)
     {stringify(nodesTmMultiplier), &nodesTmMultiplier},
     {stringify(nodesTmBase), &nodesTmBase},
-
-    // Eval scale with material / game phase
     {stringify(evalMaterialScaleMin), &evalMaterialScaleMin},
     {stringify(evalMaterialScaleMax), &evalMaterialScaleMax},
-
-    // Aspiration windows
     {stringify(aspMinDepth), &aspMinDepth},
     {stringify(aspInitialDelta), &aspInitialDelta},
     {stringify(aspDeltaMultiplier), &aspDeltaMultiplier},
-
-    // RFP (Reverse futility pruning)
+    {stringify(improvingThreshold), &improvingThreshold},
     {stringify(rfpMaxDepth), &rfpMaxDepth},
     {stringify(rfpMultiplier), &rfpMultiplier},
-
-    // Razoring
     {stringify(razoringMaxDepth), &razoringMaxDepth},
     {stringify(razoringMultiplier), &razoringMultiplier},
-
-    // NMP (Null move pruning)
     {stringify(nmpMinDepth), &nmpMinDepth},
     {stringify(nmpBaseReduction), &nmpBaseReduction},
     {stringify(nmpReductionDivisor), &nmpReductionDivisor},
     {stringify(nmpEvalBetaDivisor), &nmpEvalBetaDivisor},
     {stringify(nmpEvalBetaMax), &nmpEvalBetaMax},
-
-    // IIR (Internal iterative reduction)
     {stringify(iirMinDepth), &iirMinDepth},
-
-    // LMP (Late move pruning)
     {stringify(lmpMinMoves), &lmpMinMoves},
     {stringify(lmpMultiplier), &lmpMultiplier},
-
-    // FP (Futility pruning)
     {stringify(fpMaxDepth), &fpMaxDepth},
     {stringify(fpBase), &fpBase},
     {stringify(fpMultiplier), &fpMultiplier},
-
-    // SEE pruning
     {stringify(seePruningMaxDepth), &seePruningMaxDepth},
     {stringify(seeQuietThreshold), &seeQuietThreshold},
     {stringify(seeQuietHistoryDiv), &seeQuietHistoryDiv},
     {stringify(seeNoisyThreshold), &seeNoisyThreshold},
     {stringify(seeNoisyHistoryDiv), &seeNoisyHistoryDiv},
-
-    // SE (Singular extensions)
     {stringify(singularMinDepth), &singularMinDepth},
     {stringify(singularDepthMargin), &singularDepthMargin},
     {stringify(singularBetaMultiplier), &singularBetaMultiplier},
     {stringify(doubleExtensionMargin), &doubleExtensionMargin},
-
-    // LMR (Late move reductions)
     {stringify(lmrBase), &lmrBase},
     {stringify(lmrMultiplier), &lmrMultiplier},
     {stringify(lmrMinMoves), &lmrMinMoves},
     {stringify(lmrQuietHistoryDiv), &lmrQuietHistoryDiv},
     {stringify(lmrNoisyHistoryDiv), &lmrNoisyHistoryDiv},
-
-    // History
     {stringify(historyMax), &historyMax},
     {stringify(historyBonusMultiplier), &historyBonusMultiplier},
     {stringify(historyMalusMultiplier), &historyMalusMultiplier},
     {stringify(mainHistoryWeight), &mainHistoryWeight},
     {stringify(contHistoryWeight), &contHistoryWeight},
-
-    // Correction history
     {stringify(corrHistNewWeightMax), &corrHistNewWeightMax},
     {stringify(corrHistScale), &corrHistScale},
     {stringify(corrHistMax), &corrHistMax},
-
-    // SEE piece values
     {stringify(seePawnValue), &seePawnValue},
     {stringify(seeMinorValue), &seeMinorValue},
     {stringify(seeRookValue), &seeRookValue},
