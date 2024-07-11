@@ -511,7 +511,7 @@ class SearchThread {
                 bonus * historyBonusMultiplier(), 
                 plyDataPtr->mEnemyAttacks & bitboard(move.from()), 
                 plyDataPtr->mEnemyAttacks & bitboard(move.to()), 
-                mBoard.lastMove());
+                { mBoard.lastMove(), mBoard.nthToLastMove(2) });
 
             // History malus: decrease history of fail low quiets
             for (Move failLow : failLowQuiets) {
@@ -521,7 +521,7 @@ class SearchThread {
                     -bonus * historyMalusMultiplier(),
                     plyDataPtr->mEnemyAttacks & bitboard(failLow.from()), 
                     plyDataPtr->mEnemyAttacks & bitboard(failLow.to()),  
-                    mBoard.lastMove());
+                    { mBoard.lastMove(), mBoard.nthToLastMove(2) });
             }
 
             break;

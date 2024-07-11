@@ -72,7 +72,7 @@ struct PlyData {
                 mMovesScores[i] = movesHistory[stm][pt][move.to()].total(
                     mEnemyAttacks & bitboard(move.from()), 
                     mEnemyAttacks & bitboard(move.to()), 
-                    board.lastMove());
+                    { board.lastMove(), board.nthToLastMove(2) });
             }
         }
 
