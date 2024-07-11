@@ -62,10 +62,10 @@ struct PlyData {
                                      : GOOD_NOISY_SCORE)
                                   : -GOOD_NOISY_SCORE;
 
-                // MVV (most valuable victim)
-                mMovesScores[i] += ((i32)captured + 1) * 1'000'000;
-
                 mMovesScores[i] += historyEntry.noisyHistory(captured);
+
+                // MVV (most valuable victim)
+                mMovesScores[i] += (i32)captured + 1;
             }
             else if (promotion == PieceType::QUEEN) {
                 mMovesScores[i] = SEE(board, move) ? GOOD_QUEEN_PROMO_SCORE : -GOOD_NOISY_SCORE;
