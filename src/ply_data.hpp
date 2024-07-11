@@ -67,11 +67,11 @@ struct PlyData {
                 i32 mvvlva = 100 * ((i32)captured + 1) - ((i32)move.pieceType() + 1);
                 mMovesScores[i] += mvvlva * 1'000'000;
 
-                mMovesScores[i] += historyEntry.noisyHistory(captured);
+                mMovesScores[i] += historyEntry.noisyHistory(captured, mEnemyAttacks & bitboard(move.to()));
             }
             else if (promotion == PieceType::QUEEN) {
                 mMovesScores[i] = SEE(board, move) ? GOOD_QUEEN_PROMO_SCORE : -GOOD_NOISY_SCORE;
-                mMovesScores[i] += historyEntry.noisyHistory(captured);
+                mMovesScores[i] += historyEntry.noisyHistory(captured, mEnemyAttacks & bitboard(move.to()));
             }
             else if (move == mKiller)
                 mMovesScores[i] = KILLER_SCORE;

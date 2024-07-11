@@ -15,7 +15,7 @@ struct HistoryEntry {
 
     MultiArray<i16, 2, 2>  mMainHist  = {}; // [enemyAttacksOrigin][enemyAttacksDestination]
     MultiArray<i16, 6, 64> mContHist  = {}; // [previousMovePieceType][previousMoveTo]
-    std::array<i16, 7>     mNoisyHist = {}; // [pieceTypeCaptured]
+    MultiArray<i16, 7, 2>  mNoisyHist = {}; // [pieceTypeCaptured][enemyAttacksDst]
 
     public:
 
@@ -43,12 +43,12 @@ struct HistoryEntry {
             }
     }
 
-    inline i32 noisyHistory(PieceType captured) {
-        return mNoisyHist[(int)captured];
+    inline i32 noisyHistory(PieceType captured, bool enemyAttacksDst) {
+        return mNoisyHist[(int)captured][enemyAttacksDst];
     }
 
-    inline i16* noisyHistoryPtr(PieceType captured) {
-        return &mNoisyHist[(int)captured];
+    inline i16* noisyHistoryPtr(PieceType captured, bool enemyAttacksDst) {
+        return &mNoisyHist[(int)captured][enemyAttacksDst];
     }
 
 }; // HistoryEntry
