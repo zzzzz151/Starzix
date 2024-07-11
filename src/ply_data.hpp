@@ -51,6 +51,9 @@ struct PlyData {
             // Starzix doesnt generate underpromotions in search
             assert(promotion == PieceType::NONE || promotion == PieceType::QUEEN);
 
+            int pt = (int)move.pieceType();
+            HistoryEntry &historyEntry = movesHistory[stm][pt][move.to()];
+
             if (captured != PieceType::NONE)
             {
                 mMovesScores[i] = SEE(board, move) 
@@ -60,20 +63,21 @@ struct PlyData {
                                   : -GOOD_NOISY_SCORE;
 
                 // MVV (most valuable victim)
-                mMovesScores[i] += 100 * (i32)captured - (i32)move.pieceType();
+                mMovesScores[i] += ((i32)captured + 1) * 1'000'000;
+
+                mMovesScores[i] += historyEntry.noisyHistory(captured);
             }
-            else if (promotion == PieceType::QUEEN)
+            else if (promotion == PieceType::QUEEN) {
                 mMovesScores[i] = SEE(board, move) ? GOOD_QUEEN_PROMO_SCORE : -GOOD_NOISY_SCORE;
+                mMovesScores[i] += historyEntry.noisyHistory(captured);
+            }
             else if (move == mKiller)
                 mMovesScores[i] = KILLER_SCORE;
-            else {
-                int pt = (int)move.pieceType();
-                
-                mMovesScores[i] = movesHistory[stm][pt][move.to()].total(
+            else           
+                mMovesScores[i] = historyEntry.quietHistory(
                     mEnemyAttacks & bitboard(move.from()), 
                     mEnemyAttacks & bitboard(move.to()), 
                     { board.lastMove(), board.nthToLastMove(2) });
-            }
         }
 
         mCurrentMoveIdx = -1; // prepare for moves loop

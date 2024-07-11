@@ -363,6 +363,7 @@ class SearchThread {
         Bound bound = Bound::UPPER;
 
         ArrayVec<Move, 256> failLowQuiets;
+        ArrayVec<i16*, 256> failLowNoisiesHistory;
 
         // Moves loop
         for (auto [move, moveScore] = plyDataPtr->nextMove(); 
@@ -477,10 +478,17 @@ class SearchThread {
             
             if (score > bestScore) bestScore = score;
 
+            int stm = (int)mBoard.sideToMove();
+            int pt = (int)move.pieceType();
+            HistoryEntry &historyEntry =  mMovesHistory[stm][pt][move.to()];
+
             // Fail low?
             if (score <= alpha) {
-                if (isQuiet) failLowQuiets.push_back(move);
-                
+                if (isQuiet) 
+                    failLowQuiets.push_back(move);
+                else         
+                    failLowNoisiesHistory.push_back(historyEntry.noisyHistoryPtr(captured));
+
                 continue;
             }
 
@@ -495,33 +503,38 @@ class SearchThread {
             // Fail high / beta cutoff
 
             bound = Bound::LOWER;
+            i32 baseBonus = depth * depth;
 
-            if (!isQuiet) break;
+            // History malus: decrease history of fail low noisies
+            for (i16* noisyHistory : failLowNoisiesHistory)
+                updateHistory(noisyHistory, -baseBonus * historyMalusMultiplier());
 
-            // This move is a fail high quiet
+            if (!isQuiet) {
+                // History bonus: increase this move's history
+                updateHistory(historyEntry.noisyHistoryPtr(captured), baseBonus * historyBonusMultiplier());
+                break;
+            }
+
+            // This move is quiet
 
             plyDataPtr->mKiller = move;
-
-            int stm = (int)mBoard.sideToMove();
-            int pt = (int)move.pieceType();
-            i32 bonus = depth * depth;
             
             // History bonus: increase this move's history
-            mMovesHistory[stm][pt][move.to()].update(
-                bonus * historyBonusMultiplier(), 
+            historyEntry.updateQuietHistories(
                 plyDataPtr->mEnemyAttacks & bitboard(move.from()), 
                 plyDataPtr->mEnemyAttacks & bitboard(move.to()), 
-                { mBoard.lastMove(), mBoard.nthToLastMove(2) });
+                { mBoard.lastMove(), mBoard.nthToLastMove(2) },
+                baseBonus * historyBonusMultiplier());
 
             // History malus: decrease history of fail low quiets
             for (Move failLow : failLowQuiets) {
                 pt = (int)failLow.pieceType();
 
-                mMovesHistory[stm][pt][failLow.to()].update(
-                    -bonus * historyMalusMultiplier(),
+                mMovesHistory[stm][pt][failLow.to()].updateQuietHistories(
                     plyDataPtr->mEnemyAttacks & bitboard(failLow.from()), 
                     plyDataPtr->mEnemyAttacks & bitboard(failLow.to()),  
-                    { mBoard.lastMove(), mBoard.nthToLastMove(2) });
+                    { mBoard.lastMove(), mBoard.nthToLastMove(2) },
+                    -baseBonus * historyMalusMultiplier());
             }
 
             break;

@@ -2,14 +2,24 @@
 
 #pragma once
 
+inline void updateHistory(i16 &history, i32 bonus) {
+    history = std::clamp((i32)history + bonus, -historyMax(), historyMax());
+}
+
+inline void updateHistory(i16* history, i32 bonus) {
+    updateHistory(*history, bonus);
+}
+
 struct HistoryEntry {
     private:
-    MultiArray<i16, 2, 2>  mMainHist = {}; // [enemyAttacksOrigin][enemyAttacksDestination]
-    MultiArray<i16, 6, 64> mContHist = {}; // [previousMovePieceType][previousMoveTo]
+
+    MultiArray<i16, 2, 2>  mMainHist  = {}; // [enemyAttacksOrigin][enemyAttacksDestination]
+    MultiArray<i16, 6, 64> mContHist  = {}; // [previousMovePieceType][previousMoveTo]
+    std::array<i16, 7>     mNoisyHist = {}; // [pieceTypeCaptured]
 
     public:
 
-    inline i32 total(bool enemyAttacksOrigin, bool enemyAttacksDst, std::array<Move, 2> moves) 
+    inline i32 quietHistory(bool enemyAttacksOrigin, bool enemyAttacksDst, std::array<Move, 2> moves) 
     {
         float total = mMainHist[enemyAttacksOrigin][enemyAttacksDst] * mainHistoryWeight();
 
@@ -22,16 +32,23 @@ struct HistoryEntry {
         return total;
     }
 
-    inline void update(i32 bonus, bool enemyAttacksOrigin, bool enemyAttacksDst, std::array<Move, 2> moves)
+    inline void updateQuietHistories(bool enemyAttacksOrigin, bool enemyAttacksDst, std::array<Move, 2> moves, i32 bonus)
     {
-        mMainHist[enemyAttacksOrigin][enemyAttacksDst] 
-            = std::clamp(mMainHist[enemyAttacksOrigin][enemyAttacksDst] + bonus, -historyMax(), historyMax());
+        updateHistory(mMainHist[enemyAttacksOrigin][enemyAttacksDst], bonus);
 
         for (Move move : moves) 
             if (move != MOVE_NONE) {
                 int pt = (int)move.pieceType();
-                mContHist[pt][move.to()] = std::clamp(mContHist[pt][move.to()] + bonus, -historyMax(), historyMax());
+                updateHistory(mContHist[pt][move.to()], bonus);
             }
+    }
+
+    inline i32 noisyHistory(PieceType captured) {
+        return mNoisyHist[(int)captured];
+    }
+
+    inline i16* noisyHistoryPtr(PieceType captured) {
+        return &mNoisyHist[(int)captured];
     }
 
 }; // HistoryEntry
