@@ -49,7 +49,7 @@ TunableParam<i32> aspInitialDelta = TunableParam<i32>(20, 5, 25, 5);
 TunableParam<double> aspDeltaMultiplier = TunableParam<double>(1.5, 1.2, 2.0, 0.1);
 
 // Improving flag
-TunableParam<i32> improvingThreshold = TunableParam<i32>(5, 0, 50, 5);
+TunableParam<i32> improvingThreshold = TunableParam<i32>(5, 1, 51, 5);
 
 // RFP (Reverse futility pruning)
 TunableParam<i32> rfpMaxDepth = TunableParam<i32>(8, 6, 10, 1);

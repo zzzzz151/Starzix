@@ -15,7 +15,7 @@ struct PlyData {
     int mCurrentMoveIdx = -1;
 
     ArrayVec<Move, MAX_DEPTH+1> mPvLine = {};
-    i32 mEval = INF;
+    i32 mEval = EVAL_NONE;
     Move mKiller = MOVE_NONE;
     u64 mEnemyAttacks = 0;
 
