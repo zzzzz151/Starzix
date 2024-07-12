@@ -2,12 +2,12 @@
 
 #pragma once
 
-inline void updateHistory(i16 &history, i32 bonus) {
+inline void updateQuietHistory(i16 &history, i32 bonus) {
     history = std::clamp((i32)history + bonus, -historyMax(), historyMax());
 }
 
-inline void updateHistory(i16* history, i32 bonus) {
-    updateHistory(*history, bonus);
+inline void updateNoisyHistory(i16* history, i32 bonus) {
+    *history += bonus - abs(bonus) * i32(*history) / historyMax();
 }
 
 struct HistoryEntry {
@@ -34,12 +34,12 @@ struct HistoryEntry {
 
     inline void updateQuietHistories(bool enemyAttacksOrigin, bool enemyAttacksDst, std::array<Move, 2> moves, i32 bonus)
     {
-        updateHistory(mMainHist[enemyAttacksOrigin][enemyAttacksDst], bonus);
+        updateQuietHistory(mMainHist[enemyAttacksOrigin][enemyAttacksDst], bonus);
 
         for (Move move : moves) 
             if (move != MOVE_NONE) {
                 int pt = (int)move.pieceType();
-                updateHistory(mContHist[pt][move.to()], bonus);
+                updateQuietHistory(mContHist[pt][move.to()], bonus);
             }
     }
 

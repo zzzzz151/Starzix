@@ -512,11 +512,11 @@ class SearchThread {
 
             // History malus: decrease history of fail low noisies
             for (i16* noisyHistory : failLowNoisiesHistory)
-                updateHistory(noisyHistory, -baseBonus * historyMalusMultiplier());
+                updateNoisyHistory(noisyHistory, -baseBonus * historyMalusMultiplier());
 
             if (!isQuiet) {
                 // History bonus: increase this move's history
-                updateHistory(noisyHistoryPtr(), baseBonus * historyBonusMultiplier());
+                updateNoisyHistory(noisyHistoryPtr(), baseBonus * historyBonusMultiplier());
                 break;
             }
 
