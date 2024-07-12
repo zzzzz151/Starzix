@@ -19,8 +19,11 @@ struct PlyData {
     Move mKiller = MOVE_NONE;
     u64 mEnemyAttacks = 0;
 
-    inline void genAndScoreMoves(Board &board, bool noisiesOnly, Move ttMove, MultiArray<HistoryEntry, 2, 6, 64> &movesHistory) 
+    inline void genAndScoreMoves(Board &board, bool noisiesOnly, Move ttMove, Move countermove,
+        MultiArray<HistoryEntry, 2, 6, 64> &movesHistory) 
     {
+        assert(!(board.lastMove() == MOVE_NONE && countermove != MOVE_NONE));
+
         // Generate enemy attacks if not already generated
         if (mMovesGenerated == MoveGenType::NONE)
             mEnemyAttacks = board.attacks(board.oppSide());
@@ -66,6 +69,8 @@ struct PlyData {
                 mMovesScores[i] = SEE(board, move) ? GOOD_QUEEN_PROMO_SCORE : -GOOD_NOISY_SCORE;
             else if (move == mKiller)
                 mMovesScores[i] = KILLER_SCORE;
+            else if (move == countermove)
+                mMovesScores[i] = COUNTERMOVE_SCORE;
             else {
                 int pt = (int)move.pieceType();
                 

@@ -54,6 +54,8 @@ class SearchThread {
 
     MultiArray<HistoryEntry, 2, 6, 64> mMovesHistory = {}; // [stm][pieceType][targetSquare]
 
+    MultiArray<Move, 2, 1ULL << 17> mCountermoves = {}; // [nstm][lastMove]
+
     std::array<u64, 1ULL << 17> mMovesNodes; // [move]
 
     std::vector<TTEntry>* ttPtr = nullptr;
@@ -68,6 +70,7 @@ class SearchThread {
 
     inline void reset() {
         mMovesHistory = {};
+        mCountermoves = {};
     }
 
     inline u64 getNodes() { return mNodes; }
@@ -349,9 +352,12 @@ class SearchThread {
         if (depth >= iirMinDepth() && ttMove == MOVE_NONE && pvNode && !singular)
             depth--;
 
-        if (!singular)
-            // gen and score all moves, except underpromotions
-            plyDataPtr->genAndScoreMoves(mBoard, false, ttMove, mMovesHistory);
+        int stm = (int)mBoard.sideToMove();
+        Move &countermove = mCountermoves[!stm][mBoard.lastMove().encoded()];
+
+        // gen and score all moves, except underpromotions
+        if (!singular) 
+            plyDataPtr->genAndScoreMoves(mBoard, false, ttMove, countermove, mMovesHistory);
 
         assert(!singular || plyDataPtr->mCurrentMoveIdx == 0);
 
@@ -378,7 +384,7 @@ class SearchThread {
             bool isQuiet = captured == PieceType::NONE && move.promotion() == PieceType::NONE;
 
             // Moves loop pruning
-            if (ply > 0 && bestScore > -MIN_MATE_SCORE && moveScore < KILLER_SCORE)
+            if (ply > 0 && bestScore > -MIN_MATE_SCORE && moveScore < COUNTERMOVE_SCORE)
             {
                 i32 lmrDepth = std::max(0, depth - LMR_TABLE[depth][legalMovesSeen]);
 
@@ -450,7 +456,7 @@ class SearchThread {
             }
 
             // LMR (Late move reductions)
-            if (depth >= 2 && !mBoard.inCheck() && legalMovesSeen >= lmrMinMoves() && moveScore < KILLER_SCORE)
+            if (depth >= 2 && !mBoard.inCheck() && legalMovesSeen >= lmrMinMoves() && moveScore < COUNTERMOVE_SCORE)
             {
                 lmr = LMR_TABLE[depth][legalMovesSeen];
                 lmr -= pvNode; // reduce pv nodes less
@@ -501,8 +507,8 @@ class SearchThread {
             // This move is a fail high quiet
 
             plyDataPtr->mKiller = move;
+            if (mBoard.lastMove() != MOVE_NONE) countermove = move;
 
-            int stm = (int)mBoard.sideToMove();
             int pt = (int)move.pieceType();
             i32 bonus = depth * depth;
             
@@ -564,7 +570,7 @@ class SearchThread {
         }
 
         // generate noisy moves except underpromotions
-        plyDataPtr->genAndScoreMoves(mBoard, true, MOVE_NONE, mMovesHistory);
+        plyDataPtr->genAndScoreMoves(mBoard, true, MOVE_NONE, MOVE_NONE, mMovesHistory);
 
         u64 pinned = mBoard.pinned();
         i32 bestScore = mBoard.inCheck() ? -INF + ply : eval;
