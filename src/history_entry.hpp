@@ -24,13 +24,17 @@ struct HistoryEntry {
 
     inline void update(i32 bonus, bool enemyAttacksOrigin, bool enemyAttacksDst, std::array<Move, 2> moves)
     {
-        mMainHist[enemyAttacksOrigin][enemyAttacksDst] 
-            = std::clamp(mMainHist[enemyAttacksOrigin][enemyAttacksDst] + bonus, -historyMax(), historyMax());
+        auto updateHistory = [](i16 &history, i32 bonus) -> void {
+            history += bonus - abs(bonus) * (i32)history / historyMax();
+            assert(history >= -historyMax() && history <= historyMax());
+        };
+
+        updateHistory(mMainHist[enemyAttacksOrigin][enemyAttacksDst], bonus);
 
         for (Move move : moves) 
             if (move != MOVE_NONE) {
                 int pt = (int)move.pieceType();
-                mContHist[pt][move.to()] = std::clamp(mContHist[pt][move.to()] + bonus, -historyMax(), historyMax());
+                updateHistory(mContHist[pt][move.to()], bonus);
             }
     }
 
