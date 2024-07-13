@@ -386,6 +386,10 @@ class SearchThread {
             // Moves loop pruning
             if (ply > 0 && bestScore > -MIN_MATE_SCORE && moveScore < COUNTERMOVE_SCORE)
             {
+                if (legalMovesSeen >= lmpMinMoves() + pvNode + mBoard.inCheck()
+                                       + depth * depth * lmpMultiplier())
+                    break;
+
                 i32 lmrDepth = std::max(0, depth - LMR_TABLE[depth][legalMovesSeen]);
 
                 // FP (Futility pruning)
