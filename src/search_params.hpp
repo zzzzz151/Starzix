@@ -100,7 +100,7 @@ TunableParam<i32> lmrQuietHistoryDiv = TunableParam<i32>(8192, 1024, 16384, 1024
 TunableParam<i32> lmrNoisyHistoryDiv = TunableParam<i32>(4096, 1024, 16384, 1024);
 
 // History
-TunableParam<i32> historyMax = TunableParam<i32>(8192, 2048, 24576, 2048);
+TunableParam<i32> historyMax = TunableParam<i32>(16384, 8192, 24576, 2048);
 TunableParam<float> historyBonusMultiplier = TunableParam<float>(1.0, 0.25, 4.0, 0.25);
 TunableParam<float> historyMalusMultiplier = TunableParam<float>(1.0, 0.25, 4.0, 0.25);
 TunableParam<float> mainHistoryWeight = TunableParam<float>(1.0, 0.25, 4.0, 0.25);

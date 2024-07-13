@@ -514,7 +514,7 @@ class SearchThread {
             if (mBoard.lastMove() != MOVE_NONE) countermove = move;
 
             int pt = (int)move.pieceType();
-            i32 bonus = depth * depth;
+            i32 bonus = std::min(depth * 300 - 50, 1500);
             
             // History bonus: increase this move's history
             mMovesHistory[stm][pt][move.to()].update(
