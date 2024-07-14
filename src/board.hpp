@@ -894,13 +894,11 @@ class Board {
         if (move == MOVE_NONE) return hashAfter;
         
         int stm = (int)sideToMove();
-        int nstm = (int)oppSide();
-
         Square to = move.to();
         PieceType captured = pieceTypeAt(to);
 
         if (captured != PieceType::NONE)
-            hashAfter ^= ZOBRIST_PIECES[nstm][(int)captured][to];
+            hashAfter ^= ZOBRIST_PIECES[!stm][(int)captured][to];
 
         int pieceType = (int)move.pieceType();
         return hashAfter ^ ZOBRIST_PIECES[stm][pieceType][move.from()] ^ ZOBRIST_PIECES[stm][pieceType][to];

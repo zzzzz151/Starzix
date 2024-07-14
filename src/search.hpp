@@ -346,6 +346,10 @@ class SearchThread {
             && eval >= beta
             && mBoard.hasNonPawnMaterial(mBoard.sideToMove()))
             {
+                // Prefetch TT entry
+                auto childEntryIdx = TTEntryIndex(mBoard.zobristHash() ^ ZOBRIST_COLOR, ttPtr->size());
+                __builtin_prefetch(&(*ttPtr)[childEntryIdx]);
+
                 makeMove(MOVE_NONE, plyDataPtr);
 
                 i32 nmpDepth = depth - nmpBaseReduction() - depth / nmpReductionDivisor();
@@ -456,6 +460,13 @@ class SearchThread {
                     return singularBeta;
                     
                 plyDataPtr->mCurrentMoveIdx = 0; // reset since the singular search used this
+            }
+
+            // If not a special move, we can probably correctly predict the zobrist hash after it
+            // and prefetch the TT entry
+            if (move.flag() <= Move::KING_FLAG) {
+                auto childEntryIdx = TTEntryIndex(mBoard.roughHashAfter(move), ttPtr->size());
+                __builtin_prefetch(&(*ttPtr)[childEntryIdx]);
             }
 
             u64 nodesBefore = mNodes;
@@ -647,7 +658,6 @@ class SearchThread {
 
         return bestScore;
     }
-
 
 }; // class SearchThread
 
