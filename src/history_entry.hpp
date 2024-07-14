@@ -15,7 +15,7 @@ struct HistoryEntry {
 
     inline i32 total(bool enemyAttacksOrigin, bool enemyAttacksDst, std::array<Move, 3> moves) 
     {
-        float total = mMainHist[enemyAttacksOrigin][enemyAttacksDst];
+        i32 total = mMainHist[enemyAttacksOrigin][enemyAttacksDst];
 
         for (Move move : moves) 
             if (move != MOVE_NONE) {
