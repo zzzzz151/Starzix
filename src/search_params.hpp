@@ -88,7 +88,6 @@ TunableParam<i32> seeNoisyHistoryDiv = TunableParam<i32>(128, 25, 525, 50);
 // SE (Singular extensions)
 TunableParam<i32> singularMinDepth = TunableParam<i32>(7, 6, 10, 1);
 TunableParam<i32> singularDepthMargin = TunableParam<i32>(3, 1, 5, 1);
-TunableParam<i32> singularBetaMultiplier = TunableParam<i32>(1, 1, 2, 1);
 TunableParam<i32> doubleExtensionMargin = TunableParam<i32>(20, 2, 42, 10);
 constexpr u8 DOUBLE_EXTENSIONS_MAX = 10;
 
@@ -99,17 +98,26 @@ TunableParam<i32> lmrMinMoves = TunableParam<i32>(3, 2, 4, 1);
 TunableParam<i32> lmrQuietHistoryDiv = TunableParam<i32>(8192, 1024, 16384, 1024);
 TunableParam<i32> lmrNoisyHistoryDiv = TunableParam<i32>(4096, 1024, 16384, 1024);
 
-// History
+// History max
 TunableParam<i32> historyMax = TunableParam<i32>(16384, 8192, 24576, 2048);
-TunableParam<float> historyBonusMultiplier = TunableParam<float>(1.0, 0.25, 4.0, 0.25);
-TunableParam<float> historyMalusMultiplier = TunableParam<float>(1.0, 0.25, 4.0, 0.25);
+
+// History bonus
+TunableParam<i32> historyBonusMultiplier = TunableParam<i32>(300, 50, 600, 50);
+TunableParam<i32> historyBonusOffset = TunableParam<i32>(50, 0, 500, 100);
+TunableParam<i32> historyBonusMax = TunableParam<i32>(1500, 500, 2500, 200);
+
+// History malus
+TunableParam<i32> historyMalusMultiplier = TunableParam<i32>(300, 50, 600, 50);
+TunableParam<i32> historyMalusOffset = TunableParam<i32>(50, 0, 500, 100);
+TunableParam<i32> historyMalusMax = TunableParam<i32>(1500, 500, 2500, 200);
+
+// History weights
 TunableParam<float> mainHistoryWeight = TunableParam<float>(1.0, 0.25, 4.0, 0.25);
 TunableParam<float> contHistoryWeight = TunableParam<float>(1.0, 0.25, 4.0, 0.25);
 
 // Correction history
-TunableParam<i32> corrHistNewWeightMax = TunableParam<i32>(16, 8, 24, 4);
-TunableParam<i32> corrHistScale = TunableParam<i32>(200, 50, 750, 100);
-TunableParam<i32> corrHistMax = TunableParam<i32>(12288, 2048, 16384, 2048);
+TunableParam<i32> corrHistScale = TunableParam<i32>(200, 50, 550, 100);
+TunableParam<i32> corrHistMax = TunableParam<i32>(16384, 4096, 32768, 2048);
 
 // SEE piece values
 TunableParam<i32> seePawnValue = TunableParam<i32>(100, 0, 200, 50);
@@ -157,7 +165,6 @@ tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
     {stringify(seeNoisyHistoryDiv), &seeNoisyHistoryDiv},
     {stringify(singularMinDepth), &singularMinDepth},
     {stringify(singularDepthMargin), &singularDepthMargin},
-    {stringify(singularBetaMultiplier), &singularBetaMultiplier},
     {stringify(doubleExtensionMargin), &doubleExtensionMargin},
     {stringify(lmrBase), &lmrBase},
     {stringify(lmrMultiplier), &lmrMultiplier},
@@ -166,10 +173,13 @@ tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
     {stringify(lmrNoisyHistoryDiv), &lmrNoisyHistoryDiv},
     {stringify(historyMax), &historyMax},
     {stringify(historyBonusMultiplier), &historyBonusMultiplier},
+    {stringify(historyBonusOffset), &historyBonusOffset},
+    {stringify(historyBonusMax), &historyBonusMax},
     {stringify(historyMalusMultiplier), &historyMalusMultiplier},
+    {stringify(historyMalusOffset), &historyMalusOffset},
+    {stringify(historyMalusMax), &historyMalusMax},
     {stringify(mainHistoryWeight), &mainHistoryWeight},
     {stringify(contHistoryWeight), &contHistoryWeight},
-    {stringify(corrHistNewWeightMax), &corrHistNewWeightMax},
     {stringify(corrHistScale), &corrHistScale},
     {stringify(corrHistMax), &corrHistMax},
     {stringify(seePawnValue), &seePawnValue},

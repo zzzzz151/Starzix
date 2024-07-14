@@ -386,8 +386,9 @@ class SearchThread {
             // Moves loop pruning
             if (ply > 0 && bestScore > -MIN_MATE_SCORE && moveScore < COUNTERMOVE_SCORE)
             {
+                // LMP (Late move pruning)
                 if (legalMovesSeen >= lmpMinMoves() + pvNode + mBoard.inCheck()
-                                       + depth * depth * lmpMultiplier())
+                                      + depth * depth * lmpMultiplier())
                     break;
 
                 i32 lmrDepth = std::max(0, depth - LMR_TABLE[depth][legalMovesSeen]);
@@ -419,13 +420,13 @@ class SearchThread {
             && (i32)ttEntry.depth >= depth - singularDepthMargin()
             && ttEntry.bound() != Bound::UPPER 
             && abs(ttEntry.score) < MIN_MATE_SCORE
-            && (singularBeta = (i32)ttEntry.score - depth * singularBetaMultiplier()) > -MIN_MATE_SCORE + 1)
+            && (singularBeta = (i32)ttEntry.score - depth) > -MIN_MATE_SCORE + 1)
             {
                 // Singular search: before searching any move, 
                 // search this node at a shallower depth with TT move excluded
 
                 i32 singularScore = search((depth - 1) / 2, ply, singularBeta - 1, singularBeta, 
-                                            doubleExtsLeft, true);
+                                           doubleExtsLeft, true);
 
                 // Double extension
                 if (!pvNode && singularScore < singularBeta - doubleExtensionMargin() && doubleExtsLeft > 0) {
@@ -514,11 +515,12 @@ class SearchThread {
             if (mBoard.lastMove() != MOVE_NONE) countermove = move;
 
             int pt = (int)move.pieceType();
-            i32 bonus = std::min(depth * 300 - 50, 1500);
+            i32 bonus =  std::clamp(depth * historyBonusMultiplier() - historyBonusOffset(), 0, historyBonusMax());
+            i32 malus = -std::clamp(depth * historyMalusMultiplier() - historyMalusOffset(), 0, historyMalusMax());
             
             // History bonus: increase this move's history
             mMovesHistory[stm][pt][move.to()].update(
-                bonus * historyBonusMultiplier(), 
+                bonus, 
                 plyDataPtr->mEnemyAttacks & bitboard(move.from()), 
                 plyDataPtr->mEnemyAttacks & bitboard(move.to()), 
                 { mBoard.lastMove(), mBoard.nthToLastMove(2) });
@@ -528,7 +530,7 @@ class SearchThread {
                 pt = (int)failLow.pieceType();
 
                 mMovesHistory[stm][pt][failLow.to()].update(
-                    -bonus * historyMalusMultiplier(),
+                    malus,
                     plyDataPtr->mEnemyAttacks & bitboard(failLow.from()), 
                     plyDataPtr->mEnemyAttacks & bitboard(failLow.to()),  
                     { mBoard.lastMove(), mBoard.nthToLastMove(2) });
