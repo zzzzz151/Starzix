@@ -58,6 +58,8 @@ class SearchThread {
 
     std::array<u64, 1ULL << 17> mMovesNodes; // [move]
 
+    MultiArray<i32, 2, 16384> mCorrectionHistory = {}; // [color][pawnHash % 16384]
+
     std::vector<TTEntry>* ttPtr = nullptr;
     
     public:
@@ -71,6 +73,7 @@ class SearchThread {
     inline void reset() {
         mMovesHistory = {};
         mCountermoves = {};
+        mCorrectionHistory = {};
     }
 
     inline u64 getNodes() { return mNodes; }
@@ -211,6 +214,11 @@ class SearchThread {
             eval = 0;
         else if (eval == EVAL_NONE) {
             eval = evaluate(mAccumulatorPtr, mBoard, true);
+
+            // Adjust eval with correction history
+            int stm = (int)mBoard.sideToMove();
+            eval += mCorrectionHistory[stm][mBoard.pawnHash() % 16384] / corrHistScale();
+
             eval = std::clamp(eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
         }
 
@@ -366,6 +374,7 @@ class SearchThread {
 
         i32 bestScore = -INF;
         Move bestMove = MOVE_NONE;
+        bool isBestMoveQuiet = false;
         Bound bound = Bound::UPPER;
 
         ArrayVec<Move, 256> failLowQuiets;
@@ -497,6 +506,7 @@ class SearchThread {
 
             alpha = score;
             bestMove = move;
+            isBestMoveQuiet = isQuiet;
             bound = Bound::EXACT;
 
             if (pvNode) plyDataPtr->updatePV(move);
@@ -544,9 +554,26 @@ class SearchThread {
                    : mBoard.inCheck() ? -INF + ply // checkmate
                    : 0; // stalemate
 
-        // Store in TT
-        if (!singular)
+        if (!singular) {
+            // Store in TT
             (*ttPtr)[ttEntryIdx].update(mBoard.zobristHash(), depth, ply, bestScore, bestMove, bound);
+
+            // Update correction history
+            if (!mBoard.inCheck()
+            && abs(bestScore) < MIN_MATE_SCORE
+            && (bestMove == MOVE_NONE || isBestMoveQuiet)
+            && !(bound == Bound::LOWER && bestScore <= eval)
+            && !(bound == Bound::UPPER && bestScore >= eval))
+            {
+                i32 &corrHist = mCorrectionHistory[stm][mBoard.pawnHash() % 16384];
+                i32 newWeight = std::min(depth + depth * depth, corrHistScale());
+                
+                corrHist *= corrHistScale() - newWeight;
+                corrHist += (bestScore - eval) * corrHistScale() * newWeight;
+                corrHist = std::clamp(corrHist / corrHistScale(), -corrHistMax(), corrHistMax());
+            }
+
+        }
 
         return bestScore;
     }

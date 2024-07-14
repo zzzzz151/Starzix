@@ -116,7 +116,7 @@ TunableParam<float> mainHistoryWeight = TunableParam<float>(1.0, 0.25, 4.0, 0.25
 TunableParam<float> contHistoryWeight = TunableParam<float>(1.0, 0.25, 4.0, 0.25);
 
 // Correction history
-TunableParam<i32> corrHistScale = TunableParam<i32>(200, 50, 550, 100);
+TunableParam<i32> corrHistScale = TunableParam<i32>(200, 50, 550, 50);
 TunableParam<i32> corrHistMax = TunableParam<i32>(16384, 4096, 32768, 2048);
 
 // SEE piece values
