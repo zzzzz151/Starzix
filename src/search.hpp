@@ -330,6 +330,9 @@ class SearchThread {
             && eval + depth * razoringMultiplier() < alpha)
             {
                 i32 score = qSearch(ply, alpha, beta);
+
+                if (stopSearch()) return 0;
+
                 if (score <= alpha) return score;
             }
 
@@ -341,14 +344,13 @@ class SearchThread {
             {
                 makeMove(MOVE_NONE, plyDataPtr);
 
-                i32 score = 0;
-
-                if (!mBoard.isDraw(ply)) {
-                    i32 nmpDepth = depth - nmpBaseReduction() - depth / nmpReductionDivisor();
-                    score = -search(nmpDepth, ply + 1, -beta, -alpha, doubleExtsLeft);
-                }
+                i32 nmpDepth = depth - nmpBaseReduction() - depth / nmpReductionDivisor();
+                
+                i32 score = mBoard.isDraw(ply) ? 0 : -search(nmpDepth, ply + 1, -beta, -alpha, doubleExtsLeft);
 
                 mBoard.undoMove();
+
+                if (stopSearch()) return 0;
 
 				if (score >= beta) return score >= MIN_MATE_SCORE ? beta : score;
             }
