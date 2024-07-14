@@ -539,28 +539,31 @@ class SearchThread {
             // This move is a fail high quiet
 
             plyDataPtr->mKiller = move;
+            
             if (mBoard.lastMove() != MOVE_NONE) countermove = move;
 
             int pt = (int)move.pieceType();
+            std::array<Move, 3> moves = { mBoard.lastMove(), mBoard.nthToLastMove(2), mBoard.nthToLastMove(4) };
+
             i32 bonus =  std::clamp(depth * historyBonusMultiplier() - historyBonusOffset(), 0, historyBonusMax());
             i32 malus = -std::clamp(depth * historyMalusMultiplier() - historyMalusOffset(), 0, historyMalusMax());
             
             // History bonus: increase this move's history
             mMovesHistory[stm][pt][move.to()].update(
-                bonus, 
                 plyDataPtr->mEnemyAttacks & bitboard(move.from()), 
                 plyDataPtr->mEnemyAttacks & bitboard(move.to()), 
-                { mBoard.lastMove(), mBoard.nthToLastMove(2) });
+                moves,
+                bonus);
 
             // History malus: decrease history of fail low quiets
             for (Move failLow : failLowQuiets) {
                 pt = (int)failLow.pieceType();
 
                 mMovesHistory[stm][pt][failLow.to()].update(
-                    malus,
                     plyDataPtr->mEnemyAttacks & bitboard(failLow.from()), 
                     plyDataPtr->mEnemyAttacks & bitboard(failLow.to()),  
-                    { mBoard.lastMove(), mBoard.nthToLastMove(2) });
+                    moves,
+                    malus);
             }
 
             break;

@@ -191,6 +191,12 @@ inline void setoption(std::vector<std::string> &tokens, std::vector<TTEntry> &tt
                     0,               // King
                     0                // None
                 };
+            else if (optionName == stringify(contHist1PlyWeight)
+            || optionName == stringify(contHist2PlyWeight)
+            || optionName == stringify(contHist4PlyWeight)) 
+                CONT_HISTORY_WEIGHTS = { 
+                    contHist1PlyWeight(), contHist2PlyWeight(), contHist4PlyWeight() 
+                };
 
             std::cout << optionName << " set to " << myParam->value << std::endl;
         }, tunableParam);
