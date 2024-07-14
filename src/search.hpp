@@ -230,24 +230,28 @@ class SearchThread {
         // Aspiration Windows
         // Search with a small window, adjusting it and researching until the score is inside the window
 
+        i32 depth = iterationDepth;
         i32 delta = aspInitialDelta();
         i32 alpha = std::max(-INF, score - delta);
         i32 beta = std::min(INF, score + delta);
         i32 bestScore = score;
 
         while (true) {
-            score = search(iterationDepth, 0, alpha, beta, DOUBLE_EXTENSIONS_MAX);
+            score = search(depth, 0, alpha, beta, DOUBLE_EXTENSIONS_MAX);
 
             if (stopSearch()) return 0;
 
             if (score > bestScore) bestScore = score;
 
-            if (score >= beta)
+            if (score >= beta) {
                 beta = std::min(beta + delta, INF);
+                if (depth > 1) depth--;
+            }
             else if (score <= alpha)
             {
                 beta = (alpha + beta) / 2;
                 alpha = std::max(alpha - delta, -INF);
+                depth = iterationDepth;
             }
             else
                 break;
