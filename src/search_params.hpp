@@ -95,8 +95,7 @@ constexpr u8 DOUBLE_EXTENSIONS_MAX = 10;
 TunableParam<double> lmrBase = TunableParam<double>(0.8, 0.4, 1.2, 0.1);
 TunableParam<double> lmrMultiplier = TunableParam<double>(0.4, 0.2, 0.8, 0.1);
 TunableParam<i32> lmrMinMoves = TunableParam<i32>(3, 2, 4, 1);
-TunableParam<i32> lmrQuietHistoryDiv = TunableParam<i32>(8192, 1024, 16384, 1024);
-TunableParam<i32> lmrNoisyHistoryDiv = TunableParam<i32>(4096, 1024, 16384, 1024);
+TunableParam<i32> lmrHistoryDiv = TunableParam<i32>(32768, 8192, 32768, 2048);
 
 // History max
 TunableParam<i32> historyMax = TunableParam<i32>(16384, 8192, 24576, 2048);
@@ -171,8 +170,7 @@ tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
     {stringify(lmrBase), &lmrBase},
     {stringify(lmrMultiplier), &lmrMultiplier},
     {stringify(lmrMinMoves), &lmrMinMoves},
-    {stringify(lmrQuietHistoryDiv), &lmrQuietHistoryDiv},
-    {stringify(lmrNoisyHistoryDiv), &lmrNoisyHistoryDiv},
+    {stringify(lmrHistoryDiv), &lmrHistoryDiv},
     {stringify(historyMax), &historyMax},
     {stringify(historyBonusMultiplier), &historyBonusMultiplier},
     {stringify(historyBonusOffset), &historyBonusOffset},
