@@ -113,7 +113,9 @@ TunableParam<i32> historyMalusMax = TunableParam<i32>(1500, 500, 2500, 200);
 
 // History weights
 TunableParam<float> mainHistoryWeight = TunableParam<float>(1.0, 0.25, 4.0, 0.25);
-TunableParam<float> contHistoryWeight = TunableParam<float>(1.0, 0.25, 4.0, 0.25);
+TunableParam<float> contHist1PlyWeight = TunableParam<float>(1.0, 0.25, 4.0, 0.25);
+TunableParam<float> contHist2PlyWeight = TunableParam<float>(1.0, 0.25, 4.0, 0.25);
+TunableParam<float> contHist4PlyWeight = TunableParam<float>(0.5, 0.25, 4.0, 0.25);
 
 // Correction history
 TunableParam<i32> corrHistScale = TunableParam<i32>(200, 50, 550, 50);
@@ -179,7 +181,9 @@ tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
     {stringify(historyMalusOffset), &historyMalusOffset},
     {stringify(historyMalusMax), &historyMalusMax},
     {stringify(mainHistoryWeight), &mainHistoryWeight},
-    {stringify(contHistoryWeight), &contHistoryWeight},
+    {stringify(contHist1PlyWeight), &contHist1PlyWeight},
+    {stringify(contHist2PlyWeight), &contHist2PlyWeight},
+    {stringify(contHist4PlyWeight), &contHist4PlyWeight},
     {stringify(corrHistScale), &corrHistScale},
     {stringify(corrHistMax), &corrHistMax},
     {stringify(seePawnValue), &seePawnValue},
