@@ -490,7 +490,11 @@ class SearchThread {
             if (depth >= 2 && !mBoard.inCheck() && legalMovesSeen >= lmrMinMoves() && moveScore < COUNTERMOVE_SCORE)
             {
                 lmr = LMR_TABLE[depth][legalMovesSeen];
+                
                 lmr -= pvNode; // reduce pv nodes less
+
+                // reduce quiets with good history less and vice versa
+                if (isQuiet) lmr -= round((float)moveScore / (float)lmrHistoryDiv());
 
                 if (lmr < 0) lmr = 0; // dont extend
             }
