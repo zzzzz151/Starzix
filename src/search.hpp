@@ -154,7 +154,7 @@ class SearchThread {
                 double bestMoveNodesFraction = bestMoveNodes / std::max<double>(mNodes, 1.0);
                 assert(bestMoveNodesFraction >= 0.0 && bestMoveNodesFraction <= 1.0);
                 
-                return mSoftMilliseconds * nodesTmMultiplier() * (nodesTmBase() - bestMoveNodesFraction);
+                return (double)mSoftMilliseconds * (1.5 - bestMoveNodesFraction);
             };
                          
             if (msElapsed >= (iterationDepth >= aspMinDepth() ? scaledSoftMs() : mSoftMilliseconds))
