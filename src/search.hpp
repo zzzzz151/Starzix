@@ -472,7 +472,7 @@ class SearchThread {
             u64 nodesBefore = mNodes;
             makeMove(move, plyDataPtr);
 
-            i32 score = 0, lmr = 0;
+            i32 score = 0;
 
             if (mBoard.isDraw(ply)) goto moveSearched;
 
@@ -480,16 +480,10 @@ class SearchThread {
 
             // PVS (Principal variation search)
 
-            // First move, aka left-most leaf, is a PV node searched with full window
-            if (legalMovesSeen == 1) {
-                score = -search(newDepth, ply + 1, -beta, -alpha, doubleExtsLeft);
-                goto moveSearched;
-            }
-
             // LMR (Late move reductions)
             if (depth >= 2 && !mBoard.inCheck() && legalMovesSeen >= lmrMinMoves() && moveScore < COUNTERMOVE_SCORE)
             {
-                lmr = LMR_TABLE[depth][legalMovesSeen];
+                i32 lmr = LMR_TABLE[depth][legalMovesSeen];
                 
                 lmr -= pvNode; // reduce pv nodes less
 
@@ -497,13 +491,16 @@ class SearchThread {
                 if (isQuiet) lmr -= round((float)moveScore / (float)lmrHistoryDiv());
 
                 if (lmr < 0) lmr = 0; // dont extend
+
+                score = -search(newDepth - lmr, ply + 1, -alpha - 1, -alpha, doubleExtsLeft);
+
+                if (score > alpha && lmr > 0)
+                    score = -search(newDepth, ply + 1, -alpha - 1, -alpha, doubleExtsLeft);
             }
+            else if (!pvNode || legalMovesSeen > 1)
+                score = -search(newDepth, ply + 1, -alpha - 1, -alpha, doubleExtsLeft);
 
-            // Reduced, zero window search (non PV node)
-            score = -search(newDepth - lmr, ply + 1, -alpha - 1, -alpha, doubleExtsLeft);
-
-            // Research (PV node)
-            if (score > alpha && (score < beta || lmr > 0))
+            if (pvNode && (legalMovesSeen == 1 || score > alpha))
                 score = -search(newDepth, ply + 1, -beta, -alpha, doubleExtsLeft);
 
             moveSearched:
