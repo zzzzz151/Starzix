@@ -497,8 +497,14 @@ class SearchThread {
 
                 score = -search(newDepth - lmr, ply + 1, -alpha - 1, -alpha, true, doubleExtsLeft);
 
-                if (score > alpha && lmr > 0)
+                if (score > alpha && lmr > 0) 
+                {
+                    // Deeper or shallower search?
+                    newDepth += score > bestScore + deeperBase() + deeperMultiplier() * newDepth && ply > 0;
+                    newDepth -= score < bestScore + newDepth                                     && ply > 0;
+
                     score = -search(newDepth, ply + 1, -alpha - 1, -alpha, !cutNode, doubleExtsLeft);
+                }
             }
             else if (!pvNode || legalMovesSeen > 1)
                 score = -search(newDepth, ply + 1, -alpha - 1, -alpha, !cutNode, doubleExtsLeft);
