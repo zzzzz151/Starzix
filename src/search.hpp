@@ -114,7 +114,7 @@ class SearchThread {
 
             i32 iterationScore = iterationDepth >= aspMinDepth() 
                                  ? aspiration(iterationDepth, score)
-                                 : search(iterationDepth, 0, -INF, INF, DOUBLE_EXTENSIONS_MAX);
+                                 : search(iterationDepth, 0, -INF, INF, false, DOUBLE_EXTENSIONS_MAX);
 
             if (stopSearch()) break;
 
@@ -237,7 +237,7 @@ class SearchThread {
         i32 bestScore = score;
 
         while (true) {
-            score = search(depth, 0, alpha, beta, DOUBLE_EXTENSIONS_MAX);
+            score = search(depth, 0, alpha, beta, false, DOUBLE_EXTENSIONS_MAX);
 
             if (stopSearch()) return 0;
 
@@ -262,7 +262,9 @@ class SearchThread {
         return score;
     }
 
-    inline i32 search(i32 depth, i32 ply, i32 alpha, i32 beta, u8 doubleExtsLeft, bool singular = false) {
+    inline i32 search(i32 depth, i32 ply, i32 alpha, i32 beta, 
+        bool cutNode, u8 doubleExtsLeft, bool singular = false) 
+    {
         assert(ply >= 0 && ply <= mMaxDepth);
         assert(alpha >= -INF && alpha <= INF);
         assert(beta  >= -INF && beta  <= INF);
@@ -354,7 +356,8 @@ class SearchThread {
 
                 i32 nmpDepth = depth - nmpBaseReduction() - depth / nmpReductionDivisor();
                 
-                i32 score = mBoard.isDraw(ply) ? 0 : -search(nmpDepth, ply + 1, -beta, -alpha, doubleExtsLeft);
+                i32 score = mBoard.isDraw(ply) ? 0 
+                            : -search(nmpDepth, ply + 1, -beta, -alpha, !cutNode, doubleExtsLeft);
 
                 mBoard.undoMove();
 
@@ -445,7 +448,7 @@ class SearchThread {
                 // search this node at a shallower depth with TT move excluded
 
                 i32 singularScore = search((depth - 1) / 2, ply, singularBeta - 1, singularBeta, 
-                                           doubleExtsLeft, true);
+                                           cutNode, doubleExtsLeft, true);
 
                 // Double extension
                 if (!pvNode && singularScore < singularBeta - doubleExtensionMargin() && doubleExtsLeft > 0) {
@@ -472,7 +475,7 @@ class SearchThread {
             u64 nodesBefore = mNodes;
             makeMove(move, plyDataPtr);
 
-            i32 score = 0, lmr = 0;
+            i32 score = 0;
 
             if (mBoard.isDraw(ply)) goto moveSearched;
 
@@ -480,31 +483,28 @@ class SearchThread {
 
             // PVS (Principal variation search)
 
-            // First move, aka left-most leaf, is a PV node searched with full window
-            if (legalMovesSeen == 1) {
-                score = -search(newDepth, ply + 1, -beta, -alpha, doubleExtsLeft);
-                goto moveSearched;
-            }
-
             // LMR (Late move reductions)
             if (depth >= 2 && !mBoard.inCheck() && legalMovesSeen >= lmrMinMoves() && moveScore < COUNTERMOVE_SCORE)
             {
-                lmr = LMR_TABLE[depth][legalMovesSeen];
+                i32 lmr = LMR_TABLE[depth][legalMovesSeen]
+                          - pvNode       // reduce pv nodes less
+                          + 2 * cutNode; // reduce more if we expect to fail high
                 
-                lmr -= pvNode; // reduce pv nodes less
-
                 // reduce quiets with good history less and vice versa
                 if (isQuiet) lmr -= round((float)moveScore / (float)lmrHistoryDiv());
 
                 if (lmr < 0) lmr = 0; // dont extend
+
+                score = -search(newDepth - lmr, ply + 1, -alpha - 1, -alpha, true, doubleExtsLeft);
+
+                if (score > alpha && lmr > 0)
+                    score = -search(newDepth, ply + 1, -alpha - 1, -alpha, !cutNode, doubleExtsLeft);
             }
+            else if (!pvNode || legalMovesSeen > 1)
+                score = -search(newDepth, ply + 1, -alpha - 1, -alpha, !cutNode, doubleExtsLeft);
 
-            // Reduced, zero window search (non PV node)
-            score = -search(newDepth - lmr, ply + 1, -alpha - 1, -alpha, doubleExtsLeft);
-
-            // Research (PV node)
-            if (score > alpha && (score < beta || lmr > 0))
-                score = -search(newDepth, ply + 1, -beta, -alpha, doubleExtsLeft);
+            if (pvNode && (legalMovesSeen == 1 || score > alpha))
+                score = -search(newDepth, ply + 1, -beta, -alpha, false, doubleExtsLeft);
 
             moveSearched:
 
