@@ -370,7 +370,7 @@ class SearchThread {
         Move ttMove = ttHit ? Move(ttEntry.move) : MOVE_NONE;
 
         // IIR (Internal iterative reduction)
-        if (depth >= iirMinDepth() && ttMove == MOVE_NONE && pvNode && !singular)
+        if (depth >= iirMinDepth() && ttMove == MOVE_NONE && !singular && (pvNode || cutNode))
             depth--;
 
         int stm = (int)mBoard.sideToMove();
