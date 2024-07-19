@@ -380,8 +380,7 @@ class SearchThread {
         Move &countermove = mCountermoves[!stm][mBoard.lastMove().encoded()];
 
         // gen and score all moves, except underpromotions
-        if (!singular) 
-            plyDataPtr->genAndScoreMoves(mBoard, false, ttMove, countermove, mMovesHistory);
+        if (!singular) plyDataPtr->genAndScoreMoves(mBoard, ttMove, countermove, mMovesHistory);
 
         assert(!singular || plyDataPtr->mCurrentMoveIdx == 0);
 
@@ -639,8 +638,8 @@ class SearchThread {
             if (eval > alpha) alpha = eval;
         }
 
-        // generate noisy moves except underpromotions
-        plyDataPtr->genAndScoreMoves(mBoard, true, MOVE_NONE, MOVE_NONE, mMovesHistory);
+        // generate and score noisy moves except underpromotions
+        plyDataPtr->genAndScoreMovesQSearch(mBoard);
 
         u64 pinned = mBoard.pinned();
         i32 bestScore = mBoard.inCheck() ? -INF + ply : eval;
@@ -650,10 +649,8 @@ class SearchThread {
              move != MOVE_NONE; 
              std::tie(move, moveScore) = plyDataPtr->nextMove())
         {
-            assert(mBoard.captured(move) != PieceType::NONE || move.promotion() != PieceType::NONE);
-
             // SEE pruning (skip bad noisy moves)
-            if (moveScore < 0) break;
+            if (!SEE(mBoard, move)) continue;
 
             // skip illegal moves
             if (!mBoard.isPseudolegalLegal(move, pinned)) continue;

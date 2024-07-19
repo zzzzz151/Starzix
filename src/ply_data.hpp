@@ -19,7 +19,7 @@ struct PlyData {
     Move mKiller = MOVE_NONE;
     u64 mEnemyAttacks = 0;
 
-    inline void genAndScoreMoves(Board &board, bool noisiesOnly, Move ttMove, Move countermove,
+    inline void genAndScoreMoves(Board &board, Move ttMove, Move countermove,
         MultiArray<HistoryEntry, 2, 6, 64> &movesHistory) 
     {
         assert(!(board.lastMove() == MOVE_NONE && countermove != MOVE_NONE));
@@ -28,17 +28,13 @@ struct PlyData {
         if (mMovesGenerated == MoveGenType::NONE)
             mEnemyAttacks = board.attacks(board.oppSide());
 
-        // Generate moves if not already generated
-        // Never generate underpromotions in search
-        if (mMovesGenerated != (MoveGenType)noisiesOnly) {
-            board.pseudolegalMoves(mMoves, noisiesOnly, false);
-            mMovesGenerated = (MoveGenType)noisiesOnly;
+        // Generate all moves (except underpromotions) if not already generated
+        if (mMovesGenerated != MoveGenType::ALL) {
+            board.pseudolegalMoves(mMoves, false, false);
+            mMovesGenerated = MoveGenType::ALL;
         }
 
         // Score moves
-
-        int stm = (int)board.sideToMove();
-
         for (size_t i = 0; i < mMoves.size(); i++)
         {
             Move move = mMoves[i];
@@ -62,7 +58,7 @@ struct PlyData {
                                      : GOOD_NOISY_SCORE)
                                   : -GOOD_NOISY_SCORE;
 
-                // MVV (most valuable victim)
+                // MVVLVA (most valuable victim, least valuable attacker)
                 mMovesScores[i] += 100 * (i32)captured - (i32)move.pieceType();
             }
             else if (promotion == PieceType::QUEEN)
@@ -72,6 +68,7 @@ struct PlyData {
             else if (move == countermove)
                 mMovesScores[i] = COUNTERMOVE_SCORE;
             else {
+                int stm = (int)board.sideToMove();
                 int pt = (int)move.pieceType();
                 
                 mMovesScores[i] = movesHistory[stm][pt][move.to()].total(
@@ -79,6 +76,37 @@ struct PlyData {
                     mEnemyAttacks & bitboard(move.to()), 
                     { board.lastMove(), board.nthToLastMove(2) });
             }
+        }
+
+        mCurrentMoveIdx = -1; // prepare for moves loop
+    }
+
+    inline void genAndScoreMovesQSearch(Board &board) 
+    {
+        // Generate noisy moves (except underpromotions) if not already generated
+        if (mMovesGenerated != MoveGenType::NOISIES_ONLY) {
+            board.pseudolegalMoves(mMoves, true, false);
+            mMovesGenerated = MoveGenType::NOISIES_ONLY;
+        }
+
+        // Score moves
+        for (size_t i = 0; i < mMoves.size(); i++) 
+        {
+            Move move = mMoves[i];
+            PieceType captured = board.captured(move);
+            PieceType promotion = move.promotion();
+
+            // Starzix doesnt generate underpromotions in search
+            assert(promotion == PieceType::NONE || promotion == PieceType::QUEEN);
+
+            // Assert only noisy moves were generated
+            assert(captured != PieceType::NONE || promotion == PieceType::QUEEN);
+
+            // MVVLVA (most valuable victim, least valuable attacker)
+            mMovesScores[i] = 100 * (i32)captured - (i32)move.pieceType();
+
+            if (promotion == PieceType::QUEEN)
+                mMovesScores[i] += 1'000'000;
         }
 
         mCurrentMoveIdx = -1; // prepare for moves loop
