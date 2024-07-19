@@ -438,7 +438,6 @@ class SearchThread {
             i32 singularBeta;
 
             if (move == ttMove
-            && !mBoard.inCheck()
             && ply > 0
             && depth >= singularMinDepth()
             && (i32)ttEntry.depth >= depth - singularDepthMargin()
@@ -474,7 +473,8 @@ class SearchThread {
 
             if (mBoard.isDraw(ply)) goto moveSearched;
 
-            newDepth += mBoard.inCheck(); // Check extension
+            // Check extension if no singular extensions
+            newDepth += newDepth == depth - 1 && mBoard.inCheck();
 
             // PVS (Principal variation search)
 
@@ -495,8 +495,8 @@ class SearchThread {
                 if (score > alpha && lmr > 0) 
                 {
                     // Deeper or shallower search?
-                    newDepth += score > bestScore + deeperBase() + deeperMultiplier() * newDepth && ply > 0;
-                    newDepth -= score < bestScore + newDepth                                     && ply > 0;
+                    newDepth += ply > 0 && score > bestScore + deeperBase() + deeperMultiplier() * newDepth;
+                    newDepth -= ply > 0 && score < bestScore + newDepth;
 
                     score = -search(newDepth, ply + 1, -alpha - 1, -alpha, !cutNode, doubleExtsLeft);
                 }
