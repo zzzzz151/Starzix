@@ -435,8 +435,9 @@ class SearchThread {
             // SE (Singular extensions)
             // In singular searches, ttMove = MOVE_NONE, which prevents SE
 
+            bool singularTried = false;
             i32 singularBeta;
-
+            
             if (move == ttMove
             && ply > 0
             && depth >= singularMinDepth()
@@ -463,6 +464,7 @@ class SearchThread {
                 else if (singularBeta >= beta) 
                     return singularBeta;
                     
+                singularTried = true;
                 plyDataPtr->mCurrentMoveIdx = 0; // reset since the singular search used this
             }
 
@@ -474,7 +476,7 @@ class SearchThread {
             if (mBoard.isDraw(ply)) goto moveSearched;
 
             // Check extension if no singular extensions
-            newDepth += newDepth == depth - 1 && mBoard.inCheck();
+            newDepth += !singularTried && mBoard.inCheck();
 
             // PVS (Principal variation search)
 
