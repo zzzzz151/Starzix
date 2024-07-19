@@ -16,9 +16,11 @@ using namespace SIMD;
 
 namespace nnue {
 
-constexpr int HIDDEN_LAYER_SIZE = 1024;
-constexpr i32 SCALE = 400, QA = 255, QB = 64;
-constexpr int WEIGHTS_PER_VEC = sizeof(Vec) / sizeof(i16);
+constexpr i32 HIDDEN_LAYER_SIZE = 1024,
+              SCALE = 400, 
+              QA = 255, 
+              QB = 64,
+              WEIGHTS_PER_VEC = sizeof(Vec) / sizeof(i16);
 
 struct alignas(ALIGNMENT) Net {
     public:
