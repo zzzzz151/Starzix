@@ -24,14 +24,11 @@ struct PlyData {
     {
         assert(!(board.lastMove() == MOVE_NONE && countermove != MOVE_NONE));
 
-        // Generate enemy attacks if not already generated
-        if (mMovesGenerated == MoveGenType::NONE)
-            mEnemyAttacks = board.attacks(board.oppSide());
-
-        // Generate all moves (except underpromotions) if not already generated
+        // Generate all moves (except underpromotions) and enemy attacks, if not already generated
         if (mMovesGenerated != MoveGenType::ALL) {
             board.pseudolegalMoves(mMoves, false, false);
             mMovesGenerated = MoveGenType::ALL;
+            mEnemyAttacks = board.attacks(board.oppSide());
         }
 
         // Score moves
