@@ -380,8 +380,7 @@ class SearchThread {
         Move &countermove = mCountermoves[!stm][mBoard.lastMove().encoded()];
 
         // gen and score all moves, except underpromotions
-        if (!singular) 
-            plyDataPtr->genAndScoreMoves(mBoard, false, ttMove, countermove, mMovesHistory);
+        if (!singular) plyDataPtr->genAndScoreMoves(mBoard, ttMove, countermove, mMovesHistory);
 
         assert(!singular || plyDataPtr->mCurrentMoveIdx == 0);
 
@@ -436,10 +435,10 @@ class SearchThread {
             // SE (Singular extensions)
             // In singular searches, ttMove = MOVE_NONE, which prevents SE
 
+            bool singularTried = false;
             i32 singularBeta;
-
+            
             if (move == ttMove
-            && !mBoard.inCheck()
             && ply > 0
             && depth >= singularMinDepth()
             && (i32)ttEntry.depth >= depth - singularDepthMargin()
@@ -465,6 +464,7 @@ class SearchThread {
                 else if (singularBeta >= beta) 
                     return singularBeta;
                     
+                singularTried = true;
                 plyDataPtr->mCurrentMoveIdx = 0; // reset since the singular search used this
             }
 
@@ -475,7 +475,8 @@ class SearchThread {
 
             if (mBoard.isDraw(ply)) goto moveSearched;
 
-            newDepth += mBoard.inCheck(); // Check extension
+            // Check extension if no singular extensions
+            newDepth += !singularTried && mBoard.inCheck();
 
             // PVS (Principal variation search)
 
@@ -496,8 +497,8 @@ class SearchThread {
                 if (score > alpha && lmr > 0) 
                 {
                     // Deeper or shallower search?
-                    newDepth += score > bestScore + deeperBase() + deeperMultiplier() * newDepth && ply > 0;
-                    newDepth -= score < bestScore + newDepth                                     && ply > 0;
+                    newDepth += ply > 0 && score > bestScore + deeperBase() + deeperMultiplier() * newDepth;
+                    newDepth -= ply > 0 && score < bestScore + newDepth;
 
                     score = -search(newDepth, ply + 1, -alpha - 1, -alpha, !cutNode, doubleExtsLeft);
                 }
@@ -639,8 +640,8 @@ class SearchThread {
             if (eval > alpha) alpha = eval;
         }
 
-        // generate noisy moves except underpromotions
-        plyDataPtr->genAndScoreMoves(mBoard, true, MOVE_NONE, MOVE_NONE, mMovesHistory);
+        // generate and score noisy moves except underpromotions
+        plyDataPtr->genAndScoreMovesQSearch(mBoard);
 
         u64 pinned = mBoard.pinned();
         i32 bestScore = mBoard.inCheck() ? -INF + ply : eval;
@@ -650,10 +651,8 @@ class SearchThread {
              move != MOVE_NONE; 
              std::tie(move, moveScore) = plyDataPtr->nextMove())
         {
-            assert(mBoard.captured(move) != PieceType::NONE || move.promotion() != PieceType::NONE);
-
             // SEE pruning (skip bad noisy moves)
-            if (moveScore < 0) break;
+            if (!SEE(mBoard, move)) continue;
 
             // skip illegal moves
             if (!mBoard.isPseudolegalLegal(move, pinned)) continue;
