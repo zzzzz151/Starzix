@@ -652,6 +652,8 @@ class SearchThread {
 
         u64 pinned = mBoard.pinned();
         i32 bestScore = mBoard.inCheck() ? -INF + ply : eval;
+        Move bestMove = MOVE_NONE;
+        Bound bound = Bound::UPPER;
 
         // Moves loop
         for (auto [move, moveScore] = plyDataPtr->nextMove(); 
@@ -677,10 +679,20 @@ class SearchThread {
 
             bestScore = score;
 
-            if (bestScore >= beta) break; // Fail high / beta cutoff
-            
-            if (bestScore > alpha) alpha = bestScore;
+            if (bestScore > alpha) {
+                alpha = bestScore;
+                bestMove = move;
+            }
+
+             // Fail high / beta cutoff
+            if (bestScore >= beta) {
+                bound = Bound::LOWER;
+                break;
+            }
         }
+
+        // Store in TT
+        (*ttPtr)[ttEntryIdx].update(mBoard.zobristHash(), 0, ply, bestScore, bestMove, bound);
 
         return bestScore;
     }

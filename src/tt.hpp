@@ -37,7 +37,11 @@ struct TTEntry {
                     : score <= -MIN_MATE_SCORE ? score - ply 
                     : score;
 
-        if (bestMove != MOVE_NONE) this->move = bestMove.encoded();
+        // Save new best move in TT if
+        // this TT entry doesn't have one
+        // or if it has, if the new move is not a fail low
+        if (Move(this->move) == MOVE_NONE || bound != Bound::UPPER) 
+            this->move = bestMove.encoded();
     }
 
 } __attribute__((packed)); // struct TTEntry
