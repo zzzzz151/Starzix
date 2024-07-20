@@ -467,6 +467,8 @@ class SearchThread {
                 // Multicut
                 else if (singularBeta >= beta) 
                     return singularBeta;
+                else if (cutNode)
+                    newDepth -= 2;
                     
                 singularTried = true;
                 plyDataPtr->mCurrentMoveIdx = 0; // reset since the singular search used this
