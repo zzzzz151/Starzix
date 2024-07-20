@@ -300,15 +300,20 @@ class SearchThread {
         auto ttEntryIdx = TTEntryIndex(mBoard.zobristHash(), ttPtr->size());
         TTEntry ttEntry = singular ? TTEntry() : (*ttPtr)[ttEntryIdx];
         bool ttHit = mBoard.zobristHash() == ttEntry.zobristHash;
+        Move ttMove = MOVE_NONE;
 
-        // TT cutoff (not done in singular searches since ttHit is false)
-        if (ttHit 
-        && ply > 0
-        && ttEntry.depth >= depth 
-        && (ttEntry.bound() == Bound::EXACT
-        || (ttEntry.bound() == Bound::LOWER && ttEntry.score >= beta) 
-        || (ttEntry.bound() == Bound::UPPER && ttEntry.score <= alpha)))
-            return ttEntry.adjustedScore(ply);
+        if (ttHit) {
+            ttEntry.adjustScore(ply);
+            ttMove = Move(ttEntry.move);
+
+            // TT cutoff (not done in singular searches since ttHit is false)
+            if (ply > 0
+            && ttEntry.depth >= depth 
+            && (ttEntry.bound() == Bound::EXACT
+            || (ttEntry.bound() == Bound::LOWER && ttEntry.score >= beta) 
+            || (ttEntry.bound() == Bound::UPPER && ttEntry.score <= alpha)))
+                return ttEntry.score;
+        }
 
         PlyData* plyDataPtr = &mPliesData[ply];
 
@@ -353,6 +358,7 @@ class SearchThread {
             if (depth >= nmpMinDepth() 
             && mBoard.lastMove() != MOVE_NONE 
             && eval >= beta
+            //&& !(ttHit && ttEntry.bound() == Bound::UPPER && ttEntry.score < beta)
             && mBoard.hasNonPawnMaterial(mBoard.sideToMove()))
             {
                 makeMove(MOVE_NONE, plyDataPtr);
@@ -369,8 +375,6 @@ class SearchThread {
 				if (score >= beta) return score >= MIN_MATE_SCORE ? beta : score;
             }
         }
-
-        Move ttMove = ttHit ? Move(ttEntry.move) : MOVE_NONE;
 
         // IIR (Internal iterative reduction)
         if (depth >= iirMinDepth() && ttMove == MOVE_NONE && !singular && (pvNode || cutNode))
@@ -618,14 +622,17 @@ class SearchThread {
 
         // Probe TT
         auto ttEntryIdx = TTEntryIndex(mBoard.zobristHash(), ttPtr->size());
-        TTEntry &ttEntry = (*ttPtr)[ttEntryIdx];
+        TTEntry ttEntry = (*ttPtr)[ttEntryIdx];
 
         // TT cutoff
-        if (mBoard.zobristHash() == ttEntry.zobristHash
-        && (ttEntry.bound() == Bound::EXACT
-        || (ttEntry.bound() == Bound::LOWER && ttEntry.score >= beta) 
-        || (ttEntry.bound() == Bound::UPPER && ttEntry.score <= alpha)))
-            return ttEntry.adjustedScore(ply);
+        if (mBoard.zobristHash() == ttEntry.zobristHash) {
+            ttEntry.adjustScore(ply);
+
+            if (ttEntry.bound() == Bound::EXACT
+            || (ttEntry.bound() == Bound::LOWER && ttEntry.score >= beta) 
+            || (ttEntry.bound() == Bound::UPPER && ttEntry.score <= alpha))
+                return ttEntry.score;
+        }
 
         PlyData* plyDataPtr = &mPliesData[ply];
 

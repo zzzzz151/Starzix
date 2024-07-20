@@ -15,10 +15,12 @@ struct TTEntry {
     u16 move = MOVE_NONE.encoded();
     u8 boundAndAge = 0; // lowest 2 bits for bound, highest 6 bits for age
 
-    inline i16 adjustedScore(i16 ply) {
-        return score >= MIN_MATE_SCORE  ? score - ply
-             : score <= -MIN_MATE_SCORE ? score + ply
-             : score;
+    inline void adjustScore(i16 ply) 
+    {
+        if (score >= MIN_MATE_SCORE)
+            score -= ply;
+        else if (score <= -MIN_MATE_SCORE)
+            score += ply;
     }
 
     inline Bound bound() {
