@@ -91,7 +91,8 @@ constexpr u8 DOUBLE_EXTENSIONS_MAX = 10;
 TunableParam<double> lmrBase = TunableParam<double>(0.8, 0.4, 1.2, 0.1);
 TunableParam<double> lmrMultiplier = TunableParam<double>(0.4, 0.2, 0.8, 0.1);
 TunableParam<i32> lmrMinMoves = TunableParam<i32>(3, 2, 4, 1);
-TunableParam<i32> lmrHistoryDiv = TunableParam<i32>(32768, 8192, 32768, 2048);
+TunableParam<i32> lmrQuietHistoryDiv = TunableParam<i32>(32768, 8192, 32768, 2048);
+TunableParam<i32> lmrNoisyHistoryDiv = TunableParam<i32>(4096, 1024, 16384, 1024);
 
 // Deeper search in PVS with LMR
 TunableParam<i32> deeperBase = TunableParam<i32>(50, 15, 95, 20);
@@ -168,7 +169,8 @@ tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
     {stringify(lmrBase), &lmrBase},
     {stringify(lmrMultiplier), &lmrMultiplier},
     {stringify(lmrMinMoves), &lmrMinMoves},
-    {stringify(lmrHistoryDiv), &lmrHistoryDiv},
+    {stringify(lmrQuietHistoryDiv), &lmrQuietHistoryDiv},
+    {stringify(lmrNoisyHistoryDiv), &lmrNoisyHistoryDiv},
     {stringify(deeperBase), &deeperBase},
     {stringify(deeperMultiplier), &deeperMultiplier},
     {stringify(historyMax), &historyMax},

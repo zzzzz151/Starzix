@@ -68,7 +68,7 @@ struct PlyData {
                 int stm = (int)board.sideToMove();
                 int pt = (int)move.pieceType();
                 
-                mMovesScores[i] = movesHistory[stm][pt][move.to()].total(
+                mMovesScores[i] = movesHistory[stm][pt][move.to()].quietHistory(
                     mEnemyAttacks & bitboard(move.from()), 
                     mEnemyAttacks & bitboard(move.to()), 
                     { board.lastMove(), board.nthToLastMove(2) });
