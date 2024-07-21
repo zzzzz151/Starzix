@@ -397,6 +397,7 @@ class SearchThread {
         Bound bound = Bound::UPPER;
 
         ArrayVec<Move, 256> failLowQuiets;
+        ArrayVec<i16*, 256> failLowNoisiesHistory;
 
         // Moves loop
         for (auto [move, moveScore] = plyDataPtr->nextMove(); 
@@ -477,6 +478,9 @@ class SearchThread {
             u64 nodesBefore = mNodes;
             makeMove(move, plyDataPtr);
 
+            int pt = (int)move.pieceType();
+            HistoryEntry &historyEntry = mMovesHistory[stm][pt][move.to()];
+
             i32 score = 0;
 
             if (mBoard.isDraw(ply)) goto moveSearched;
@@ -493,8 +497,11 @@ class SearchThread {
                           - pvNode       // reduce pv nodes less
                           + 2 * cutNode; // reduce more if we expect to fail high
                 
-                // reduce quiets with good history less and vice versa
-                if (isQuiet) lmr -= round((float)moveScore / (float)lmrHistoryDiv());
+                // reduce moves with good history less and vice versa
+                lmr -= round(
+                    isQuiet ? moveScore / (float)lmrQuietHistoryDiv()
+                            : historyEntry.noisyHistory(captured) / (float)lmrNoisyHistoryDiv()
+                );
 
                 if (lmr < 0) lmr = 0; // dont extend
 
@@ -529,7 +536,10 @@ class SearchThread {
 
             // Fail low?
             if (score <= alpha) {
-                if (isQuiet) failLowQuiets.push_back(move);
+                if (isQuiet) 
+                    failLowQuiets.push_back(move);
+                else
+                    failLowNoisiesHistory.push_back(historyEntry.noisyHistoryPtr(captured));
                 
                 continue;
             }
@@ -547,7 +557,18 @@ class SearchThread {
 
             bound = Bound::LOWER;
 
-            if (!isQuiet) break;
+            i32 bonus =  std::clamp(depth * historyBonusMultiplier() - historyBonusOffset(), 0, historyBonusMax());
+            i32 malus = -std::clamp(depth * historyMalusMultiplier() - historyMalusOffset(), 0, historyMalusMax());
+
+            // History malus: decrease history of fail low noisy moves
+            for (i16* noisyHistoryPtr : failLowNoisiesHistory)
+                updateHistory(noisyHistoryPtr, malus);
+
+            if (!isQuiet) {
+                // History bonus: increase this move's history
+                updateHistory(historyEntry.noisyHistoryPtr(captured), bonus);
+                break;
+            }
 
             // This move is a fail high quiet
 
@@ -555,14 +576,10 @@ class SearchThread {
             
             if (mBoard.lastMove() != MOVE_NONE) countermove = move;
 
-            int pt = (int)move.pieceType();
             std::array<Move, 3> moves = { mBoard.lastMove(), mBoard.nthToLastMove(2), mBoard.nthToLastMove(4) };
-
-            i32 bonus =  std::clamp(depth * historyBonusMultiplier() - historyBonusOffset(), 0, historyBonusMax());
-            i32 malus = -std::clamp(depth * historyMalusMultiplier() - historyMalusOffset(), 0, historyMalusMax());
             
             // History bonus: increase this move's history
-            mMovesHistory[stm][pt][move.to()].update(
+            historyEntry.updateQuietHistories(
                 plyDataPtr->mEnemyAttacks & bitboard(move.from()), 
                 plyDataPtr->mEnemyAttacks & bitboard(move.to()), 
                 moves,
@@ -572,7 +589,7 @@ class SearchThread {
             for (Move failLow : failLowQuiets) {
                 pt = (int)failLow.pieceType();
 
-                mMovesHistory[stm][pt][failLow.to()].update(
+                mMovesHistory[stm][pt][failLow.to()].updateQuietHistories(
                     plyDataPtr->mEnemyAttacks & bitboard(failLow.from()), 
                     plyDataPtr->mEnemyAttacks & bitboard(failLow.to()),  
                     moves,
