@@ -116,7 +116,6 @@ inline void uci() {
     std::cout << "option name Hash type spin default 32 min 1 max 65536" << std::endl;
     std::cout << "option name Threads type spin default 1 min 1 max 256" << std::endl;
 
-    /*
     for (auto &pair : tunableParams) {
         std::string paramName = pair.first;
         auto &tunableParam = pair.second;
@@ -134,7 +133,6 @@ inline void uci() {
             
         }, tunableParam);
     }
-    */
 
     std::cout << "uciok" << std::endl;
 }
@@ -176,7 +174,8 @@ inline void setoption(std::vector<std::string> &tokens, std::vector<TTEntry> &tt
 
             myParam->value = std::stod(optionValue);
 
-            if (optionName == stringify(lmrBase) || optionName == stringify(lmrMultiplier))
+            if (optionName == stringify(lmrBaseQuiet) || optionName == stringify(lmrMultiplierQuiet)
+            || optionName == stringify(lmrBaseNoisy) || optionName == stringify(lmrMultiplierNoisy))
                 initLmrTable();
             else if (optionName == stringify(seePawnValue)
             || optionName == stringify(seeMinorValue)

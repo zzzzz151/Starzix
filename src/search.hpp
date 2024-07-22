@@ -16,15 +16,21 @@ constexpr i32 INF = 32000,
 
 inline u64 totalNodes();
 
-MultiArray<i32, MAX_DEPTH+1, 256> LMR_TABLE = {}; // [depth][moveIndex]
+MultiArray<i32, 2, MAX_DEPTH+1, 256> LMR_TABLE = {}; // [isQuietMove][depth][moveIndex]
 
 constexpr void initLmrTable()
 {
     LMR_TABLE = {};
 
-    for (u64 depth = 1; depth < LMR_TABLE.size(); depth++)
-        for (u64 move = 1; move < LMR_TABLE[0].size(); move++)
-            LMR_TABLE[depth][move] = round(lmrBase() + ln(depth) * ln(move) * lmrMultiplier());
+    for (u64 depth = 1; depth < MAX_DEPTH+1; depth++)
+        for (u64 move = 1; move < 256; move++)
+        {
+            LMR_TABLE[0][depth][move] 
+                = round(lmrBaseNoisy() + ln(depth) * ln(move) * lmrMultiplierNoisy());
+
+            LMR_TABLE[1][depth][move] 
+                = round(lmrBaseQuiet() + ln(depth) * ln(move) * lmrMultiplierQuiet());
+        }
 }
 
 class SearchThread;
@@ -420,7 +426,7 @@ class SearchThread {
                                       + depth * depth * lmpMultiplier())
                     break;
 
-                i32 lmrDepth = std::max(0, depth - LMR_TABLE[depth][legalMovesSeen] + improving);
+                i32 lmrDepth = std::max(0, depth - LMR_TABLE[isQuiet][depth][legalMovesSeen] + improving);
 
                 // FP (Futility pruning)
                 if (lmrDepth <= fpMaxDepth() 
@@ -493,7 +499,7 @@ class SearchThread {
             // LMR (Late move reductions)
             if (depth >= 2 && !mBoard.inCheck() && legalMovesSeen >= lmrMinMoves() && moveScore < COUNTERMOVE_SCORE)
             {
-                i32 lmr = LMR_TABLE[depth][legalMovesSeen]
+                i32 lmr = LMR_TABLE[isQuiet][depth][legalMovesSeen]
                           - pvNode       // reduce pv nodes less
                           + 2 * cutNode; // reduce more if we expect to fail high
                 

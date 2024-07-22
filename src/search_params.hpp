@@ -33,7 +33,7 @@ constexpr i32 GOOD_QUEEN_PROMO_SCORE = 1'600'000'000,
 
 // Time management
 TunableParam<double> hardTimePercentage = TunableParam<double>(0.5, 0.25, 0.75, 0.1);
-TunableParam<double> softTimePercentage = TunableParam<double>(0.05, 0.01, 0.11, 0.02);
+TunableParam<double> softTimePercentage = TunableParam<double>(0.05, 0.01, 0.15, 0.02);
 
 // Eval scale with material / game phase
 TunableParam<float> evalMaterialScaleMin = TunableParam<float>(0.8, 0.5, 1.0, 0.1);
@@ -59,8 +59,6 @@ TunableParam<i32> razoringMultiplier = TunableParam<i32>(350, 250, 450, 50);
 TunableParam<i32> nmpMinDepth = TunableParam<i32>(3, 2, 4, 1);
 TunableParam<i32> nmpBaseReduction = TunableParam<i32>(3, 2, 4, 1);
 TunableParam<float> nmpReductionDivisor = TunableParam<float>(3.0, 2.0, 4.0, 0.5);
-TunableParam<i32> nmpEvalBetaDivisor = TunableParam<i32>(200, 100, 300, 50);
-TunableParam<i32> nmpEvalBetaMax = TunableParam<i32>(3, 1, 5, 2);
 
 // IIR (Internal iterative reduction)
 TunableParam<i32> iirMinDepth = TunableParam<i32>(4, 4, 6, 1);
@@ -76,10 +74,8 @@ TunableParam<i32> fpMultiplier = TunableParam<i32>(160, 40, 260, 20);
 
 // SEE pruning
 TunableParam<i32> seePruningMaxDepth = TunableParam<i32>(8, 7, 11, 1);
-TunableParam<i32> seeQuietThreshold = TunableParam<i32>(-60, -101, -1, 20);
-TunableParam<i32> seeQuietHistoryDiv = TunableParam<i32>(256, 25, 525, 50);
+TunableParam<i32> seeQuietThreshold = TunableParam<i32>(-60, -161, -1, 20);
 TunableParam<i32> seeNoisyThreshold = TunableParam<i32>(-110, -161, -1, 20);
-TunableParam<i32> seeNoisyHistoryDiv = TunableParam<i32>(128, 25, 525, 50);
 
 // SE (Singular extensions)
 TunableParam<i32> singularMinDepth = TunableParam<i32>(7, 6, 10, 1);
@@ -88,14 +84,16 @@ TunableParam<i32> doubleExtensionMargin = TunableParam<i32>(20, 2, 42, 10);
 constexpr u8 DOUBLE_EXTENSIONS_MAX = 10;
 
 // LMR (Late move reductions)
-TunableParam<double> lmrBase = TunableParam<double>(0.8, 0.4, 1.2, 0.1);
-TunableParam<double> lmrMultiplier = TunableParam<double>(0.4, 0.2, 0.8, 0.1);
+TunableParam<double> lmrBaseQuiet = TunableParam<double>(0.8, 0.4, 1.2, 0.1);
+TunableParam<double> lmrMultiplierQuiet = TunableParam<double>(0.4, 0.2, 0.8, 0.1);
+TunableParam<double> lmrBaseNoisy = TunableParam<double>(0.8, 0.4, 1.2, 0.1);
+TunableParam<double> lmrMultiplierNoisy = TunableParam<double>(0.4, 0.2, 0.8, 0.1);
 TunableParam<i32> lmrMinMoves = TunableParam<i32>(3, 2, 4, 1);
 TunableParam<i32> lmrQuietHistoryDiv = TunableParam<i32>(32768, 8192, 32768, 2048);
 TunableParam<i32> lmrNoisyHistoryDiv = TunableParam<i32>(4096, 1024, 16384, 1024);
 
 // Deeper search in PVS with LMR
-TunableParam<i32> deeperBase = TunableParam<i32>(50, 15, 95, 20);
+TunableParam<i32> deeperBase = TunableParam<i32>(50, 15, 90, 15);
 TunableParam<i32> deeperMultiplier = TunableParam<i32>(2, 1, 3, 1);
 
 // History max
@@ -112,17 +110,17 @@ TunableParam<i32> historyMalusOffset = TunableParam<i32>(50, 0, 500, 100);
 TunableParam<i32> historyMalusMax = TunableParam<i32>(1500, 500, 2500, 200);
 
 // History weights
-TunableParam<float> mainHistoryWeight = TunableParam<float>(1.0, 0.25, 4.0, 0.25);
-TunableParam<float> contHist1PlyWeight = TunableParam<float>(1.0, 0.25, 4.0, 0.25);
-TunableParam<float> contHist2PlyWeight = TunableParam<float>(1.0, 0.25, 4.0, 0.25);
-TunableParam<float> contHist4PlyWeight = TunableParam<float>(0.5, 0.25, 4.0, 0.25);
+TunableParam<float> mainHistoryWeight = TunableParam<float>(1.0, 0.2, 4.0, 0.2);
+TunableParam<float> contHist1PlyWeight = TunableParam<float>(1.0, 0.2, 4.0, 0.2);
+TunableParam<float> contHist2PlyWeight = TunableParam<float>(1.0, 0.2, 4.0, 0.2);
+TunableParam<float> contHist4PlyWeight = TunableParam<float>(0.5, 0.2, 4.0, 0.2);
 
 // Correction history
 TunableParam<i32> corrHistScale = TunableParam<i32>(200, 50, 550, 50);
 TunableParam<i32> corrHistMax = TunableParam<i32>(16384, 4096, 32768, 2048);
 
 // SEE piece values
-TunableParam<i32> seePawnValue = TunableParam<i32>(100, 0, 200, 50);
+TunableParam<i32> seePawnValue = TunableParam<i32>(100, 1, 201, 50);
 TunableParam<i32> seeMinorValue = TunableParam<i32>(300, 150, 450, 50);
 TunableParam<i32> seeRookValue = TunableParam<i32>(500, 300, 700, 50);
 TunableParam<i32> seeQueenValue = TunableParam<i32>(900 , 600, 1200, 100);
@@ -150,8 +148,6 @@ tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
     {stringify(nmpMinDepth), &nmpMinDepth},
     {stringify(nmpBaseReduction), &nmpBaseReduction},
     {stringify(nmpReductionDivisor), &nmpReductionDivisor},
-    {stringify(nmpEvalBetaDivisor), &nmpEvalBetaDivisor},
-    {stringify(nmpEvalBetaMax), &nmpEvalBetaMax},
     {stringify(iirMinDepth), &iirMinDepth},
     {stringify(lmpMinMoves), &lmpMinMoves},
     {stringify(lmpMultiplier), &lmpMultiplier},
@@ -160,14 +156,14 @@ tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
     {stringify(fpMultiplier), &fpMultiplier},
     {stringify(seePruningMaxDepth), &seePruningMaxDepth},
     {stringify(seeQuietThreshold), &seeQuietThreshold},
-    {stringify(seeQuietHistoryDiv), &seeQuietHistoryDiv},
     {stringify(seeNoisyThreshold), &seeNoisyThreshold},
-    {stringify(seeNoisyHistoryDiv), &seeNoisyHistoryDiv},
     {stringify(singularMinDepth), &singularMinDepth},
     {stringify(singularDepthMargin), &singularDepthMargin},
     {stringify(doubleExtensionMargin), &doubleExtensionMargin},
-    {stringify(lmrBase), &lmrBase},
-    {stringify(lmrMultiplier), &lmrMultiplier},
+    {stringify(lmrBaseQuiet), &lmrBaseQuiet},
+    {stringify(lmrMultiplierQuiet), &lmrMultiplierQuiet},
+    {stringify(lmrBaseNoisy), &lmrBaseNoisy},
+    {stringify(lmrMultiplierNoisy), &lmrMultiplierNoisy},
     {stringify(lmrMinMoves), &lmrMinMoves},
     {stringify(lmrQuietHistoryDiv), &lmrQuietHistoryDiv},
     {stringify(lmrNoisyHistoryDiv), &lmrNoisyHistoryDiv},
