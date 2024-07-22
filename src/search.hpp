@@ -420,7 +420,7 @@ class SearchThread {
                                       + depth * depth * lmpMultiplier())
                     break;
 
-                i32 lmrDepth = std::max(0, depth - LMR_TABLE[depth][legalMovesSeen]);
+                i32 lmrDepth = std::max(0, depth - LMR_TABLE[depth][legalMovesSeen] + improving);
 
                 // FP (Futility pruning)
                 if (lmrDepth <= fpMaxDepth() 
