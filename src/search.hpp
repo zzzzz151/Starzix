@@ -405,6 +405,9 @@ class SearchThread {
         ArrayVec<Move, 256> failLowQuiets;
         ArrayVec<i16*, 256> failLowNoisiesHistory;
 
+        bool lmrImproving = ply > 1 && !mBoard.inCheck() && !mBoard.inCheck2PliesAgo() 
+                            && eval > (plyDataPtr - 2)->mEval;
+
         // Moves loop
         for (auto [move, moveScore] = plyDataPtr->nextMove(); 
              move != MOVE_NONE; 
@@ -501,6 +504,7 @@ class SearchThread {
             {
                 i32 lmr = LMR_TABLE[isQuiet][depth][legalMovesSeen]
                           - pvNode       // reduce pv nodes less
+                          - lmrImproving // reduce less if were improving
                           + 2 * cutNode; // reduce more if we expect to fail high
                 
                 // reduce moves with good history less and vice versa
