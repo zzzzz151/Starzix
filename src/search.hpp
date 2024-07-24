@@ -204,9 +204,7 @@ class SearchThread {
         mBoard.makeMove(move);
         mNodes++;
 
-        (plyDataPtr + 1)->mMovesGenerated = MoveGenType::NONE;
-        (plyDataPtr + 1)->mPvLine.clear();
-        (plyDataPtr + 1)->mEval = EVAL_NONE;
+        (plyDataPtr + 1)->softReset();
         
         if (move != MOVE_NONE) {
             mAccumulatorPtr++;
@@ -412,9 +410,9 @@ class SearchThread {
                             && eval > (plyDataPtr - 2)->mEval;
 
         // Moves loop
-        for (auto [move, moveScore] = plyDataPtr->nextMove(); 
+        for (auto [move, moveScore] = plyDataPtr->nextMove(plyDataPtr->mAllMoves); 
              move != MOVE_NONE; 
-             std::tie(move, moveScore) = plyDataPtr->nextMove())
+             std::tie(move, moveScore) = plyDataPtr->nextMove(plyDataPtr->mAllMoves))
         {
             // skip illegal moves
             if (!mBoard.isPseudolegalLegal(move, pinned)) continue;
@@ -680,7 +678,7 @@ class SearchThread {
         }
 
         // generate and score noisy moves except underpromotions
-        plyDataPtr->genAndScoreMovesQSearch(mBoard);
+        plyDataPtr->genAndScoreNoisyMoves(mBoard);
 
         u64 pinned = mBoard.pinned();
         i32 bestScore = mBoard.inCheck() ? -INF + ply : eval;
@@ -688,9 +686,9 @@ class SearchThread {
         Bound bound = Bound::UPPER;
 
         // Moves loop
-        for (auto [move, moveScore] = plyDataPtr->nextMove(); 
+        for (auto [move, moveScore] = plyDataPtr->nextMove(plyDataPtr->mNoisyMoves); 
              move != MOVE_NONE; 
-             std::tie(move, moveScore) = plyDataPtr->nextMove())
+             std::tie(move, moveScore) = plyDataPtr->nextMove(plyDataPtr->mNoisyMoves))
         {
             // SEE pruning (skip bad noisy moves)
             if (!SEE(mBoard, move)) continue;
