@@ -2,15 +2,17 @@
 
 #pragma once
 
-enum class MoveGenType : i8 {
-    NONE = -1, ALL = 0, NOISIES_ONLY = 1
-};
-
 struct PlyData {
     public:
 
-    MoveGenType mMovesGenerated = MoveGenType::NONE;
-    ArrayVec<Move, 256> mMoves;
+    // For main search
+    ArrayVec<Move, 256> mAllMoves;
+    bool mAllMovesGenerated = false;
+
+    // For qsearch
+    ArrayVec<Move, 256> mNoisyMoves; 
+    bool mNoisyMovesGenerated = false;
+
     std::array<i32, 256> mMovesScores;
     int mCurrentMoveIdx = -1;
 
@@ -19,22 +21,30 @@ struct PlyData {
     Move mKiller = MOVE_NONE;
     u64 mEnemyAttacks = 0;
 
+    // Soft reset when we make a move in search
+    inline void softReset() {
+        mAllMovesGenerated = mNoisyMovesGenerated = false;
+        mPvLine.clear();
+        mEval = EVAL_NONE;
+    }
+
+    // For main search
     inline void genAndScoreMoves(Board &board, Move ttMove, Move countermove,
         MultiArray<HistoryEntry, 2, 6, 64> &movesHistory) 
     {
         assert(!(board.lastMove() == MOVE_NONE && countermove != MOVE_NONE));
 
         // Generate all moves (except underpromotions) and enemy attacks, if not already generated
-        if (mMovesGenerated != MoveGenType::ALL) {
-            board.pseudolegalMoves(mMoves, false, false);
-            mMovesGenerated = MoveGenType::ALL;
+        if (!mAllMovesGenerated) {
+            board.pseudolegalMoves(mAllMoves, false, false);
+            mAllMovesGenerated = true;
             mEnemyAttacks = board.attacks(board.oppSide());
         }
 
         // Score moves
-        for (size_t i = 0; i < mMoves.size(); i++)
+        for (size_t i = 0; i < mAllMoves.size(); i++)
         {
-            Move move = mMoves[i];
+            Move move = mAllMoves[i];
 
             if (move == ttMove) {
                 mMovesScores[i] = I32_MAX;
@@ -75,21 +85,23 @@ struct PlyData {
             }
         }
 
-        mCurrentMoveIdx = -1; // prepare for moves loop
+        // prepare for nextMove() usage in moves loop
+        mCurrentMoveIdx = -1; 
     }
 
-    inline void genAndScoreMovesQSearch(Board &board) 
+    // For qsearch
+    inline void genAndScoreNoisyMoves(Board &board) 
     {
         // Generate noisy moves (except underpromotions) if not already generated
-        if (mMovesGenerated != MoveGenType::NOISIES_ONLY) {
-            board.pseudolegalMoves(mMoves, true, false);
-            mMovesGenerated = MoveGenType::NOISIES_ONLY;
+        if (!mNoisyMovesGenerated) {
+            board.pseudolegalMoves(mNoisyMoves, true, false);
+            mNoisyMovesGenerated = true;
         }
 
         // Score moves
-        for (size_t i = 0; i < mMoves.size(); i++) 
+        for (size_t i = 0; i < mNoisyMoves.size(); i++) 
         {
-            Move move = mMoves[i];
+            Move move = mNoisyMoves[i];
             PieceType captured = board.captured(move);
             PieceType promotion = move.promotion();
 
@@ -106,25 +118,26 @@ struct PlyData {
                 mMovesScores[i] += 1'000'000;
         }
 
-        mCurrentMoveIdx = -1; // prepare for moves loop
+        // prepare for nextMove() usage in moves loop
+        mCurrentMoveIdx = -1;
     }
 
-    inline std::pair<Move, i32> nextMove()
+    inline std::pair<Move, i32> nextMove(ArrayVec<Move, 256> &moves)
     {
         mCurrentMoveIdx++;
 
-        if (mCurrentMoveIdx >= (int)mMoves.size())
+        if (mCurrentMoveIdx >= (int)moves.size())
             return { MOVE_NONE, 0 };
 
         // Incremental sort
-        for (size_t j = mCurrentMoveIdx + 1; j < mMoves.size(); j++)
+        for (size_t j = mCurrentMoveIdx + 1; j < moves.size(); j++)
             if (mMovesScores[j] > mMovesScores[mCurrentMoveIdx])
             {
-                mMoves.swap(mCurrentMoveIdx, j);
+                moves.swap(mCurrentMoveIdx, j);
                 std::swap(mMovesScores[mCurrentMoveIdx], mMovesScores[j]);
             }
 
-        return { mMoves[mCurrentMoveIdx], mMovesScores[mCurrentMoveIdx] };
+        return { moves[mCurrentMoveIdx], mMovesScores[mCurrentMoveIdx] };
     }
 
     inline void updatePV(Move move) 
