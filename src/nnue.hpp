@@ -103,6 +103,8 @@ struct alignas(ALIGNMENT) Accumulator
     {
         assert(oldAcc->mUpdated && !mUpdated);
 
+        mMirrorHorizontally = oldAcc->mMirrorHorizontally;
+
         Move move = board.lastMove();
         assert(move != MOVE_NONE);
 
