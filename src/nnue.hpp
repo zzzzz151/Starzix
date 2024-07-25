@@ -31,95 +31,154 @@ struct alignas(ALIGNMENT) Net {
 };
 
 INCBIN(NetFile, "src/net.bin");
-const Net* NET = (const Net*)(gNetFileData);
+const Net* NET = (const Net*)gNetFileData;
 
 struct alignas(ALIGNMENT) Accumulator
 {
     public:
-    MultiArray<i16, 2, HIDDEN_LAYER_SIZE> mAccumulators = NET->hiddenBiases;
+
+    MultiArray<i16, 2, HIDDEN_LAYER_SIZE> mAccumulators;
     bool mUpdated = false;
+
+    // HM (Horizontal mirroring)
+    // If a king is on right side of board,
+    // mirror all pieces horizontally (along vertical axis) 
+    // in that color's accumulator
+    std::array<bool, 2> mMirrorHorizontally = {false, false}; // [color]
 
     inline Accumulator() = default;
 
-    inline Accumulator(const Board &board) {
-        mAccumulators = NET->hiddenBiases;
+    inline Accumulator(Board &board) 
+    {
+        for (Color color : {Color::WHITE, Color::BLACK}) 
+        {
+            File kingFile = squareFile(board.kingSquare(color));
+            mMirrorHorizontally[(int)color] = (int)kingFile >= (int)File::E;
+        }
 
-        for (Color color : {Color::WHITE, Color::BLACK})
-            for (int pt = PAWN; pt <= KING; pt++)
-                {
-                    u64 bb = board.getBb(color, (PieceType)pt);
-                    activateAll(bb, (color == Color::BLACK) * 384 + pt * 64);
-                }
+        resetAccumulator(Color::WHITE, board);
+        resetAccumulator(Color::BLACK, board);
 
         mUpdated = true;
     }
 
-    inline void activateAll(u64 bb, int feature) {
-        while (bb > 0) {
-            int square = poplsb(bb);
+    inline void resetAccumulator(const Color color, Board &board) 
+    {
+        mAccumulators[(int)color] = NET->hiddenBiases[(int)color];
 
-            for (int color : {WHITE, BLACK})
-                for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
-                    mAccumulators[color][i] += NET->featuresWeights[color][feature + square][i];
-        }
+        for (Color pieceColor : {Color::WHITE, Color::BLACK})
+            for (int pt = PAWN; pt <= KING; pt++)
+            {
+                u64 bb = board.getBb(pieceColor, (PieceType)pt);
+
+                while (bb > 0) {
+                    int square = poplsb(bb);
+
+                    const int ft = feature(color, pieceColor, (PieceType)pt, square);
+
+                    for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
+                        mAccumulators[(int)color][i] += NET->featuresWeights[(int)color][ft][i];
+                }
+            }
+    }
+
+    inline int feature(Color color, Color pieceColor, PieceType pt, Square sq) const
+    {
+        if (mMirrorHorizontally[(int)color])
+            sq ^= 7;
+
+        return (int)pieceColor * 384 + (int)pt * 64 + (int)sq;
+    }
+
+    // [color]
+    inline std::array<int, 2> features(Color pieceColor, PieceType pt, Square sq) const
+    {
+        return {
+            feature(Color::WHITE, pieceColor, pt, sq),
+            feature(Color::BLACK, pieceColor, pt, sq)
+        };
     }
 
     inline void update(Accumulator* oldAcc, Board &board)
     {
         assert(oldAcc->mUpdated && !mUpdated);
 
+        mMirrorHorizontally = oldAcc->mMirrorHorizontally;
+
         Move move = board.lastMove();
         assert(move != MOVE_NONE);
 
-        const auto moveFlag = move.flag();
+        const Color stm = board.oppSide(); // side that moved
         const int from = move.from();
         const int to = move.to();
         const PieceType pieceType = move.pieceType();
         const PieceType promotion = move.promotion();
         const PieceType place = promotion != PieceType::NONE ? promotion : pieceType;
 
-        const int stm = (int)board.oppSide(); // side that moved
+        // If a king moved, we update mMirrorHorizontally[stm]
+        if (pieceType == PieceType::KING)
+        {
+            File newKingFile = squareFile(board.kingSquare(stm));
+            mMirrorHorizontally[(int)stm] = (int)newKingFile >= (int)File::E;
 
-        const int subPieceFeature = stm * 384 + (int)pieceType * 64 + from;
-        const int addPieceFeature = stm * 384 + (int)place * 64 + to;
+            // If the king crossed the vertical axis, we reset his color's accumulator
+            if (mMirrorHorizontally[(int)stm] != oldAcc->mMirrorHorizontally[(int)stm])
+                resetAccumulator(stm, board);
+        }
+
+        // [color]
+        const std::array<int, 2> subPieceFeature = features(stm, pieceType, from);
+        const std::array<int, 2> addPieceFeature = features(stm, place, to);
+        std::array<int, 2> subCapturedFeature;
 
         if (board.captured() != PieceType::NONE)
         {
-            const int capturedPieceSq = moveFlag == Move::EN_PASSANT_FLAG 
-                                        ? (to > from ? to - 8 : to + 8)
-                                        : to;
+            int capturedPieceSq = move.flag() == Move::EN_PASSANT_FLAG 
+                                  ? (to > from ? to - 8 : to + 8)
+                                  : to;
 
-            const int subCapturedFeature = !stm * 384 + (int)board.captured() * 64 + capturedPieceSq;
-
-            for (int color : {WHITE, BLACK})
-                for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
-                    mAccumulators[color][i] = oldAcc->mAccumulators[color][i]
-                        - NET->featuresWeights[color][subPieceFeature][i]  
-                        + NET->featuresWeights[color][addPieceFeature][i]
-                        - NET->featuresWeights[color][subCapturedFeature][i];
-
+            subCapturedFeature = features(oppColor(stm), board.captured(), capturedPieceSq);
         }
-        else if (moveFlag == Move::CASTLING_FLAG)
+
+        for (int color : {WHITE, BLACK})
         {
-            auto [rookFrom, rookTo] = CASTLING_ROOK_FROM_TO[to];
-            const int subRookFeature = stm * 384 + ROOK * 64 + (int)rookFrom;
-            const int addRookFeature = stm * 384 + ROOK * 64 + (int)rookTo;
+            // No need to update this color's accumulator if we just resetted it
+            // due to that king crossing the vertical axis
+            if (mMirrorHorizontally[color] != oldAcc->mMirrorHorizontally[color]) 
+                continue;
 
-            for (int color : {WHITE, BLACK})
+            if (board.captured() != PieceType::NONE)
+            {
                 for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
-                    mAccumulators[color][i] = oldAcc->mAccumulators[color][i] 
-                        - NET->featuresWeights[color][subPieceFeature][i]  
-                        + NET->featuresWeights[color][addPieceFeature][i]
-                        - NET->featuresWeights[color][subRookFeature][i]  
-                        + NET->featuresWeights[color][addRookFeature][i]; 
-         
-        }
-        else {
-            for (int color : {WHITE, BLACK})
+                    mAccumulators[color][i] = 
+                        oldAcc->mAccumulators[color][i]
+                        - NET->featuresWeights[color][subPieceFeature[color]][i]  
+                        + NET->featuresWeights[color][addPieceFeature[color]][i]
+                        - NET->featuresWeights[color][subCapturedFeature[color]][i];
+            }
+            else if (move.flag() == Move::CASTLING_FLAG)
+            {
+                auto [rookFrom, rookTo] = CASTLING_ROOK_FROM_TO[to];
+
+                // [color]
+                const std::array<int, 2> subRookFeature = features(stm, PieceType::ROOK, rookFrom);
+                const std::array<int, 2> addRookFeature = features(stm, PieceType::ROOK, rookTo);
+
                 for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
-                    mAccumulators[color][i] = oldAcc->mAccumulators[color][i]
-                        - NET->featuresWeights[color][subPieceFeature][i]  
-                        + NET->featuresWeights[color][addPieceFeature][i];     
+                    mAccumulators[color][i] = 
+                        oldAcc->mAccumulators[color][i] 
+                        - NET->featuresWeights[color][subPieceFeature[color]][i]  
+                        + NET->featuresWeights[color][addPieceFeature[color]][i]
+                        - NET->featuresWeights[color][subRookFeature[color]][i]  
+                        + NET->featuresWeights[color][addRookFeature[color]][i];
+            }
+            else {
+                for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
+                    mAccumulators[color][i] = 
+                        oldAcc->mAccumulators[color][i]
+                        - NET->featuresWeights[color][subPieceFeature[color]][i]  
+                        + NET->featuresWeights[color][addPieceFeature[color]][i];
+            }
         }
 
         mUpdated = true;

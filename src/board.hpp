@@ -948,5 +948,9 @@ class Board {
         return false;
     }
 
+    inline Square kingSquare(Color color) {
+        return lsb(getBb(color, PieceType::KING));
+    }
+
 }; // class Board
 
