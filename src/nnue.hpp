@@ -84,9 +84,10 @@ struct alignas(ALIGNMENT) Accumulator
 
     inline int feature(Color color, Color pieceColor, PieceType pt, Square sq) const
     {
-        return (int)pieceColor * 384 
-               + (int)pt * 64 
-               + int(mMirrorHorizontally[(int)color] ? sq ^ 7 : sq);
+        if (mMirrorHorizontally[(int)color])
+            sq ^= 7;
+
+        return (int)pieceColor * 384 + (int)pt * 64 + (int)sq;
     }
 
     // [color]
