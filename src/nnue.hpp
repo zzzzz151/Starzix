@@ -31,7 +31,7 @@ struct alignas(ALIGNMENT) Net {
 };
 
 INCBIN(NetFile, "src/net.bin");
-const Net* NET = (const Net*)(gNetFileData);
+const Net* NET = (const Net*)gNetFileData;
 
 struct alignas(ALIGNMENT) Accumulator
 {
