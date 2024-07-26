@@ -156,8 +156,7 @@ class Board {
         mState->pliesSincePawnOrCapture = fenSplit.size() >= 5 ? stoi(fenSplit[4]) : 0;
         mState->currentMoveCounter = fenSplit.size() >= 6 ? stoi(fenSplit[5]) : 1;
 
-        Square kingSquare = lsb(getBb(sideToMove(), PieceType::KING));
-        mState->checkers = attackers(kingSquare) & them();
+        mState->checkers = attackers(kingSquare()) & them();
     }
 
     inline Color sideToMove() { return mState->colorToMove; }
@@ -228,6 +227,14 @@ class Board {
                 return (PieceType)pt;
 
         return PieceType::NONE;
+    }
+
+    inline Square kingSquare(Color color) {
+        return lsb(getBb(color, PieceType::KING));
+    }
+    
+    inline Square kingSquare() {
+        return kingSquare(sideToMove());
     }
 
     private:
@@ -501,15 +508,14 @@ class Board {
             attacksBb |= attacks::rookAttacks(sq, occupancy());
         }
 
-        Square kingSquare = lsb(getBb(color, PieceType::KING));
-        attacksBb |= attacks::kingAttacks(kingSquare);
+        attacksBb |= attacks::kingAttacks(kingSquare(color));
 
         assert(attacksBb > 0);
         return attacksBb;
     } 
 
     inline u64 pinned() { 
-        Square kingSquare = lsb(getBb(sideToMove(), PieceType::KING));
+        Square kingSquare = this->kingSquare();
         u64 theirBishopsQueens = them() & (getBb(PieceType::BISHOP) | getBb(PieceType::QUEEN));
         u64 theirRooksQueens   = them() & (getBb(PieceType::ROOK)   | getBb(PieceType::QUEEN));
 
@@ -671,8 +677,7 @@ class Board {
         if (sideToMove() == Color::WHITE)
             mState->currentMoveCounter++;
 
-        Square kingSquare = lsb(getBb(sideToMove(), PieceType::KING));
-        mState->checkers = attackers(kingSquare) & them();
+        mState->checkers = attackers(kingSquare()) & them();
     }
 
     inline void undoMove()
@@ -789,7 +794,7 @@ class Board {
             }
         }
 
-        Square kingSquare = lsb(getBb(sideToMove(), PieceType::KING));
+        Square kingSquare = this->kingSquare();
         u64 kingMoves = attacks::kingAttacks(kingSquare) & mask;
 
         while (kingMoves > 0) {
@@ -839,7 +844,7 @@ class Board {
                    // Long castle
                    : !isSquareAttacked(from - 1, oppSide) && !isSquareAttacked(from - 2, oppSide);
 
-        Square kingSquare = lsb(getBb(sideToMove(), PieceType::KING));
+        Square kingSquare = this->kingSquare();
 
         if (moveFlag == Move::EN_PASSANT_FLAG) 
         {
@@ -946,10 +951,6 @@ class Board {
         }
 
         return false;
-    }
-
-    inline Square kingSquare(Color color) {
-        return lsb(getBb(color, PieceType::KING));
     }
 
 }; // class Board
