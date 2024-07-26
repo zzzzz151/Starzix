@@ -41,6 +41,8 @@ struct PlyData {
             mEnemyAttacks = board.attacks(board.oppSide());
         }
 
+        std::array<Move, 3> lastMoves = { board.lastMove(), board.nthToLastMove(2), board.nthToLastMove(4) };
+
         // Score moves
         for (size_t i = 0; i < mAllMoves.size(); i++)
         {
@@ -81,7 +83,7 @@ struct PlyData {
                 mMovesScores[i] = movesHistory[stm][pt][move.to()].quietHistory(
                     mEnemyAttacks & bitboard(move.from()), 
                     mEnemyAttacks & bitboard(move.to()), 
-                    { board.lastMove(), board.nthToLastMove(2) });
+                    lastMoves);
             }
         }
 
