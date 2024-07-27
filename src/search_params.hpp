@@ -113,7 +113,7 @@ TunableParam<i32> historyMalusMax = TunableParam<i32>(1489, 500, 2500, 200);
 TunableParam<float> mainHistoryWeight = TunableParam<float>(0.857, 0.2, 4.0, 0.2);
 TunableParam<float> contHist1PlyWeight = TunableParam<float>(0.84, 0.2, 4.0, 0.2);
 TunableParam<float> contHist2PlyWeight = TunableParam<float>(1.12, 0.2, 4.0, 0.2);
-TunableParam<float> contHist4PlyWeight = TunableParam<float>(0.515, 0.2, 4.0, 0.2);
+TunableParam<float> contHist4PlyWeight = TunableParam<float>(0.45, 0.2, 4.0, 0.2);
 
 // Correction history
 TunableParam<i32> corrHistScale = TunableParam<i32>(244, 50, 550, 50);
