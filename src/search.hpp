@@ -733,7 +733,7 @@ class SearchThread {
             if (!mBoard.hasLegalMove()) return 0;
         }
 
-        // Store in TT (mate scores can't be trusted in qsearch)
+        // Store in TT
         (*ttPtr)[ttEntryIdx].update(mBoard.zobristHash(), 0, ply, bestScore, bestMove, bound);
 
         return bestScore;
