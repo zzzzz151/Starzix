@@ -658,10 +658,9 @@ class SearchThread {
         // Probe TT
         auto ttEntryIdx = TTEntryIndex(mBoard.zobristHash(), ttPtr->size());
         TTEntry ttEntry = (*ttPtr)[ttEntryIdx];
-        bool ttHit = mBoard.zobristHash() == ttEntry.zobristHash;
 
         // TT cutoff
-        if (ttHit) {
+        if (mBoard.zobristHash() == ttEntry.zobristHash) {
             ttEntry.adjustScore(ply);
 
             if (ttEntry.bound() == Bound::EXACT
