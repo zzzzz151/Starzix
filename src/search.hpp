@@ -683,7 +683,6 @@ class SearchThread {
             plyDataPtr->genAndScoreMoves(mBoard, ttMove, countermove, mMovesHistory);
         }
 
-        int legalMovesSeen = 0;
         i32 bestScore = mBoard.inCheck() ? -INF : eval;
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::UPPER;
@@ -693,8 +692,6 @@ class SearchThread {
              move != MOVE_NONE; 
              std::tie(move, moveScore) = plyDataPtr->nextMove(mBoard))
         {
-            legalMovesSeen++;
-
             // SEE pruning (skip bad noisy moves)
             if (!mBoard.inCheck() && !SEE(mBoard, move)) 
                 continue;
@@ -724,14 +721,9 @@ class SearchThread {
             }
         }
 
-        if (legalMovesSeen == 0) 
-        {
-            // checkmate
-            if (mBoard.inCheck()) return -INF + ply;
-
-            // stalemate
-            if (!mBoard.hasLegalMove()) return 0;
-        }
+        // Checkmate?
+        if (mBoard.inCheck() && bestScore == -INF)
+            return -INF + ply;
 
         // Store in TT
         (*ttPtr)[ttEntryIdx].update(mBoard.zobristHash(), 0, ply, bestScore, bestMove, bound);
