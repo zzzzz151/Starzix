@@ -29,6 +29,8 @@ struct TTEntry {
 
     inline void update(u64 zobristHash, u8 depth, i16 ply, i16 score, Move bestMove, Bound bound)
     {
+        assert(abs(score) < INF);
+
         this->zobristHash = zobristHash;
         this->depth = depth;
         this->boundAndAge = (this->boundAndAge & 0b1111'1100) | (u8)bound; 

@@ -686,7 +686,7 @@ class SearchThread {
         // generate and score noisy moves (except underpromotions)
         plyDataPtr->genAndScoreNoisyMoves(mBoard);
 
-        i32 bestScore = mBoard.inCheck() ? -INF : eval;
+        i32 bestScore = eval;
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::UPPER;
 
@@ -700,10 +700,9 @@ class SearchThread {
 
             i32 score = makeMove(move, ply + 1);
 
-            // Terminal position?
-            if (score != VALUE_NONE) return score;
-
-            score = -qSearch(ply + 1, -beta, -alpha);
+            // If not terminal position, search
+            if (score == VALUE_NONE)
+                score = -qSearch(ply + 1, -beta, -alpha);
 
             mBoard.undoMove();
             mAccumulatorPtr--;

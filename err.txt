@@ -1,0 +1,1 @@
+Assertion failed: abs(score) < INF, file src\tt.hpp, line 32
