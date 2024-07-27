@@ -693,7 +693,8 @@ class SearchThread {
              std::tie(move, moveScore) = plyDataPtr->nextMove(mBoard))
         {
             // SEE pruning (skip bad noisy moves)
-            if (!mBoard.inCheck() && !SEE(mBoard, move)) 
+            // In check, skip bad quiets too
+            if (mBoard.inCheck() ? bestScore > -MIN_MATE_SCORE && moveScore < 0 : !SEE(mBoard, move))
                 continue;
 
             makeMove(move, ply + 1);
