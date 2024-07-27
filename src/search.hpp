@@ -192,7 +192,7 @@ class SearchThread {
         return sSearchStopped = (mNodes % 1024 == 0 && millisecondsElapsed() >= mHardMilliseconds);
     }
 
-    inline void makeMove(Move move, PlyData* plyDataPtr)
+    inline void makeMove(Move move, i32 newPly)
     {
         // If not a special move, we can probably correctly predict the zobrist hash after it
         // and prefetch the TT entry
@@ -204,7 +204,10 @@ class SearchThread {
         mBoard.makeMove(move);
         mNodes++;
 
-        (plyDataPtr + 1)->softReset();
+        // update seldepth
+        if (newPly > mMaxPlyReached) mMaxPlyReached = newPly;
+
+        mPliesData[newPly].softReset();
         
         if (move != MOVE_NONE) {
             mAccumulatorPtr++;
@@ -282,8 +285,6 @@ class SearchThread {
         assert(alpha < beta);
 
         if (stopSearch()) return 0;
-
-        if (ply > mMaxPlyReached) mMaxPlyReached = ply; // update seldepth
 
         // Cuckoo / detect upcoming repetition
         if (ply > 0 && alpha < 0 && mBoard.hasUpcomingRepetition(ply)) 
@@ -365,11 +366,11 @@ class SearchThread {
             && !(ttHit && ttEntry.bound() == Bound::UPPER && ttEntry.score < beta)
             && mBoard.hasNonPawnMaterial(mBoard.sideToMove()))
             {
-                makeMove(MOVE_NONE, plyDataPtr);
+                makeMove(MOVE_NONE, ply + 1);
 
                 i32 nmpDepth = depth - nmpBaseReduction() - depth / nmpReductionDivisor();
                 
-                i32 score = mBoard.isDraw(ply) ? 0 
+                i32 score = mBoard.isDraw(ply + 1) ? 0 
                             : -search(nmpDepth, ply + 1, -beta, -alpha, !cutNode, doubleExtsLeft);
 
                 mBoard.undoMove();
@@ -395,9 +396,7 @@ class SearchThread {
 
         assert(!singular || plyDataPtr->mCurrentMoveIdx == 0);
 
-        u64 pinned = mBoard.pinned();
         int legalMovesSeen = 0;
-
         i32 bestScore = -INF;
         Move bestMove = MOVE_NONE;
         bool isBestMoveQuiet = false;
@@ -410,13 +409,10 @@ class SearchThread {
                             && eval > (plyDataPtr - 2)->mEval;
 
         // Moves loop
-        for (auto [move, moveScore] = plyDataPtr->nextMove(plyDataPtr->mAllMoves); 
+        for (auto [move, moveScore] = plyDataPtr->nextMove(mBoard); 
              move != MOVE_NONE; 
-             std::tie(move, moveScore) = plyDataPtr->nextMove(plyDataPtr->mAllMoves))
+             std::tie(move, moveScore) = plyDataPtr->nextMove(mBoard))
         {
-            // skip illegal moves
-            if (!mBoard.isPseudolegalLegal(move, pinned)) continue;
-
             legalMovesSeen++;
 
             PieceType captured = mBoard.captured(move);
@@ -486,14 +482,15 @@ class SearchThread {
             }
 
             u64 nodesBefore = mNodes;
-            makeMove(move, plyDataPtr);
+            makeMove(move, ply + 1);
 
             int pt = (int)move.pieceType();
             HistoryEntry &historyEntry = mMovesHistory[stm][pt][move.to()];
 
             i32 score = 0;
 
-            if (mBoard.isDraw(ply)) goto moveSearched;
+            if (mBoard.isDraw(ply + 1)) 
+                goto moveSearched;
 
             // Check extension if no singular extensions
             newDepth += !singularTried && mBoard.inCheck();
@@ -648,14 +645,13 @@ class SearchThread {
 
         if (stopSearch()) return 0;
 
-        if (ply > mMaxPlyReached) mMaxPlyReached = ply; // update seldepth
-
         // Probe TT
         auto ttEntryIdx = TTEntryIndex(mBoard.zobristHash(), ttPtr->size());
         TTEntry ttEntry = (*ttPtr)[ttEntryIdx];
+        bool ttHit = mBoard.zobristHash() == ttEntry.zobristHash;
 
         // TT cutoff
-        if (mBoard.zobristHash() == ttEntry.zobristHash) {
+        if (ttHit) {
             ttEntry.adjustScore(ply);
 
             if (ttEntry.bound() == Bound::EXACT
@@ -675,30 +671,37 @@ class SearchThread {
         if (!mBoard.inCheck()) {
             if (eval >= beta) return eval; 
             if (eval > alpha) alpha = eval;
+
+            // not in check, generate and score noisy moves (except underpromotions)
+            plyDataPtr->genAndScoreNoisyMoves(mBoard);
+        }
+        else {
+            Move ttMove = ttHit ? Move(ttEntry.move) : MOVE_NONE;
+            Move countermove = mCountermoves[(int)mBoard.oppSide()][mBoard.lastMove().encoded()];
+
+            // in check, generate and score all moves (except underpromotions)
+            plyDataPtr->genAndScoreMoves(mBoard, ttMove, countermove, mMovesHistory);
         }
 
-        // generate and score noisy moves except underpromotions
-        plyDataPtr->genAndScoreNoisyMoves(mBoard);
-
-        u64 pinned = mBoard.pinned();
-        i32 bestScore = mBoard.inCheck() ? -INF + ply : eval;
+        int legalMovesSeen = 0;
+        i32 bestScore = mBoard.inCheck() ? -INF : eval;
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::UPPER;
 
         // Moves loop
-        for (auto [move, moveScore] = plyDataPtr->nextMove(plyDataPtr->mNoisyMoves); 
+        for (auto [move, moveScore] = plyDataPtr->nextMove(mBoard); 
              move != MOVE_NONE; 
-             std::tie(move, moveScore) = plyDataPtr->nextMove(plyDataPtr->mNoisyMoves))
+             std::tie(move, moveScore) = plyDataPtr->nextMove(mBoard))
         {
+            legalMovesSeen++;
+
             // SEE pruning (skip bad noisy moves)
-            if (!SEE(mBoard, move)) continue;
+            if (!mBoard.inCheck() && !SEE(mBoard, move)) 
+                continue;
 
-            // skip illegal moves
-            if (!mBoard.isPseudolegalLegal(move, pinned)) continue;
+            makeMove(move, ply + 1);
 
-            makeMove(move, plyDataPtr);
-
-            i32 score = mBoard.isDraw(ply) ? 0 : -qSearch(ply + 1, -beta, -alpha);
+            i32 score = mBoard.isDraw(ply + 1) ? 0 : -qSearch(ply + 1, -beta, -alpha);
 
             mBoard.undoMove();
             mAccumulatorPtr--;
@@ -721,7 +724,16 @@ class SearchThread {
             }
         }
 
-        // Store in TT
+        if (legalMovesSeen == 0) 
+        {
+            // checkmate
+            if (mBoard.inCheck()) return -INF + ply;
+
+            // stalemate
+            if (!mBoard.hasLegalMove()) return 0;
+        }
+
+        // Store in TT (mate scores can't be trusted in qsearch)
         (*ttPtr)[ttEntryIdx].update(mBoard.zobristHash(), 0, ply, bestScore, bestMove, bound);
 
         return bestScore;

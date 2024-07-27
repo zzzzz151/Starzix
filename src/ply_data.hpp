@@ -5,17 +5,14 @@
 struct PlyData {
     public:
 
-    // For main search
-    ArrayVec<Move, 256> mAllMoves;
-    bool mAllMovesGenerated = false;
-
-    // For qsearch
-    ArrayVec<Move, 256> mNoisyMoves; 
-    bool mNoisyMovesGenerated = false;
+    ArrayVec<Move, 256> mAllMoves, mNoisyMoves, *mCurrentMoves;
+    
+    bool mAllMovesGenerated = false, mNoisyMovesGenerated = false;
 
     std::array<i32, 256> mMovesScores;
     int mCurrentMoveIdx = -1;
 
+    u64 mPinned = 0;
     ArrayVec<Move, MAX_DEPTH+1> mPvLine = {};
     i32 mEval = EVAL_NONE;
     Move mKiller = MOVE_NONE;
@@ -33,6 +30,11 @@ struct PlyData {
         MultiArray<HistoryEntry, 2, 6, 64> &movesHistory) 
     {
         assert(!(board.lastMove() == MOVE_NONE && countermove != MOVE_NONE));
+
+        // Generate pinned pieces if not already generated
+        // Needed for Board.isPseudolegalLegal(Move move, u64 pinned)
+        if (!mAllMovesGenerated && !mNoisyMovesGenerated)
+            mPinned = board.pinned();
 
         // Generate all moves (except underpromotions) and enemy attacks, if not already generated
         if (!mAllMovesGenerated) {
@@ -88,12 +90,18 @@ struct PlyData {
         }
 
         // prepare for nextMove() usage in moves loop
+        mCurrentMoves = &mAllMoves;
         mCurrentMoveIdx = -1; 
     }
 
     // For qsearch
     inline void genAndScoreNoisyMoves(Board &board) 
     {
+        // Generate pinned pieces if not already generated
+        // Needed for Board.isPseudolegalLegal(Move move, u64 pinned)
+        if (!mAllMovesGenerated && !mNoisyMovesGenerated)
+            mPinned = board.pinned();
+
         // Generate noisy moves (except underpromotions) if not already generated
         if (!mNoisyMovesGenerated) {
             board.pseudolegalMoves(mNoisyMoves, true, false);
@@ -121,25 +129,30 @@ struct PlyData {
         }
 
         // prepare for nextMove() usage in moves loop
+        mCurrentMoves = &mNoisyMoves;
         mCurrentMoveIdx = -1;
     }
 
-    inline std::pair<Move, i32> nextMove(ArrayVec<Move, 256> &moves)
+    inline std::pair<Move, i32> nextMove(Board &board)
     {
         mCurrentMoveIdx++;
 
-        if (mCurrentMoveIdx >= (int)moves.size())
+        if (mCurrentMoveIdx >= (int)mCurrentMoves->size())
             return { MOVE_NONE, 0 };
 
         // Incremental sort
-        for (size_t j = mCurrentMoveIdx + 1; j < moves.size(); j++)
+        for (size_t j = mCurrentMoveIdx + 1; j <  mCurrentMoves->size(); j++)
             if (mMovesScores[j] > mMovesScores[mCurrentMoveIdx])
             {
-                moves.swap(mCurrentMoveIdx, j);
+                mCurrentMoves->swap(mCurrentMoveIdx, j);
                 std::swap(mMovesScores[mCurrentMoveIdx], mMovesScores[j]);
             }
 
-        return { moves[mCurrentMoveIdx], mMovesScores[mCurrentMoveIdx] };
+        Move nextBestMove = (*mCurrentMoves)[mCurrentMoveIdx];
+
+        return board.isPseudolegalLegal(nextBestMove, mPinned) 
+               ? std::make_pair(nextBestMove, mMovesScores[mCurrentMoveIdx])
+               : nextMove(board);
     }
 
     inline void updatePV(Move move) 
