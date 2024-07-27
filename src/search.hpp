@@ -219,7 +219,7 @@ class SearchThread {
 
         // Checkmate or stalemate?
         if (!mBoard.hasLegalMove())
-            return mBoard.inCheck() ? -INF + newPly : 0;
+            return mBoard.inCheck() ? INF - newPly : 0;
 
         // Not a terminal position
         return VALUE_NONE;
