@@ -682,8 +682,7 @@ class SearchThread {
             // in check, generate and score all moves (except underpromotions)
             plyDataPtr->genAndScoreMoves(mBoard, ttMove, countermove, mMovesHistory);
         }
-
-        int legalMovesSeen = 0;
+        
         i32 bestScore = mBoard.inCheck() ? -INF : eval;
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::UPPER;
@@ -693,11 +692,9 @@ class SearchThread {
              move != MOVE_NONE; 
              std::tie(move, moveScore) = plyDataPtr->nextMove(mBoard))
         {
-            legalMovesSeen++;
-
             // SEE pruning (skip bad noisy moves)
             // In check, skip bad quiets too
-            if (mBoard.inCheck() ? bestScore > -MIN_MATE_SCORE && legalMovesSeen >= 3 && moveScore < 0 : !SEE(mBoard, move))
+            if (mBoard.inCheck() ? bestScore > -MIN_MATE_SCORE && moveScore < KILLER_SCORE : !SEE(mBoard, move))
                 continue;
 
             makeMove(move, ply + 1);
