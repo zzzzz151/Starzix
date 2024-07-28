@@ -4,7 +4,7 @@
 
 constexpr i32 INF = 32000, 
               MIN_MATE_SCORE = INF - 256,
-              EVAL_NONE = INF;
+              VALUE_NONE = INF + 1;
 
 #include "board.hpp"
 #include "search_params.hpp"
@@ -192,7 +192,7 @@ class SearchThread {
         return sSearchStopped = (mNodes % 1024 == 0 && millisecondsElapsed() >= mHardMilliseconds);
     }
 
-    inline void makeMove(Move move, i32 newPly)
+    inline i32 makeMove(Move move, i32 newPly)
     {
         // If not a special move, we can probably correctly predict the zobrist hash after it
         // and prefetch the TT entry
@@ -213,6 +213,16 @@ class SearchThread {
             mAccumulatorPtr++;
             mAccumulatorPtr->mUpdated = false;
         }
+
+        if (mBoard.isDraw(newPly)) 
+            return 0;
+
+        // Checkmate or stalemate?
+        if (!mBoard.hasLegalMove())
+            return mBoard.inCheck() ? -INF + newPly : 0;
+
+        // Not a terminal position
+        return VALUE_NONE;
     }
 
     inline i32 updateAccumulatorAndEval(i32 &eval) 
@@ -226,7 +236,7 @@ class SearchThread {
 
         if (mBoard.inCheck())
             eval = 0;
-        else if (eval == EVAL_NONE) {
+        else if (eval == VALUE_NONE) {
             eval = evaluate(mAccumulatorPtr, mBoard, true);
 
             // Adjust eval with correction history
@@ -279,6 +289,7 @@ class SearchThread {
     inline i32 search(i32 depth, i32 ply, i32 alpha, i32 beta, 
         bool cutNode, u8 doubleExtsLeft, bool singular = false) 
     {
+        assert(mBoard.hasLegalMove());
         assert(ply >= 0 && ply <= mMaxDepth);
         assert(alpha >= -INF && alpha <= INF);
         assert(beta  >= -INF && beta  <= INF);
@@ -366,12 +377,13 @@ class SearchThread {
             && !(ttHit && ttEntry.bound() == Bound::UPPER && ttEntry.score < beta)
             && mBoard.hasNonPawnMaterial(mBoard.sideToMove()))
             {
-                makeMove(MOVE_NONE, ply + 1);
+                i32 score = makeMove(MOVE_NONE, ply + 1);
 
-                i32 nmpDepth = depth - nmpBaseReduction() - depth / nmpReductionDivisor();
-                
-                i32 score = mBoard.isDraw(ply + 1) ? 0 
-                            : -search(nmpDepth, ply + 1, -beta, -alpha, !cutNode, doubleExtsLeft);
+                // If not a terminal position, search
+                if (score == VALUE_NONE) {
+                    i32 nmpDepth = depth - nmpBaseReduction() - depth / nmpReductionDivisor();
+                    score = -search(nmpDepth, ply + 1, -beta, -alpha, !cutNode, doubleExtsLeft);
+                }
 
                 mBoard.undoMove();
 
@@ -481,16 +493,15 @@ class SearchThread {
                 plyDataPtr->mCurrentMoveIdx = 0; // reset since the singular search used this
             }
 
-            u64 nodesBefore = mNodes;
-            makeMove(move, ply + 1);
-
             int pt = (int)move.pieceType();
             HistoryEntry &historyEntry = mMovesHistory[stm][pt][move.to()];
 
-            i32 score = 0;
+            u64 nodesBefore = mNodes;
 
-            if (mBoard.isDraw(ply + 1)) 
-                goto moveSearched;
+            i32 score = makeMove(move, ply + 1);
+
+            // Terminal position?
+            if (score != VALUE_NONE) goto moveSearched;
 
             // Check extension if no singular extensions
             newDepth += !singularTried && mBoard.inCheck();
@@ -607,10 +618,8 @@ class SearchThread {
             break;
         }
 
-        if (legalMovesSeen == 0) 
-            return singular ? alpha 
-                   : mBoard.inCheck() ? -INF + ply // checkmate
-                   : 0; // stalemate
+        if (singular && legalMovesSeen == 0) 
+            return alpha;
 
         if (!singular) {
             // Store in TT
@@ -638,6 +647,7 @@ class SearchThread {
 
     inline i32 qSearch(i32 ply, i32 alpha, i32 beta)
     {
+        assert(mBoard.hasLegalMove());
         assert(ply > 0 && ply <= mMaxDepth);
         assert(alpha >= -INF && alpha <= INF);
         assert(beta  >= -INF && beta  <= INF);
@@ -671,17 +681,10 @@ class SearchThread {
         if (!mBoard.inCheck()) {
             if (eval >= beta) return eval; 
             if (eval > alpha) alpha = eval;
-
-            // not in check, generate and score noisy moves (except underpromotions)
-            plyDataPtr->genAndScoreNoisyMoves(mBoard);
         }
-        else {
-            Move ttMove = ttHit ? Move(ttEntry.move) : MOVE_NONE;
-            Move countermove = mCountermoves[(int)mBoard.oppSide()][mBoard.lastMove().encoded()];
 
-            // in check, generate and score all moves (except underpromotions)
-            plyDataPtr->genAndScoreMoves(mBoard, ttMove, countermove, mMovesHistory);
-        }
+        // generate and score noisy moves (except underpromotions)
+        plyDataPtr->genAndScoreNoisyMoves(mBoard);
 
         i32 bestScore = mBoard.inCheck() ? -INF : eval;
         Move bestMove = MOVE_NONE;
@@ -693,13 +696,14 @@ class SearchThread {
              std::tie(move, moveScore) = plyDataPtr->nextMove(mBoard))
         {
             // SEE pruning (skip bad noisy moves)
-            // In check, skip bad quiets too
-            if (mBoard.inCheck() ? bestScore > -MIN_MATE_SCORE && moveScore < 0 : !SEE(mBoard, move))
-                continue;
+            if (!SEE(mBoard, move)) continue;
 
-            makeMove(move, ply + 1);
+            i32 score = makeMove(move, ply + 1);
 
-            i32 score = mBoard.isDraw(ply + 1) ? 0 : -qSearch(ply + 1, -beta, -alpha);
+            // Terminal position?
+            if (score != VALUE_NONE) return score;
+
+            score = -qSearch(ply + 1, -beta, -alpha);
 
             mBoard.undoMove();
             mAccumulatorPtr--;
@@ -721,10 +725,6 @@ class SearchThread {
                 break;
             }
         }
-
-        // Checkmate?
-        if (mBoard.inCheck() && bestScore == -INF)
-            return -INF + ply;
 
         // Store in TT
         (*ttPtr)[ttEntryIdx].update(mBoard.zobristHash(), 0, ply, bestScore, bestMove, bound);

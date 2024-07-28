@@ -14,7 +14,7 @@ struct PlyData {
 
     u64 mPinned = 0;
     ArrayVec<Move, MAX_DEPTH+1> mPvLine = {};
-    i32 mEval = EVAL_NONE;
+    i32 mEval = VALUE_NONE;
     Move mKiller = MOVE_NONE;
     u64 mEnemyAttacks = 0;
 
@@ -22,7 +22,7 @@ struct PlyData {
     inline void softReset() {
         mAllMovesGenerated = mNoisyMovesGenerated = false;
         mPvLine.clear();
-        mEval = EVAL_NONE;
+        mEval = VALUE_NONE;
     }
 
     // For main search
