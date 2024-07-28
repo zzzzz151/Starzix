@@ -692,11 +692,14 @@ class SearchThread {
              move != MOVE_NONE; 
              std::tie(move, moveScore) = plyDataPtr->nextMove(mBoard))
         {
-            // SEE pruning (skip bad noisy moves)
-            // In check, skip bad quiets too
-            if (mBoard.inCheck() ? bestScore > -MIN_MATE_SCORE && moveScore < KILLER_SCORE : !SEE(mBoard, move))
-                continue;
+            // If in check, skip quiets and bad noisy moves
+            if (mBoard.inCheck() && bestScore > -MIN_MATE_SCORE && moveScore <= KILLER_SCORE)
+                break;
 
+            // If not in check, skip bad noisy moves
+            if (!mBoard.inCheck() && !SEE(mBoard, move))
+                continue;
+                
             makeMove(move, ply + 1);
 
             i32 score = mBoard.isDraw(ply + 1) ? 0 : -qSearch(ply + 1, -beta, -alpha);
