@@ -680,12 +680,19 @@ class SearchThread {
         if (!mBoard.inCheck()) {
             if (eval >= beta) return eval; 
             if (eval > alpha) alpha = eval;
+
+            // not in check, generate and score noisy moves (except underpromotions)
+            plyDataPtr->genAndScoreNoisyMoves(mBoard);
+        }
+        else {
+            Move ttMove = mBoard.zobristHash() == ttEntry.zobristHash ? Move(ttEntry.move) : MOVE_NONE;
+            Move countermove = mCountermoves[(int)mBoard.oppSide()][mBoard.lastMove().encoded()];
+
+            // in check, generate and score all moves (except underpromotions)
+            plyDataPtr->genAndScoreMoves(mBoard, ttMove, countermove, mMovesHistory);
         }
 
-        // generate and score noisy moves (except underpromotions)
-        plyDataPtr->genAndScoreNoisyMoves(mBoard);
-
-        i32 bestScore = eval;
+        i32 bestScore = mBoard.inCheck() ? -INF : eval;
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::UPPER;
 
@@ -695,7 +702,9 @@ class SearchThread {
              std::tie(move, moveScore) = plyDataPtr->nextMove(mBoard))
         {
             // SEE pruning (skip bad noisy moves)
-            if (!SEE(mBoard, move)) continue;
+            // In check, skip bad quiets too (history < 0)
+            if (mBoard.inCheck() ? bestScore > -MIN_MATE_SCORE && moveScore < 0 : !SEE(mBoard, move)) 
+                continue;
 
             i32 score = makeMove(move, ply + 1);
 
@@ -724,7 +733,6 @@ class SearchThread {
             }
         }
 
-        // Store in TT
         (*ttPtr)[ttEntryIdx].update(mBoard.zobristHash(), 0, ply, bestScore, bestMove, bound);
 
         return bestScore;
