@@ -726,8 +726,7 @@ class SearchThread {
         }
 
         // Checkmate?
-        if (mBoard.inCheck() && bestScore == -INF)
-            return -INF + ply;
+        if (bestScore == -INF) return -INF + ply;
 
         // Store in TT
         (*ttPtr)[ttEntryIdx].update(mBoard.zobristHash(), 0, ply, bestScore, bestMove, bound);
