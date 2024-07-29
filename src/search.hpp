@@ -294,10 +294,7 @@ class SearchThread {
         }
 
         // Quiescence search at leaf nodes
-        if (depth <= 0) { 
-            assert(!mBoard.inCheck());
-            return qSearch(ply, alpha, beta);
-        }
+        if (depth <= 0) return qSearch(ply, alpha, beta);
 
         if (depth > mMaxDepth) depth = mMaxDepth;
 
@@ -600,10 +597,16 @@ class SearchThread {
             break;
         }
 
-        if (legalMovesSeen == 0) 
-            return singular ? alpha 
-                   : mBoard.inCheck() ? -INF + ply // checkmate
-                   : 0; // stalemate
+        if (legalMovesSeen == 0) {
+            if (singular) return alpha;
+
+            assert(!mBoard.hasLegalMove());
+
+            // Checkmate or stalemate
+            return mBoard.inCheck() ? -INF + ply : 0;
+        }
+
+        assert(mBoard.hasLegalMove());
 
         if (!singular) {
             // Store in TT
@@ -719,7 +722,10 @@ class SearchThread {
         }
 
         // Checkmate?
-        if (bestScore == -INF) return -INF + ply;
+        if (bestScore == -INF) {
+            assert(!mBoard.hasLegalMove());
+            return -INF + ply;
+        }
 
         // Store in TT
         (*ttPtr)[ttEntryIdx].update(mBoard.zobristHash(), 0, ply, bestScore, bestMove, bound);
