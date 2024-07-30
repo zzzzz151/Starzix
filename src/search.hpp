@@ -423,14 +423,14 @@ class SearchThread {
                 if (legalMovesSeen >= lmpMinMoves() + pvNode + mBoard.inCheck()
                                       + depth * depth * lmpMultiplier())
                     break;
-
-                i32 lmrDepth = std::max(0, depth - LMR_TABLE[isQuiet][depth][legalMovesSeen] + improving);
+                    
+                i32 lmrDepth = depth - LMR_TABLE[isQuiet][depth][legalMovesSeen];
 
                 // FP (Futility pruning)
                 if (lmrDepth <= fpMaxDepth() 
                 && !mBoard.inCheck()
                 && alpha < MIN_MATE_SCORE
-                && alpha > eval + fpBase() + lmrDepth * fpMultiplier())
+                && alpha > eval + fpBase() + std::max(lmrDepth + improving, 0) * fpMultiplier())
                     break;
 
                 // SEE pruning
