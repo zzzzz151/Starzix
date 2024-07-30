@@ -92,4 +92,6 @@
         #endif
     }
 
+#else
+    using Vec = __m128i;
 #endif

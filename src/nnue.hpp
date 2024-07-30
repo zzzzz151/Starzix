@@ -22,11 +22,18 @@ constexpr i32 HIDDEN_LAYER_SIZE = 1024,
 
 struct Net {
     public:
-    MultiArray<i16, 2, 768, HIDDEN_LAYER_SIZE> featuresWeights;   // [color][feature][hiddenNeuron]
-    MultiArray<i16, 2, HIDDEN_LAYER_SIZE>      hiddenBiases;      // [color][hiddenNeuron]
-    std::array<i16, HIDDEN_LAYER_SIZE>         outputWeightsStm;  // [hiddenNeuron]
-    std::array<i16, HIDDEN_LAYER_SIZE>         outputWeightsNstm; // [hiddenNeuron]
-    i16                                        outputBias;
+
+    // [color][feature][hiddenNeuronIdx]
+    alignas(sizeof(Vec)) MultiArray<i16, 2, 768, HIDDEN_LAYER_SIZE> featuresWeights;
+
+    // [color][hiddenNeuronIdx]
+    alignas(sizeof(Vec)) MultiArray<i16, 2, HIDDEN_LAYER_SIZE> hiddenBiases;
+
+    // [hiddenNeuronIdx]
+    alignas(sizeof(Vec)) std::array<i16, HIDDEN_LAYER_SIZE> outputWeightsStm;
+    alignas(sizeof(Vec)) std::array<i16, HIDDEN_LAYER_SIZE> outputWeightsNstm;
+
+    i16 outputBias;
 };
 
 INCBIN(NetFile, "src/net.bin");
@@ -35,7 +42,8 @@ const Net* NET = (const Net*)gNetFileData;
 struct Accumulator {
     public:
 
-    MultiArray<i16, 2, HIDDEN_LAYER_SIZE> mAccumulators;
+    alignas(sizeof(Vec)) MultiArray<i16, 2, HIDDEN_LAYER_SIZE> mAccumulators;
+
     bool mUpdated = false;
 
     // HM (Horizontal mirroring)
