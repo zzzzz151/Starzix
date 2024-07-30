@@ -4,6 +4,7 @@
 
 #define stringify(myVar) (std::string)#myVar
 
+#include "array_extensions.hpp"
 #include <iostream>
 #include <string>
 #include <vector>
@@ -12,10 +13,9 @@
 #include <algorithm>
 #include <bitset>
 #include <chrono>
-#include <unordered_map>
+#include <bit>
+#include <cmath>
 #include <type_traits>
-#include "array_extensions.hpp"
-#include "3rdparty/ordered_map.h"
 
 using size_t = size_t;
 using u8 = uint8_t;
@@ -173,6 +173,19 @@ constexpr double ln(double x) {
 inline auto millisecondsElapsed(std::chrono::steady_clock::time_point start)
 {
     return (std::chrono::steady_clock::now() - start) / std::chrono::milliseconds(1);
+}
+
+u64 gRngState = 1070372;
+
+inline void resetRng() { 
+    gRngState = 1070372;
+}
+
+inline u64 randomU64() {
+    gRngState ^= gRngState >> 12;
+    gRngState ^= gRngState << 25;
+    gRngState ^= gRngState >> 27;
+    return gRngState * 2685821657736338717LL;
 }
 
 // [color][CASTLE_SHORT or CASTLE_LONG or isLongCastle]

@@ -2,11 +2,11 @@
 
 #pragma once
 
-#include <thread>
 #include "board.hpp"
 #include "perft.hpp"
 #include "search.hpp"
 #include "bench.hpp"
+#include <thread>
 
 namespace uci { // Universal chess interface
 
@@ -116,7 +116,6 @@ inline void uci() {
     std::cout << "option name Hash type spin default 32 min 1 max 65536" << std::endl;
     std::cout << "option name Threads type spin default 1 min 1 max 256" << std::endl;
 
-    /*
     for (auto &pair : tunableParams) {
         std::string paramName = pair.first;
         auto &tunableParam = pair.second;
@@ -134,7 +133,6 @@ inline void uci() {
             
         }, tunableParam);
     }
-    */
 
     std::cout << "uciok" << std::endl;
 }
@@ -176,12 +174,9 @@ inline void setoption(std::vector<std::string> &tokens, std::vector<TTEntry> &tt
 
             myParam->value = std::stod(optionValue);
 
-            if (optionName == stringify(lmrBase) || optionName == stringify(lmrMultiplier))
+            if (optionName == stringify(lmrBaseQuiet) || optionName == stringify(lmrMultiplierQuiet)
+            || optionName == stringify(lmrBaseNoisy) || optionName == stringify(lmrMultiplierNoisy))
                 initLmrTable();
-            else if (optionName == stringify(onePlyContHistWeight)
-            || optionName == stringify(twoPlyContHistWeight)
-            || optionName == stringify(fourPlyContHistWeight))
-                CONT_HISTS_WEIGHTS = { onePlyContHistWeight(), twoPlyContHistWeight(), fourPlyContHistWeight() };
             else if (optionName == stringify(seePawnValue)
             || optionName == stringify(seeMinorValue)
             || optionName == stringify(seeRookValue)
@@ -231,7 +226,7 @@ inline void go(std::vector<std::string> &tokens, Board &board)
     i32 maxDepth = MAX_DEPTH;
     i64 milliseconds = I64_MAX;
     i64 incrementMs = 0;
-    i64 movesToGo = defaultMovesToGo();
+    i64 movesToGo = 0;
     bool isMoveTime = false;
     i64 maxNodes = I64_MAX;
 
@@ -262,18 +257,12 @@ inline void go(std::vector<std::string> &tokens, Board &board)
 
     // Calculate search time limits
 
-    i64 maxHardMilliseconds = std::max((i64)0, milliseconds - 10);
-    u64 hardMilliseconds, softMilliseconds;
+    u64 hardMilliseconds = std::max((i64)0, milliseconds - 10);
+    u64 softMilliseconds = I64_MAX;
 
-    if (isMoveTime || maxHardMilliseconds <= 0) {
-        hardMilliseconds = maxHardMilliseconds;
-        softMilliseconds = I64_MAX;
-    }
-    else {
-        hardMilliseconds = round(maxHardMilliseconds * hardTimePercentage());
-        double softMs = (double)maxHardMilliseconds / (double)movesToGo + (double)incrementMs * 0.6666;
-        softMilliseconds = round(softMs * softTimePercentage());
-        softMilliseconds = std::min(softMilliseconds, hardMilliseconds);
+    if (!isMoveTime) {
+        hardMilliseconds *= hardTimePercentage();
+        softMilliseconds = hardMilliseconds * softTimePercentage();
     }
 
     SearchThread::sSearchStopped = false;
@@ -283,15 +272,16 @@ inline void go(std::vector<std::string> &tokens, Board &board)
     for (u64 i = 1; i < gSearchThreads.size(); i++)
         threads.emplace_back([&, i]() {
             gSearchThreads[i].search(
-                board, maxDepth, startTime, softMilliseconds, hardMilliseconds, I64_MAX, maxNodes);
+                board, maxDepth, startTime, hardMilliseconds, softMilliseconds, maxNodes);
         });
 
     // Main thread search
-    gMainThread->search(board, maxDepth, startTime, softMilliseconds, hardMilliseconds, I64_MAX, maxNodes);
+    gMainThread->search(board, maxDepth, startTime, hardMilliseconds, softMilliseconds, maxNodes);
 
     // Wait for secondary threads
     for (auto &thread : threads)
-        thread.join();
+        if (thread.joinable())
+            thread.join();
 
     std::cout << "bestmove " << gMainThread->bestMoveRoot().toUci() << std::endl;
 }

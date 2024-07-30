@@ -2,50 +2,53 @@
 
 #pragma once
 
-enum class MoveGenType : i8 {
-    NONE = -1, ALL = 0, NOISIES_ONLY = 1
-};
-
 struct PlyData {
     public:
 
-    MoveGenType mMovesGenerated = MoveGenType::NONE;
-    ArrayVec<Move, 256> mMoves;
+    ArrayVec<Move, 256> mAllMoves, mNoisyMoves, *mCurrentMoves;
+    
+    bool mAllMovesGenerated = false, mNoisyMovesGenerated = false;
+
     std::array<i32, 256> mMovesScores;
     int mCurrentMoveIdx = -1;
-    
-    ArrayVec<Move, MAX_DEPTH+1> mPvLine;
+
+    u64 mPinned = 0;
+    ArrayVec<Move, MAX_DEPTH+1> mPvLine = {};
+    i32 mEval = EVAL_NONE;
     Move mKiller = MOVE_NONE;
-    i32 mEval = INF;
     u64 mEnemyAttacks = 0;
 
-    inline void genAndScoreMoves(Board &board, bool noisiesOnly, Move ttMove, Move countermove, 
-                                 MultiArray<HistoryEntry, 2, 6, 64> &historyTable)
+    // Soft reset when we make a move in search
+    inline void softReset() {
+        mAllMovesGenerated = mNoisyMovesGenerated = false;
+        mPvLine.clear();
+        mEval = EVAL_NONE;
+    }
+
+    // For main search
+    inline void genAndScoreMoves(Board &board, Move ttMove, Move countermove,
+        MultiArray<HistoryEntry, 2, 6, 64> &movesHistory) 
     {
-        // Generate enemy attacks if not already generated
-        if (mMovesGenerated == MoveGenType::NONE)
+        assert(!(board.lastMove() == MOVE_NONE && countermove != MOVE_NONE));
+
+        // Generate pinned pieces if not already generated
+        // Needed for Board.isPseudolegalLegal(Move move, u64 pinned)
+        if (!mAllMovesGenerated && !mNoisyMovesGenerated)
+            mPinned = board.pinned();
+
+        // Generate all moves (except underpromotions) and enemy attacks, if not already generated
+        if (!mAllMovesGenerated) {
+            board.pseudolegalMoves(mAllMoves, false, false);
+            mAllMovesGenerated = true;
             mEnemyAttacks = board.attacks(board.oppSide());
-
-        assert(mMovesGenerated == MoveGenType::NONE || mEnemyAttacks == board.attacks(board.oppSide()));
-
-        // Generate moves if not already generated
-        // Never generate underpromotions in search
-        if (mMovesGenerated != (MoveGenType)noisiesOnly) {
-            board.pseudolegalMoves(mMoves, noisiesOnly, false);
-            mMovesGenerated = (MoveGenType)noisiesOnly;
         }
 
+        std::array<Move, 3> lastMoves = { board.lastMove(), board.nthToLastMove(2), board.nthToLastMove(4) };
+
         // Score moves
-
-        int stm = (int)board.sideToMove();
-
-        std::array<Move, 3> lastMoves = {
-            board.nthToLastMove(1), board.nthToLastMove(2), board.nthToLastMove(4)
-        };
-
-        for (size_t i = 0; i < mMoves.size(); i++)
+        for (size_t i = 0; i < mAllMoves.size(); i++)
         {
-            Move move = mMoves[i];
+            Move move = mAllMoves[i];
 
             if (move == ttMove) {
                 mMovesScores[i] = I32_MAX;
@@ -54,9 +57,9 @@ struct PlyData {
 
             PieceType captured = board.captured(move);
             PieceType promotion = move.promotion();
-            
-            int pt = (int)move.pieceType();
-            HistoryEntry &historyEntry = historyTable[stm][pt][move.to()];
+
+            // Starzix doesnt generate underpromotions in search
+            assert(promotion == PieceType::NONE || promotion == PieceType::QUEEN);
 
             if (captured != PieceType::NONE)
             {
@@ -66,46 +69,90 @@ struct PlyData {
                                      : GOOD_NOISY_SCORE)
                                   : -GOOD_NOISY_SCORE;
 
-                // MVV (most valuable victim)
-                mMovesScores[i] += ((i32)captured + 1) * 1'000'000; 
-
-                mMovesScores[i] += historyEntry.noisyHistory(captured);
+                // MVVLVA (most valuable victim, least valuable attacker)
+                mMovesScores[i] += 100 * (i32)captured - (i32)move.pieceType();
             }
             else if (promotion == PieceType::QUEEN)
-            {
                 mMovesScores[i] = SEE(board, move) ? GOOD_QUEEN_PROMO_SCORE : -GOOD_NOISY_SCORE;
-                mMovesScores[i] += historyEntry.noisyHistory(captured);
-            }
             else if (move == mKiller)
                 mMovesScores[i] = KILLER_SCORE;
             else if (move == countermove)
                 mMovesScores[i] = COUNTERMOVE_SCORE;
-            else
-                mMovesScores[i] = historyEntry.quietHistory(
-                    mEnemyAttacks & bitboard(move.from()),
-                    mEnemyAttacks & bitboard(move.to()),
+            else {
+                int stm = (int)board.sideToMove();
+                int pt = (int)move.pieceType();
+                
+                mMovesScores[i] = movesHistory[stm][pt][move.to()].quietHistory(
+                    mEnemyAttacks & bitboard(move.from()), 
+                    mEnemyAttacks & bitboard(move.to()), 
                     lastMoves);
+            }
         }
 
-        mCurrentMoveIdx = -1; // prepare for moves loop
+        // prepare for nextMove() usage in moves loop
+        mCurrentMoves = &mAllMoves;
+        mCurrentMoveIdx = -1; 
     }
-    
-    inline std::pair<Move, i32> nextMove()
+
+    // For qsearch
+    inline void genAndScoreNoisyMoves(Board &board) 
+    {
+        // Generate pinned pieces if not already generated
+        // Needed for Board.isPseudolegalLegal(Move move, u64 pinned)
+        if (!mAllMovesGenerated && !mNoisyMovesGenerated)
+            mPinned = board.pinned();
+
+        // Generate noisy moves (except underpromotions) if not already generated
+        if (!mNoisyMovesGenerated) {
+            board.pseudolegalMoves(mNoisyMoves, true, false);
+            mNoisyMovesGenerated = true;
+        }
+
+        // Score moves
+        for (size_t i = 0; i < mNoisyMoves.size(); i++) 
+        {
+            Move move = mNoisyMoves[i];
+            PieceType captured = board.captured(move);
+            PieceType promotion = move.promotion();
+
+            // Starzix doesnt generate underpromotions in search
+            assert(promotion == PieceType::NONE || promotion == PieceType::QUEEN);
+
+            // Assert only noisy moves were generated
+            assert(captured != PieceType::NONE || promotion == PieceType::QUEEN);
+
+            // MVVLVA (most valuable victim, least valuable attacker)
+            mMovesScores[i] = 100 * (i32)captured - (i32)move.pieceType();
+
+            if (promotion == PieceType::QUEEN)
+                mMovesScores[i] += 1'000'000;
+        }
+
+        // prepare for nextMove() usage in moves loop
+        mCurrentMoves = &mNoisyMoves;
+        mCurrentMoveIdx = -1;
+    }
+
+    inline std::pair<Move, i32> nextMove(Board &board)
     {
         mCurrentMoveIdx++;
 
-        if (mCurrentMoveIdx >= (int)mMoves.size())
+        if (mCurrentMoveIdx >= (int)mCurrentMoves->size())
             return { MOVE_NONE, 0 };
 
         // Incremental sort
-        for (size_t j = mCurrentMoveIdx + 1; j < mMoves.size(); j++)
+        for (size_t j = mCurrentMoveIdx + 1; j <  mCurrentMoves->size(); j++)
             if (mMovesScores[j] > mMovesScores[mCurrentMoveIdx])
             {
-                mMoves.swap(mCurrentMoveIdx, j);
+                mCurrentMoves->swap(mCurrentMoveIdx, j);
                 std::swap(mMovesScores[mCurrentMoveIdx], mMovesScores[j]);
             }
 
-        return { mMoves[mCurrentMoveIdx], mMovesScores[mCurrentMoveIdx] };
+        Move nextBestMove = (*mCurrentMoves)[mCurrentMoveIdx];
+
+        return board.isPseudolegalLegal(nextBestMove, mPinned) 
+               ? std::make_pair(nextBestMove, mMovesScores[mCurrentMoveIdx])
+               : nextMove(board);
     }
 
     inline void updatePV(Move move) 
@@ -133,5 +180,4 @@ struct PlyData {
         trim(str);
         return str;
     }
-
-}; // struct PlyData
+};
