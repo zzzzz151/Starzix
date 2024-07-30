@@ -14,11 +14,11 @@ int main(int argc, char* argv[])
     std::cout << "Starzix by zzzzz" << std::endl;
 
     #if defined(__AVX512F__) && defined(__AVX512BW__)
-        std::cout << "Using avx512" << std::endl;
+        std::cout << "Using avx512 (fastest)" << std::endl;
     #elif defined(__AVX2__)
-        std::cout << "Using avx2" << std::endl;
+        std::cout << "Using avx2 (fast)" << std::endl;
     #else
-        std::cout << "Not using avx2 or avx512" << std::endl;
+        std::cout << "Not using avx2 or avx512 (slow)" << std::endl;
     #endif
 
     // On Windows, stack size is increased through a compiler flag
