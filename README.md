@@ -68,7 +68,6 @@ Have clang++ installed and run ```make```
 - Internal iterative reduction
 - Late move reductions
 - Singular extensions (with negative and double extensions)
-- Check extension
 - Correction history
 - Cuckoo (detect upcoming repetition)
 - Time management: hard and soft time limits
@@ -76,7 +75,7 @@ Have clang++ installed and run ```make```
 
 ### Move ordering
 - TT move
-- Good noisy moves by SEE + MVV + noisy history
+- Good noisy moves by SEE + MVVLVA
 - Killer move
 - Countermove
 - Quiet moves by history
