@@ -207,10 +207,11 @@ inline i32 evaluate(Accumulator* accumulator, Board &board, bool materialScale)
 
         const Vec vecZero = setEpi16(0);  // N i16 zeros
         const Vec vecQA   = setEpi16(QA); // N i16 QA's
+        Vec vecSum = vecZero; // N/2 i32 zeros
 
         // Takes N i16 hidden neurons, along with N i16 output weights
         // Activates the hidden neurons (SCReLU) and multiplies each with its output weight
-        // Finally, adds the resulting N i16's to the "sum" variable
+        // Finally, adds the resulting N i16's to the 'sum' variable
         auto sumSlice = [&](const i16 &accumulatorStart, const i16 &outputWeightsStart) -> void
         {
             // Load N hidden neurons and clamp them to [0, QA]
@@ -221,16 +222,17 @@ inline i32 evaluate(Accumulator* accumulator, Board &board, bool materialScale)
             Vec outputWeights = loadVec((Vec*)&outputWeightsStart);
 
             // Multiply each hidden neuron with its respective output weight
-            // We use mullo, which multiplies in the i16 world
+            // We use mullo, which multiplies in the i32 world but returns the results as i16's
             // since we know the results fit in an i16
             Vec result = mulloEpi16(hiddenNeurons, outputWeights);
 
             // Multiply with hidden neurons again (square part of SCReLU)
-            // We use madd, which multiplies in the i32 world
+            // We use madd, which multiplies in the i32 world and adds adjacent pairs
+            // 'result' becomes N/2 i32's
             result = maddEpi16(result, hiddenNeurons);
 
-            // Sum the resulting N i32's, and add that sum to the "sum" variable
-            sum += sumVec(result);
+            // Add 'result' to 'vecSum' (vecSum is the total running sum)
+            vecSum = addEpi32(vecSum, result);
         };
 
         for (int i = 0; i < HIDDEN_LAYER_SIZE; i += sizeof(Vec) / sizeof(i16))
@@ -240,6 +242,8 @@ inline i32 evaluate(Accumulator* accumulator, Board &board, bool materialScale)
             sumSlice(accumulator->mAccumulators[stm][i], NET->outputWeightsStm[i]);
             sumSlice(accumulator->mAccumulators[!stm][i], NET->outputWeightsNstm[i]);
         }
+
+        sum = sumVec(vecSum);
     #else
         for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
         {

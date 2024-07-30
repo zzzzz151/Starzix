@@ -56,6 +56,15 @@
         #endif
     }
 
+    inline Vec addEpi32(Vec a, Vec b) 
+    {
+        #if defined(__AVX512F__) && defined(__AVX512BW__)
+            return _mm512_add_epi32(a, b);
+        #else // AVX2
+            return _mm256_add_epi32(a, b);
+        #endif
+    }
+
     // Adds the i16's in vec, returning an i32
     inline i32 sumVec(Vec vec) 
     {
