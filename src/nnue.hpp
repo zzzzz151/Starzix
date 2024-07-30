@@ -207,11 +207,11 @@ inline i32 evaluate(Accumulator* accumulator, Board &board, bool materialScale)
 
         const Vec vecZero = setEpi16(0);  // N i16 zeros
         const Vec vecQA   = setEpi16(QA); // N i16 QA's
-        Vec vecSum = vecZero; // N/2 i32 zeros
+        Vec vecSum = vecZero; // N/2 i32 zeros, the total running sum
 
         // Takes N i16 hidden neurons, along with N i16 output weights
         // Activates the hidden neurons (SCReLU) and multiplies each with its output weight
-        // Finally, adds the resulting N i16's to the 'sum' variable
+        // End result is N/2 i32's, which are summed to 'vecSum'
         auto sumSlice = [&](const i16 &accumulatorStart, const i16 &outputWeightsStart) -> void
         {
             // Load N hidden neurons and clamp them to [0, QA]
@@ -231,8 +231,7 @@ inline i32 evaluate(Accumulator* accumulator, Board &board, bool materialScale)
             // 'result' becomes N/2 i32's
             result = maddEpi16(result, hiddenNeurons);
 
-            // Add 'result' to 'vecSum' (vecSum is the total running sum)
-            vecSum = addEpi32(vecSum, result);
+            vecSum = addEpi32(vecSum, result); // Add 'result' to 'vecSum'
         };
 
         for (int i = 0; i < HIDDEN_LAYER_SIZE; i += sizeof(Vec) / sizeof(i16))
@@ -243,7 +242,7 @@ inline i32 evaluate(Accumulator* accumulator, Board &board, bool materialScale)
             sumSlice(accumulator->mAccumulators[!stm][i], NET->outputWeightsNstm[i]);
         }
 
-        sum = sumVec(vecSum);
+        sum = sumVec(vecSum); // Add the N/2 i32's to get final sum (i32)
     #else
         for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
         {
