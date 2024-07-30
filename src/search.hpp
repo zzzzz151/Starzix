@@ -298,6 +298,8 @@ class SearchThread {
 
         if (depth > mMaxDepth) depth = mMaxDepth;
 
+        bool pvNode = beta > alpha + 1;
+
         // Probe TT
         auto ttEntryIdx = TTEntryIndex(mBoard.zobristHash(), ttPtr->size());
         TTEntry ttEntry = singular ? TTEntry() : (*ttPtr)[ttEntryIdx];
@@ -309,7 +311,7 @@ class SearchThread {
             ttMove = Move(ttEntry.move);
 
             // TT cutoff (not done in singular searches since ttHit is false)
-            if (ply > 0
+            if (!pvNode
             && ttEntry.depth >= depth 
             && (ttEntry.bound() == Bound::EXACT
             || (ttEntry.bound() == Bound::LOWER && ttEntry.score >= beta) 
@@ -323,7 +325,6 @@ class SearchThread {
         if (ply >= mMaxDepth) 
             return mBoard.inCheck() ? 0 : updateAccumulatorAndEval(plyDataPtr->mEval);
 
-        bool pvNode = beta > alpha + 1;
         i32 eval = updateAccumulatorAndEval(plyDataPtr->mEval);
 
         int improving = ply <= 1 || mBoard.inCheck() || mBoard.inCheck2PliesAgo()
