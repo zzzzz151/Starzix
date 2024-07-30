@@ -60,13 +60,7 @@
     inline i32 sumVec(Vec vec) 
     {
         #if defined(__AVX512F__) && defined(__AVX512BW__)
-            const Vec high64 = _mm_unpackhi_epi64(vec, vec);
-            const Vec sum64 = _mm_add_epi32(vec, high64);
-
-            const Vec high32 = _mm_shuffle_epi32(sum64, _MM_SHUFFLE(2, 3, 0, 1));
-            const Vec sum32 = _mm_add_epi32(sum64, high32);
-
-            return _mm_cvtsi128_si32(sum32);
+            return _mm512_reduce_add_epi32(vec);
         #else // AVX2
             // Get the lower and upper half of the register:
             __m128i xmm0 =  _mm256_castsi256_si128(vec);
@@ -91,7 +85,6 @@
             return _mm_cvtsi128_si32(xmm0);
         #endif
     }
-
 #else
     using Vec = __m128i;
 #endif
