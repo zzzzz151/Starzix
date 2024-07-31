@@ -15,7 +15,20 @@
 
 namespace nnue {
 
+constexpr std::array<int, 64> INPUT_BUCKETS = {
+//  A  B  C  D  E  F  G  H
+    1, 1, 1, 1, 2, 2, 2, 2, // 0
+    1, 1, 1, 1, 2, 2, 2, 2, // 1
+    1, 1, 1, 1, 2, 2, 2, 2, // 2
+    1, 1, 1, 1, 2, 2, 2, 2, // 3
+    3, 3, 3, 3, 4, 4, 4, 4, // 4
+    3, 3, 3, 3, 4, 4, 4, 4, // 5
+    3, 3, 3, 3, 4, 4, 4, 4, // 6 
+    3, 3, 3, 3, 4, 4, 4, 4  // 7
+};
+
 constexpr i32 HIDDEN_LAYER_SIZE = 1024,
+              NUM_INPUT_BUCKETS = 5,
               SCALE = 400, 
               QA = 255, 
               QB = 64;
@@ -23,8 +36,8 @@ constexpr i32 HIDDEN_LAYER_SIZE = 1024,
 struct Net {
     public:
 
-    // [color][feature][hiddenNeuronIdx]
-    alignas(sizeof(Vec)) MultiArray<i16, 2, 768, HIDDEN_LAYER_SIZE> featuresWeights;
+    // [color][inputBucket][feature][hiddenNeuronIdx]
+    alignas(sizeof(Vec)) MultiArray<i16, 2, NUM_INPUT_BUCKETS, 768, HIDDEN_LAYER_SIZE> featuresWeights;
 
     // [color][hiddenNeuronIdx]
     alignas(sizeof(Vec)) MultiArray<i16, 2, HIDDEN_LAYER_SIZE> hiddenBiases;
@@ -36,15 +49,13 @@ struct Net {
     i16 outputBias;
 };
 
-INCBIN(NetFile, "src/net.bin");
+INCBIN(NetFile, "../nn-trainer/checkpoints/net768x2-queen-buckets-600.bin");
 const Net* NET = (const Net*)gNetFileData;
 
 struct Accumulator {
     public:
 
     alignas(sizeof(Vec)) MultiArray<i16, 2, HIDDEN_LAYER_SIZE> mAccumulators;
-
-    bool mUpdated = false;
 
     // HM (Horizontal mirroring)
     // If a king is on right side of board,
@@ -64,13 +75,26 @@ struct Accumulator {
 
         resetAccumulator(Color::WHITE, board);
         resetAccumulator(Color::BLACK, board);
-
-        mUpdated = true;
     }
 
     inline void resetAccumulator(const Color color, Board &board) 
     {
         mAccumulators[(int)color] = NET->hiddenBiases[(int)color];
+
+        const int inputBucket = [&]
+        {
+            u64 enemyQueensBb = board.getBb(oppColor(color), PieceType::QUEEN);
+
+            if (std::popcount(enemyQueensBb) != 1)
+                return 0;
+
+            Square enemyQueenSquare = lsb(enemyQueensBb);
+
+            if (mMirrorHorizontally[(int)color])
+                enemyQueenSquare ^= 7;
+
+            return INPUT_BUCKETS[enemyQueenSquare];
+        }();
 
         for (Color pieceColor : {Color::WHITE, Color::BLACK})
             for (int pt = PAWN; pt <= KING; pt++)
@@ -80,122 +104,21 @@ struct Accumulator {
                 while (bb > 0) {
                     int square = poplsb(bb);
 
-                    const int ft = feature(color, pieceColor, (PieceType)pt, square);
+                    if (mMirrorHorizontally[(int)color])
+                        square ^= 7;
+
+                    const int ft = (int)pieceColor * 384 + pt * 64 + (int)square;
 
                     for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
-                        mAccumulators[(int)color][i] += NET->featuresWeights[(int)color][ft][i];
+                        mAccumulators[(int)color][i] += NET->featuresWeights[(int)color][inputBucket][ft][i];
                 }
             }
-    }
-
-    inline int feature(Color color, Color pieceColor, PieceType pt, Square sq) const
-    {
-        if (mMirrorHorizontally[(int)color])
-            sq ^= 7;
-
-        return (int)pieceColor * 384 + (int)pt * 64 + (int)sq;
-    }
-
-    // [color]
-    inline std::array<int, 2> features(Color pieceColor, PieceType pt, Square sq) const
-    {
-        return {
-            feature(Color::WHITE, pieceColor, pt, sq),
-            feature(Color::BLACK, pieceColor, pt, sq)
-        };
-    }
-
-    inline void update(Accumulator* oldAcc, Board &board)
-    {
-        assert(oldAcc->mUpdated && !mUpdated);
-
-        mMirrorHorizontally = oldAcc->mMirrorHorizontally;
-
-        Move move = board.lastMove();
-        assert(move != MOVE_NONE);
-
-        const Color stm = board.oppSide(); // side that moved
-        const int from = move.from();
-        const int to = move.to();
-        const PieceType pieceType = move.pieceType();
-        const PieceType promotion = move.promotion();
-        const PieceType place = promotion != PieceType::NONE ? promotion : pieceType;
-
-        // If a king moved, we update mMirrorHorizontally[stm]
-        if (pieceType == PieceType::KING)
-        {
-            File newKingFile = squareFile(board.kingSquare(stm));
-            mMirrorHorizontally[(int)stm] = (int)newKingFile >= (int)File::E;
-
-            // If the king crossed the vertical axis, we reset his color's accumulator
-            if (mMirrorHorizontally[(int)stm] != oldAcc->mMirrorHorizontally[(int)stm])
-                resetAccumulator(stm, board);
-        }
-
-        // [color]
-        const std::array<int, 2> subPieceFeature = features(stm, pieceType, from);
-        const std::array<int, 2> addPieceFeature = features(stm, place, to);
-        std::array<int, 2> subCapturedFeature;
-
-        if (board.captured() != PieceType::NONE)
-        {
-            int capturedPieceSq = move.flag() == Move::EN_PASSANT_FLAG 
-                                  ? (to > from ? to - 8 : to + 8)
-                                  : to;
-
-            subCapturedFeature = features(oppColor(stm), board.captured(), capturedPieceSq);
-        }
-
-        for (int color : {WHITE, BLACK})
-        {
-            // No need to update this color's accumulator if we just resetted it
-            // due to that king crossing the vertical axis
-            if (mMirrorHorizontally[color] != oldAcc->mMirrorHorizontally[color]) 
-                continue;
-
-            if (board.captured() != PieceType::NONE)
-            {
-                for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
-                    mAccumulators[color][i] = 
-                        oldAcc->mAccumulators[color][i]
-                        - NET->featuresWeights[color][subPieceFeature[color]][i]  
-                        + NET->featuresWeights[color][addPieceFeature[color]][i]
-                        - NET->featuresWeights[color][subCapturedFeature[color]][i];
-            }
-            else if (move.flag() == Move::CASTLING_FLAG)
-            {
-                auto [rookFrom, rookTo] = CASTLING_ROOK_FROM_TO[to];
-
-                // [color]
-                const std::array<int, 2> subRookFeature = features(stm, PieceType::ROOK, rookFrom);
-                const std::array<int, 2> addRookFeature = features(stm, PieceType::ROOK, rookTo);
-
-                for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
-                    mAccumulators[color][i] = 
-                        oldAcc->mAccumulators[color][i] 
-                        - NET->featuresWeights[color][subPieceFeature[color]][i]  
-                        + NET->featuresWeights[color][addPieceFeature[color]][i]
-                        - NET->featuresWeights[color][subRookFeature[color]][i]  
-                        + NET->featuresWeights[color][addRookFeature[color]][i];
-            }
-            else {
-                for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
-                    mAccumulators[color][i] = 
-                        oldAcc->mAccumulators[color][i]
-                        - NET->featuresWeights[color][subPieceFeature[color]][i]  
-                        + NET->featuresWeights[color][addPieceFeature[color]][i];
-            }
-        }
-
-        mUpdated = true;
     }
 
 }; // struct Accumulator
 
 inline i32 evaluate(Accumulator* accumulator, Board &board, bool materialScale)
 {
-    assert(accumulator->mUpdated);
-
     int stm = (int)board.sideToMove();
     i32 sum = 0;
 
