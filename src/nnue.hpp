@@ -49,7 +49,7 @@ struct Net {
     i16 outputBias;
 };
 
-INCBIN(NetFile, "../nn-trainer/checkpoints/net768x2-queen-buckets-600.bin");
+INCBIN(NetFile, "src/net.bin");
 const Net* NET = (const Net*)gNetFileData;
 
 struct Accumulator {
