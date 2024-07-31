@@ -47,7 +47,6 @@ std::unordered_map<std::string, int> FENS_EVAL = {
     { "4k3/7n/8/8/8/6R1/8/1K6 w - - 0 1", 9 },
 };
 
-/*
 void testAccumulatorUpdate(Board board, Move move) 
 {
     Accumulator acc = Accumulator(board);
@@ -73,7 +72,6 @@ void testAccumulatorUpdate(Board board, Move move)
                   << " in '" << fen << "'" 
                   << std::endl;
 }
-*/
 
 int main()
 {
@@ -95,8 +93,6 @@ int main()
                       << std::endl;
     }
 
-    /*
-
     std::cout << "Testing Accumulator.update() ..." << std::endl;
 
     Board board = Board(START_FEN);
@@ -114,8 +110,6 @@ int main()
     for (Move move : moves)
         if (board.isPseudolegalLegal(move, pinned)) 
             testAccumulatorUpdate(board, move);
-
-    */
 
     std::cout << "Finished" << std::endl;
 

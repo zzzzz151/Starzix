@@ -369,8 +369,14 @@ class Board {
         std::cout << fen() << std::endl;
         std::cout << "Zobrist hash: " << mState->zobristHash << std::endl;
 
-        if (lastMove() != MOVE_NONE)
-            std::cout << "Last move: " << lastMove().toUci() << std::endl;
+        if (mStates.size() == 0) return;
+
+        std::cout << "Moves:";
+
+        for (size_t i = 1; i < mStates.size(); i++)
+            std::cout << " " << Move(mStates[i].lastMove).toUci();
+
+        std::cout << std::endl;
     }
 
     inline bool isCapture(Move move) {

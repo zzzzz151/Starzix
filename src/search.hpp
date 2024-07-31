@@ -209,17 +209,30 @@ class SearchThread {
 
         mPliesData[newPly].softReset();
         
-        if (move != MOVE_NONE) 
+        if (move != MOVE_NONE) {
             mAccumulatorPtr++;
+            mAccumulatorPtr->mUpdated = false;
+        }
     }
 
     inline i32 updateAccumulatorAndEval(i32 &eval) 
     {
+        assert(mAccumulatorPtr == &mAccumulators[0] 
+               ? mAccumulatorPtr->mUpdated 
+               : (mAccumulatorPtr - 1)->mUpdated);
+
+        if (!mAccumulatorPtr->mUpdated) 
+            mAccumulatorPtr->update(mAccumulatorPtr - 1, mBoard);
+
         if (mBoard.inCheck())
             eval = 0;
         else if (eval == EVAL_NONE) {
-            Accumulator acc = Accumulator(mBoard);
-            eval = evaluate(&acc, mBoard, true);
+            eval = evaluate(mAccumulatorPtr, mBoard, true);
+
+            assert([&]() {
+                Accumulator freshAcc = Accumulator(mBoard);
+                return evaluate(mAccumulatorPtr, mBoard, false) == evaluate(&freshAcc, mBoard, false);
+            }());
 
             // Adjust eval with correction history
             int stm = (int)mBoard.sideToMove();
