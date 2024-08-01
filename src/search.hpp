@@ -229,6 +229,11 @@ class SearchThread {
         else if (eval == EVAL_NONE) {
             eval = evaluate(mAccumulatorPtr, mBoard, true);
 
+            assert([&]() {
+                Accumulator freshAcc = Accumulator(mBoard);
+                return evaluate(mAccumulatorPtr, mBoard, false) == evaluate(&freshAcc, mBoard, false);
+            }());
+
             // Adjust eval with correction history
             int stm = (int)mBoard.sideToMove();
             eval += mCorrectionHistory[stm][mBoard.pawnHash() % 16384] / corrHistScale();

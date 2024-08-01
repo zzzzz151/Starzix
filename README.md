@@ -47,7 +47,9 @@ Have clang++ installed and run ```make```
 - Copymake make/undo move
 
 ### NNUE evaluation 
-- (768x2 -> 1024)x2 -> 1
+- (768x2x5 -> 1024)x2 -> 1
+- Horizontally mirrored based on friendly king square
+- 5 enemy queen input buckets
 - Lc0 data
 - Trained with [my trainer](https://github.com/zzzzz151/nn-trainer)
 
