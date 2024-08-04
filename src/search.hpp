@@ -68,7 +68,7 @@ class SearchThread {
     MultiArray<i16, 2, 16384> mPawnsCorrHist = {}; // [color][pawnHash % 16384]
 
     // Kings correction history
-    MultiArray<i16, 2, 4, 4> mKingsCorrHist = {}; // [color][whiteKingBucket][blackKingBucket]
+    MultiArray<i16, 2, 8, 8> mKingsCorrHist = {}; // [color][whiteKingBucket][blackKingBucket]
 
     // [whiteKingSquare]
     // [blackKingSquare ^ 56]
@@ -76,12 +76,12 @@ class SearchThread {
     //  A  B  C  D  E  F  G  H
         0, 0, 0, 1, 1, 2, 2, 2, // 1
         0, 0, 0, 1, 1, 2, 2, 2, // 2
-        3, 3, 3, 3, 3, 3, 3, 3, // 3
-        3, 3, 3, 3, 3, 3, 3, 3, // 4
-        3, 3, 3, 3, 3, 3, 3, 3, // 5
-        3, 3, 3, 3, 3, 3, 3, 3, // 6
-        3, 3, 3, 3, 3, 3, 3, 3, // 7 
-        3, 3, 3, 3, 3, 3, 3, 3, // 8
+        4, 4, 4, 4, 5, 5, 5, 5, // 3
+        4, 4, 4, 4, 5, 5, 5, 5, // 4
+        4, 4, 4 ,4, 5, 5, 5, 5, // 5
+        6, 6, 6, 6, 7, 7, 7, 7, // 6
+        6, 6, 6 ,6, 7, 7, 7, 7, // 7 
+        6, 6, 6, 6, 7, 7, 7, 7  // 8
     };
 
     std::vector<TTEntry>* ttPtr = nullptr;
