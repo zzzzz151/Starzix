@@ -68,7 +68,19 @@ class SearchThread {
     MultiArray<i16, 2, 16384> mPawnsCorrHist = {}; // [color][pawnHash % 16384]
 
     // Kings correction history
-    MultiArray<i16, 2, 64, 64> mKingsCorrHist = {}; // [color][whiteKingSquare][blackKingSquare]
+    MultiArray<i16, 2, 7, 7> mKingsCorrHist = {}; // [color][whiteKingBucket][blackKingBucket]
+
+    constexpr static std::array<int, 64> KINGS_CORR_HIST_BUCKETS = {
+    //  A  B  C  D  E  F  G  H
+        0, 0, 0, 1, 1, 2, 2, 2, // 1
+        0, 0, 0, 1, 1, 2, 2, 2, // 2
+        3, 3, 3, 3, 3, 3, 3, 3, // 3
+        3, 3, 3, 3, 3, 3, 3, 3, // 4
+        3, 3, 3, 3, 3, 3, 3, 3, // 5
+        3, 3, 3, 3, 3, 3, 3, 3, // 6
+        4, 4, 4, 5, 5, 6, 6, 6, // 7 
+        4, 4, 4, 5, 5, 6, 6, 6  // 8
+    };
 
     std::vector<TTEntry>* ttPtr = nullptr;
     
@@ -253,10 +265,12 @@ class SearchThread {
     inline std::array<i16*, 2> correctionHistories()
     {
         int stm = (int)mBoard.sideToMove();
+        int whiteKingBucket = KINGS_CORR_HIST_BUCKETS[mBoard.kingSquare(Color::WHITE)];
+        int blackKingBucket = KINGS_CORR_HIST_BUCKETS[mBoard.kingSquare(Color::BLACK)];
 
         return { 
             &mPawnsCorrHist[stm][mBoard.pawnHash() % 16384],  
-            &mKingsCorrHist[stm][mBoard.kingSquare(Color::WHITE)][mBoard.kingSquare(Color::BLACK)]
+            &mKingsCorrHist[stm][whiteKingBucket][blackKingBucket]
         };
     }
 
