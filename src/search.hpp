@@ -64,7 +64,11 @@ class SearchThread {
 
     std::array<u64, 1ULL << 17> mMovesNodes; // [move]
 
-    MultiArray<i32, 2, 16384> mCorrectionHistory = {}; // [color][pawnHash % 16384]
+    // Pawns correction history
+    MultiArray<i16, 2, 16384> mPawnsCorrHist = {}; // [color][pawnHash % 16384]
+
+    // Kings correction history
+    MultiArray<i16, 2, 64, 64> mKingsCorrHist = {}; // [color][whiteKingSquare][blackKingSquare]
 
     std::vector<TTEntry>* ttPtr = nullptr;
     
@@ -79,7 +83,8 @@ class SearchThread {
     inline void reset() {
         mMovesHistory = {};
         mCountermoves = {};
-        mCorrectionHistory = {};
+        mPawnsCorrHist = {};
+        mKingsCorrHist = {};
     }
 
     inline u64 getNodes() { return mNodes; }
@@ -226,22 +231,33 @@ class SearchThread {
 
         if (mBoard.inCheck())
             eval = 0;
-        else if (eval == EVAL_NONE) {
-            eval = evaluate(mAccumulatorPtr, mBoard, true);
-
+        else if (eval == EVAL_NONE) 
+        {
             assert([&]() {
                 Accumulator freshAcc = Accumulator(mBoard);
                 return evaluate(mAccumulatorPtr, mBoard, false) == evaluate(&freshAcc, mBoard, false);
             }());
 
-            // Adjust eval with correction history
-            int stm = (int)mBoard.sideToMove();
-            eval += mCorrectionHistory[stm][mBoard.pawnHash() % 16384] / corrHistScale();
+            eval = evaluate(mAccumulatorPtr, mBoard, true);
+
+            // Adjust eval with correction histories
+            for (i16* corrHist : correctionHistories())
+                eval += i32(*corrHist) / corrHistScale();
 
             eval = std::clamp(eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
         }
 
         return eval;
+    }
+
+    inline std::array<i16*, 2> correctionHistories()
+    {
+        int stm = (int)mBoard.sideToMove();
+
+        return { 
+            &mPawnsCorrHist[stm][mBoard.pawnHash() % 16384],  
+            &mKingsCorrHist[stm][mBoard.kingSquare(Color::WHITE)][mBoard.kingSquare(Color::BLACK)]
+        };
     }
 
     inline i32 aspiration(i32 iterationDepth, i32 score)
@@ -618,19 +634,25 @@ class SearchThread {
             // Store in TT
             (*ttPtr)[ttEntryIdx].update(mBoard.zobristHash(), depth, ply, bestScore, bestMove, bound);
 
-            // Update correction history
+            // Update correction histories
             if (!mBoard.inCheck()
             && abs(bestScore) < MIN_MATE_SCORE
             && (bestMove == MOVE_NONE || isBestMoveQuiet)
             && !(bound == Bound::LOWER && bestScore <= eval)
             && !(bound == Bound::UPPER && bestScore >= eval))
             {
-                i32 &corrHist = mCorrectionHistory[stm][mBoard.pawnHash() % 16384];
                 i32 newWeight = std::min(depth + depth * depth, corrHistScale());
-                
-                corrHist *= corrHistScale() - newWeight;
-                corrHist += (bestScore - eval) * corrHistScale() * newWeight;
-                corrHist = std::clamp(corrHist / corrHistScale(), -corrHistMax(), corrHistMax());
+
+                auto updateCorrHist = [&](i16* corrHist) -> void
+                {
+                    i32 newValue = *corrHist;
+                    newValue *= corrHistScale() - newWeight;
+                    newValue += (bestScore - eval) * corrHistScale() * newWeight;
+                    *corrHist = std::clamp(newValue / corrHistScale(), -corrHistMax(), corrHistMax());
+                };
+
+                for (i16* corrHist : correctionHistories())
+                    updateCorrHist(corrHist);
             }
 
         }

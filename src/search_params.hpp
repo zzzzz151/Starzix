@@ -117,7 +117,7 @@ TunableParam<float> contHist4PlyWeight = TunableParam<float>(0.45, 0.2, 4.0, 0.2
 
 // Correction history
 TunableParam<i32> corrHistScale = TunableParam<i32>(244, 50, 550, 50);
-TunableParam<i32> corrHistMax = TunableParam<i32>(15996, 4096, 32768, 2048);
+TunableParam<i32> corrHistMax = TunableParam<i32>(15996, 4096, 24576, 2048);
 
 // SEE piece values
 TunableParam<i32> seePawnValue = TunableParam<i32>(139, 1, 201, 50);
