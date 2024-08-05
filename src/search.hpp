@@ -4,7 +4,7 @@
 
 constexpr i32 INF = 32000, 
               MIN_MATE_SCORE = INF - 256,
-              EVAL_NONE = INF;
+              VALUE_NONE = INF + 1;
 
 #include "board.hpp"
 #include "search_params.hpp"
@@ -229,7 +229,7 @@ class SearchThread {
 
         if (mBoard.inCheck())
             eval = 0;
-        else if (eval == EVAL_NONE) 
+        else if (eval == VALUE_NONE) 
         {
             assert([&]() {
                 Accumulator freshAcc = Accumulator(mBoard);
@@ -397,6 +397,21 @@ class SearchThread {
                 if (stopSearch()) return 0;
 
 				if (score >= beta) return score >= MIN_MATE_SCORE ? beta : score;
+            }
+
+            // Probcut
+            i32 probcutBeta = beta + probcutMargin() - 50 * improving;
+            if (depth >= 5
+            && abs(beta) < MIN_MATE_SCORE - 1
+            && probcutBeta < MIN_MATE_SCORE - 1
+            && !(ttHit && (i32)ttEntry.depth >= depth - 3 && ttEntry.score < probcutBeta))
+            {
+                i32 probcutScore = probcut(
+                    depth, ply, probcutBeta, cutNode, doubleExtsLeft, ttMove, ttEntryIdx);
+
+                if (stopSearch()) return 0;
+
+                if (probcutScore != VALUE_NONE) return probcutScore;
             }
         }
 
@@ -759,6 +774,51 @@ class SearchThread {
         (*ttPtr)[ttEntryIdx].update(mBoard.zobristHash(), 0, ply, bestScore, bestMove, bound);
 
         return bestScore;
+    }
+
+    inline i32 probcut(
+        i32 depth, i32 ply, i32 probcutBeta, bool cutNode, u8 doubleExtsLeft, Move ttMove, auto ttEntryIdx)
+    {
+        PlyData* plyDataPtr = &mPliesData[ply];
+
+        // generate and score noisy moves (except underpromotions)
+        plyDataPtr->genAndScoreNoisyMoves(mBoard, ttMove);
+
+        // Moves loop
+        for (auto [move, moveScore] = plyDataPtr->nextMove(mBoard); 
+             move != MOVE_NONE; 
+             std::tie(move, moveScore) = plyDataPtr->nextMove(mBoard))
+        {
+            // SEE pruning (skip bad noisy moves)
+            if (!SEE(mBoard, move, probcutBeta - plyDataPtr->mEval)) 
+                continue;
+
+            makeMove(move, ply + 1);
+
+            auto score = [&] () -> i32
+            {
+                if (mBoard.isDraw(ply + 1)) return 0;
+
+                i32 score = -qSearch(ply + 1, -probcutBeta, -probcutBeta + 1);
+
+                if (score < probcutBeta) return score;
+
+                return -search(depth - 4, ply + 1, -probcutBeta, -probcutBeta + 1, !cutNode, doubleExtsLeft);
+            }();
+
+            mBoard.undoMove();
+            mAccumulatorPtr--;
+
+            if (stopSearch()) return 0;
+
+            if (score >= probcutBeta) {
+                (*ttPtr)[ttEntryIdx].update(mBoard.zobristHash(), depth - 3, ply, score, move, Bound::LOWER);
+                return score;
+            }
+
+        }
+
+        return VALUE_NONE;
     }
 
 }; // class SearchThread

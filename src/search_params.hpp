@@ -60,6 +60,9 @@ TunableParam<i32> nmpMinDepth = TunableParam<i32>(4, 2, 4, 1);
 TunableParam<i32> nmpBaseReduction = TunableParam<i32>(4, 2, 4, 1);
 TunableParam<float> nmpReductionDivisor = TunableParam<float>(2.982, 2.0, 4.0, 0.5);
 
+// Probcut
+TunableParam<i32> probcutMargin = TunableParam<i32>(200, 100, 350, 50);
+
 // IIR (Internal iterative reduction)
 TunableParam<i32> iirMinDepth = TunableParam<i32>(4, 4, 6, 1);
 
@@ -148,6 +151,7 @@ tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
     {stringify(nmpMinDepth), &nmpMinDepth},
     {stringify(nmpBaseReduction), &nmpBaseReduction},
     {stringify(nmpReductionDivisor), &nmpReductionDivisor},
+    {stringify(probcutMargin), &probcutMargin},
     {stringify(iirMinDepth), &iirMinDepth},
     {stringify(lmpMinMoves), &lmpMinMoves},
     {stringify(lmpMultiplier), &lmpMultiplier},
