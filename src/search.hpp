@@ -64,26 +64,9 @@ class SearchThread {
 
     std::array<u64, 1ULL << 17> mMovesNodes; // [move]
 
-    // Pawns correction history
-    MultiArray<i16, 2, 16384> mPawnsCorrHist = {}; // [color][pawnHash % 16384]
-
-    // Kings correction history
-    MultiArray<i16, 2, 7, 7> mKingsCorrHist = {}; // [color][whiteKingBucket][blackKingBucket]
-
-    // Kings correction history buckets
-    // [whiteKingSquare]
-    // [blackKingSquare ^ 56]
-    constexpr static std::array<int, 64> KINGS_CORR_HIST_BUCKETS = {
-    //  A  B  C  D  E  F  G  H
-        0, 0, 0, 1, 1, 2, 2, 2, // 1
-        0, 0, 0, 1, 1, 2, 2, 2, // 2
-        3, 3, 3, 3, 4, 4, 4, 4, // 3
-        3, 3, 3, 3, 4, 4, 4, 4, // 4
-        3, 3, 3, 3, 4, 4, 4, 4, // 5
-        5, 5, 5, 5, 6, 6, 6, 6, // 6
-        5, 5, 5, 5, 6, 6, 6, 6, // 7 
-        5, 5, 5, 5, 6, 6, 6, 6  // 8
-    };
+    // Correction histories
+    MultiArray<i16, 2, 16384> mPawnsCorrHist    = {}, // [color][Board.pawnHash % 16384]
+                              mNonPawnsCorrHist = {}; // [color][Board.nonPawnHash % 16384]
 
     std::vector<TTEntry>* ttPtr = nullptr;
     
@@ -99,7 +82,7 @@ class SearchThread {
         mMovesHistory = {};
         mCountermoves = {};
         mPawnsCorrHist = {};
-        mKingsCorrHist = {};
+        mNonPawnsCorrHist = {};
     }
 
     inline u64 getNodes() { return mNodes; }
@@ -255,26 +238,16 @@ class SearchThread {
 
             eval = evaluate(mAccumulatorPtr, mBoard, true);
 
+            int stm = (int)mBoard.sideToMove();
+
             // Adjust eval with correction histories
-            for (i16* corrHist : correctionHistories())
-                eval += i32(*corrHist) / corrHistScale();
+            eval += (i32)mPawnsCorrHist[stm][mBoard.pawnHash() % 16384] / corrHistScale();
+            eval += (i32)mNonPawnsCorrHist[stm][mBoard.nonPawnHash() % 16384] / corrHistScale();
 
             eval = std::clamp(eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
         }
 
         return eval;
-    }
-
-    inline std::array<i16*, 2> correctionHistories()
-    {
-        int stm = (int)mBoard.sideToMove();
-        int whiteKingBucket = KINGS_CORR_HIST_BUCKETS[mBoard.kingSquare(Color::WHITE)];
-        int blackKingBucket = KINGS_CORR_HIST_BUCKETS[mBoard.kingSquare(Color::BLACK) ^ 56];
-
-        return { 
-            &mPawnsCorrHist[stm][mBoard.pawnHash() % 16384],  
-            &mKingsCorrHist[stm][whiteKingBucket][blackKingBucket]
-        };
     }
 
     inline i32 aspiration(i32 iterationDepth, i32 score)
@@ -660,16 +633,16 @@ class SearchThread {
             {
                 i32 newWeight = std::min(depth + depth * depth, corrHistScale());
 
-                auto updateCorrHist = [&](i16* corrHist) -> void
+                auto updateCorrHist = [&](i16 &corrHist) -> void
                 {
-                    i32 newValue = *corrHist;
+                    i32 newValue = corrHist;
                     newValue *= corrHistScale() - newWeight;
                     newValue += (bestScore - eval) * corrHistScale() * newWeight;
-                    *corrHist = std::clamp(newValue / corrHistScale(), -corrHistMax(), corrHistMax());
+                    corrHist = std::clamp(newValue / corrHistScale(), -corrHistMax(), corrHistMax());
                 };
 
-                for (i16* corrHist : correctionHistories())
-                    updateCorrHist(corrHist);
+                updateCorrHist(mPawnsCorrHist[stm][mBoard.pawnHash() % 16384]);
+                updateCorrHist(mNonPawnsCorrHist[stm][mBoard.nonPawnHash() % 16384]);
             }
 
         }
