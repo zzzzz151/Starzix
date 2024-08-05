@@ -40,7 +40,7 @@ struct BoardState {
     u64 checkers = 0;
     u64 zobristHash = 0;
     u64 pawnHash = 0;
-    u64 nonPawnHash = 0;
+    std::array<u64, 2> nonPawnsHash = {}; // [pieceColor]
     u16 lastMove = MOVE_NONE.encoded();
     PieceType captured = PieceType::NONE;
 } __attribute__((packed));
@@ -207,7 +207,7 @@ class Board {
 
     inline u64 pawnHash() { return mState->pawnHash; }
 
-    inline u64 nonPawnHash() { return mState->nonPawnHash; }
+    inline u64 nonPawnsHash(Color color) { return mState->nonPawnsHash[(int)color]; }
 
     inline Move lastMove() { return mState->lastMove; }
 
@@ -269,7 +269,7 @@ class Board {
         if (pieceType == PieceType::PAWN)
             mState->pawnHash ^= ZOBRIST_PIECES[(int)color][(int)pieceType][square];
         else
-            mState->nonPawnHash ^= ZOBRIST_PIECES[(int)color][(int)pieceType][square];
+            mState->nonPawnsHash[(int)color] ^= ZOBRIST_PIECES[(int)color][(int)pieceType][square];
     }
 
     public:

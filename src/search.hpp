@@ -65,8 +65,8 @@ class SearchThread {
     std::array<u64, 1ULL << 17> mMovesNodes; // [move]
 
     // Correction histories
-    MultiArray<i16, 2, 16384> mPawnsCorrHist    = {}, // [color][Board.pawnHash % 16384]
-                              mNonPawnsCorrHist = {}; // [color][Board.nonPawnHash % 16384]
+    MultiArray<i16, 2, 16384> mPawnsCorrHist    = {}, // [stm][Board.pawnHash % 16384]
+                              mNonPawnsCorrHist = {}; // [pieceColor][Board.nonPawnsHash(pieceColor) % 16384]
 
     std::vector<TTEntry>* ttPtr = nullptr;
     
@@ -238,16 +238,26 @@ class SearchThread {
 
             eval = evaluate(mAccumulatorPtr, mBoard, true);
 
-            int stm = (int)mBoard.sideToMove();
-
             // Adjust eval with correction histories
-            eval += (i32)mPawnsCorrHist[stm][mBoard.pawnHash() % 16384] / corrHistScale();
-            eval += (i32)mNonPawnsCorrHist[stm][mBoard.nonPawnHash() % 16384] / corrHistScale();
+            auto [pawnsCorrHist, whitePiecesNoPawnsCorrHist, blackPiecesNoPawnsCorrHist] = correctionHistories();
+            eval += i32(*pawnsCorrHist) / corrHistScale();
+            eval += (i32(*whitePiecesNoPawnsCorrHist) + i32(*blackPiecesNoPawnsCorrHist)) / 2 / corrHistScale();
 
             eval = std::clamp(eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
         }
 
         return eval;
+    }
+
+    inline std::array<i16*, 3> correctionHistories()
+    {
+        int stm = (int)mBoard.sideToMove();
+
+        return {
+            &mPawnsCorrHist[stm][mBoard.pawnHash() % 16384],
+            &mNonPawnsCorrHist[WHITE][mBoard.nonPawnsHash(Color::WHITE) % 16384],
+            &mNonPawnsCorrHist[BLACK][mBoard.nonPawnsHash(Color::BLACK) % 16384]
+        };
     }
 
     inline i32 aspiration(i32 iterationDepth, i32 score)
@@ -633,16 +643,16 @@ class SearchThread {
             {
                 i32 newWeight = std::min(depth + depth * depth, corrHistScale());
 
-                auto updateCorrHist = [&](i16 &corrHist) -> void
+                auto updateCorrHist = [&](i16* corrHist) -> void
                 {
-                    i32 newValue = corrHist;
+                    i32 newValue = *corrHist;
                     newValue *= corrHistScale() - newWeight;
                     newValue += (bestScore - eval) * corrHistScale() * newWeight;
-                    corrHist = std::clamp(newValue / corrHistScale(), -corrHistMax(), corrHistMax());
+                    *corrHist = std::clamp(newValue / corrHistScale(), -corrHistMax(), corrHistMax());
                 };
 
-                updateCorrHist(mPawnsCorrHist[stm][mBoard.pawnHash() % 16384]);
-                updateCorrHist(mNonPawnsCorrHist[stm][mBoard.nonPawnHash() % 16384]);
+                for (i16* corrHist : correctionHistories())
+                    updateCorrHist(corrHist);
             }
 
         }
