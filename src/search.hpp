@@ -65,8 +65,8 @@ class SearchThread {
     std::array<u64, 1ULL << 17> mMovesNodes; // [move]
 
     // Correction histories
-    MultiArray<i16, 2, 16384> mPawnsCorrHist    = {}, // [stm][Board.pawnHash % 16384]
-                              mNonPawnsCorrHist = {}; // [pieceColor][Board.nonPawnsHash(pieceColor) % 16384]
+    MultiArray<i16, 2, 16384> mPawnsCorrHist = {}; // [stm][Board.pawnHash % 16384]
+    MultiArray<i16, 2, 2, 16384> mNonPawnsCorrHist = {}; // [stm][pieceColor][Board.nonPawnsHash(pieceColor) % 16384]
 
     std::vector<TTEntry>* ttPtr = nullptr;
     
@@ -255,8 +255,8 @@ class SearchThread {
 
         return {
             &mPawnsCorrHist[stm][mBoard.pawnHash() % 16384],
-            &mNonPawnsCorrHist[WHITE][mBoard.nonPawnsHash(Color::WHITE) % 16384],
-            &mNonPawnsCorrHist[BLACK][mBoard.nonPawnsHash(Color::BLACK) % 16384]
+            &mNonPawnsCorrHist[stm][WHITE][mBoard.nonPawnsHash(Color::WHITE) % 16384],
+            &mNonPawnsCorrHist[stm][BLACK][mBoard.nonPawnsHash(Color::BLACK) % 16384]
         };
     }
 
