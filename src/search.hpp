@@ -4,7 +4,7 @@
 
 constexpr i32 INF = 32000, 
               MIN_MATE_SCORE = INF - 256,
-              EVAL_NONE = INF;
+              VALUE_NONE = INF + 1;
 
 #include "board.hpp"
 #include "search_params.hpp"
@@ -65,7 +65,7 @@ class SearchThread {
     std::array<u64, 1ULL << 17> mMovesNodes; // [move]
 
     // Correction histories
-    MultiArray<i16, 2, 16384> mPawnsCorrHist = {}; // [stm][Board.pawnHash % 16384]
+    MultiArray<i16, 2, 16384> mPawnsCorrHist = {}; // [stm][Board.pawnsHash() % 16384]
     MultiArray<i16, 2, 2, 16384> mNonPawnsCorrHist = {}; // [stm][pieceColor][Board.nonPawnsHash(pieceColor) % 16384]
 
     std::vector<TTEntry>* ttPtr = nullptr;
@@ -229,7 +229,7 @@ class SearchThread {
 
         if (mBoard.inCheck())
             eval = 0;
-        else if (eval == EVAL_NONE) 
+        else if (eval == VALUE_NONE) 
         {
             assert([&]() {
                 Accumulator freshAcc = Accumulator(mBoard);
@@ -254,7 +254,7 @@ class SearchThread {
         int stm = (int)mBoard.sideToMove();
 
         return {
-            &mPawnsCorrHist[stm][mBoard.pawnHash() % 16384],
+            &mPawnsCorrHist[stm][mBoard.pawnsHash() % 16384],
             &mNonPawnsCorrHist[stm][WHITE][mBoard.nonPawnsHash(Color::WHITE) % 16384],
             &mNonPawnsCorrHist[stm][BLACK][mBoard.nonPawnsHash(Color::BLACK) % 16384]
         };
@@ -397,6 +397,21 @@ class SearchThread {
                 if (stopSearch()) return 0;
 
 				if (score >= beta) return score >= MIN_MATE_SCORE ? beta : score;
+            }
+
+            // Probcut
+            i32 probcutBeta = beta + probcutMargin() - improving * probcutMargin() * probcutImprovingPercentage();
+            if (depth >= 5
+            && abs(beta) < MIN_MATE_SCORE - 1
+            && probcutBeta < MIN_MATE_SCORE - 1
+            && !(ttHit && (i32)ttEntry.depth >= depth - 3 && ttEntry.score < probcutBeta))
+            {
+                i32 probcutScore = probcut(
+                    depth, ply, probcutBeta, cutNode, doubleExtsLeft, ttMove, ttEntryIdx);
+
+                if (stopSearch()) return 0;
+
+                if (probcutScore != VALUE_NONE) return probcutScore;
             }
         }
 
@@ -643,16 +658,13 @@ class SearchThread {
             {
                 i32 newWeight = std::min(depth + depth * depth, corrHistScale());
 
-                auto updateCorrHist = [&](i16* corrHist) -> void
+                for (i16* corrHist : correctionHistories())
                 {
                     i32 newValue = *corrHist;
                     newValue *= corrHistScale() - newWeight;
                     newValue += (bestScore - eval) * corrHistScale() * newWeight;
                     *corrHist = std::clamp(newValue / corrHistScale(), -corrHistMax(), corrHistMax());
-                };
-
-                for (i16* corrHist : correctionHistories())
-                    updateCorrHist(corrHist);
+                }
             }
 
         }
@@ -759,6 +771,52 @@ class SearchThread {
         (*ttPtr)[ttEntryIdx].update(mBoard.zobristHash(), 0, ply, bestScore, bestMove, bound);
 
         return bestScore;
+    }
+
+    inline i32 probcut(
+        i32 depth, i32 ply, i32 probcutBeta, bool cutNode, u8 doubleExtsLeft, Move ttMove, auto ttEntryIdx)
+    {
+        PlyData* plyDataPtr = &mPliesData[ply];
+
+        // generate and score noisy moves (except underpromotions)
+        plyDataPtr->genAndScoreNoisyMoves(mBoard, ttMove);
+
+        // Moves loop
+        for (auto [move, moveScore] = plyDataPtr->nextMove(mBoard); 
+             move != MOVE_NONE; 
+             std::tie(move, moveScore) = plyDataPtr->nextMove(mBoard))
+        {
+            // SEE pruning (skip bad noisy moves)
+            if (!SEE(mBoard, move, probcutBeta - plyDataPtr->mEval)) 
+                continue;
+
+            makeMove(move, ply + 1);
+
+            i32 score = 0;
+
+            if (mBoard.isDraw(ply + 1))
+                goto moveSearched;
+
+            score = -qSearch(ply + 1, -probcutBeta, -probcutBeta + 1);
+
+            if (score >= probcutBeta)
+                score = -search(depth - 4, ply + 1, -probcutBeta, -probcutBeta + 1, !cutNode, doubleExtsLeft);
+
+            moveSearched:
+
+            mBoard.undoMove();
+            mAccumulatorPtr--;
+
+            if (stopSearch()) return 0;
+
+            if (score >= probcutBeta) {
+                (*ttPtr)[ttEntryIdx].update(mBoard.zobristHash(), depth - 3, ply, score, move, Bound::LOWER);
+                return score;
+            }
+
+        }
+
+        return VALUE_NONE;
     }
 
 }; // class SearchThread

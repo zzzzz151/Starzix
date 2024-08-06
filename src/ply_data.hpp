@@ -14,7 +14,7 @@ struct PlyData {
 
     u64 mPinned = 0;
     ArrayVec<Move, MAX_DEPTH+1> mPvLine = {};
-    i32 mEval = EVAL_NONE;
+    i32 mEval = VALUE_NONE;
     Move mKiller = MOVE_NONE;
     u64 mEnemyAttacks = 0;
 
@@ -22,7 +22,7 @@ struct PlyData {
     inline void softReset() {
         mAllMovesGenerated = mNoisyMovesGenerated = false;
         mPvLine.clear();
-        mEval = EVAL_NONE;
+        mEval = VALUE_NONE;
     }
 
     // For main search
@@ -95,7 +95,7 @@ struct PlyData {
     }
 
     // For qsearch
-    inline void genAndScoreNoisyMoves(Board &board) 
+    inline void genAndScoreNoisyMoves(Board &board, Move ttMove = MOVE_NONE) 
     {
         // Generate pinned pieces if not already generated
         // Needed for Board.isPseudolegalLegal(Move move, u64 pinned)
@@ -112,6 +112,12 @@ struct PlyData {
         for (size_t i = 0; i < mNoisyMoves.size(); i++) 
         {
             Move move = mNoisyMoves[i];
+
+            if (move == ttMove) {
+                mMovesScores[i] = I32_MAX;
+                continue;
+            }
+
             PieceType captured = board.captured(move);
             PieceType promotion = move.promotion();
 

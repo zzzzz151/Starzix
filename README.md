@@ -57,22 +57,23 @@ Have clang++ installed and run ```make```
 - Iterative deepening
 - Fail-soft Negamax
 - Principal variation search
-- Aspiration windows
 - Quiescence search
+- Aspiration windows
 - Transposition table
 - Alpha-beta pruning
 - Reverse futility pruning
 - Razoring
 - Null move pruning
+- Probcut
 - Late move pruning
 - Futility pruning
 - SEE pruning
 - Internal iterative reduction
 - Late move reductions
 - Singular extensions (with negative and double extensions)
-- Correction history
+- Correction histories
 - Cuckoo (detect upcoming repetition)
-- Time management: hard and soft time limits
+- Time management (hard limit, soft limit, nodes TM)
 - Multithreading / Lazy SMP
 
 ### Move ordering
