@@ -65,7 +65,7 @@ class SearchThread {
     std::array<u64, 1ULL << 17> mMovesNodes; // [move]
 
     // Correction histories
-    MultiArray<i16, 2, 16384> mPawnsCorrHist = {}; // [stm][Board.pawnHash % 16384]
+    MultiArray<i16, 2, 16384> mPawnsCorrHist = {}; // [stm][Board.pawnsHash() % 16384]
     MultiArray<i16, 2, 2, 16384> mNonPawnsCorrHist = {}; // [stm][pieceColor][Board.nonPawnsHash(pieceColor) % 16384]
 
     std::vector<TTEntry>* ttPtr = nullptr;
@@ -254,7 +254,7 @@ class SearchThread {
         int stm = (int)mBoard.sideToMove();
 
         return {
-            &mPawnsCorrHist[stm][mBoard.pawnHash() % 16384],
+            &mPawnsCorrHist[stm][mBoard.pawnsHash() % 16384],
             &mNonPawnsCorrHist[stm][WHITE][mBoard.nonPawnsHash(Color::WHITE) % 16384],
             &mNonPawnsCorrHist[stm][BLACK][mBoard.nonPawnsHash(Color::BLACK) % 16384]
         };
@@ -658,16 +658,13 @@ class SearchThread {
             {
                 i32 newWeight = std::min(depth + depth * depth, corrHistScale());
 
-                auto updateCorrHist = [&](i16* corrHist) -> void
+                for (i16* corrHist : correctionHistories())
                 {
                     i32 newValue = *corrHist;
                     newValue *= corrHistScale() - newWeight;
                     newValue += (bestScore - eval) * corrHistScale() * newWeight;
                     *corrHist = std::clamp(newValue / corrHistScale(), -corrHistMax(), corrHistMax());
-                };
-
-                for (i16* corrHist : correctionHistories())
-                    updateCorrHist(corrHist);
+                }
             }
 
         }
@@ -795,16 +792,17 @@ class SearchThread {
 
             makeMove(move, ply + 1);
 
-            auto score = [&] () -> i32
-            {
-                if (mBoard.isDraw(ply + 1)) return 0;
+            i32 score = 0;
 
-                i32 score = -qSearch(ply + 1, -probcutBeta, -probcutBeta + 1);
+            if (mBoard.isDraw(ply + 1))
+                goto moveSearched;
 
-                if (score < probcutBeta) return score;
+            score = -qSearch(ply + 1, -probcutBeta, -probcutBeta + 1);
 
-                return -search(depth - 4, ply + 1, -probcutBeta, -probcutBeta + 1, !cutNode, doubleExtsLeft);
-            }();
+            if (score >= probcutBeta)
+                score = -search(depth - 4, ply + 1, -probcutBeta, -probcutBeta + 1, !cutNode, doubleExtsLeft);
+
+            moveSearched:
 
             mBoard.undoMove();
             mAccumulatorPtr--;

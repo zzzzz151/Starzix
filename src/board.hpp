@@ -39,7 +39,7 @@ struct BoardState {
     u16 currentMoveCounter = 1;
     u64 checkers = 0;
     u64 zobristHash = 0;
-    u64 pawnHash = 0;
+    u64 pawnsHash = 0;
     std::array<u64, 2> nonPawnsHash = {}; // [pieceColor]
     u16 lastMove = MOVE_NONE.encoded();
     PieceType captured = PieceType::NONE;
@@ -205,7 +205,7 @@ class Board {
 
     inline u64 zobristHash() { return mState->zobristHash; }
 
-    inline u64 pawnHash() { return mState->pawnHash; }
+    inline u64 pawnsHash() { return mState->pawnsHash; }
 
     inline u64 nonPawnsHash(Color color) { return mState->nonPawnsHash[(int)color]; }
 
@@ -267,7 +267,7 @@ class Board {
         mState->zobristHash ^= ZOBRIST_PIECES[(int)color][(int)pieceType][square];
 
         if (pieceType == PieceType::PAWN)
-            mState->pawnHash ^= ZOBRIST_PIECES[(int)color][(int)pieceType][square];
+            mState->pawnsHash ^= ZOBRIST_PIECES[(int)color][(int)pieceType][square];
         else
             mState->nonPawnsHash[(int)color] ^= ZOBRIST_PIECES[(int)color][(int)pieceType][square];
     }
@@ -1116,7 +1116,7 @@ class Board {
                 auto colorBitboards = mState->colorBitboard;
                 auto pawnBb = mState->piecesBitboards[PAWN];
                 auto zobristHash = mState->zobristHash;
-                auto pawnHash = mState->pawnHash;
+                auto pawnsHash = mState->pawnsHash;
 
                 // Make the en passant move
 
@@ -1134,7 +1134,7 @@ class Board {
                 mState->colorBitboard = colorBitboards;
                 mState->piecesBitboards[PAWN] = pawnBb;
                 mState->zobristHash = zobristHash;
-                mState->pawnHash = pawnHash;
+                mState->pawnsHash = pawnsHash;
 
                 if (enPassantLegal) return true;
             }
