@@ -68,7 +68,7 @@ class SearchThread {
     MultiArray<i16, 2, 16384>    mPawnsCorrHist    = {}; // [stm][Board.pawnsHash() % 16384]
     MultiArray<i16, 2, 2, 16384> mNonPawnsCorrHist = {}; // [stm][pieceColor][Board.nonPawnsHash(pieceColor) % 16384]
 
-     MultiArray<nnue::FinnyTableEntry, 2, nnue::NUM_INPUT_BUCKETS> mFinnyTable; // [inputBucket]
+    nnue::FinnyTable mFinnyTable; // [color][mirrorHorizontally][inputBucket]
 
     std::vector<TTEntry>* ttPtr = nullptr;
     
@@ -117,7 +117,11 @@ class SearchThread {
         mAccumulators[0] = Accumulator(mBoard);
         mAccumulatorPtr = &mAccumulators[0];
 
-        mFinnyTable = {};
+        // Reset finny table
+        for (Color color : {Color::WHITE, Color::BLACK})
+            for (int mirrorHorizontally : {false, true})
+                for (int inputBucket = 0; inputBucket < nnue::NUM_INPUT_BUCKETS; inputBucket++)
+                    mFinnyTable[(int)color][mirrorHorizontally][inputBucket] = nnue::FinnyTableEntry(color);
 
         // ID (Iterative deepening)
         i32 score = 0;
@@ -237,7 +241,11 @@ class SearchThread {
         {
             assert([&]() {
                 Accumulator freshAcc = Accumulator(mBoard);
-                return evaluate(mAccumulatorPtr, mBoard, false) == evaluate(&freshAcc, mBoard, false);
+                bool equal = evaluate(mAccumulatorPtr, mBoard, false) == evaluate(&freshAcc, mBoard, false);
+
+                if (!equal) mBoard.print();
+
+                return equal;
             }());
 
             eval = evaluate(mAccumulatorPtr, mBoard, true);

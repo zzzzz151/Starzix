@@ -55,12 +55,23 @@ const Net* NET = (const Net*)gNetFileData;
 struct FinnyTableEntry {
     public:
 
-    std::array<u64, 2> colorBitboards  = {}; // [color]
-    std::array<u64, 6> piecesBitboards = {}; // [pieceType]
+    std::array<u64, 2> colorBitboards;  // [color]
+    std::array<u64, 6> piecesBitboards; // [pieceType]
 
-    // [color][hiddenNeuronIdx]
-    alignas(sizeof(Vec)) MultiArray<i16, 2, HIDDEN_LAYER_SIZE> accumulators = NET->hiddenBiases;
+    // [hiddenNeuronIdx]
+    alignas(sizeof(Vec)) std::array<i16, HIDDEN_LAYER_SIZE> accumulator;
+
+    inline FinnyTableEntry() = default;
+
+    inline FinnyTableEntry(Color color) {
+        colorBitboards  = {};
+        piecesBitboards = {};
+        accumulator = NET->hiddenBiases[(int)color];
+    }
 };
+
+// [color][mirrorHorizontally][inputBucket]
+using FinnyTable = MultiArray<FinnyTableEntry, 2, 2, NUM_INPUT_BUCKETS>; 
 
 struct Accumulator {
     public:
@@ -139,6 +150,8 @@ struct Accumulator {
         if (mMirrorHorizontally[(int)color])
             sq ^= 7;
 
+        assert((int)pieceColor * 384 + (int)pt * 64 + (int)sq < 768);
+
         return (int)pieceColor * 384 + (int)pt * 64 + (int)sq;
     }
 
@@ -151,9 +164,10 @@ struct Accumulator {
         };
     }
 
-    inline void updateFinnyEntryAndAccumulator(FinnyTableEntry &finnyEntry, Color accColor, Board &board) 
+    inline void updateFinnyEntryAndAccumulator(FinnyTable &finnyTable, Color accColor, Board &board) 
     {
-        const int inputBucket = mInputBucket[(int)accColor];
+        const int iAccColor = (int)accColor;
+        FinnyTableEntry &finnyEntry = finnyTable[iAccColor][mMirrorHorizontally[iAccColor]][mInputBucket[iAccColor]];
 
         auto updatePiece = [&](Color pieceColor, PieceType pt) -> void
         {
@@ -165,18 +179,18 @@ struct Accumulator {
 
             while (remove > 0) {
                 Square sq = poplsb(remove);
-                const int ft = feature(accColor, pieceColor, pt, sq); 
+                const int ft = feature(accColor, pieceColor, pt, sq);
 
                 for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
-                    finnyEntry.accumulators[(int)accColor][i] -= NET->featuresWeights[(int)accColor][inputBucket][ft][i];
+                    finnyEntry.accumulator[i] -= NET->featuresWeights[iAccColor][mInputBucket[iAccColor]][ft][i];
             }
 
             while (add > 0) {
                 Square sq = poplsb(add);
-                const int ft = feature(accColor, pieceColor, pt, sq); 
+                const int ft = feature(accColor, pieceColor, pt, sq);
 
                 for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
-                    finnyEntry.accumulators[(int)accColor][i] += NET->featuresWeights[(int)accColor][inputBucket][ft][i];
+                    finnyEntry.accumulator[i] += NET->featuresWeights[iAccColor][mInputBucket[iAccColor]][ft][i];
             }
         };
 
@@ -184,7 +198,7 @@ struct Accumulator {
             for (int pieceType = PAWN; pieceType <= KING; pieceType++)
                 updatePiece(pieceColor, (PieceType)pieceType);
 
-        mAccumulators[(int)accColor] = finnyEntry.accumulators[(int)accColor];
+        mAccumulators[iAccColor] = finnyEntry.accumulator;
 
         board.getColorBitboards(finnyEntry.colorBitboards);
         board.getPiecesBitboards(finnyEntry.piecesBitboards);
@@ -192,7 +206,7 @@ struct Accumulator {
 
     public:
 
-    inline void update(Accumulator* oldAcc, Board &board, MultiArray<FinnyTableEntry, 2, NUM_INPUT_BUCKETS> &finnyTable)
+    inline void update(Accumulator* oldAcc, Board &board, FinnyTable &finnyTable)
     {
         assert(oldAcc->mUpdated && !mUpdated);
 
@@ -226,10 +240,7 @@ struct Accumulator {
         // If our HM toggled or our input bucket changed, reset our accumulator
         if  (mMirrorHorizontally[iColorMoving] != oldAcc->mMirrorHorizontally[iColorMoving]
         || mInputBucket[iColorMoving] != oldAcc->mInputBucket[iColorMoving])
-        {
-            FinnyTableEntry &finnyEntry = finnyTable[mMirrorHorizontally[iColorMoving]][mInputBucket[iColorMoving]];
-            updateFinnyEntryAndAccumulator(finnyEntry, colorMoving, board);
-        }
+            updateFinnyEntryAndAccumulator(finnyTable, colorMoving, board);
 
         // If our queen moved or we promoted to a queen, enemy's input bucket may have changed
         if (pieceType == PieceType::QUEEN || promotion == PieceType::QUEEN)
@@ -238,10 +249,7 @@ struct Accumulator {
 
             // If their input bucket changed, reset their accumulator
             if  (mInputBucket[iNotColorMoving] != oldAcc->mInputBucket[iNotColorMoving])
-            {
-                FinnyTableEntry &finnyEntry = finnyTable[mMirrorHorizontally[iNotColorMoving]][mInputBucket[iNotColorMoving]];
-                updateFinnyEntryAndAccumulator(finnyEntry, notColorMoving, board);
-            }
+                updateFinnyEntryAndAccumulator(finnyTable, notColorMoving, board);
         }
 
         // [color]

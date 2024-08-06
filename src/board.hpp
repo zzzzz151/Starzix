@@ -382,7 +382,7 @@ class Board {
         std::cout << fen() << std::endl;
         std::cout << "Zobrist hash: " << mState->zobristHash << std::endl;
 
-        if (mStates.size() == 0) return;
+        if (mStates.size() <= 1) return;
 
         std::cout << "Moves:";
 

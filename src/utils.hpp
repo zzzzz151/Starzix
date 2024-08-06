@@ -124,14 +124,18 @@ constexpr u64 shiftDown(u64 bb) { return bb >> 8ULL; }
 
 inline void printBitboard(u64 bb)
 {
+    std::cout << std::endl;
     std::bitset<64> b(bb);
     std::string str_bitset = b.to_string(); 
+
     for (int i = 0; i < 64; i += 8)
     {
         std::string x = str_bitset.substr(i, 8);
         reverse(x.begin(), x.end());
+
         for (u64 j = 0; j < x.length(); j++)
             std::cout << std::string(1, x[j]) << " ";
+
         std::cout << std::endl;
     }
 }
