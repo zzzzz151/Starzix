@@ -55,8 +55,8 @@ class SearchThread {
 
     std::array<PlyData, MAX_DEPTH+1> mPliesData; // [ply]
 
-    std::array<Accumulator, MAX_DEPTH+1> mAccumulators;
-    Accumulator* mAccumulatorPtr = &mAccumulators[0];
+    std::array<BothAccumulators, MAX_DEPTH+1> mAccumulators;
+    BothAccumulators* mAccumulatorPtr = &mAccumulators[0];
 
     MultiArray<HistoryEntry, 2, 6, 64> mMovesHistory = {}; // [stm][pieceType][targetSquare]
 
@@ -65,8 +65,10 @@ class SearchThread {
     std::array<u64, 1ULL << 17> mMovesNodes; // [move]
 
     // Correction histories
-    MultiArray<i16, 2, 16384> mPawnsCorrHist = {}; // [stm][Board.pawnsHash() % 16384]
+    MultiArray<i16, 2, 16384>    mPawnsCorrHist    = {}; // [stm][Board.pawnsHash() % 16384]
     MultiArray<i16, 2, 2, 16384> mNonPawnsCorrHist = {}; // [stm][pieceColor][Board.nonPawnsHash(pieceColor) % 16384]
+
+    nnue::FinnyTable mFinnyTable; // [color][mirrorHorizontally][inputBucket]
 
     std::vector<TTEntry>* ttPtr = nullptr;
     
@@ -109,11 +111,25 @@ class SearchThread {
 
         mPliesData[0] = PlyData();
 
-        mAccumulators[0] = Accumulator(mBoard);
-        mAccumulatorPtr = &mAccumulators[0];
-
         mNodes = 0;
         mMovesNodes = {};
+
+        mAccumulators[0] = BothAccumulators(mBoard);
+        mAccumulatorPtr = &mAccumulators[0];
+
+        // Reset finny table
+        for (int color : {WHITE, BLACK})
+            for (int mirrorHorizontally : {false, true})
+                for (int inputBucket = 0; inputBucket < nnue::NUM_INPUT_BUCKETS; inputBucket++)
+                {
+                    bool sameAcc = mirrorHorizontally == mAccumulatorPtr->mMirrorHorizontally[color]
+                                   && inputBucket == mAccumulatorPtr->mInputBucket[color];
+
+                    mFinnyTable[color][mirrorHorizontally][inputBucket] =
+                        sameAcc 
+                        ? nnue::FinnyTableEntry(mAccumulatorPtr->mAccumulators[color], mBoard)
+                        : nnue::FinnyTableEntry((Color)color);
+                }
 
         // ID (Iterative deepening)
         i32 score = 0;
@@ -225,15 +241,19 @@ class SearchThread {
                : (mAccumulatorPtr - 1)->mUpdated);
 
         if (!mAccumulatorPtr->mUpdated) 
-            mAccumulatorPtr->update(mAccumulatorPtr - 1, mBoard);
+            mAccumulatorPtr->update(mAccumulatorPtr - 1, mBoard, mFinnyTable);
 
         if (mBoard.inCheck())
             eval = 0;
         else if (eval == VALUE_NONE) 
         {
             assert([&]() {
-                Accumulator freshAcc = Accumulator(mBoard);
-                return evaluate(mAccumulatorPtr, mBoard, false) == evaluate(&freshAcc, mBoard, false);
+                BothAccumulators freshAcc = BothAccumulators(mBoard);
+                bool equal = evaluate(mAccumulatorPtr, mBoard, false) == evaluate(&freshAcc, mBoard, false);
+
+                if (!equal) mBoard.print();
+
+                return equal;
             }());
 
             eval = evaluate(mAccumulatorPtr, mBoard, true);
