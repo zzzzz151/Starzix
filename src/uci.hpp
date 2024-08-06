@@ -50,7 +50,7 @@ inline void runCommand(std::string &command, Board &board, std::vector<TTEntry> 
         board.print();
     else if (tokens[0] == "eval") 
     {
-        Accumulator acc = Accumulator(board);
+        BothAccumulators acc = BothAccumulators(board);
 
         std::cout << "eval "    << evaluate(&acc, board, false)
                   << " scaled " << evaluate(&acc, board, true)

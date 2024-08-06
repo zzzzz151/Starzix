@@ -73,7 +73,7 @@ struct FinnyTableEntry {
 // [color][mirrorHorizontally][inputBucket]
 using FinnyTable = MultiArray<FinnyTableEntry, 2, 2, NUM_INPUT_BUCKETS>; 
 
-struct Accumulator {
+struct BothAccumulators {
     public:
 
     // [color][hiddenNeuronIdx]
@@ -89,9 +89,9 @@ struct Accumulator {
 
     std::array<int, 2> mInputBucket = {0, 0}; // [color]
 
-    inline Accumulator() = default;
+    inline BothAccumulators() = default;
 
-    inline Accumulator(Board &board) 
+    inline BothAccumulators(Board &board) 
     {
         mAccumulators = NET->hiddenBiases;
 
@@ -110,12 +110,11 @@ struct Accumulator {
 
             while (bb > 0) {
                 Square sq = poplsb(bb);
-                const int featureWhite = feature(Color::WHITE, pieceColor, pt, sq); 
-                const int featureBlack = feature(Color::BLACK, pieceColor, pt, sq);
+                std::array<int, 2> fts = features(pieceColor, pt, sq);
 
                 for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) {
-                    mAccumulators[WHITE][i] += NET->featuresWeights[WHITE][mInputBucket[WHITE]][featureWhite][i];
-                    mAccumulators[BLACK][i] += NET->featuresWeights[BLACK][mInputBucket[BLACK]][featureBlack][i];
+                    mAccumulators[WHITE][i] += NET->featuresWeights[WHITE][mInputBucket[WHITE]][fts[WHITE]][i];
+                    mAccumulators[BLACK][i] += NET->featuresWeights[BLACK][mInputBucket[BLACK]][fts[BLACK]][i];
                 }
             }
         };
@@ -206,7 +205,7 @@ struct Accumulator {
 
     public:
 
-    inline void update(Accumulator* oldAcc, Board &board, FinnyTable &finnyTable)
+    inline void update(BothAccumulators* oldAcc, Board &board, FinnyTable &finnyTable)
     {
         assert(oldAcc->mUpdated && !mUpdated);
 
@@ -310,9 +309,9 @@ struct Accumulator {
         mUpdated = true;
     }
 
-}; // struct Accumulator
+}; // struct BothAccumulators
 
-inline i32 evaluate(Accumulator* accumulator, Board &board, bool materialScale)
+inline i32 evaluate(BothAccumulators* accumulator, Board &board, bool materialScale)
 {
     assert(accumulator->mUpdated);
 
@@ -399,4 +398,4 @@ inline i32 evaluate(Accumulator* accumulator, Board &board, bool materialScale)
 
 } // namespace nnue
 
-using Accumulator = nnue::Accumulator;
+using BothAccumulators = nnue::BothAccumulators;

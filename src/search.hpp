@@ -55,8 +55,8 @@ class SearchThread {
 
     std::array<PlyData, MAX_DEPTH+1> mPliesData; // [ply]
 
-    std::array<Accumulator, MAX_DEPTH+1> mAccumulators;
-    Accumulator* mAccumulatorPtr = &mAccumulators[0];
+    std::array<BothAccumulators, MAX_DEPTH+1> mAccumulators;
+    BothAccumulators* mAccumulatorPtr = &mAccumulators[0];
 
     MultiArray<HistoryEntry, 2, 6, 64> mMovesHistory = {}; // [stm][pieceType][targetSquare]
 
@@ -114,7 +114,7 @@ class SearchThread {
         mNodes = 0;
         mMovesNodes = {};
 
-        mAccumulators[0] = Accumulator(mBoard);
+        mAccumulators[0] = BothAccumulators(mBoard);
         mAccumulatorPtr = &mAccumulators[0];
 
         // Reset finny table
@@ -240,7 +240,7 @@ class SearchThread {
         else if (eval == VALUE_NONE) 
         {
             assert([&]() {
-                Accumulator freshAcc = Accumulator(mBoard);
+                BothAccumulators freshAcc = BothAccumulators(mBoard);
                 bool equal = evaluate(mAccumulatorPtr, mBoard, false) == evaluate(&freshAcc, mBoard, false);
 
                 if (!equal) mBoard.print();
