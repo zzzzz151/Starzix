@@ -681,7 +681,7 @@ class SearchThread {
                 for (i16* corrHist : correctionHistories())
                 {
                     i32 newValue = *corrHist;
-                    newValue *= corrHistScale() - newWeight;
+                    newValue *= std::max(corrHistScale() - newWeight, 1);
                     newValue += (bestScore - eval) * corrHistScale() * newWeight;
                     *corrHist = std::clamp(newValue / corrHistScale(), -corrHistMax(), corrHistMax());
                 }
