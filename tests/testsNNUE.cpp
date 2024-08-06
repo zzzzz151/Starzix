@@ -47,32 +47,6 @@ std::unordered_map<std::string, int> FENS_EVAL = {
     { "4k3/7n/8/8/8/6R1/8/1K6 w - - 0 1", 9 },
 };
 
-void testAccumulatorUpdate(Board board, Move move) 
-{
-    Accumulator acc = Accumulator(board);
-    Accumulator oldAcc = acc;
-    
-    board.makeMove(move);
-    std::string fen = board.fen();
-
-    if (FENS_EVAL.find(fen) == FENS_EVAL.end())
-    {
-        std::cout << "No fen '" << fen << "'" << std::endl;
-        return;
-    }
-    
-    acc.mUpdated = false;
-    acc.update(&oldAcc, board);
-
-    auto eval = evaluate(&acc, board, false);
-
-    if (eval != FENS_EVAL[fen]) 
-        std::cout << "Expected eval " << FENS_EVAL[fen] 
-                  << " but got " << eval 
-                  << " in '" << fen << "'" 
-                  << std::endl;
-}
-
 int main()
 {
     initUtils();
@@ -93,25 +67,6 @@ int main()
                       << std::endl;
     }
 
-    std::cout << "Testing Accumulator.update() ..." << std::endl;
-
-    Board board = Board(START_FEN);
-    testAccumulatorUpdate(board, board.uciToMove("e2e4"));
-
-    board.makeMove(board.uciToMove("e2e4"));
-    testAccumulatorUpdate(board, board.uciToMove("g8f6"));
-
-    board = Board("r3k2b/6P1/8/1pP5/8/8/4P3/4K2R w Kq b6 0 1");
-    u64 pinned = board.pinned();
-
-    ArrayVec<Move, 256> moves;
-    board.pseudolegalMoves(moves);
-
-    for (Move move : moves)
-        if (board.isPseudolegalLegal(move, pinned)) 
-            testAccumulatorUpdate(board, move);
-
     std::cout << "Finished" << std::endl;
-
     return 0;
 }

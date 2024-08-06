@@ -31,8 +31,8 @@ inline void initZobrist()
 struct BoardState {
     public:
     Color colorToMove = Color::NONE;
-    std::array<u64, 2> colorBitboard = { };   // [color]
-    std::array<u64, 6> piecesBitboards = { }; // [pieceType]
+    std::array<u64, 2> colorBitboards  = {}; // [color]
+    std::array<u64, 6> piecesBitboards = {}; // [pieceType]
     u64 castlingRights = 0;
     Square enPassantSquare = SQUARE_NONE;
     u8 pliesSincePawnOrCapture = 0;
@@ -86,7 +86,7 @@ class Board {
 
         // Parse pieces
 
-        mState->colorBitboard = {};
+        mState->colorBitboards  = {};
         mState->piecesBitboards = {};
 
         std::string fenRows = fenSplit[0];
@@ -169,12 +169,20 @@ class Board {
     }
 
     inline u64 getBb(Color color) const { 
-        return mState->colorBitboard[(int)color]; 
+        return mState->colorBitboards[(int)color]; 
     }
 
     inline u64 getBb(Color color, PieceType pieceType) const {
         return mState->piecesBitboards[(int)pieceType]
-               & mState->colorBitboard[(int)color];
+               & mState->colorBitboards[(int)color];
+    }
+
+    inline void getColorBitboards(std::array<u64, 2> &colorBitboards) {
+        colorBitboards = mState->colorBitboards;
+    }
+
+    inline void getPiecesBitboards(std::array<u64, 6> &piecesBitboards) {
+        piecesBitboards = mState->piecesBitboards;
     }
 
     inline u64 us() { 
@@ -246,7 +254,7 @@ class Board {
     {
         assert(!isOccupied(square));
 
-        mState->colorBitboard[(int)color] |= bitboard(square);
+        mState->colorBitboards[(int)color]      |= bitboard(square);
         mState->piecesBitboards[(int)pieceType] |= bitboard(square);
 
         updateHashes(color, pieceType, square);
@@ -256,7 +264,7 @@ class Board {
     {
         assert(getBb(color, pieceType) & bitboard(square));
 
-        mState->colorBitboard[(int)color] ^= bitboard(square);
+        mState->colorBitboards[(int)color]      ^= bitboard(square);
         mState->piecesBitboards[(int)pieceType] ^= bitboard(square);
 
         updateHashes(color, pieceType, square);
@@ -1113,7 +1121,7 @@ class Board {
             while (ourNearbyPawns) {
                 Square ourPawnSquare = poplsb(ourNearbyPawns);
 
-                auto colorBitboards = mState->colorBitboard;
+                auto colorBitboards = mState->colorBitboards;
                 auto pawnBb = mState->piecesBitboards[PAWN];
                 auto zobristHash = mState->zobristHash;
                 auto pawnsHash = mState->pawnsHash;
@@ -1131,7 +1139,7 @@ class Board {
                 bool enPassantLegal = !isSquareAttacked(kingSquare, enemyColor);
 
                 // Undo the en passant move
-                mState->colorBitboard = colorBitboards;
+                mState->colorBitboards = colorBitboards;
                 mState->piecesBitboards[PAWN] = pawnBb;
                 mState->zobristHash = zobristHash;
                 mState->pawnsHash = pawnsHash;

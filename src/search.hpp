@@ -65,8 +65,10 @@ class SearchThread {
     std::array<u64, 1ULL << 17> mMovesNodes; // [move]
 
     // Correction histories
-    MultiArray<i16, 2, 16384> mPawnsCorrHist = {}; // [stm][Board.pawnsHash() % 16384]
+    MultiArray<i16, 2, 16384>    mPawnsCorrHist    = {}; // [stm][Board.pawnsHash() % 16384]
     MultiArray<i16, 2, 2, 16384> mNonPawnsCorrHist = {}; // [stm][pieceColor][Board.nonPawnsHash(pieceColor) % 16384]
+
+     MultiArray<nnue::FinnyTableEntry, 2, nnue::NUM_INPUT_BUCKETS> mFinnyTable; // [inputBucket]
 
     std::vector<TTEntry>* ttPtr = nullptr;
     
@@ -109,11 +111,13 @@ class SearchThread {
 
         mPliesData[0] = PlyData();
 
+        mNodes = 0;
+        mMovesNodes = {};
+
         mAccumulators[0] = Accumulator(mBoard);
         mAccumulatorPtr = &mAccumulators[0];
 
-        mNodes = 0;
-        mMovesNodes = {};
+        mFinnyTable = {};
 
         // ID (Iterative deepening)
         i32 score = 0;
@@ -225,7 +229,7 @@ class SearchThread {
                : (mAccumulatorPtr - 1)->mUpdated);
 
         if (!mAccumulatorPtr->mUpdated) 
-            mAccumulatorPtr->update(mAccumulatorPtr - 1, mBoard);
+            mAccumulatorPtr->update(mAccumulatorPtr - 1, mBoard, mFinnyTable);
 
         if (mBoard.inCheck())
             eval = 0;
