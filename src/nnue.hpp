@@ -55,18 +55,25 @@ const Net* NET = (const Net*)gNetFileData;
 struct FinnyTableEntry {
     public:
 
-    std::array<u64, 2> colorBitboards;  // [color]
-    std::array<u64, 6> piecesBitboards; // [pieceType]
-
     // [hiddenNeuronIdx]
     alignas(sizeof(Vec)) std::array<i16, HIDDEN_LAYER_SIZE> accumulator;
+
+    std::array<u64, 2> colorBitboards;  // [color]
+    std::array<u64, 6> piecesBitboards; // [pieceType]
 
     inline FinnyTableEntry() = default;
 
     inline FinnyTableEntry(Color color) {
+        accumulator = NET->hiddenBiases[(int)color];
         colorBitboards  = {};
         piecesBitboards = {};
-        accumulator = NET->hiddenBiases[(int)color];
+    }
+
+    inline FinnyTableEntry(std::array<i16, HIDDEN_LAYER_SIZE> &acc, Board &board)
+    {
+        accumulator = acc;
+        board.getColorBitboards(colorBitboards);
+        board.getPiecesBitboards(piecesBitboards);
     }
 };
 

@@ -118,10 +118,18 @@ class SearchThread {
         mAccumulatorPtr = &mAccumulators[0];
 
         // Reset finny table
-        for (Color color : {Color::WHITE, Color::BLACK})
+        for (int color : {WHITE, BLACK})
             for (int mirrorHorizontally : {false, true})
                 for (int inputBucket = 0; inputBucket < nnue::NUM_INPUT_BUCKETS; inputBucket++)
-                    mFinnyTable[(int)color][mirrorHorizontally][inputBucket] = nnue::FinnyTableEntry(color);
+                {
+                    bool sameAcc = mirrorHorizontally == mAccumulatorPtr->mMirrorHorizontally[color]
+                                   && inputBucket == mAccumulatorPtr->mInputBucket[color];
+
+                    mFinnyTable[color][mirrorHorizontally][inputBucket] =
+                        sameAcc 
+                        ? nnue::FinnyTableEntry(mAccumulatorPtr->mAccumulators[color], mBoard)
+                        : nnue::FinnyTableEntry((Color)color);
+                }
 
         // ID (Iterative deepening)
         i32 score = 0;
