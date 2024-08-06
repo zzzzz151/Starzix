@@ -400,7 +400,7 @@ class SearchThread {
             }
 
             // Probcut
-            i32 probcutBeta = beta + probcutMargin() - 50 * improving;
+            i32 probcutBeta = beta + probcutMargin() - improving * probcutMargin() * probcutImprovingPercentage();
             if (depth >= 5
             && abs(beta) < MIN_MATE_SCORE - 1
             && probcutBeta < MIN_MATE_SCORE - 1
