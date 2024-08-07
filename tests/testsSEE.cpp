@@ -1,7 +1,7 @@
 // clang-format off
+
 #include <fstream>
 #include "../src/board.hpp"
-#include "../src/see.hpp"
 
 int main() {
     initUtils();
@@ -10,8 +10,10 @@ int main() {
     std::ifstream inputFile("tests/SEE.txt");
     assert(inputFile.is_open());
 
-    //                   P    N    B    R    Q    K  NONE
-    SEE_PIECE_VALUES = { 100, 300, 300, 500, 900, 0, 0 };
+    seePawnValue.value  = 100;
+    seeMinorValue.value = 300;
+    seeRookValue.value  = 500;
+    seeQueenValue.value = 900;
 
     int failed = 0, passed = 0;
 
@@ -27,7 +29,7 @@ int main() {
         bool expected = gain >= 0;
 
         Board board = Board(fen);
-        bool result = SEE(board, board.uciToMove(uciMove));
+        bool result = board.SEE(board.uciToMove(uciMove));
 
         if (result == expected)
             passed++;

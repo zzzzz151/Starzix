@@ -12,11 +12,11 @@ struct PlyData {
     std::array<i32, 256> mMovesScores;
     int mCurrentMoveIdx = -1;
 
-    u64 mPinned = 0;
+    u64 mPinned = 0, mEnemyAttacks = 0;
+    
     ArrayVec<Move, MAX_DEPTH+1> mPvLine = {};
     i32 mEval = VALUE_NONE;
     Move mKiller = MOVE_NONE;
-    u64 mEnemyAttacks = 0;
 
     // Soft reset when we make a move in search
     inline void softReset() {
@@ -63,7 +63,7 @@ struct PlyData {
 
             if (captured != PieceType::NONE)
             {
-                mMovesScores[i] = SEE(board, move) 
+                mMovesScores[i] = board.SEE(move)
                                   ? (promotion == PieceType::QUEEN
                                      ? GOOD_QUEEN_PROMO_SCORE 
                                      : GOOD_NOISY_SCORE)
@@ -73,7 +73,7 @@ struct PlyData {
                 mMovesScores[i] += 100 * (i32)captured - (i32)move.pieceType();
             }
             else if (promotion == PieceType::QUEEN)
-                mMovesScores[i] = SEE(board, move) ? GOOD_QUEEN_PROMO_SCORE : -GOOD_NOISY_SCORE;
+                mMovesScores[i] = board.SEE(move) ? GOOD_QUEEN_PROMO_SCORE : -GOOD_NOISY_SCORE;
             else if (move == mKiller)
                 mMovesScores[i] = KILLER_SCORE;
             else if (move == countermove)

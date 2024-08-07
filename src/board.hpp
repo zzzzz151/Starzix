@@ -4,6 +4,7 @@
 
 #include "utils.hpp"
 #include "move.hpp"
+#include "search_params.hpp" // SEE piece values
 
 constexpr u8 CASTLE_SHORT = 0, CASTLE_LONG = 1;
 
@@ -560,6 +561,95 @@ class Board {
 
         return pinnedBitboard;
      }
+
+     // SEE (Static exchange evaluation)
+    inline bool SEE(Move move, i32 threshold = 0)
+    {
+        assert(move != MOVE_NONE);
+
+        const std::array<i32, 7> SEE_PIECE_VALUES = {
+            seePawnValue(),  // Pawn
+            seeMinorValue(), // Knight
+            seeMinorValue(), // Bishop
+            seeRookValue(),  // Rook
+            seeQueenValue(), // Queen
+            0,               // King
+            0                // None
+        };
+
+        i32 score = -threshold;
+
+        PieceType captured = this->captured(move);
+        score += SEE_PIECE_VALUES[(int)captured];
+
+        PieceType promotion = move.promotion();
+
+        if (promotion != PieceType::NONE)
+            score += SEE_PIECE_VALUES[(int)promotion] - SEE_PIECE_VALUES[PAWN];
+
+        if (score < 0) return false;
+
+        PieceType next = promotion != PieceType::NONE ? promotion : move.pieceType();
+        score -= SEE_PIECE_VALUES[(int)next];
+
+        if (score >= 0) return true;
+
+        Square from = move.from();
+        Square square = move.to();
+
+        u64 bishopsQueens = getBb(PieceType::BISHOP) | getBb(PieceType::QUEEN);
+        u64 rooksQueens   = getBb(PieceType::ROOK)   | getBb(PieceType::QUEEN);
+
+        u64 occupancy = this->occupancy() ^ bitboard(from) ^ bitboard(square);
+        u64 attackers = this->attackers(square, occupancy);
+
+        Color us = oppSide();
+
+        auto popLeastValuable = [&] (u64 attackers) -> PieceType 
+        {
+            for (int pt = PAWN; pt <= KING; pt++)
+            {
+                u64 bb = attackers & getBb(us, (PieceType)pt);
+
+                if (bb > 0) {
+                    Square sq = lsb(bb);
+                    occupancy ^= bitboard(sq);
+                    return (PieceType)pt;
+                }
+            }
+
+            return PieceType::NONE;
+        };
+
+        while (true)
+        {
+            u64 ourAttackers = attackers & getBb(us);
+
+            if (ourAttackers == 0) break;
+
+            next = popLeastValuable(ourAttackers);
+
+            if (next == PieceType::PAWN || next == PieceType::BISHOP || next == PieceType::QUEEN)
+                attackers |= attacks::bishopAttacks(square, occupancy) & bishopsQueens;
+
+            if (next == PieceType::ROOK || next == PieceType::QUEEN)
+                attackers |= attacks::rookAttacks(square, occupancy) & rooksQueens;
+
+            attackers &= occupancy;
+            score = -score - 1 - SEE_PIECE_VALUES[(int)next];
+            us = oppColor(us);
+
+            // if our only attacker is our king, but the opponent still has defenders
+            if (score >= 0 
+            && next == PieceType::KING 
+            && (attackers & getBb(us)) > 0)
+                us = oppColor(us);
+
+            if (score >= 0) break;
+        }
+
+        return sideToMove() != us;
+    }
 
     inline Move uciToMove(std::string uciMove)
     {

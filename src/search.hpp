@@ -9,7 +9,6 @@ constexpr i32 INF = 32000,
 #include "board.hpp"
 #include "search_params.hpp"
 #include "history_entry.hpp"
-#include "see.hpp"
 #include "ply_data.hpp"
 #include "tt.hpp"
 #include "nnue.hpp"
@@ -68,7 +67,7 @@ class SearchThread {
     MultiArray<i16, 2, 16384>    mPawnsCorrHist    = {}; // [stm][Board.pawnsHash() % 16384]
     MultiArray<i16, 2, 2, 16384> mNonPawnsCorrHist = {}; // [stm][pieceColor][Board.nonPawnsHash(pieceColor) % 16384]
 
-    nnue::FinnyTable mFinnyTable; // [color][mirrorHorizontally][inputBucket]
+    FinnyTable mFinnyTable; // [color][mirrorHorizontally][inputBucket]
 
     std::vector<TTEntry>* ttPtr = nullptr;
     
@@ -127,8 +126,8 @@ class SearchThread {
 
                     mFinnyTable[color][mirrorHorizontally][inputBucket] =
                         sameAcc 
-                        ? nnue::FinnyTableEntry(mAccumulatorPtr->mAccumulators[color], mBoard)
-                        : nnue::FinnyTableEntry((Color)color);
+                        ? FinnyTableEntry(mAccumulatorPtr->mAccumulators[color], mBoard)
+                        : FinnyTableEntry((Color)color);
                 }
 
         // ID (Iterative deepening)
@@ -491,7 +490,7 @@ class SearchThread {
 
                 // SEE pruning
                 i32 threshold = depth * (isQuiet ? seeQuietThreshold() : seeNoisyThreshold());
-                if (depth <= seePruningMaxDepth() && !SEE(mBoard, move, threshold))
+                if (depth <= seePruningMaxDepth() && !mBoard.SEE(move, threshold))
                     continue;
             }
 
@@ -753,7 +752,7 @@ class SearchThread {
                 break;
 
             // If not in check, skip bad noisy moves
-            if (!mBoard.inCheck() && !SEE(mBoard, move))
+            if (!mBoard.inCheck() && !mBoard.SEE(move))
                 continue;
                 
             makeMove(move, ply + 1);
@@ -807,7 +806,7 @@ class SearchThread {
              std::tie(move, moveScore) = plyDataPtr->nextMove(mBoard))
         {
             // SEE pruning (skip bad noisy moves)
-            if (!SEE(mBoard, move, probcutBeta - plyDataPtr->mEval)) 
+            if (!mBoard.SEE(move, probcutBeta - plyDataPtr->mEval)) 
                 continue;
 
             makeMove(move, ply + 1);
