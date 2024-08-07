@@ -4,7 +4,7 @@
 
 namespace cuckoo {
 
-std::array<u64, 8192> KEYS = {};
+std::array<u64, 8192>  KEYS  = {};
 std::array<Move, 8292> MOVES = {};
 
 constexpr u64 h1(u64 key) { return key & 0x1fff; }

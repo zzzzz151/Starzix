@@ -2,13 +2,14 @@
 
 #pragma once
 
+// incbin fuckery
 #ifdef _MSC_VER
-#define STARZIX_MSVC
-#pragma push_macro("_MSC_VER")
-#undef _MSC_VER
+    #define STARZIX_MSVC
+    #pragma push_macro("_MSC_VER")
+    #undef _MSC_VER
 #endif
-#include "3rdparty/incbin.h"
 
+#include "3rdparty/incbin.h"
 #include "board.hpp"
 #include "search_params.hpp"
 #include "simd.hpp"
@@ -406,3 +407,5 @@ inline i32 evaluate(BothAccumulators* accumulator, Board &board, bool materialSc
 } // namespace nnue
 
 using BothAccumulators = nnue::BothAccumulators;
+using FinnyTableEntry = nnue::FinnyTableEntry;
+using FinnyTable = nnue::FinnyTable;
