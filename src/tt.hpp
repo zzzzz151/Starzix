@@ -27,21 +27,27 @@ struct TTEntry {
          return (Bound)(boundAndAge & 0b0000'0011); 
     }
 
-    inline void update(u64 zobristHash, u8 depth, i16 ply, i16 score, Move bestMove, Bound bound)
+    inline void update(u64 newZobristHash, u8 newDepth, i16 ply, i16 newScore, Move newBestMove, Bound newBound)
     {
-        this->zobristHash = zobristHash;
-        this->depth = depth;
-        this->boundAndAge = (this->boundAndAge & 0b1111'1100) | (u8)bound; 
+        /// Update TT entry if
+        if (this->zobristHash != newZobristHash  // this is a TT collision
+        || newBound == Bound::EXACT              // or new bound is exact
+        || (i32)newDepth + 4 > (i32)this->depth) // or new depth is much higher
+        {
+            this->zobristHash = newZobristHash;
+            this->depth = newDepth;
+            this->boundAndAge = (this->boundAndAge & 0b1111'1100) | (u8)newBound; 
 
-        this->score = score >= MIN_MATE_SCORE  ? score + ply 
-                    : score <= -MIN_MATE_SCORE ? score - ply 
-                    : score;
+            this->score = newScore >= MIN_MATE_SCORE  ? newScore + ply 
+                        : newScore <= -MIN_MATE_SCORE ? newScore - ply 
+                        : newScore;
+        }
 
         // Save new best move in TT if
-        // this TT entry doesn't have one
-        // or if it has, if the new move is not a fail low
-        if (Move(this->move) == MOVE_NONE || bound != Bound::UPPER) 
-            this->move = bestMove.encoded();
+        if (this->zobristHash != newZobristHash // this is a TT collision
+        || Move(this->move) == MOVE_NONE        // or this TT entry doesn't have a move
+        || newBound != Bound::UPPER)            // or if it has a move, if the new move is not a fail low
+            this->move = newBestMove.encoded();
     }
 
 } __attribute__((packed)); // struct TTEntry
