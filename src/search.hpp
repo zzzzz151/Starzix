@@ -70,6 +70,8 @@ class SearchThread {
     FinnyTable mFinnyTable; // [color][mirrorHorizontally][inputBucket]
 
     std::vector<TTEntry>* ttPtr = nullptr;
+
+    u8 mTTAge = 0;
     
     public:
 
@@ -84,6 +86,7 @@ class SearchThread {
         mCountermoves = {};
         mPawnsCorrHist = {};
         mNonPawnsCorrHist = {};
+        mTTAge = 0;
     }
 
     inline u64 getNodes() { return mNodes; }
@@ -187,6 +190,8 @@ class SearchThread {
 
         // Signal secondary threads to stop
         if (this == gMainThread) sSearchStopped = true;
+
+        if (mTTAge < 127) mTTAge++;
 
         return score;
     }
@@ -352,7 +357,7 @@ class SearchThread {
 
             // TT cutoff (not done in singular searches since ttHit is false)
             if (!pvNode
-            && ttEntry.depth >= depth 
+            && ttEntry.depth() >= depth 
             && (ttEntry.bound() == Bound::EXACT
             || (ttEntry.bound() == Bound::LOWER && ttEntry.score >= beta) 
             || (ttEntry.bound() == Bound::UPPER && ttEntry.score <= alpha)))
@@ -423,7 +428,7 @@ class SearchThread {
             if (depth >= 5
             && abs(beta) < MIN_MATE_SCORE - 1
             && probcutBeta < MIN_MATE_SCORE - 1
-            && !(ttHit && (i32)ttEntry.depth >= depth - 3 && ttEntry.score < probcutBeta))
+            && !(ttHit && ttEntry.depth() >= depth - 3 && ttEntry.score < probcutBeta))
             {
                 i32 probcutScore = probcut(
                     depth, ply, probcutBeta, cutNode, doubleExtsLeft, ttMove, ttEntryIdx);
@@ -436,7 +441,7 @@ class SearchThread {
 
         // IIR (Internal iterative reduction)
         if (depth >= iirMinDepth() 
-        && (ttMove == MOVE_NONE || (i32)ttEntry.depth < depth - iirMinDepth()) 
+        && (ttMove == MOVE_NONE || ttEntry.depth() < depth - iirMinDepth()) 
         && !singular 
         && (pvNode || cutNode))
             depth--;
@@ -502,7 +507,7 @@ class SearchThread {
             if (move == ttMove
             && ply > 0
             && depth >= singularMinDepth()
-            && (i32)ttEntry.depth >= depth - singularDepthMargin()
+            && ttEntry.depth() >= depth - singularDepthMargin()
             && ttEntry.bound() != Bound::UPPER 
             && abs(ttEntry.score) < MIN_MATE_SCORE
             && (singularBeta = (i32)ttEntry.score - depth) > -MIN_MATE_SCORE + 1)
@@ -666,7 +671,7 @@ class SearchThread {
 
         if (!singular) {
             // Store in TT
-            (*ttPtr)[ttEntryIdx].update(mBoard.zobristHash(), depth, ply, bestScore, bestMove, bound);
+            (*ttPtr)[ttEntryIdx].update(mBoard.zobristHash(), depth, ply, bestScore, bestMove, bound, mTTAge);
 
             // Update correction histories
             if (!mBoard.inCheck()
@@ -787,7 +792,7 @@ class SearchThread {
         }
 
         // Store in TT
-        (*ttPtr)[ttEntryIdx].update(mBoard.zobristHash(), 0, ply, bestScore, bestMove, bound);
+        (*ttPtr)[ttEntryIdx].update(mBoard.zobristHash(), 0, ply, bestScore, bestMove, bound, mTTAge);
 
         return bestScore;
     }
@@ -829,7 +834,7 @@ class SearchThread {
             if (stopSearch()) return 0;
 
             if (score >= probcutBeta) {
-                (*ttPtr)[ttEntryIdx].update(mBoard.zobristHash(), depth - 3, ply, score, move, Bound::LOWER);
+                (*ttPtr)[ttEntryIdx].update(mBoard.zobristHash(), depth - 3, ply, score, move, Bound::LOWER, mTTAge);
                 return score;
             }
 
