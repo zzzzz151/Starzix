@@ -274,5 +274,3 @@ inline void go(std::vector<std::string> &tokens, Board &board)
 }
 
 } // namespace uci
-
-

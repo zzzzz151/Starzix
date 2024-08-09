@@ -42,8 +42,8 @@ struct TTEntry {
         /// Update TT entry if
         if (this->zobristHash != newZobristHash // this entry is empty or a TT collision
         || newBound == Bound::EXACT             // or new bound is exact
-        || this->depth() < (i32)newDepth + 4    // or new depth isn't much lower
-        || this->age() != newAge)               // or this entry is from a previous search ("go" command)
+        || this->depth() < (i32)newDepth + 4)   // or new depth isn't much lower
+        // || this->age() != newAge)            // or this entry is from a previous search ("go" command)
         {
             this->zobristHash = newZobristHash;
 

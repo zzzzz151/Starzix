@@ -288,4 +288,3 @@ inline u64 kingAttacks(Square square)  {
 }
 
 } // namespace attacks
-
