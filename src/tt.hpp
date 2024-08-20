@@ -39,7 +39,7 @@ struct TTEntry {
         assert((newDepth >> 7) == 0);
         assert((newAge >> 7) == 0);
 
-        /// Update TT entry if
+        // Update TT entry if
         if (this->zobristHash != newZobristHash // this entry is empty or a TT collision
         || newBound == Bound::EXACT             // or new bound is exact
         || this->depth() < (i32)newDepth + 4)   // or new depth isn't much lower
@@ -65,7 +65,7 @@ struct TTEntry {
 
 } __attribute__((packed)); // struct TTEntry
 
-static_assert(sizeof(TTEntry) == 8 + 1 + 2 + 2 + 1);
+static_assert(sizeof(TTEntry) == 8 + 2 + 2 + 2);
 
 inline u64 TTEntryIndex(u64 zobristHash, auto numEntries) 
 {

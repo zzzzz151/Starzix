@@ -39,7 +39,7 @@ using Square = u8;
 constexpr Square SQUARE_NONE = 255;
 
 enum class Color : i8 {
-    NONE = -1, WHITE = 0, BLACK = 1
+    WHITE = 0, BLACK = 1
 };
 
 constexpr int WHITE = 0, BLACK = 1;
@@ -75,7 +75,6 @@ inline Square strToSquare(std::string strSquare) {
 }
 
 constexpr Color oppColor(Color color) { 
-    assert(color != Color::NONE);
     return color == Color::WHITE ? Color::BLACK : Color::WHITE;
 }
 

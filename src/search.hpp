@@ -124,13 +124,20 @@ class SearchThread {
             for (int mirrorHorizontally : {false, true})
                 for (int inputBucket = 0; inputBucket < nnue::NUM_INPUT_BUCKETS; inputBucket++)
                 {
-                    bool sameAcc = mirrorHorizontally == mAccumulatorPtr->mMirrorHorizontally[color]
-                                   && inputBucket == mAccumulatorPtr->mInputBucket[color];
+                    FinnyTableEntry &finnyEntry = mFinnyTable[color][mirrorHorizontally][inputBucket];
 
-                    mFinnyTable[color][mirrorHorizontally][inputBucket] =
-                        sameAcc 
-                        ? FinnyTableEntry(mAccumulatorPtr->mAccumulators[color], mBoard)
-                        : FinnyTableEntry((Color)color);
+                    if (mirrorHorizontally == mAccumulatorPtr->mMirrorHorizontally[color]
+                    && inputBucket == mAccumulatorPtr->mInputBucket[color])
+                    {
+                        finnyEntry.accumulator = mAccumulatorPtr->mAccumulators[color];
+                        mBoard.getColorBitboards(finnyEntry.colorBitboards);
+                        mBoard.getPiecesBitboards(finnyEntry.piecesBitboards);
+                    }
+                    else {
+                        finnyEntry.accumulator = nnue::NET->hiddenBiases[color];
+                        finnyEntry.colorBitboards  = {};
+                        finnyEntry.piecesBitboards = {};
+                    }
                 }
 
         // ID (Iterative deepening)
@@ -251,16 +258,11 @@ class SearchThread {
             eval = 0;
         else if (eval == VALUE_NONE) 
         {
-            assert([&]() {
-                BothAccumulators freshAcc = BothAccumulators(mBoard);
-                bool equal = evaluate(mAccumulatorPtr, mBoard, false) == evaluate(&freshAcc, mBoard, false);
+            assert(BothAccumulators(mBoard) == *mAccumulatorPtr);
 
-                if (!equal) mBoard.print();
+            eval = nnue::evaluate(mAccumulatorPtr, mBoard.sideToMove());
 
-                return equal;
-            }());
-
-            eval = evaluate(mAccumulatorPtr, mBoard, true);
+            eval *= materialScale(mBoard); // Scale eval with material
 
             // Adjust eval with correction histories
             auto [pawnsCorrHist, whitePiecesNoPawnsCorrHist, blackPiecesNoPawnsCorrHist] = correctionHistories();
@@ -529,6 +531,7 @@ class SearchThread {
                 // Multicut
                 else if (singularBeta >= beta) 
                     return singularBeta;
+                // Negative extension
                 else if (cutNode)
                     newDepth -= 2;
                     
@@ -549,7 +552,7 @@ class SearchThread {
             // PVS (Principal variation search)
 
             // LMR (Late move reductions)
-            if (depth >= 2 && !mBoard.inCheck() && legalMovesSeen >= lmrMinMoves() && moveScore < COUNTERMOVE_SCORE)
+            if (depth >= 2 && !mBoard.inCheck() && legalMovesSeen >= 2 && moveScore < COUNTERMOVE_SCORE)
             {
                 i32 lmr = LMR_TABLE[isQuiet][depth][legalMovesSeen]
                           - pvNode       // reduce pv nodes less
@@ -569,7 +572,7 @@ class SearchThread {
                 if (score > alpha && lmr > 0) 
                 {
                     // Deeper or shallower search?
-                    newDepth += ply > 0 && score > bestScore + deeperBase() + deeperMultiplier() * newDepth;
+                    newDepth += ply > 0 && score > bestScore + deeperBase() + newDepth * 2;
                     newDepth -= ply > 0 && score < bestScore + newDepth;
 
                     score = -search(newDepth, ply + 1, -alpha - 1, -alpha, !cutNode, doubleExtsLeft);

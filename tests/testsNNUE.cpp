@@ -2,7 +2,7 @@
 #include "../src/board.hpp"
 #include "../src/nnue.hpp"
 
-std::unordered_map<std::string, int> FENS_EVAL = {
+tsl::ordered_map<std::string, int> FENS_EVAL = {
     { START_FEN, 67 },
     { "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",  -37 }, // e2e4
     { "rnbqkb1r/pppppppp/5n2/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 1 2", 102 }, // e2e4 g8f6
@@ -58,7 +58,7 @@ int main()
     {
         Board board = Board(fen);
         BothAccumulators acc = BothAccumulators(board);
-        auto eval = evaluate(&acc, board, false);
+        auto eval = nnue::evaluate(&acc, board.sideToMove());
 
         if (eval != expectedEval) 
             std::cout << "Expected eval " << expectedEval

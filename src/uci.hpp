@@ -45,15 +45,17 @@ inline void runCommand(std::string &command, Board &board, std::vector<TTEntry> 
         position(tokens, board);
     else if (tokens[0] == "go")
         go(tokens, board);
-    else if (tokens[0] == "print" || tokens[0] == "d"
-    || tokens[0] == "display" || tokens[0] == "show")
+    else if (command == "print" || command == "d"
+    || command == "display" || command == "show")
         board.print();
-    else if (tokens[0] == "eval") 
+    else if (command == "eval") 
     {
         BothAccumulators acc = BothAccumulators(board);
+        i32 eval = nnue::evaluate(&acc, board.sideToMove());
+        i32 evalScaled = eval * materialScale(board);
 
-        std::cout << "eval "    << evaluate(&acc, board, false)
-                  << " scaled " << evaluate(&acc, board, true)
+        std::cout << "eval "    << eval
+                  << " scaled " << evalScaled
                   << std::endl;
     }
     else if (tokens[0] == "bench")

@@ -31,7 +31,7 @@ inline void initZobrist()
 
 struct BoardState {
     public:
-    Color colorToMove = Color::NONE;
+    Color colorToMove = Color::WHITE;
     std::array<u64, 2> colorBitboards  = {}; // [color]
     std::array<u64, 6> piecesBitboards = {}; // [pieceType]
     u64 castlingRights = 0;
@@ -994,18 +994,12 @@ class Board {
         return true;
     }
 
-    inline bool hasNonPawnMaterial(Color color = Color::NONE)
+    inline bool hasNonPawnMaterial(Color color)
     {
-        if (color == Color::NONE)
-            return getBb(PieceType::KNIGHT)    > 0
-                   || getBb(PieceType::BISHOP) > 0
-                   || getBb(PieceType::ROOK)   > 0
-                   || getBb(PieceType::QUEEN)  > 0;
-
-        return getBb(color, PieceType::KNIGHT)    > 0
-               || getBb(color, PieceType::BISHOP) > 0
-               || getBb(color, PieceType::ROOK)   > 0
-               || getBb(color, PieceType::QUEEN)  > 0;
+        return getBb(color, PieceType::KNIGHT) > 0
+            || getBb(color, PieceType::BISHOP) > 0
+            || getBb(color, PieceType::ROOK)   > 0
+            || getBb(color, PieceType::QUEEN)  > 0;
     }
 
     inline u64 roughHashAfter(Move move) 

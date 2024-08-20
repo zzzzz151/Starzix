@@ -22,6 +22,7 @@ constexpr i32 HIDDEN_LAYER_SIZE = 1024,
               QA = 255, 
               QB = 64;
 
+// Enemy queen input buckets (0 if enemy doesnt have exactly 1 queen)
 constexpr std::array<int, 64> INPUT_BUCKETS = {
 //  A  B  C  D  E  F  G  H
     1, 1, 1, 1, 2, 2, 2, 2, // 1
@@ -37,7 +38,7 @@ constexpr std::array<int, 64> INPUT_BUCKETS = {
 struct Net {
     public:
 
-    // [color][inputBucket][feature][hiddenNeuronIdx]
+    // [color][inputBucket][feature768][hiddenNeuronIdx]
     alignas(sizeof(Vec)) MultiArray<i16, 2, NUM_INPUT_BUCKETS, 768, HIDDEN_LAYER_SIZE> featuresWeights;
 
     // [color][hiddenNeuronIdx]
@@ -61,21 +62,6 @@ struct FinnyTableEntry {
 
     std::array<u64, 2> colorBitboards;  // [color]
     std::array<u64, 6> piecesBitboards; // [pieceType]
-
-    inline FinnyTableEntry() = default;
-
-    inline FinnyTableEntry(Color color) {
-        accumulator = NET->hiddenBiases[(int)color];
-        colorBitboards  = {};
-        piecesBitboards = {};
-    }
-
-    inline FinnyTableEntry(std::array<i16, HIDDEN_LAYER_SIZE> &acc, Board &board)
-    {
-        accumulator = acc;
-        board.getColorBitboards(colorBitboards);
-        board.getPiecesBitboards(piecesBitboards);
-    }
 };
 
 // [color][mirrorHorizontally][inputBucket]
@@ -87,8 +73,6 @@ struct BothAccumulators {
     // [color][hiddenNeuronIdx]
     alignas(sizeof(Vec)) MultiArray<i16, 2, HIDDEN_LAYER_SIZE> mAccumulators;
 
-    bool mUpdated = false;
-
     // HM (Horizontal mirroring)
     // If a king is on right side of board,
     // mirror all pieces horizontally (along vertical axis) 
@@ -96,6 +80,16 @@ struct BothAccumulators {
     std::array<bool, 2> mMirrorHorizontally = {false, false}; // [color]
 
     std::array<int, 2> mInputBucket = {0, 0}; // [color]
+
+    bool mUpdated = false;
+
+    inline bool operator==(const BothAccumulators other) const 
+    {
+        return mAccumulators == other.mAccumulators
+               && mMirrorHorizontally == other.mMirrorHorizontally
+               && mInputBucket == other.mInputBucket
+               && mUpdated == other.mUpdated;
+    }
 
     inline BothAccumulators() = default;
 
@@ -118,11 +112,14 @@ struct BothAccumulators {
 
             while (bb > 0) {
                 Square sq = poplsb(bb);
-                std::array<int, 2> fts = features(pieceColor, pt, sq);
 
-                for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) {
-                    mAccumulators[WHITE][i] += NET->featuresWeights[WHITE][mInputBucket[WHITE]][fts[WHITE]][i];
-                    mAccumulators[BLACK][i] += NET->featuresWeights[BLACK][mInputBucket[BLACK]][fts[BLACK]][i];
+                for (int color : {WHITE, BLACK}) 
+                {
+                    const auto inputBucket = mInputBucket[color];
+                    const auto ft768 = feature768(pieceColor, pt, sq, mMirrorHorizontally[color]);
+
+                     for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
+                        mAccumulators[color][i] += NET->featuresWeights[color][inputBucket][ft768][i];
                 }
             }
         };
@@ -152,29 +149,22 @@ struct BothAccumulators {
         return mInputBucket[(int)color];
     }
 
-    inline int feature(Color color, Color pieceColor, PieceType pt, Square sq) const
+    inline int feature768(Color pieceColor, PieceType pt, Square sq, bool mirrorHorizontally) const
     {
-        if (mMirrorHorizontally[(int)color])
-            sq ^= 7;
+        if (mirrorHorizontally) sq ^= 7;
 
         assert((int)pieceColor * 384 + (int)pt * 64 + (int)sq < 768);
 
         return (int)pieceColor * 384 + (int)pt * 64 + (int)sq;
     }
 
-    // [color]
-    inline std::array<int, 2> features(Color pieceColor, PieceType pt, Square sq) const
-    {
-        return {
-            feature(Color::WHITE, pieceColor, pt, sq),
-            feature(Color::BLACK, pieceColor, pt, sq)
-        };
-    }
-
     inline void updateFinnyEntryAndAccumulator(FinnyTable &finnyTable, Color accColor, Board &board) 
     {
         const int iAccColor = (int)accColor;
-        FinnyTableEntry &finnyEntry = finnyTable[iAccColor][mMirrorHorizontally[iAccColor]][mInputBucket[iAccColor]];
+        const auto hm = mMirrorHorizontally[iAccColor];
+        const auto inputBucket = mInputBucket[iAccColor];
+
+        FinnyTableEntry &finnyEntry = finnyTable[iAccColor][hm][inputBucket];
 
         auto updatePiece = [&](Color pieceColor, PieceType pt) -> void
         {
@@ -185,19 +175,19 @@ struct BothAccumulators {
             u64 remove = entryBb & ~bb;
 
             while (remove > 0) {
-                Square sq = poplsb(remove);
-                const int ft = feature(accColor, pieceColor, pt, sq);
+                const Square sq = poplsb(remove);
+                const auto ft768 = feature768(pieceColor, pt, sq, hm);
 
                 for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
-                    finnyEntry.accumulator[i] -= NET->featuresWeights[iAccColor][mInputBucket[iAccColor]][ft][i];
+                    finnyEntry.accumulator[i] -= NET->featuresWeights[iAccColor][inputBucket][ft768][i];
             }
 
             while (add > 0) {
-                Square sq = poplsb(add);
-                const int ft = feature(accColor, pieceColor, pt, sq);
+                const Square sq = poplsb(add);
+                const auto ft768 = feature768(pieceColor, pt, sq, hm);
 
                 for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
-                    finnyEntry.accumulator[i] += NET->featuresWeights[iAccColor][mInputBucket[iAccColor]][ft][i];
+                    finnyEntry.accumulator[i] += NET->featuresWeights[iAccColor][inputBucket][ft768][i];
             }
         };
 
@@ -223,7 +213,6 @@ struct BothAccumulators {
         const Color colorMoving = board.oppSide();
         const Color notColorMoving = oppColor(colorMoving);
         const int iColorMoving = (int)colorMoving;
-        const int iNotColorMoving = (int)notColorMoving;
 
         Move move = board.lastMove();
         assert(move != MOVE_NONE);
@@ -255,62 +244,56 @@ struct BothAccumulators {
             setInputBucket(notColorMoving, board.getBb(colorMoving, PieceType::QUEEN));
 
             // If their input bucket changed, reset their accumulator
-            if  (mInputBucket[iNotColorMoving] != oldAcc->mInputBucket[iNotColorMoving])
+            if  (mInputBucket[!iColorMoving] != oldAcc->mInputBucket[!iColorMoving])
                 updateFinnyEntryAndAccumulator(finnyTable, notColorMoving, board);
         }
 
-        // [color]
-        const std::array<int, 2> subPieceFeature = features(colorMoving, pieceType, from);
-        const std::array<int, 2> addPieceFeature = features(colorMoving, place, to);
-        std::array<int, 2> subCapturedFeature;
-
-        if (board.captured() != PieceType::NONE)
-        {
-            int capturedPieceSq = move.flag() == Move::EN_PASSANT_FLAG 
-                                  ? (to > from ? to - 8 : to + 8)
-                                  : to;
-
-            subCapturedFeature = features(notColorMoving, board.captured(), capturedPieceSq);
-        }
+        // Update accumulators with the move played
 
         for (int color : {WHITE, BLACK})
         {
-            // No need to update this color's accumulator if we just resetted it
-            if (mMirrorHorizontally[color] != oldAcc->mMirrorHorizontally[color]
-            || mInputBucket[color] != oldAcc->mInputBucket[color]) 
+            const bool hm = mMirrorHorizontally[color];
+            const auto inputBucket = mInputBucket[color];
+
+            // No need to update this color's accumulator if we just reset it
+            if (hm != oldAcc->mMirrorHorizontally[color] || inputBucket != oldAcc->mInputBucket[color]) 
                 continue;
+
+            const auto subPieceFeature768 = feature768(colorMoving, pieceType, from, hm);
+            const auto addPieceFeature768 = feature768(colorMoving, place, to, hm);
 
             if (board.captured() != PieceType::NONE)
             {
+                const Square capturedPieceSq = move.flag() == Move::EN_PASSANT_FLAG ? to ^ 8 : to;
+                const auto subCapturedFeature768 = feature768(notColorMoving, board.captured(), capturedPieceSq, hm);
+
                 for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
                     mAccumulators[color][i] = 
                         oldAcc->mAccumulators[color][i]
-                        - NET->featuresWeights[color][mInputBucket[color]][subPieceFeature[color]][i]  
-                        + NET->featuresWeights[color][mInputBucket[color]][addPieceFeature[color]][i]
-                        - NET->featuresWeights[color][mInputBucket[color]][subCapturedFeature[color]][i];
+                        - NET->featuresWeights[color][inputBucket][subPieceFeature768][i]  
+                        + NET->featuresWeights[color][inputBucket][addPieceFeature768][i]
+                        - NET->featuresWeights[color][inputBucket][subCapturedFeature768][i];
             }
             else if (move.flag() == Move::CASTLING_FLAG)
             {
-                auto [rookFrom, rookTo] = CASTLING_ROOK_FROM_TO[to];
-
-                // [color]
-                const std::array<int, 2> subRookFeature = features(colorMoving, PieceType::ROOK, rookFrom);
-                const std::array<int, 2> addRookFeature = features(colorMoving, PieceType::ROOK, rookTo);
+                const auto [rookFrom, rookTo] = CASTLING_ROOK_FROM_TO[to];
+                const auto subRookFeature768 = feature768(colorMoving, PieceType::ROOK, rookFrom, hm);
+                const auto addRookFeature768 = feature768(colorMoving, PieceType::ROOK, rookTo, hm);
 
                 for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
                     mAccumulators[color][i] = 
                         oldAcc->mAccumulators[color][i] 
-                        - NET->featuresWeights[color][mInputBucket[color]][subPieceFeature[color]][i]  
-                        + NET->featuresWeights[color][mInputBucket[color]][addPieceFeature[color]][i]
-                        - NET->featuresWeights[color][mInputBucket[color]][subRookFeature[color]][i]  
-                        + NET->featuresWeights[color][mInputBucket[color]][addRookFeature[color]][i];
+                        - NET->featuresWeights[color][inputBucket][subPieceFeature768][i]  
+                        + NET->featuresWeights[color][inputBucket][addPieceFeature768][i]
+                        - NET->featuresWeights[color][inputBucket][subRookFeature768][i]  
+                        + NET->featuresWeights[color][inputBucket][addRookFeature768][i];
             }
             else {
                 for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
                     mAccumulators[color][i] = 
                         oldAcc->mAccumulators[color][i]
-                        - NET->featuresWeights[color][mInputBucket[color]][subPieceFeature[color]][i]  
-                        + NET->featuresWeights[color][mInputBucket[color]][addPieceFeature[color]][i];
+                        - NET->featuresWeights[color][inputBucket][subPieceFeature768][i]  
+                        + NET->featuresWeights[color][inputBucket][addPieceFeature768][i];
             }
         }
 
@@ -319,11 +302,11 @@ struct BothAccumulators {
 
 }; // struct BothAccumulators
 
-inline i32 evaluate(BothAccumulators* accumulator, Board &board, bool materialScale)
+inline i32 evaluate(BothAccumulators* accumulator, Color sideToMove)
 {
     assert(accumulator->mUpdated);
 
-    int stm = (int)board.sideToMove();
+    const int stm = (int)sideToMove;
     i32 sum = 0;
 
     // Activation function:
@@ -386,25 +369,24 @@ inline i32 evaluate(BothAccumulators* accumulator, Board &board, bool materialSc
         }
     #endif
 
-    i32 eval = (sum / QA + NET->outputBias) * SCALE / (QA * QB);
-
-    // Scale eval with material / game phase
-    if (materialScale) {
-        i32 material = 3 * std::popcount(board.getBb(PieceType::KNIGHT))
-                     + 3 * std::popcount(board.getBb(PieceType::BISHOP))
-                     + 5 * std::popcount(board.getBb(PieceType::ROOK))
-                     + 9 * std::popcount(board.getBb(PieceType::QUEEN));
-
-        constexpr i32 MATERIAL_MAX = 62;
-
-        // Linear lerp from evalMaterialScaleMin to evalMaterialScaleMax as material goes from 0 to MATERIAL_MAX
-        eval *= evalMaterialScaleMin() + (evalMaterialScaleMax() - evalMaterialScaleMin()) * material / MATERIAL_MAX;
-    }
-
-    return eval;
+    return (sum / QA + NET->outputBias) * SCALE / (QA * QB);
 }
 
 } // namespace nnue
+
+inline float materialScale(Board &board) 
+{
+    float material = 3 * std::popcount(board.getBb(PieceType::KNIGHT))
+                   + 3 * std::popcount(board.getBb(PieceType::BISHOP))
+                   + 5 * std::popcount(board.getBb(PieceType::ROOK))
+                   + 9 * std::popcount(board.getBb(PieceType::QUEEN));
+
+    // Linear lerp from evalMaterialScaleMin to evalMaterialScaleMax 
+    // as material goes from 0 to MATERIAL_MAX
+    return evalMaterialScaleMin() 
+           + (evalMaterialScaleMax() - evalMaterialScaleMin()) 
+           * material / (float)MATERIAL_MAX;
+}
 
 using BothAccumulators = nnue::BothAccumulators;
 using FinnyTableEntry = nnue::FinnyTableEntry;

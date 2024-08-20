@@ -2,8 +2,9 @@
 
 #pragma once
 
+#include <immintrin.h>
+
 #if (defined(__AVX512F__) && defined(__AVX512BW__)) || defined(__AVX2__)
-    #include <immintrin.h>
 
     #if defined(__AVX512F__) && defined(__AVX512BW__)
         using Vec = __m512i;
