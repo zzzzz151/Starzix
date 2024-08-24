@@ -267,7 +267,7 @@ class SearchThread {
             // Adjust eval with correction histories
 
             i32 correction = 0;
-            for (i16 *corrHist : correctionHistories())
+            for (i16* corrHist : correctionHistories())
                 correction += i32(*corrHist);
 
             eval += correction / corrHistScale();
