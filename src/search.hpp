@@ -314,7 +314,7 @@ class SearchThread {
             }
             else if (score <= alpha)
             {
-                beta = (alpha + beta) / 2;
+                beta = (alpha + beta + bestScore) / 3;
                 alpha = std::max(alpha - delta, -INF);
                 depth = iterationDepth;
             }
