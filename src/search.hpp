@@ -265,10 +265,14 @@ class SearchThread {
             eval *= materialScale(mBoard); // Scale eval with material
 
             // Adjust eval with correction histories
-            auto [pawnsCorrHist, whitePiecesNoPawnsCorrHist, blackPiecesNoPawnsCorrHist] = correctionHistories();
-            eval += i32(*pawnsCorrHist) / corrHistScale();
-            eval += (i32(*whitePiecesNoPawnsCorrHist) + i32(*blackPiecesNoPawnsCorrHist)) / 2 / corrHistScale();
 
+            i32 correction = 0;
+            for (i16* corrHist : correctionHistories())
+                correction += i32(*corrHist);
+
+            eval += correction / corrHistScale();
+
+            // /Clamp to avoid false mate scores and invalid scores
             eval = std::clamp(eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
         }
 
