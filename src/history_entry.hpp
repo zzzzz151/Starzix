@@ -21,12 +21,18 @@ struct HistoryEntry {
 
     inline i32 quietHistory(bool enemyAttacksOrigin, bool enemyAttacksDst, std::array<Move, 3> moves) 
     {
-        i32 total = mMainHist[enemyAttacksOrigin][enemyAttacksDst];
+        const std::array<float, 3> CONT_HISTORY_WEIGHTS = { 
+            contHist1PlyWeight(), contHist2PlyWeight(), contHist4PlyWeight() 
+        };
 
-        for (Move move : moves) 
-            if (move != MOVE_NONE) {
+        float total = float(mMainHist[enemyAttacksOrigin][enemyAttacksDst]) * mainHistoryWeight();
+
+        Move move;
+        for (size_t i = 0; i < moves.size(); i++)
+            if ((move = moves[i]) != MOVE_NONE) 
+            {
                 int pt = (int)move.pieceType();
-                total += mContHist[pt][move.to()];
+                total += float(mContHist[pt][move.to()]) * CONT_HISTORY_WEIGHTS[i];
             }
 
         return total;
@@ -34,20 +40,13 @@ struct HistoryEntry {
 
     inline void updateQuietHistories(bool enemyAttacksOrigin, bool enemyAttacksDst, std::array<Move, 3> moves, i32 bonus)
     {
-        const std::array<float, 3> CONT_HISTORY_WEIGHTS = { 
-            contHist1PlyWeight(), contHist2PlyWeight(), contHist4PlyWeight() 
-        };
+        updateHistory(mMainHist[enemyAttacksOrigin][enemyAttacksDst], bonus);
 
-        updateHistory(mMainHist[enemyAttacksOrigin][enemyAttacksDst], bonus * mainHistoryWeight());
-
-        for (size_t i = 0; i < 3; i++) 
-        {
-            Move move = moves[i];
+        for (Move move : moves) 
             if (move != MOVE_NONE) {
                 int pt = (int)move.pieceType();
-                updateHistory(mContHist[pt][move.to()], bonus * CONT_HISTORY_WEIGHTS[i]);
+                updateHistory(mContHist[pt][move.to()], bonus);
             }
-        }
     }
 
     inline i32 noisyHistory(PieceType captured) {

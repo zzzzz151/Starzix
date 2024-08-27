@@ -349,12 +349,12 @@ class SearchThread {
 
         if (depth > mMaxDepth) depth = mMaxDepth;
 
-        bool pvNode = beta > alpha + 1;
+        const bool pvNode = beta > alpha + 1;
 
         // Probe TT
         auto ttEntryIdx = TTEntryIndex(mBoard.zobristHash(), ttPtr->size());
         TTEntry ttEntry = singular ? TTEntry() : (*ttPtr)[ttEntryIdx];
-        bool ttHit = mBoard.zobristHash() == ttEntry.zobristHash;
+        const bool ttHit = mBoard.zobristHash() == ttEntry.zobristHash;
         Move ttMove = MOVE_NONE;
 
         if (ttHit) {
@@ -452,7 +452,7 @@ class SearchThread {
         && (pvNode || cutNode))
             depth--;
 
-        int stm = (int)mBoard.sideToMove();
+        const int stm = (int)mBoard.sideToMove();
         Move &countermove = mCountermoves[!stm][mBoard.lastMove().encoded()];
 
         // gen and score all moves, except underpromotions
@@ -642,13 +642,15 @@ class SearchThread {
             
             if (mBoard.lastMove() != MOVE_NONE) countermove = move;
 
-            std::array<Move, 3> moves = { mBoard.lastMove(), mBoard.nthToLastMove(2), mBoard.nthToLastMove(4) };
+            const std::array<Move, 3> lastMoves = { 
+                mBoard.lastMove(), mBoard.nthToLastMove(2), mBoard.nthToLastMove(4) 
+            };
             
             // History bonus: increase this move's history
             historyEntry.updateQuietHistories(
                 plyDataPtr->mEnemyAttacks & bitboard(move.from()), 
                 plyDataPtr->mEnemyAttacks & bitboard(move.to()), 
-                moves,
+                lastMoves,
                 bonus);
 
             // History malus: decrease history of fail low quiets
@@ -658,7 +660,7 @@ class SearchThread {
                 mMovesHistory[stm][pt][failLow.to()].updateQuietHistories(
                     plyDataPtr->mEnemyAttacks & bitboard(failLow.from()), 
                     plyDataPtr->mEnemyAttacks & bitboard(failLow.to()),  
-                    moves,
+                    lastMoves,
                     malus);
             }
 
