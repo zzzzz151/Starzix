@@ -412,6 +412,7 @@ class SearchThread {
             if (depth >= nmpMinDepth() 
             && mBoard.lastMove() != MOVE_NONE 
             && eval >= beta
+            && eval >= beta + nmpEvalBetaMargin() - depth * nmpEvalBetaMultiplier()
             && !(ttHit && ttEntry.bound() == Bound::UPPER && ttEntry.score < beta)
             && mBoard.hasNonPawnMaterial(mBoard.sideToMove()))
             {
