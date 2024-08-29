@@ -57,9 +57,11 @@ TunableParam<i32> razoringMaxDepth   = TunableParam<i32>(5, 2, 6, 2);
 TunableParam<i32> razoringMultiplier = TunableParam<i32>(388, 250, 450, 50);
 
 // NMP (Null move pruning)
-TunableParam<i32>   nmpMinDepth         = TunableParam<i32>(3, 2, 4, 1);
-TunableParam<i32>   nmpBaseReduction    = TunableParam<i32>(4, 2, 4, 1);
-TunableParam<float> nmpReductionDivisor = TunableParam<float>(2.7, 2.0, 4.0, 0.5);
+TunableParam<i32>   nmpMinDepth           = TunableParam<i32>(3, 2, 4, 1);
+TunableParam<i32>   nmpBaseReduction      = TunableParam<i32>(4, 2, 4, 1);
+TunableParam<float> nmpReductionDivisor   = TunableParam<float>(2.7, 2.0, 4.0, 0.5);
+TunableParam<i32>   nmpEvalBetaMargin     = TunableParam<i32>(90, 20, 260, 20);
+TunableParam<i32>   nmpEvalBetaMultiplier = TunableParam<i32>(13, 4, 40, 4);
 
 // Probcut
 TunableParam<i32>   probcutMargin              = TunableParam<i32>(229, 100, 350, 50);
@@ -151,6 +153,8 @@ tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
     {stringify(nmpMinDepth), &nmpMinDepth},
     {stringify(nmpBaseReduction), &nmpBaseReduction},
     {stringify(nmpReductionDivisor), &nmpReductionDivisor},
+    {stringify(nmpEvalBetaMargin), &nmpEvalBetaMargin},
+    {stringify(nmpEvalBetaMultiplier), &nmpEvalBetaMultiplier},
     {stringify(probcutMargin), &probcutMargin},
     {stringify(probcutImprovingPercentage), &probcutImprovingPercentage},
     {stringify(iirMinDepth), &iirMinDepth},
