@@ -38,9 +38,9 @@ struct Move {
 
     inline Move() = default;
 
-    inline Move(u16 move) { mMove = move; }
+    inline Move(const u16 move) { mMove = move; }
 
-    inline Move(Square from, Square to, u16 flag)
+    inline Move(const Square from, const Square to, const u16 flag)
     {
         mMove = (u16)from << 10;
         mMove |= (u16)to << 4;
@@ -52,15 +52,15 @@ struct Move {
 
     inline u16 encoded() const { return mMove; }
 
-    inline Square from() { return (mMove >> 10) & 0b111111; }
+    inline Square from() const { return (mMove >> 10) & 0b111111; }
 
-    inline Square to() { return (mMove >> 4) & 0b111111; }
+    inline Square to() const { return (mMove >> 4) & 0b111111; }
 
-    inline u16 flag() { return mMove & 0x000F; }
+    inline u16 flag() const { return mMove & 0x000F; }
 
-    inline PieceType pieceType()
+    inline PieceType pieceType() const
     {
-        auto flag = this->flag();
+        const auto flag = this->flag();
         if (flag == NULL_FLAG)
             return PieceType::NONE;
         if (flag <= KING_FLAG)
@@ -70,18 +70,20 @@ struct Move {
         return PieceType::PAWN;
     }
 
-    inline PieceType promotion()
+    inline PieceType promotion() const
     {
-        u16 flag = this->flag();
+        const u16 flag = this->flag();
+
         if (flag >= KNIGHT_PROMOTION_FLAG && flag <= QUEEN_PROMOTION_FLAG)
             return (PieceType)(flag - KNIGHT_PROMOTION_FLAG + 1);
+
         return PieceType::NONE;
     }
 
-    inline std::string toUci()
+    inline std::string toUci() const
     {
         std::string str = SQUARE_TO_STR[from()] + SQUARE_TO_STR[to()];
-        u16 flag = this->flag();
+        const u16 flag = this->flag();
 
         if (flag == QUEEN_PROMOTION_FLAG) 
             str += "q";

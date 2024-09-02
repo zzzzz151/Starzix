@@ -17,10 +17,8 @@ inline u64 totalNodes();
 
 MultiArray<i32, 2, MAX_DEPTH+1, 256> LMR_TABLE = {}; // [isQuietMove][depth][moveIndex]
 
-constexpr void initLmrTable()
+inline void initLmrTable()
 {
-    LMR_TABLE = {};
-
     for (u64 depth = 1; depth < MAX_DEPTH+1; depth++)
         for (u64 move = 1; move < 256; move++)
         {
@@ -89,20 +87,20 @@ class SearchThread {
         mTTAge = 0;
     }
 
-    inline u64 getNodes() { return mNodes; }
+    inline u64 getNodes() const { return mNodes; }
 
-    inline u64 millisecondsElapsed() {
+    inline u64 millisecondsElapsed() const {
         return (std::chrono::steady_clock::now() - mStartTime) / std::chrono::milliseconds(1);
     }
 
-    inline Move bestMoveRoot() {
+    inline Move bestMoveRoot() const {
         return mPliesData[0].mPvLine.size() == 0 
                ? MOVE_NONE 
                : mPliesData[0].mPvLine[0];
     }
 
-    inline i32 search(Board &board, i32 maxDepth, auto startTime, 
-        i64 hardMilliseconds, i64 softMilliseconds, i64 maxNodes)
+    inline i32 search(const Board &board, const i32 maxDepth, const auto startTime, 
+        const i64 hardMilliseconds, const i64 softMilliseconds, const i64 maxNodes)
     { 
         mBoard = board;
         mStartTime = startTime;
@@ -146,9 +144,9 @@ class SearchThread {
         {
             mMaxPlyReached = 0;
 
-            i32 iterationScore = iterationDepth >= aspMinDepth() 
-                                 ? aspiration(iterationDepth, score)
-                                 : search(iterationDepth, 0, -INF, INF, false, DOUBLE_EXTENSIONS_MAX);
+            const i32 iterationScore = iterationDepth >= aspMinDepth() 
+                                       ? aspiration(iterationDepth, score)
+                                       : search(iterationDepth, 0, -INF, INF, false, DOUBLE_EXTENSIONS_MAX);
 
             if (stopSearch()) break;
 
@@ -165,12 +163,12 @@ class SearchThread {
             if (abs(score) < MIN_MATE_SCORE)
                 std::cout << " score cp " << score;
             else {
-                i32 movesTillMate = round((INF - abs(score)) / 2.0);
+                const i32 movesTillMate = round((INF - abs(score)) / 2.0);
                 std::cout << " score mate " << (score > 0 ? movesTillMate : -movesTillMate);
             }
 
-            u64 nodes = totalNodes();
-            u64 msElapsed = millisecondsElapsed();
+            const u64 nodes = totalNodes();
+            const u64 msElapsed = millisecondsElapsed();
 
             std::cout << " nodes " << nodes
                       << " nps "   << nodes * 1000 / std::max(msElapsed, (u64)1)
@@ -184,8 +182,8 @@ class SearchThread {
 
             // Nodes time management: scale soft time limit based on nodes spent on best move
             auto scaledSoftMs = [&]() -> u64 {
-                double bestMoveNodes = mMovesNodes[bestMoveRoot().encoded()];
-                double bestMoveNodesFraction = bestMoveNodes / std::max<double>(mNodes, 1.0);
+                const double bestMoveNodes = mMovesNodes[bestMoveRoot().encoded()];
+                const double bestMoveNodesFraction = bestMoveNodes / std::max<double>(mNodes, 1.0);
                 assert(bestMoveNodesFraction >= 0.0 && bestMoveNodesFraction <= 1.0);
                 
                 return (double)mSoftMilliseconds * (1.5 - bestMoveNodesFraction);
@@ -222,12 +220,12 @@ class SearchThread {
         return sSearchStopped = (mNodes % 1024 == 0 && millisecondsElapsed() >= mHardMilliseconds);
     }
 
-    inline void makeMove(Move move, i32 newPly)
+    inline void makeMove(const Move move, const i32 newPly)
     {
         // If not a special move, we can probably correctly predict the zobrist hash after it
         // and prefetch the TT entry
         if (move.flag() <= Move::KING_FLAG) {
-            auto ttEntryIdx = TTEntryIndex(mBoard.roughHashAfter(move), ttPtr->size());
+            const auto ttEntryIdx = TTEntryIndex(mBoard.roughHashAfter(move), ttPtr->size());
             __builtin_prefetch(&(*ttPtr)[ttEntryIdx]);
         }
 
@@ -267,12 +265,12 @@ class SearchThread {
             // Adjust eval with correction histories
 
             i32 correction = 0;
-            for (i16* corrHist : correctionHistories())
+            for (const i16* corrHist : correctionHistories())
                 correction += i32(*corrHist);
 
             eval += correction / corrHistScale();
 
-            // /Clamp to avoid false mate scores and invalid scores
+            // Clamp to avoid false mate scores and invalid scores
             eval = std::clamp(eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
         }
 
@@ -281,7 +279,7 @@ class SearchThread {
 
     inline std::array<i16*, 3> correctionHistories()
     {
-        int stm = (int)mBoard.sideToMove();
+        const int stm = (int)mBoard.sideToMove();
 
         return {
             &mPawnsCorrHist[stm][mBoard.pawnsHash() % 16384],
@@ -290,7 +288,7 @@ class SearchThread {
         };
     }
 
-    inline i32 aspiration(i32 iterationDepth, i32 score)
+    inline i32 aspiration(const i32 iterationDepth, i32 score)
     {
         // Aspiration Windows
         // Search with a small window, adjusting it and researching until the score is inside the window
@@ -327,8 +325,8 @@ class SearchThread {
         return score;
     }
 
-    inline i32 search(i32 depth, i32 ply, i32 alpha, i32 beta, 
-        bool cutNode, u8 doubleExtsLeft, bool singular = false) 
+    inline i32 search(i32 depth, const i32 ply, i32 alpha, i32 beta, 
+        const bool cutNode, u8 doubleExtsLeft, const bool singular = false) 
     {
         assert(ply >= 0 && ply <= mMaxDepth);
         assert(alpha >= -INF && alpha <= INF);
@@ -352,7 +350,7 @@ class SearchThread {
         const bool pvNode = beta > alpha + 1;
 
         // Probe TT
-        auto ttEntryIdx = TTEntryIndex(mBoard.zobristHash(), ttPtr->size());
+        const auto ttEntryIdx = TTEntryIndex(mBoard.zobristHash(), ttPtr->size());
         TTEntry ttEntry = singular ? TTEntry() : (*ttPtr)[ttEntryIdx];
         const bool ttHit = mBoard.zobristHash() == ttEntry.zobristHash;
         Move ttMove = MOVE_NONE;
@@ -376,15 +374,15 @@ class SearchThread {
         if (ply >= mMaxDepth) 
             return mBoard.inCheck() ? 0 : updateAccumulatorAndEval(plyDataPtr->mEval);
 
-        i32 eval = updateAccumulatorAndEval(plyDataPtr->mEval);
+        const i32 eval = updateAccumulatorAndEval(plyDataPtr->mEval);
 
-        int improving = ply <= 1 || mBoard.inCheck() || mBoard.inCheck2PliesAgo()
-                        ? 0
-                        : eval - (plyDataPtr - 2)->mEval >= improvingThreshold()
-                        ? 1
-                        : eval - (plyDataPtr - 2)->mEval <= -improvingThreshold()
-                        ? -1
-                        : 0;
+        const int improving = ply <= 1 || mBoard.inCheck() || mBoard.inCheck2PliesAgo()
+                              ? 0
+                              : eval - (plyDataPtr - 2)->mEval >= improvingThreshold()
+                              ? 1
+                              : eval - (plyDataPtr - 2)->mEval <= -improvingThreshold()
+                              ? -1
+                              : 0;
 
         (plyDataPtr + 1)->mKiller = MOVE_NONE;
 
@@ -401,7 +399,7 @@ class SearchThread {
             && abs(alpha) < 2000
             && eval + depth * razoringMultiplier() < alpha)
             {
-                i32 score = qSearch(ply, alpha, beta);
+                const i32 score = qSearch(ply, alpha, beta);
 
                 if (stopSearch()) return 0;
 
@@ -418,26 +416,26 @@ class SearchThread {
             {
                 makeMove(MOVE_NONE, ply + 1);
 
-                i32 nmpDepth = depth - nmpBaseReduction() - depth / nmpReductionDivisor();
+                const i32 nmpDepth = depth - nmpBaseReduction() - depth / nmpReductionDivisor();
                 
-                i32 score = mBoard.isDraw(ply + 1) ? 0 
-                            : -search(nmpDepth, ply + 1, -beta, -alpha, !cutNode, doubleExtsLeft);
+                const i32 score = mBoard.isDraw(ply + 1) ? 0 
+                                  : -search(nmpDepth, ply + 1, -beta, -alpha, !cutNode, doubleExtsLeft);
 
                 mBoard.undoMove();
 
                 if (stopSearch()) return 0;
 
-				if (score >= beta) return score >= MIN_MATE_SCORE ? beta : score;
+                if (score >= beta) return score >= MIN_MATE_SCORE ? beta : score;
             }
 
             // Probcut
-            i32 probcutBeta = beta + probcutMargin() - improving * probcutMargin() * probcutImprovingPercentage();
+            const i32 probcutBeta = beta + probcutMargin() - improving * probcutMargin() * probcutImprovingPercentage();
             if (depth >= 5
             && abs(beta) < MIN_MATE_SCORE - 1
             && probcutBeta < MIN_MATE_SCORE - 1
             && !(ttHit && ttEntry.depth() >= depth - 3 && ttEntry.score < probcutBeta))
             {
-                i32 probcutScore = probcut(
+                const i32 probcutScore = probcut(
                     depth, ply, probcutBeta, cutNode, doubleExtsLeft, ttMove, ttEntryIdx);
 
                 if (stopSearch()) return 0;
@@ -470,8 +468,8 @@ class SearchThread {
         ArrayVec<Move, 256> failLowQuiets;
         ArrayVec<i16*, 256> failLowNoisiesHistory;
 
-        bool lmrImproving = ply > 1 && !mBoard.inCheck() && !mBoard.inCheck2PliesAgo() 
-                            && eval > (plyDataPtr - 2)->mEval;
+        const bool lmrImproving = ply > 1 && !mBoard.inCheck() && !mBoard.inCheck2PliesAgo() 
+                                  && eval > (plyDataPtr - 2)->mEval;
 
         // Moves loop
         for (auto [move, moveScore] = plyDataPtr->nextMove(mBoard); 
@@ -480,8 +478,8 @@ class SearchThread {
         {
             legalMovesSeen++;
 
-            PieceType captured = mBoard.captured(move);
-            bool isQuiet = captured == PieceType::NONE && move.promotion() == PieceType::NONE;
+            const PieceType captured = mBoard.captured(move);
+            const bool isQuiet = captured == PieceType::NONE && move.promotion() == PieceType::NONE;
 
             // Moves loop pruning
             if (ply > 0 && bestScore > -MIN_MATE_SCORE && moveScore < COUNTERMOVE_SCORE)
@@ -491,7 +489,7 @@ class SearchThread {
                                       + depth * depth * lmpMultiplier())
                     break;
                     
-                i32 lmrDepth = depth - LMR_TABLE[isQuiet][depth][legalMovesSeen];
+                const i32 lmrDepth = depth - LMR_TABLE[isQuiet][depth][legalMovesSeen];
 
                 // FP (Futility pruning)
                 if (lmrDepth <= fpMaxDepth() 
@@ -501,7 +499,7 @@ class SearchThread {
                     break;
 
                 // SEE pruning
-                i32 threshold = depth * (isQuiet ? seeQuietThreshold() : seeNoisyThreshold());
+                const i32 threshold = depth * (isQuiet ? seeQuietThreshold() : seeNoisyThreshold());
                 if (depth <= seePruningMaxDepth() && !mBoard.SEE(move, threshold))
                     continue;
             }
@@ -522,8 +520,8 @@ class SearchThread {
                 // Singular search: before searching any move, 
                 // search this node at a shallower depth with TT move excluded
 
-                i32 singularScore = search((depth - 1) / 2, ply, singularBeta - 1, singularBeta, 
-                                           cutNode, doubleExtsLeft, true);
+                const i32 singularScore = search(
+                    (depth - 1) / 2, ply, singularBeta - 1, singularBeta, cutNode, doubleExtsLeft, true);
 
                 // Double extension
                 if (!pvNode && singularScore < singularBeta - doubleExtensionMargin() && doubleExtsLeft > 0) {
@@ -543,7 +541,7 @@ class SearchThread {
                 plyDataPtr->mCurrentMoveIdx = 0; // reset since the singular search used this
             }
 
-            u64 nodesBefore = mNodes;
+            const u64 nodesBefore = mNodes;
             makeMove(move, ply + 1);
 
             int pt = (int)move.pieceType();
@@ -624,8 +622,8 @@ class SearchThread {
 
             bound = Bound::LOWER;
 
-            i32 bonus =  std::clamp(depth * historyBonusMultiplier() - historyBonusOffset(), 0, historyBonusMax());
-            i32 malus = -std::clamp(depth * historyMalusMultiplier() - historyMalusOffset(), 0, historyMalusMax());
+            const i32 bonus =  std::clamp(depth * historyBonusMultiplier() - historyBonusOffset(), 0, historyBonusMax());
+            const i32 malus = -std::clamp(depth * historyMalusMultiplier() - historyMalusOffset(), 0, historyMalusMax());
 
             // History malus: decrease history of fail low noisy moves
             for (i16* noisyHistoryPtr : failLowNoisiesHistory)
@@ -655,7 +653,7 @@ class SearchThread {
                 bonus);
 
             // History malus: decrease history of fail low quiets
-            for (Move failLow : failLowQuiets) {
+            for (const Move failLow : failLowQuiets) {
                 pt = (int)failLow.pieceType();
 
                 mMovesHistory[stm][pt][failLow.to()].updateQuietHistories(
@@ -690,7 +688,7 @@ class SearchThread {
             && !(bound == Bound::LOWER && bestScore <= eval)
             && !(bound == Bound::UPPER && bestScore >= eval))
             {
-                i32 newWeight = std::min(depth + depth * depth, corrHistScale());
+                const i32 newWeight = std::min(depth + depth * depth, corrHistScale());
 
                 for (i16* corrHist : correctionHistories())
                 {
@@ -706,7 +704,7 @@ class SearchThread {
         return bestScore;
     }
 
-    inline i32 qSearch(i32 ply, i32 alpha, i32 beta)
+    inline i32 qSearch(const i32 ply, i32 alpha, i32 beta)
     {
         assert(ply > 0 && ply <= mMaxDepth);
         assert(alpha >= -INF && alpha <= INF);
@@ -716,9 +714,9 @@ class SearchThread {
         if (stopSearch()) return 0;
 
         // Probe TT
-        auto ttEntryIdx = TTEntryIndex(mBoard.zobristHash(), ttPtr->size());
+        const auto ttEntryIdx = TTEntryIndex(mBoard.zobristHash(), ttPtr->size());
         TTEntry ttEntry = (*ttPtr)[ttEntryIdx];
-        bool ttHit = mBoard.zobristHash() == ttEntry.zobristHash;
+        const bool ttHit = mBoard.zobristHash() == ttEntry.zobristHash;
 
         // TT cutoff
         if (ttHit) {
@@ -736,7 +734,7 @@ class SearchThread {
         if (ply >= mMaxDepth)
             return mBoard.inCheck() ? 0 : updateAccumulatorAndEval(plyDataPtr->mEval);
 
-        i32 eval = updateAccumulatorAndEval(plyDataPtr->mEval);
+        const i32 eval = updateAccumulatorAndEval(plyDataPtr->mEval);
 
         if (!mBoard.inCheck()) {
             if (eval >= beta) return eval; 
@@ -746,8 +744,8 @@ class SearchThread {
             plyDataPtr->genAndScoreNoisyMoves(mBoard);
         }
         else {
-            Move ttMove = ttHit ? Move(ttEntry.move) : MOVE_NONE;
-            Move countermove = mCountermoves[(int)mBoard.oppSide()][mBoard.lastMove().encoded()];
+            const Move ttMove = ttHit ? Move(ttEntry.move) : MOVE_NONE;
+            const Move countermove = mCountermoves[(int)mBoard.oppSide()][mBoard.lastMove().encoded()];
 
             // in check, generate and score all moves (except underpromotions)
             plyDataPtr->genAndScoreMoves(mBoard, ttMove, countermove, mMovesHistory);
@@ -772,7 +770,7 @@ class SearchThread {
                 
             makeMove(move, ply + 1);
 
-            i32 score = mBoard.isDraw(ply + 1) ? 0 : -qSearch(ply + 1, -beta, -alpha);
+            const i32 score = mBoard.isDraw(ply + 1) ? 0 : -qSearch(ply + 1, -beta, -alpha);
 
             mBoard.undoMove();
             mAccumulatorPtr--;
@@ -807,8 +805,8 @@ class SearchThread {
         return bestScore;
     }
 
-    inline i32 probcut(
-        i32 depth, i32 ply, i32 probcutBeta, bool cutNode, u8 doubleExtsLeft, Move ttMove, auto ttEntryIdx)
+    inline i32 probcut(const i32 depth, const i32 ply, const i32 probcutBeta, 
+        const bool cutNode, const u8 doubleExtsLeft, const Move ttMove, const auto ttEntryIdx)
     {
         PlyData* plyDataPtr = &mPliesData[ply];
 

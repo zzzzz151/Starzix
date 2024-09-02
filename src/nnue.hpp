@@ -93,13 +93,13 @@ struct BothAccumulators {
 
     inline BothAccumulators() = default;
 
-    inline BothAccumulators(Board &board) 
+    inline BothAccumulators(const Board &board) 
     {
         mAccumulators = NET->hiddenBiases;
 
-        for (Color color : {Color::WHITE, Color::BLACK}) 
+        for (const Color color : {Color::WHITE, Color::BLACK}) 
         {
-            File kingFile = squareFile(board.kingSquare(color));
+            const File kingFile = squareFile(board.kingSquare(color));
             mMirrorHorizontally[(int)color] = (int)kingFile >= (int)File::E;
         }
 
@@ -113,7 +113,7 @@ struct BothAccumulators {
             while (bb > 0) {
                 Square sq = poplsb(bb);
 
-                for (int color : {WHITE, BLACK}) 
+                for (const int color : {WHITE, BLACK}) 
                 {
                     const auto inputBucket = mInputBucket[color];
                     const auto ft768 = feature768(pieceColor, pt, sq, mMirrorHorizontally[color]);
@@ -124,7 +124,7 @@ struct BothAccumulators {
             }
         };
 
-        for (Color pieceColor : {Color::WHITE, Color::BLACK})
+        for (const Color pieceColor : {Color::WHITE, Color::BLACK})
             for (int pieceType = PAWN; pieceType <= KING; pieceType++)
                 activatePiece(pieceColor, (PieceType)pieceType);
 
@@ -133,7 +133,7 @@ struct BothAccumulators {
 
     private:
 
-    inline int setInputBucket(Color color, u64 enemyQueensBb)
+    inline int setInputBucket(const Color color, const u64 enemyQueensBb)
     {
         if (std::popcount(enemyQueensBb) != 1) 
             mInputBucket[(int)color] = 0;
@@ -149,7 +149,8 @@ struct BothAccumulators {
         return mInputBucket[(int)color];
     }
 
-    inline int feature768(Color pieceColor, PieceType pt, Square sq, bool mirrorHorizontally) const
+    inline int feature768(
+        const Color pieceColor, const PieceType pt, Square sq, const bool mirrorHorizontally) const
     {
         if (mirrorHorizontally) sq ^= 7;
 
@@ -158,7 +159,7 @@ struct BothAccumulators {
         return (int)pieceColor * 384 + (int)pt * 64 + (int)sq;
     }
 
-    inline void updateFinnyEntryAndAccumulator(FinnyTable &finnyTable, Color accColor, Board &board) 
+    inline void updateFinnyEntryAndAccumulator(FinnyTable &finnyTable, const Color accColor, const Board &board) 
     {
         const int iAccColor = (int)accColor;
         const auto hm = mMirrorHorizontally[iAccColor];
@@ -168,8 +169,8 @@ struct BothAccumulators {
 
         auto updatePiece = [&](Color pieceColor, PieceType pt) -> void
         {
-            u64 bb = board.getBb(pieceColor, pt);
-            u64 entryBb = finnyEntry.colorBitboards[(int)pieceColor] & finnyEntry.piecesBitboards[(int)pt];
+            const u64 bb = board.getBb(pieceColor, pt);
+            const u64 entryBb = finnyEntry.colorBitboards[(int)pieceColor] & finnyEntry.piecesBitboards[(int)pt];
 
             u64 add = bb & ~entryBb;
             u64 remove = entryBb & ~bb;
@@ -191,7 +192,7 @@ struct BothAccumulators {
             }
         };
 
-        for (Color pieceColor : {Color::WHITE, Color::BLACK})
+        for (const Color pieceColor : {Color::WHITE, Color::BLACK})
             for (int pieceType = PAWN; pieceType <= KING; pieceType++)
                 updatePiece(pieceColor, (PieceType)pieceType);
 
@@ -203,7 +204,7 @@ struct BothAccumulators {
 
     public:
 
-    inline void update(BothAccumulators* oldAcc, Board &board, FinnyTable &finnyTable)
+    inline void update(BothAccumulators* oldAcc, const Board &board, FinnyTable &finnyTable)
     {
         assert(oldAcc->mUpdated && !mUpdated);
 
@@ -214,7 +215,7 @@ struct BothAccumulators {
         const Color notColorMoving = oppColor(colorMoving);
         const int iColorMoving = (int)colorMoving;
 
-        Move move = board.lastMove();
+        const Move move = board.lastMove();
         assert(move != MOVE_NONE);
 
         const int from = move.from();
@@ -250,7 +251,7 @@ struct BothAccumulators {
 
         // Update accumulators with the move played
 
-        for (int color : {WHITE, BLACK})
+        for (const int color : {WHITE, BLACK})
         {
             const bool hm = mMirrorHorizontally[color];
             const auto inputBucket = mInputBucket[color];
@@ -302,7 +303,7 @@ struct BothAccumulators {
 
 }; // struct BothAccumulators
 
-inline i32 evaluate(BothAccumulators* accumulator, Color sideToMove)
+inline i32 evaluate(const BothAccumulators* accumulator, const Color sideToMove)
 {
     assert(accumulator->mUpdated);
 
@@ -356,15 +357,15 @@ inline i32 evaluate(BothAccumulators* accumulator, Color sideToMove)
     #else
         for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
         {
-            i16 clipped = std::clamp<i16>(accumulator->mAccumulators[stm][i], 0, QA);
-            i16 x = clipped * NET->outputWeightsStm[i];
+            const i16 clipped = std::clamp<i16>(accumulator->mAccumulators[stm][i], 0, QA);
+            const i16 x = clipped * NET->outputWeightsStm[i];
             sum += x * clipped;
         }
 
         for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
         {
-            i16 clipped = std::clamp<i16>(accumulator->mAccumulators[!stm][i], 0, QA);
-            i16 x = clipped * NET->outputWeightsNstm[i];
+            const i16 clipped = std::clamp<i16>(accumulator->mAccumulators[!stm][i], 0, QA);
+            const i16 x = clipped * NET->outputWeightsNstm[i];
             sum += x * clipped;
         }
     #endif
@@ -374,12 +375,12 @@ inline i32 evaluate(BothAccumulators* accumulator, Color sideToMove)
 
 } // namespace nnue
 
-inline float materialScale(Board &board) 
+inline float materialScale(const Board &board) 
 {
-    float material = 3 * std::popcount(board.getBb(PieceType::KNIGHT))
-                   + 3 * std::popcount(board.getBb(PieceType::BISHOP))
-                   + 5 * std::popcount(board.getBb(PieceType::ROOK))
-                   + 9 * std::popcount(board.getBb(PieceType::QUEEN));
+    const float material = 3 * std::popcount(board.getBb(PieceType::KNIGHT))
+                         + 3 * std::popcount(board.getBb(PieceType::BISHOP))
+                         + 5 * std::popcount(board.getBb(PieceType::ROOK))
+                         + 9 * std::popcount(board.getBb(PieceType::QUEEN));
 
     // Linear lerp from evalMaterialScaleMin to evalMaterialScaleMax 
     // as material goes from 0 to MATERIAL_MAX

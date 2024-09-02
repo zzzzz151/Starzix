@@ -21,15 +21,15 @@ int main() {
     while (std::getline(inputFile, line))
     {
         std::stringstream iss(line);
-        std::vector<std::string> tokens = splitString(line, '|');
+        const std::vector<std::string> tokens = splitString(line, '|');
 
-        std::string fen = tokens[0];
-        std::string uciMove = tokens[1];
-        int gain = stoi(tokens[2]);
-        bool expected = gain >= 0;
+        const std::string fen = tokens[0];
+        const std::string uciMove = tokens[1];
+        const int gain = stoi(tokens[2]);
+        const bool expected = gain >= 0;
 
-        Board board = Board(fen);
-        bool result = board.SEE(board.uciToMove(uciMove));
+        const Board board = Board(fen);
+        const bool result = board.SEE(board.uciToMove(uciMove));
 
         if (result == expected)
             passed++;

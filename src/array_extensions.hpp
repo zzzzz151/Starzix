@@ -36,19 +36,19 @@ struct ArrayVec
 
     inline ArrayVec() = default;
 
-    inline T operator[](std::size_t i) const
+    inline T operator[](const std::size_t i) const
     {
         assert(i < mSize);
         return mArr[i];
     }
 
-    inline T& operator[](std::size_t i)
+    inline T& operator[](const std::size_t i)
     {
         assert(i < mSize);
         return mArr[i];
     }
 
-    inline T* ptr(std::size_t i) const
+    inline T* ptr(const std::size_t i) const
     {
         assert(i < mSize);
         return &mArr[i];
@@ -58,14 +58,14 @@ struct ArrayVec
         return mSize; 
     }
 
-    inline void clear() { mSize = 0; }
+    inline void clear(){ mSize = 0; }
 
-    inline void push_back(T elem) { 
+    inline void push_back(const T elem) { 
         assert(mSize < N);
         mArr[mSize++] = elem;
     }
 
-    inline void swap(std::size_t i, std::size_t j) 
+    inline void swap(const std::size_t i, const std::size_t j) 
     {
         assert(i < mSize && j < mSize);
         std::swap(mArr[i], mArr[j]);

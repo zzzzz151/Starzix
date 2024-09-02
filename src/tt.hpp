@@ -14,19 +14,19 @@ struct TTEntry {
     u16 move = MOVE_NONE.encoded();
     u16 depthBoundAge; // from lowest to highest bits: 7 for depth, 2 for bound, 7 for age
 
-    inline i32 depth() {
+    inline i32 depth() const {
         return depthBoundAge & 0b1111111;
     }
 
-    inline Bound bound() {
+    inline Bound bound() const {
          return Bound((depthBoundAge >> 7) & 0b11);
     }
 
-    inline u8 age() {
+    inline u8 age() const {
         return depthBoundAge >> 9;
     }
 
-    inline void adjustScore(i16 ply) 
+    inline void adjustScore(const i16 ply) 
     {
         if (score >= MIN_MATE_SCORE)
             score -= ply;
@@ -34,7 +34,8 @@ struct TTEntry {
             score += ply;
     }
 
-    inline void update(u64 newZobristHash, u8 newDepth, i16 ply, i16 newScore, Move newBestMove, Bound newBound, u8 newAge)
+    inline void update(const u64 newZobristHash, const u8 newDepth, const i16 ply, 
+        const i16 newScore, const Move newBestMove, const Bound newBound, const u8 newAge)
     {
         assert((newDepth >> 7) == 0);
         assert((newAge >> 7) == 0);
@@ -67,15 +68,15 @@ struct TTEntry {
 
 static_assert(sizeof(TTEntry) == 8 + 2 + 2 + 2);
 
-inline u64 TTEntryIndex(u64 zobristHash, auto numEntries) 
+inline u64 TTEntryIndex(const u64 zobristHash, const auto numEntries) 
 {
     return ((u128)zobristHash * (u128)numEntries) >> 64;
 }
 
-inline void printTTSize(std::vector<TTEntry> &tt) 
+inline void printTTSize(const std::vector<TTEntry> &tt) 
 {
-    double bytes = (u64)tt.size() * (u64)sizeof(TTEntry);
-    double megabytes = bytes / (1024.0 * 1024.0);
+    const double bytes = (u64)tt.size() * (u64)sizeof(TTEntry);
+    const double megabytes = bytes / (1024.0 * 1024.0);
 
     std::cout << "TT size: " << round(megabytes) << " MB"
             << " (" << tt.size() << " entries)" 
@@ -85,7 +86,7 @@ inline void printTTSize(std::vector<TTEntry> &tt)
 inline void resizeTT(std::vector<TTEntry> &tt, i64 newSizeMB) 
 {
     newSizeMB = std::clamp(newSizeMB, (i64)1, (i64)65536);
-    u64 numEntries = (u64)newSizeMB * 1024 * 1024 / (u64)sizeof(TTEntry); 
+    const u64 numEntries = (u64)newSizeMB * 1024 * 1024 / (u64)sizeof(TTEntry); 
 
     tt.clear(); // remove all elements
     tt.resize(round(numEntries));
@@ -93,7 +94,7 @@ inline void resizeTT(std::vector<TTEntry> &tt, i64 newSizeMB)
 }
 
 inline void resetTT(std::vector<TTEntry> &tt) {
-    auto numEntries = tt.size();
+    const auto numEntries = tt.size();
     tt.clear(); // remove all elements
     tt.resize(numEntries);
     tt.shrink_to_fit();

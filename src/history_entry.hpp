@@ -2,12 +2,12 @@
 
 #pragma once
 
-inline void updateHistory(i16* history, i32 bonus) {
+inline void updateHistory(i16* history, const i32 bonus) {
     *history += bonus - abs(bonus) * i32(*history) / historyMax();
     assert(*history >= -historyMax() && *history <= historyMax());
 }
 
-inline void updateHistory(i16 &history, i32 bonus) {
+inline void updateHistory(i16 &history, const i32 bonus) {
     updateHistory(&history, bonus);
 }
 
@@ -19,7 +19,8 @@ struct HistoryEntry {
 
     public:
 
-    inline i32 quietHistory(bool enemyAttacksOrigin, bool enemyAttacksDst, std::array<Move, 3> moves) 
+    inline i32 quietHistory(
+        const bool enemyAttacksOrigin, const bool enemyAttacksDst, const std::array<Move, 3> moves) const
     {
         const std::array<float, 3> CONT_HISTORY_WEIGHTS = { 
             contHist1PlyWeight(), contHist2PlyWeight(), contHist4PlyWeight() 
@@ -31,29 +32,30 @@ struct HistoryEntry {
         for (size_t i = 0; i < moves.size(); i++)
             if ((move = moves[i]) != MOVE_NONE) 
             {
-                int pt = (int)move.pieceType();
+                const int pt = (int)move.pieceType();
                 total += float(mContHist[pt][move.to()]) * CONT_HISTORY_WEIGHTS[i];
             }
 
         return total;
     }
 
-    inline void updateQuietHistories(bool enemyAttacksOrigin, bool enemyAttacksDst, std::array<Move, 3> moves, i32 bonus)
+    inline void updateQuietHistories(
+        const bool enemyAttacksOrigin, const bool enemyAttacksDst, const std::array<Move, 3> moves, const i32 bonus)
     {
         updateHistory(mMainHist[enemyAttacksOrigin][enemyAttacksDst], bonus);
 
-        for (Move move : moves) 
+        for (const Move move : moves) 
             if (move != MOVE_NONE) {
-                int pt = (int)move.pieceType();
+                const int pt = (int)move.pieceType();
                 updateHistory(mContHist[pt][move.to()], bonus);
             }
     }
 
-    inline i32 noisyHistory(PieceType captured) {
+    inline i32 noisyHistory(const PieceType captured) const  {
         return mNoisyHist[(int)captured];
     }
 
-    inline i16* noisyHistoryPtr(PieceType captured) {
+    inline i16* noisyHistoryPtr(const PieceType captured) {
         return &mNoisyHist[(int)captured];
     }
 

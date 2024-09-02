@@ -164,8 +164,8 @@ int main()
 
     // isPseudolegalLegal()
     board = Board("rnb1kbnr/pppp1ppp/8/4p3/3P4/1P2q3/P1P2PPP/RNBQKBNR w KQkq - 0 4");
-    Move legal = board.uciToMove("f2e3"), illegal = board.uciToMove("g1f3");
-    u64 pinned = board.pinned();
+    const Move legal = board.uciToMove("f2e3"), illegal = board.uciToMove("g1f3");
+    const u64 pinned = board.pinned();
     assert(!board.isPseudolegalLegal(illegal, pinned));
     assert(board.isPseudolegalLegal(legal, pinned));
 

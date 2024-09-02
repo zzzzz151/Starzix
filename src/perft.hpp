@@ -4,23 +4,23 @@
 
 #include "board.hpp"
 
-inline u64 perft(Board &board, int depth)
+inline u64 perft(Board &board, const int depth)
 {
     if (depth <= 0) return 1;
 
     ArrayVec<Move, 256> moves;
     board.pseudolegalMoves(moves);
     u64 nodes = 0;
-    u64 pinned = board.pinned();
+    const u64 pinned = board.pinned();
 
     if (depth == 1) {
-         for (Move move : moves)
+         for (const Move move : moves)
             nodes += board.isPseudolegalLegal(move, pinned);
 
         return nodes;
     }
 
-    for (Move move : moves)
+    for (const Move move : moves)
         if (board.isPseudolegalLegal(move, pinned))
         {
             board.makeMove(move);
@@ -31,7 +31,7 @@ inline u64 perft(Board &board, int depth)
     return nodes;
 }
 
-inline void perftSplit(Board &board, int depth)
+inline void perftSplit(Board &board, const int depth)
 {
     if (depth <= 0) return;
 
@@ -42,21 +42,21 @@ inline void perftSplit(Board &board, int depth)
     ArrayVec<Move, 256> moves;
     board.pseudolegalMoves(moves);
     u64 totalNodes = 0;
-    u64 pinned = board.pinned();
+    const u64 pinned = board.pinned();
 
     if (depth == 1) {
-        for (Move move : moves)
+        for (const Move move : moves)
             if (board.isPseudolegalLegal(move, pinned))
                 std::cout << move.toUci() << ": 1" << std::endl;   
 
         return;
     }
 
-    for (Move move : moves) 
+    for (const Move move : moves) 
         if (board.isPseudolegalLegal(move, pinned))
         {
             board.makeMove(move);
-            u64 nodes = perft(board, depth - 1);
+            const u64 nodes = perft(board, depth - 1);
             std::cout << move.toUci() << ": " << nodes << std::endl;
             totalNodes += nodes;
             board.undoMove();
@@ -68,12 +68,12 @@ inline void perftSplit(Board &board, int depth)
 inline u64 perftBench(Board &board, int depth)
 {
     depth = std::max(depth, 0);
-    std::string fen = board.fen();
+    const std::string fen = board.fen();
 
     std::cout << "Running perft depth " << depth << " on " << fen << std::endl;
 
-    std::chrono::steady_clock::time_point start =  std::chrono::steady_clock::now();
-    u64 nodes = perft(board, depth);
+    const std::chrono::steady_clock::time_point start =  std::chrono::steady_clock::now();
+    const u64 nodes = perft(board, depth);
 
     std::cout << "perft depth " << depth 
               << " nodes " << nodes 

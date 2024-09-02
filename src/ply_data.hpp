@@ -26,8 +26,8 @@ struct PlyData {
     }
 
     // For main search
-    inline void genAndScoreMoves(Board &board, Move ttMove, Move countermove,
-        MultiArray<HistoryEntry, 2, 6, 64> &movesHistory) 
+    inline void genAndScoreMoves(const Board &board, const Move ttMove, const Move countermove,
+        const MultiArray<HistoryEntry, 2, 6, 64> &movesHistory) 
     {
         assert(!(board.lastMove() == MOVE_NONE && countermove != MOVE_NONE));
 
@@ -43,20 +43,22 @@ struct PlyData {
             mEnemyAttacks = board.attacks(board.oppSide());
         }
 
-        std::array<Move, 3> lastMoves = { board.lastMove(), board.nthToLastMove(2), board.nthToLastMove(4) };
+        const std::array<Move, 3> lastMoves = { 
+            board.lastMove(), board.nthToLastMove(2), board.nthToLastMove(4) 
+        };
 
         // Score moves
         for (size_t i = 0; i < mAllMoves.size(); i++)
         {
-            Move move = mAllMoves[i];
+            const Move move = mAllMoves[i];
 
             if (move == ttMove) {
                 mMovesScores[i] = I32_MAX;
                 continue;
             }
 
-            PieceType captured = board.captured(move);
-            PieceType promotion = move.promotion();
+            const PieceType captured = board.captured(move);
+            const PieceType promotion = move.promotion();
 
             // Starzix doesnt generate underpromotions in search
             assert(promotion == PieceType::NONE || promotion == PieceType::QUEEN);
@@ -79,8 +81,8 @@ struct PlyData {
             else if (move == countermove)
                 mMovesScores[i] = COUNTERMOVE_SCORE;
             else {
-                int stm = (int)board.sideToMove();
-                int pt = (int)move.pieceType();
+                const int stm = (int)board.sideToMove();
+                const int pt = (int)move.pieceType();
                 
                 mMovesScores[i] = movesHistory[stm][pt][move.to()].quietHistory(
                     mEnemyAttacks & bitboard(move.from()), 
@@ -95,7 +97,7 @@ struct PlyData {
     }
 
     // For qsearch
-    inline void genAndScoreNoisyMoves(Board &board, Move ttMove = MOVE_NONE) 
+    inline void genAndScoreNoisyMoves(const Board &board, const Move ttMove = MOVE_NONE) 
     {
         // Generate pinned pieces if not already generated
         // Needed for Board.isPseudolegalLegal(Move move, u64 pinned)
@@ -111,15 +113,15 @@ struct PlyData {
         // Score moves
         for (size_t i = 0; i < mNoisyMoves.size(); i++) 
         {
-            Move move = mNoisyMoves[i];
+            const Move move = mNoisyMoves[i];
 
             if (move == ttMove) {
                 mMovesScores[i] = I32_MAX;
                 continue;
             }
 
-            PieceType captured = board.captured(move);
-            PieceType promotion = move.promotion();
+            const PieceType captured = board.captured(move);
+            const PieceType promotion = move.promotion();
 
             // Starzix doesnt generate underpromotions in search
             assert(promotion == PieceType::NONE || promotion == PieceType::QUEEN);
@@ -139,7 +141,7 @@ struct PlyData {
         mCurrentMoveIdx = -1;
     }
 
-    inline std::pair<Move, i32> nextMove(Board &board)
+    inline std::pair<Move, i32> nextMove(const Board &board)
     {
         mCurrentMoveIdx++;
 
@@ -154,33 +156,33 @@ struct PlyData {
                 std::swap(mMovesScores[mCurrentMoveIdx], mMovesScores[j]);
             }
 
-        Move nextBestMove = (*mCurrentMoves)[mCurrentMoveIdx];
+        const Move nextBestMove = (*mCurrentMoves)[mCurrentMoveIdx];
 
         return board.isPseudolegalLegal(nextBestMove, mPinned) 
                ? std::make_pair(nextBestMove, mMovesScores[mCurrentMoveIdx])
                : nextMove(board);
     }
 
-    inline void updatePV(Move move) 
+    inline void updatePV(const Move move) 
     {
         // This function is called from SearchThread in search.cpp, which has a
         // std::array<PlyData, MAX_DEPTH+1> mPliesData
         // so the data is continuous and we can fetch the next ply data
         // by incrementing this pointer
-        PlyData* nextPlyData = this + 1;
+        const PlyData* nextPlyData = this + 1;
 
         mPvLine.clear();
         mPvLine.push_back(move);
 
         // Copy child's PV
-        for (Move move : nextPlyData->mPvLine)
+        for (const Move move : nextPlyData->mPvLine)
             mPvLine.push_back(move);
     }
 
-    inline std::string pvString() 
+    inline std::string pvString() const
     {
         std::string str = "";
-        for (Move move : mPvLine)
+        for (const Move move : mPvLine)
             str += move.toUci() + " ";
 
         trim(str);

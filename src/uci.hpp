@@ -11,14 +11,14 @@
 namespace uci { // Universal chess interface
 
 inline void uci();
-inline void setoption(std::vector<std::string> &tokens, std::vector<TTEntry> &tt);
-inline void position(std::vector<std::string> &tokens, Board &board);
-inline void go(std::vector<std::string> &tokens, Board &board);
+inline void setoption(const std::vector<std::string> &tokens, std::vector<TTEntry> &tt);
+inline void position(const std::vector<std::string> &tokens, Board &board);
+inline void go(const std::vector<std::string> &tokens, const Board &board);
 
 inline void runCommand(std::string &command, Board &board, std::vector<TTEntry> &tt)
 {
     trim(command);
-    std::vector<std::string> tokens = splitString(command, ' ');
+    const std::vector<std::string> tokens = splitString(command, ' ');
 
     if (!std::cin.good())
         exit(EXIT_FAILURE);
@@ -50,9 +50,9 @@ inline void runCommand(std::string &command, Board &board, std::vector<TTEntry> 
         board.print();
     else if (command == "eval") 
     {
-        BothAccumulators acc = BothAccumulators(board);
-        i32 eval = nnue::evaluate(&acc, board.sideToMove());
-        i32 evalScaled = eval * materialScale(board);
+        const BothAccumulators acc = BothAccumulators(board);
+        const i32 eval = nnue::evaluate(&acc, board.sideToMove());
+        const i32 evalScaled = eval * materialScale(board);
 
         std::cout << "eval "    << eval
                   << " scaled " << evalScaled
@@ -63,19 +63,19 @@ inline void runCommand(std::string &command, Board &board, std::vector<TTEntry> 
         if (tokens.size() == 1)
             bench();
         else {
-            int depth = stoi(tokens[1]);
+            const int depth = stoi(tokens[1]);
             bench(depth);
         }
     }
     else if (tokens[0] == "perft" || (tokens[0] == "go" && tokens[1] == "perft"))
     {
-        int depth = stoi(tokens.back());
+        const int depth = stoi(tokens.back());
         perftBench(board, depth);
     }
     else if (tokens[0] == "perftsplit" || tokens[0] == "splitperft" 
     || tokens[0] == "perftdivide" || tokens[0] == "divideperft")
     {
-        int depth = stoi(tokens[1]);
+        const int depth = stoi(tokens[1]);
         perftSplit(board, depth);
     }
     else if (tokens[0] == "makemove")
@@ -141,10 +141,10 @@ inline void uci() {
     std::cout << "uciok" << std::endl;
 }
 
-inline void setoption(std::vector<std::string> &tokens, std::vector<TTEntry> &tt)
+inline void setoption(const std::vector<std::string> &tokens, std::vector<TTEntry> &tt)
 {
-    std::string optionName = tokens[2];
-    std::string optionValue = tokens[4];
+    const std::string optionName  = tokens[2];
+    const std::string optionValue = tokens[4];
 
     if (optionName == "Hash" || optionName == "hash")
     {
@@ -153,7 +153,7 @@ inline void setoption(std::vector<std::string> &tokens, std::vector<TTEntry> &tt
     }
     else if (optionName == "Threads" || optionName == "threads")
     {
-        int numThreads = std::clamp(stoi(optionValue), 1, 256);
+        const int numThreads = std::clamp(stoi(optionValue), 1, 256);
 
         // Remove all threads except main thread
         while (gSearchThreads.size() > 1)
@@ -187,7 +187,7 @@ inline void setoption(std::vector<std::string> &tokens, std::vector<TTEntry> &tt
     }
 }
 
-inline void position(std::vector<std::string> &tokens, Board &board)
+inline void position(const std::vector<std::string> &tokens, Board &board)
 {
     int movesTokenIndex = -1;
 
@@ -199,8 +199,10 @@ inline void position(std::vector<std::string> &tokens, Board &board)
     {
         std::string fen = "";
         u64 i = 0;
+        
         for (i = 2; i < tokens.size() && tokens[i] != "moves"; i++)
             fen += tokens[i] + " ";
+
         fen.pop_back(); // remove last whitespace
         board = Board(fen);
         movesTokenIndex = i;
@@ -210,9 +212,9 @@ inline void position(std::vector<std::string> &tokens, Board &board)
         board.makeMove(tokens[i]);
 }
 
-inline void go(std::vector<std::string> &tokens, Board &board)
+inline void go(const std::vector<std::string> &tokens, const Board &board)
 {
-    std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
+    const std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
 
     i32 maxDepth = MAX_DEPTH;
     i64 milliseconds = I64_MAX;

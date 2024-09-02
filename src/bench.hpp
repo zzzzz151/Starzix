@@ -66,9 +66,9 @@ inline void bench(int depth = 14)
 
     u64 totalNodes = 0, totalMilliseconds = 0;
 
-    for (std::string fen : BENCH_FENS)
+    for (const std::string fen : BENCH_FENS)
     {
-        Board board = Board(fen);
+        const Board board = Board(fen);
 
         SearchThread::sSearchStopped = false;
         

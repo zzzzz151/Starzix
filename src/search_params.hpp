@@ -9,7 +9,7 @@ template <typename T> struct TunableParam {
     public:
     T value, min, max, step;
 
-    inline TunableParam(T value, T min, T max, T step) 
+    inline TunableParam(const T value, const T min, const T max, const T step) 
     : value(value), min(min), max(max), step(step) { }
 
     // overload function operator
@@ -17,9 +17,9 @@ template <typename T> struct TunableParam {
         return value;
     }
 
-    inline bool floatOrDouble() {
+    inline bool floatOrDouble() const {
         return std::is_same<decltype(value), double>::value
-               || std::is_same<decltype(value), float>::value;
+            || std::is_same<decltype(value), float>::value;
     }
 
 };

@@ -7,11 +7,11 @@ namespace cuckoo {
 std::array<u64, 8192>  KEYS  = {};
 std::array<Move, 8292> MOVES = {};
 
-constexpr u64 h1(u64 key) { return key & 0x1fff; }
+constexpr u64 h1(const u64 key) { return key & 0x1fff; }
 
-constexpr u64 h2(u64 key) { return (key >> 16) & 0x1fff; }
+constexpr u64 h2(const u64 key) { return (key >> 16) & 0x1fff; }
 
-constexpr int initPiece(Color color, PieceType pieceType) 
+constexpr int initPiece(const Color color, const PieceType pieceType) 
 {
     assert(pieceType != PieceType::PAWN);
 
@@ -20,11 +20,11 @@ constexpr int initPiece(Color color, PieceType pieceType)
     for (Square sq1 = 0; sq1 < 64; sq1++)
         for (Square sq2 = sq1 + 1; sq2 < 64; sq2++)
         {
-            u64 attacks = pieceType == PieceType::KNIGHT ? attacks::knightAttacks(sq1)
-                        : pieceType == PieceType::BISHOP ? attacks::bishopAttacks(sq1, 0)
-                        : pieceType == PieceType::ROOK   ? attacks::rookAttacks(sq1, 0)
-                        : pieceType == PieceType::QUEEN  ? attacks::queenAttacks(sq1, 0)
-                        : attacks::kingAttacks(sq1);
+            const u64 attacks = pieceType == PieceType::KNIGHT ? attacks::knightAttacks(sq1)
+                              : pieceType == PieceType::BISHOP ? attacks::bishopAttacks(sq1, 0)
+                              : pieceType == PieceType::ROOK   ? attacks::rookAttacks(sq1, 0)
+                              : pieceType == PieceType::QUEEN  ? attacks::queenAttacks(sq1, 0)
+                              : attacks::kingAttacks(sq1);
 
             if ((attacks & bitboard(sq2)) == 0) continue;
 
@@ -52,7 +52,7 @@ constexpr void init()
 {
     int count = 0;
 
-    for (Color color : {Color::WHITE, Color::BLACK})
+    for (const Color color : {Color::WHITE, Color::BLACK})
         for (int pt = KNIGHT; pt <= KING; pt++)
             count += initPiece(color, (PieceType)pt);
 
