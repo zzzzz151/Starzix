@@ -482,7 +482,7 @@ class SearchThread {
             const bool isQuiet = captured == PieceType::NONE && move.promotion() == PieceType::NONE;
 
             // Moves loop pruning
-            if (ply > 0 && bestScore > -MIN_MATE_SCORE && moveScore < COUNTERMOVE_SCORE)
+            if (ply > 0 && bestScore > -MIN_MATE_SCORE && legalMovesSeen >= 3 && moveScore < COUNTERMOVE_SCORE)
             {
                 // LMP (Late move pruning)
                 if (legalMovesSeen >= lmpMinMoves() + pvNode + mBoard.inCheck()
