@@ -57,8 +57,6 @@ class SearchThread {
 
     MultiArray<HistoryEntry, 2, 6, 64> mMovesHistory = {}; // [stm][pieceType][targetSquare]
 
-    MultiArray<Move, 2, 1ULL << 17> mCountermoves = {}; // [nstm][lastMove]
-
     std::array<u64, 1ULL << 17> mMovesNodes; // [move]
 
     // Correction histories
@@ -80,9 +78,8 @@ class SearchThread {
     }
 
     inline void reset() {
-        mMovesHistory = {};
-        mCountermoves = {};
-        mPawnsCorrHist = {};
+        mMovesHistory     = {};
+        mPawnsCorrHist    = {};
         mNonPawnsCorrHist = {};
         mTTAge = 0;
     }
@@ -452,10 +449,9 @@ class SearchThread {
             depth--;
 
         const int stm = (int)mBoard.sideToMove();
-        Move &countermove = mCountermoves[!stm][mBoard.lastMove().encoded()];
 
         // gen and score all moves, except underpromotions
-        if (!singular) plyDataPtr->genAndScoreMoves(mBoard, ttMove, countermove, mMovesHistory);
+        if (!singular) plyDataPtr->genAndScoreMoves(mBoard, ttMove, mMovesHistory);
 
         assert(!singular || plyDataPtr->mCurrentMoveIdx == 0);
 
@@ -482,7 +478,7 @@ class SearchThread {
             const bool isQuiet = captured == PieceType::NONE && move.promotion() == PieceType::NONE;
 
             // Moves loop pruning
-            if (ply > 0 && bestScore > -MIN_MATE_SCORE && legalMovesSeen >= 3 && moveScore < COUNTERMOVE_SCORE)
+            if (ply > 0 && bestScore > -MIN_MATE_SCORE && legalMovesSeen >= 3 && moveScore < KILLER_SCORE)
             {
                 // LMP (Late move pruning)
                 if (legalMovesSeen >= lmpMinMoves() + pvNode + mBoard.inCheck()
@@ -555,7 +551,7 @@ class SearchThread {
             // PVS (Principal variation search)
 
             // LMR (Late move reductions)
-            if (depth >= 2 && !mBoard.inCheck() && legalMovesSeen >= 2 && moveScore < COUNTERMOVE_SCORE)
+            if (depth >= 2 && !mBoard.inCheck() && legalMovesSeen >= 2 && moveScore < KILLER_SCORE)
             {
                 i32 lmr = LMR_TABLE[isQuiet][depth][legalMovesSeen]
                           - pvNode       // reduce pv nodes less
@@ -639,8 +635,6 @@ class SearchThread {
 
             plyDataPtr->mKiller = move;
             
-            if (mBoard.lastMove() != MOVE_NONE) countermove = move;
-
             const std::array<Move, 3> lastMoves = { 
                 mBoard.lastMove(), mBoard.nthToLastMove(2), mBoard.nthToLastMove(4) 
             };
@@ -743,13 +737,10 @@ class SearchThread {
             // not in check, generate and score noisy moves (except underpromotions)
             plyDataPtr->genAndScoreNoisyMoves(mBoard);
         }
-        else {
-            const Move ttMove = ttHit ? Move(ttEntry.move) : MOVE_NONE;
-            const Move countermove = mCountermoves[(int)mBoard.oppSide()][mBoard.lastMove().encoded()];
-
+        else 
             // in check, generate and score all moves (except underpromotions)
-            plyDataPtr->genAndScoreMoves(mBoard, ttMove, countermove, mMovesHistory);
-        }
+            plyDataPtr->genAndScoreMoves(mBoard, ttHit ? Move(ttEntry.move) : MOVE_NONE, mMovesHistory);
+        
         
         i32 bestScore = mBoard.inCheck() ? -INF : eval;
         Move bestMove = MOVE_NONE;

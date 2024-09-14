@@ -26,11 +26,9 @@ struct PlyData {
     }
 
     // For main search
-    inline void genAndScoreMoves(const Board &board, const Move ttMove, const Move countermove,
+    inline void genAndScoreMoves(const Board &board, const Move ttMove,
         const MultiArray<HistoryEntry, 2, 6, 64> &movesHistory) 
     {
-        assert(!(board.lastMove() == MOVE_NONE && countermove != MOVE_NONE));
-
         // Generate pinned pieces if not already generated
         // Needed for Board.isPseudolegalLegal(Move move, u64 pinned)
         if (!mAllMovesGenerated && !mNoisyMovesGenerated)
@@ -78,8 +76,6 @@ struct PlyData {
                 mMovesScores[i] = board.SEE(move) ? GOOD_QUEEN_PROMO_SCORE : -GOOD_NOISY_SCORE;
             else if (move == mKiller)
                 mMovesScores[i] = KILLER_SCORE;
-            else if (move == countermove)
-                mMovesScores[i] = COUNTERMOVE_SCORE;
             else {
                 const int stm = (int)board.sideToMove();
                 const int pt = (int)move.pieceType();

@@ -80,7 +80,6 @@ Have clang++ installed and run ```make```
 - TT move
 - Good noisy moves by SEE + MVVLVA
 - Killer move
-- Countermove
 - Quiet moves by history
 - Bad noisy moves
 

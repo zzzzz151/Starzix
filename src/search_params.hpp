@@ -28,8 +28,7 @@ constexpr u8 MAX_DEPTH = 100;
 
 constexpr i32 GOOD_QUEEN_PROMO_SCORE = 1'600'000'000,
               GOOD_NOISY_SCORE       = 1'500'000'000,
-              KILLER_SCORE           = 1'000'000'000,
-              COUNTERMOVE_SCORE      = 500'000'000;
+              KILLER_SCORE           = 1'000'000'000;
 
 // Time management
 TunableParam<double> hardTimePercentage = TunableParam<double>(0.7, 0.25, 0.75, 0.1);
