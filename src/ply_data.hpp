@@ -6,17 +6,15 @@ struct PlyData {
     public:
 
     ArrayVec<Move, 256> mAllMoves, mNoisyMoves, *mCurrentMoves;
-    
     bool mAllMovesGenerated = false, mNoisyMovesGenerated = false;
-
     std::array<i32, 256> mMovesScores;
     int mCurrentMoveIdx = -1;
 
     u64 mPinned = 0, mEnemyAttacks = 0;
     
     ArrayVec<Move, MAX_DEPTH+1> mPvLine = {};
-    i32 mEval = VALUE_NONE;
     Move mKiller = MOVE_NONE;
+    i32 mEval = VALUE_NONE;
 
     // Soft reset when we make a move in search
     inline void softReset() {
