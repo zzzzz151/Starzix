@@ -13,11 +13,14 @@ inline void updateHistory(i16 &history, const i32 bonus) {
 
 struct HistoryEntry {
     private:
+    
     MultiArray<i16, 2, 2>  mMainHist  = {}; // [enemyAttacksOrigin][enemyAttacksDestination]
     MultiArray<i16, 6, 64> mContHist  = {}; // [previousMovePieceType][previousMoveTo]
     std::array<i16, 7>     mNoisyHist = {}; // [pieceTypeCaptured]
 
     public:
+    
+    i16 corrHist = 0;
 
     inline i32 quietHistory(
         const bool enemyAttacksOrigin, const bool enemyAttacksDst, const std::array<Move, 3> moves) const

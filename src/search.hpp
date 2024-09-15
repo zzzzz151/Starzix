@@ -258,11 +258,13 @@ class SearchThread {
 
             eval *= materialScale(mBoard); // Scale eval with material
 
-            // Adjust eval with correction histories
+            // Correct eval with correction histories
 
             i32 correction = 0;
+
             for (const i16* corrHist : correctionHistories())
-                correction += i32(*corrHist);
+                if (corrHist != nullptr) 
+                    correction += i32(*corrHist);
 
             eval += correction / corrHistScale();
 
@@ -273,14 +275,23 @@ class SearchThread {
         return eval;
     }
 
-    inline std::array<i16*, 3> correctionHistories()
+    inline std::array<i16*, 4> correctionHistories()
     {
         const int stm = (int)mBoard.sideToMove();
+        i16* lastMoveCorrHistPtr = nullptr;
+
+        if (mBoard.lastMove() != MOVE_NONE) 
+        {
+            const PieceType pt = mBoard.lastMove().pieceType();
+            HistoryEntry &histEntry = mMovesHistory[stm][(int)pt][mBoard.lastMove().to()];
+            lastMoveCorrHistPtr = &(histEntry.corrHist);
+        }
 
         return {
             &mPawnsCorrHist[stm][mBoard.pawnsHash() % 16384],
             &mNonPawnsCorrHist[stm][WHITE][mBoard.nonPawnsHash(Color::WHITE) % 16384],
-            &mNonPawnsCorrHist[stm][BLACK][mBoard.nonPawnsHash(Color::BLACK) % 16384]
+            &mNonPawnsCorrHist[stm][BLACK][mBoard.nonPawnsHash(Color::BLACK) % 16384],
+            lastMoveCorrHistPtr
         };
     }
 
@@ -685,6 +696,8 @@ class SearchThread {
 
                 for (i16* corrHist : correctionHistories())
                 {
+                    if (corrHist == nullptr) continue;
+
                     i32 newValue = *corrHist;
                     newValue *= std::max(corrHistScale() - newWeight, 1);
                     newValue += (bestScore - eval) * corrHistScale() * newWeight;
