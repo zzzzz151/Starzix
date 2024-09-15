@@ -182,7 +182,6 @@ class SearchThread {
                 const double bestMoveNodes = mMovesNodes[bestMoveRoot().encoded()];
                 const double bestMoveNodesFraction = bestMoveNodes / std::max<double>(mNodes, 1.0);
                 assert(bestMoveNodesFraction >= 0.0 && bestMoveNodesFraction <= 1.0);
-                
                 return (double)mSoftMilliseconds * (1.5 - bestMoveNodesFraction);
             };
                          
