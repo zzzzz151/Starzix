@@ -20,7 +20,7 @@ struct HistoryEntry {
 
     public:
     
-    i16 corrHist = 0;
+    i16 mCorrHist = 0;
 
     inline i32 quietHistory(
         const bool enemyAttacksOrigin, const bool enemyAttacksDst, const std::array<Move, 3> moves) const

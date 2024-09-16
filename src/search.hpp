@@ -216,6 +216,24 @@ class SearchThread {
         return sSearchStopped = (mNodes % 1024 == 0 && millisecondsElapsed() >= mHardMilliseconds);
     }
 
+    inline std::array<i16*, 4> correctionHistories()
+    {
+        const int stm = (int)mBoard.sideToMove();
+        i16* lastMoveCorrHistPtr = nullptr;
+
+        if (mBoard.lastMove() != MOVE_NONE) {
+            const PieceType pt = mBoard.lastMove().pieceType();
+            lastMoveCorrHistPtr = &(mMovesHistory[stm][(int)pt][mBoard.lastMove().to()].mCorrHist);
+        }
+
+        return {
+            &mPawnsCorrHist[stm][mBoard.pawnsHash() % 16384],
+            &mNonPawnsCorrHist[stm][WHITE][mBoard.nonPawnsHash(Color::WHITE) % 16384],
+            &mNonPawnsCorrHist[stm][BLACK][mBoard.nonPawnsHash(Color::BLACK) % 16384],
+            lastMoveCorrHistPtr
+        };
+    }
+
     inline void makeMove(const Move move, const i32 newPly)
     {
         // If not a special move, we can probably correctly predict the zobrist hash after it
@@ -273,26 +291,6 @@ class SearchThread {
         }
 
         return eval;
-    }
-
-    inline std::array<i16*, 4> correctionHistories()
-    {
-        const int stm = (int)mBoard.sideToMove();
-        i16* lastMoveCorrHistPtr = nullptr;
-
-        if (mBoard.lastMove() != MOVE_NONE) 
-        {
-            const PieceType pt = mBoard.lastMove().pieceType();
-            HistoryEntry &histEntry = mMovesHistory[stm][(int)pt][mBoard.lastMove().to()];
-            lastMoveCorrHistPtr = &(histEntry.corrHist);
-        }
-
-        return {
-            &mPawnsCorrHist[stm][mBoard.pawnsHash() % 16384],
-            &mNonPawnsCorrHist[stm][WHITE][mBoard.nonPawnsHash(Color::WHITE) % 16384],
-            &mNonPawnsCorrHist[stm][BLACK][mBoard.nonPawnsHash(Color::BLACK) % 16384],
-            lastMoveCorrHistPtr
-        };
     }
 
     inline i32 aspiration(const i32 iterationDepth, i32 score)
