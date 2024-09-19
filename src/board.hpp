@@ -811,7 +811,7 @@ class Board {
     }
 
     inline void pseudolegalMoves(
-        ArrayVec<Move, 256> &moves, const bool noisyOnly = false, const bool underpromotions = true) const
+        ArrayVec<Move, 256> &moves, const MoveGenType moveGenType, const bool underpromotions = true) const
     {
         moves.clear();
 
@@ -827,7 +827,7 @@ class Board {
         };
 
         // En passant
-        if (mState->enPassantSquare != SQUARE_NONE)
+        if (moveGenType != MoveGenType::QUIETS && mState->enPassantSquare != SQUARE_NONE)
         {   
             u64 ourEnPassantPawns = attacks::pawnAttacks(mState->enPassantSquare, enemyColor) & ourPiecesBbs[PAWN];
 
@@ -850,9 +850,14 @@ class Board {
                 willPromote = sideToMove() == Color::WHITE;
             }
 
+            u64 pawnAttacks;
+            const Square squareOneUp = sideToMove() == Color::WHITE ? sq + 8 : sq - 8;
+
+            if (moveGenType == MoveGenType::QUIETS) goto pawnPushes;
+
             // Generate this pawn's captures
 
-            u64 pawnAttacks = attacks::pawnAttacks(sq, sideToMove()) & them();
+            pawnAttacks = attacks::pawnAttacks(sq, sideToMove()) & them();
 
             while (pawnAttacks > 0) {
                 const Square targetSquare = poplsb(pawnAttacks);
@@ -862,7 +867,6 @@ class Board {
                     moves.push_back(Move(sq, targetSquare, Move::PAWN_FLAG));
             }
 
-            const Square squareOneUp = sideToMove() == Color::WHITE ? sq + 8 : sq - 8;
             if (isOccupied(squareOneUp))
                 continue;
 
@@ -871,7 +875,9 @@ class Board {
                 continue;
             }
 
-            if (noisyOnly) continue;
+            if (moveGenType == MoveGenType::NOISIES) continue;
+
+            pawnPushes:
 
             // pawn 1 square up
             moves.push_back(Move(sq, squareOneUp, Move::PAWN_FLAG));
@@ -882,7 +888,9 @@ class Board {
                 moves.push_back(Move(sq, squareTwoUp, Move::PAWN_TWO_UP_FLAG));
         }
 
-        const u64 mask = noisyOnly ? them() : ~us();
+        const u64 mask = moveGenType == MoveGenType::NOISIES ? them()
+                       : moveGenType == MoveGenType::QUIETS  ? ~occ
+                       : ~us();
 
         while (ourPiecesBbs[KNIGHT] > 0) {
             const Square sq = poplsb(ourPiecesBbs[KNIGHT]);
@@ -933,7 +941,7 @@ class Board {
         }
 
         // Castling
-        if (!noisyOnly && !inCheck())
+        if (moveGenType != MoveGenType::NOISIES && !inCheck())
         {
             // Short castle
             if ((mState->castlingRights & CASTLING_MASKS[(int)sideToMove()][CASTLE_SHORT])
@@ -963,8 +971,74 @@ class Board {
 
     public:
 
+    inline bool isPseudolegal(const Move move) const
+    {
+        if (move == MOVE_NONE) return false;
+
+        const Square from = move.from();
+        const Square to = move.to();
+        const PieceType pt = move.pieceType();
+
+        // Do we have the move's piece on origin square?
+        if (!(getBb(sideToMove(), pt) & bitboard(from)))
+            return false;
+
+        if (pt == PieceType::PAWN) {
+            // If promotion, is target square free?
+            if (move.promotion() != PieceType::NONE)
+                return !isOccupied(to);
+
+            // If en passant, is this board's en passant square the move's target square?
+            if (move.flag() == Move::EN_PASSANT_FLAG)
+                return mState->enPassantSquare == to;
+
+            // If pawn is capturing, is there an enemy piece in target square?
+            if (attacks::pawnAttacks(from, sideToMove()) & bitboard(to))
+                return them() & bitboard(to);
+
+            // We have a pawn push, are the squares in front of the pawn free?
+
+            assert((sideToMove() == Color::WHITE && squareRank(from) == Rank::RANK_2) 
+                || (sideToMove() == Color::BLACK && squareRank(from) == Rank::RANK_7));
+
+            // Pawn one up
+            const Square squareOneUp = sideToMove() == Color::WHITE ? from + 8 : from - 8;
+            if (to == squareOneUp) return !isOccupied(squareOneUp);
+
+            // Pawn two up
+            const Square squareTwoUp = sideToMove() == Color::WHITE ? from + 16 : from - 16;
+            assert(to == squareTwoUp);
+            return !isOccupied(squareOneUp) && !isOccupied(squareTwoUp);
+        }
+
+        if (move.flag() == Move::CASTLING_FLAG)
+        {
+            if (inCheck()) return false;
+
+            const bool isLongCastle = from > to;
+            const bool hasCastlingRight = mState->castlingRights & CASTLING_MASKS[(int)sideToMove()][isLongCastle];
+
+            if (!hasCastlingRight) return false;
+
+            const auto [rookFrom, rookTo] = CASTLING_ROOK_FROM_TO[to];
+
+            // Do we have the rook on the corner?
+            return getBb(sideToMove(), PieceType::ROOK) & bitboard(rookFrom);
+        }
+
+        const u64 attacks = pt == PieceType::KNIGHT ? attacks::knightAttacks(from)
+                          : pt == PieceType::BISHOP ? attacks::bishopAttacks(from, occupancy())
+                          : pt == PieceType::ROOK   ? attacks::rookAttacks(from, occupancy())
+                          : pt == PieceType::QUEEN  ? attacks::queenAttacks(from, occupancy())
+                          : attacks::kingAttacks(from);
+
+        return attacks & bitboard(to);
+    }
+
     inline bool isPseudolegalLegal(const Move move, const u64 pinned) const
     {
+        assert(move != MOVE_NONE);
+
         const auto moveFlag = move.flag();
         const Square from = move.from();
         const Square to = move.to();

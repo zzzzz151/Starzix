@@ -59,6 +59,10 @@ enum class File : u8 {
     A = 0, B = 1, C = 2, D = 3, E = 4, F = 5, G = 6, H = 7
 };
 
+enum class MoveGenType : u8 {
+    ALL = 0, NOISIES = 1, QUIETS = 2
+};
+
 const std::string SQUARE_TO_STR[64] = {
     "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1",
     "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2",

@@ -65,6 +65,11 @@ struct ArrayVec
         mArr[mSize++] = elem;
     }
 
+    inline void pop_back() { 
+        assert(mSize > 0);
+        mSize--;
+    }
+
     inline void swap(const std::size_t i, const std::size_t j) 
     {
         assert(i < mSize && j < mSize);

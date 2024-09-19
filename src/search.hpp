@@ -9,7 +9,7 @@ constexpr i32 INF = 32000,
 #include "board.hpp"
 #include "search_params.hpp"
 #include "history_entry.hpp"
-#include "ply_data.hpp"
+#include "move_picker.hpp"
 #include "tt.hpp"
 #include "nnue.hpp"
 
@@ -34,6 +34,13 @@ class SearchThread;
 
 // in main.cpp, main thread is created and gMainThread = &gSearchThreads[0]
 SearchThread* gMainThread = nullptr;
+
+struct PlyData {
+    public:
+    ArrayVec<Move, MAX_DEPTH+1> pvLine = {};
+    Move killer = MOVE_NONE;
+    i32 eval = VALUE_NONE;
+};
 
 class SearchThread {
     private:
@@ -91,9 +98,8 @@ class SearchThread {
     }
 
     inline Move bestMoveRoot() const {
-        return mPliesData[0].mPvLine.size() == 0 
-               ? MOVE_NONE 
-               : mPliesData[0].mPvLine[0];
+        return mPliesData[0].pvLine.size() == 0 
+               ? MOVE_NONE : mPliesData[0].pvLine[0];
     }
 
     inline i32 search(const Board &board, const i32 maxDepth, const auto startTime, 
@@ -170,8 +176,12 @@ class SearchThread {
             std::cout << " nodes " << nodes
                       << " nps "   << nodes * 1000 / std::max(msElapsed, (u64)1)
                       << " time "  << msElapsed
-                      << " pv "    << mPliesData[0].pvString()
-                      << std::endl;
+                      << " pv";
+
+            for (const Move move : mPliesData[0].pvLine)
+                std::cout << " " << move.toUci();
+
+            std::cout << std::endl;
 
             // Check soft time limit (in case one exists)
 
@@ -249,7 +259,8 @@ class SearchThread {
         // update seldepth
         if (newPly > mMaxPlyReached) mMaxPlyReached = newPly;
 
-        mPliesData[newPly].softReset();
+        mPliesData[newPly].pvLine.clear();
+        mPliesData[newPly].eval = VALUE_NONE;
         
         if (move != MOVE_NONE) {
             mAccumulatorPtr++;
@@ -377,19 +388,19 @@ class SearchThread {
 
         // Max ply cutoff
         if (ply >= mMaxDepth) 
-            return mBoard.inCheck() ? 0 : updateAccumulatorAndEval(plyDataPtr->mEval);
+            return mBoard.inCheck() ? 0 : updateAccumulatorAndEval(plyDataPtr->eval);
 
-        const i32 eval = updateAccumulatorAndEval(plyDataPtr->mEval);
+        const i32 eval = updateAccumulatorAndEval(plyDataPtr->eval);
 
         const int improving = ply <= 1 || mBoard.inCheck() || mBoard.inCheck2PliesAgo()
                               ? 0
-                              : eval - (plyDataPtr - 2)->mEval >= improvingThreshold()
+                              : eval - (plyDataPtr - 2)->eval >= improvingThreshold()
                               ? 1
-                              : eval - (plyDataPtr - 2)->mEval <= -improvingThreshold()
+                              : eval - (plyDataPtr - 2)->eval <= -improvingThreshold()
                               ? -1
                               : 0;
 
-        (plyDataPtr + 1)->mKiller = MOVE_NONE;
+        (plyDataPtr + 1)->killer = MOVE_NONE;
 
         // Node pruning
         if (!pvNode && !mBoard.inCheck() && !singular) 
@@ -456,13 +467,10 @@ class SearchThread {
         && (pvNode || cutNode))
             depth--;
 
+        const bool lmrImproving = ply > 1 && !mBoard.inCheck() && !mBoard.inCheck2PliesAgo() 
+                                  && eval > (plyDataPtr - 2)->eval;
+
         const int stm = (int)mBoard.sideToMove();
-
-        // gen and score all moves, except underpromotions
-        if (!singular) plyDataPtr->genAndScoreMoves(mBoard, ttMove, mMovesHistory);
-
-        assert(!singular || plyDataPtr->mCurrentMoveIdx == 0);
-
         int legalMovesSeen = 0;
         i32 bestScore = -INF;
         Move bestMove = MOVE_NONE;
@@ -472,13 +480,12 @@ class SearchThread {
         ArrayVec<Move, 256> failLowQuiets;
         ArrayVec<i16*, 256> failLowNoisiesHistory;
 
-        const bool lmrImproving = ply > 1 && !mBoard.inCheck() && !mBoard.inCheck2PliesAgo() 
-                                  && eval > (plyDataPtr - 2)->mEval;
-
         // Moves loop
-        for (auto [move, moveScore] = plyDataPtr->nextMove(mBoard); 
-             move != MOVE_NONE; 
-             std::tie(move, moveScore) = plyDataPtr->nextMove(mBoard))
+
+        MovePicker movePicker = MovePicker(false, &mBoard, ttMove, plyDataPtr->killer, &mMovesHistory);
+        Move move;
+
+        while ((move = movePicker.next()) != MOVE_NONE)
         {
             legalMovesSeen++;
 
@@ -486,7 +493,10 @@ class SearchThread {
             const bool isQuiet = captured == PieceType::NONE && move.promotion() == PieceType::NONE;
 
             // Moves loop pruning
-            if (ply > 0 && bestScore > -MIN_MATE_SCORE && legalMovesSeen >= 3 && moveScore < KILLER_SCORE)
+            if (ply > 0 
+            && bestScore > -MIN_MATE_SCORE 
+            && legalMovesSeen >= 3 
+            && int(movePicker.stage()) >= int(MoveGenStage::QUIETS))
             {
                 // LMP (Late move pruning)
                 if (legalMovesSeen >= lmpMinMoves() + pvNode + mBoard.inCheck()
@@ -540,9 +550,7 @@ class SearchThread {
                     return singularBeta;
                 // Negative extension
                 else if (cutNode)
-                    newDepth -= 2;
-                    
-                plyDataPtr->mCurrentMoveIdx = 0; // reset since the singular search used this
+                    newDepth -= 2;                    
             }
 
             const u64 nodesBefore = mNodes;
@@ -559,17 +567,20 @@ class SearchThread {
             // PVS (Principal variation search)
 
             // LMR (Late move reductions)
-            if (depth >= 2 && !mBoard.inCheck() && legalMovesSeen >= 2 && moveScore < KILLER_SCORE)
+            if (depth >= 2 
+            && !mBoard.inCheck() 
+            && legalMovesSeen >= 2 
+            && int(movePicker.stage()) >= int(MoveGenStage::QUIETS))
             {
                 i32 lmr = LMR_TABLE[isQuiet][depth][legalMovesSeen]
                           - pvNode       // reduce pv nodes less
                           - lmrImproving // reduce less if were improving
                           + 2 * cutNode; // reduce more if we expect to fail high
-                
+
                 // reduce moves with good history less and vice versa
                 lmr -= round(
-                    isQuiet ? moveScore / (float)lmrQuietHistoryDiv()
-                            : historyEntry.noisyHistory(captured) / (float)lmrNoisyHistoryDiv()
+                    isQuiet ? float(movePicker.moveScore()) / (float)lmrQuietHistoryDiv()
+                            : float(historyEntry.noisyHistory(captured)) / (float)lmrNoisyHistoryDiv()
                 );
 
                 if (lmr < 0) lmr = 0; // dont extend
@@ -618,7 +629,15 @@ class SearchThread {
             isBestMoveQuiet = isQuiet;
             bound = Bound::EXACT;
 
-            if (pvNode) plyDataPtr->updatePV(move);
+            // If PV node, update PV line
+            if (pvNode) { 
+                plyDataPtr->pvLine.clear();
+                plyDataPtr->pvLine.push_back(move);
+
+                // Copy child's PV line
+                for (const Move move : (plyDataPtr + 1)->pvLine)
+                    plyDataPtr->pvLine.push_back(move);
+            }
 
             if (score < beta) continue;
 
@@ -641,26 +660,32 @@ class SearchThread {
 
             // This move is a fail high quiet
 
-            plyDataPtr->mKiller = move;
-            
+            plyDataPtr->killer = move;
+
+            const bool enemyAttacksOrigin = movePicker.enemyAttacks() == 0 
+                                            ? mBoard.isSquareAttacked(move.from(), mBoard.oppSide()) 
+                                            : movePicker.enemyAttacks() & bitboard(move.from());
+
+            const bool enemyAttacksDst = movePicker.enemyAttacks() == 0 
+                                         ? mBoard.isSquareAttacked(move.to(), mBoard.oppSide()) 
+                                         : movePicker.enemyAttacks() & bitboard(move.to());
+
             const std::array<Move, 3> lastMoves = { 
                 mBoard.lastMove(), mBoard.nthToLastMove(2), mBoard.nthToLastMove(4) 
             };
-            
+
             // History bonus: increase this move's history
-            historyEntry.updateQuietHistories(
-                plyDataPtr->mEnemyAttacks & bitboard(move.from()), 
-                plyDataPtr->mEnemyAttacks & bitboard(move.to()), 
-                lastMoves,
-                bonus);
+            historyEntry.updateQuietHistories(enemyAttacksOrigin, enemyAttacksDst, lastMoves, bonus);
+
+            assert(failLowQuiets.size() == 0 || movePicker.enemyAttacks() > 0);
 
             // History malus: decrease history of fail low quiets
             for (const Move failLow : failLowQuiets) {
                 pt = (int)failLow.pieceType();
 
                 mMovesHistory[stm][pt][failLow.to()].updateQuietHistories(
-                    plyDataPtr->mEnemyAttacks & bitboard(failLow.from()), 
-                    plyDataPtr->mEnemyAttacks & bitboard(failLow.to()),  
+                    movePicker.enemyAttacks() & bitboard(failLow.from()), 
+                    movePicker.enemyAttacks() & bitboard(failLow.to()),  
                     lastMoves,
                     malus);
             }
@@ -736,33 +761,30 @@ class SearchThread {
 
         // Max ply cutoff
         if (ply >= mMaxDepth)
-            return mBoard.inCheck() ? 0 : updateAccumulatorAndEval(plyDataPtr->mEval);
+            return mBoard.inCheck() ? 0 : updateAccumulatorAndEval(plyDataPtr->eval);
 
-        const i32 eval = updateAccumulatorAndEval(plyDataPtr->mEval);
+        const i32 eval = updateAccumulatorAndEval(plyDataPtr->eval);
 
         if (!mBoard.inCheck()) {
             if (eval >= beta) return eval; 
             if (eval > alpha) alpha = eval;
-
-            // not in check, generate and score noisy moves (except underpromotions)
-            plyDataPtr->genAndScoreNoisyMoves(mBoard);
         }
-        else 
-            // in check, generate and score all moves (except underpromotions)
-            plyDataPtr->genAndScoreMoves(mBoard, ttHit ? Move(ttEntry.move) : MOVE_NONE, mMovesHistory);
-        
         
         i32 bestScore = mBoard.inCheck() ? -INF : eval;
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::UPPER;
 
         // Moves loop
-        for (auto [move, moveScore] = plyDataPtr->nextMove(mBoard); 
-             move != MOVE_NONE; 
-             std::tie(move, moveScore) = plyDataPtr->nextMove(mBoard))
+
+        MovePicker movePicker = MovePicker(
+            !mBoard.inCheck(), &mBoard, ttHit ? MOVE_NONE : Move(ttEntry.move), plyDataPtr->killer, &mMovesHistory);
+
+        Move move;
+
+        while ((move = movePicker.next()) != MOVE_NONE)
         {
             // If in check, skip quiets and bad noisy moves
-            if (mBoard.inCheck() && bestScore > -MIN_MATE_SCORE && moveScore <= KILLER_SCORE)
+            if (mBoard.inCheck() && bestScore > -MIN_MATE_SCORE && int(movePicker.stage()) > int(MoveGenStage::GOOD_NOISIES))
                 break;
 
             // If not in check, skip bad noisy moves
@@ -811,16 +833,15 @@ class SearchThread {
     {
         PlyData* plyDataPtr = &mPliesData[ply];
 
-        // generate and score noisy moves (except underpromotions)
-        plyDataPtr->genAndScoreNoisyMoves(mBoard, ttMove);
-
         // Moves loop
-        for (auto [move, moveScore] = plyDataPtr->nextMove(mBoard); 
-             move != MOVE_NONE; 
-             std::tie(move, moveScore) = plyDataPtr->nextMove(mBoard))
+
+        MovePicker movePicker = MovePicker(true, &mBoard, ttMove, plyDataPtr->killer, &mMovesHistory);
+        Move move;
+
+        while ((move = movePicker.next()) != MOVE_NONE)
         {
             // SEE pruning (skip bad noisy moves)
-            if (!mBoard.SEE(move, probcutBeta - plyDataPtr->mEval)) 
+            if (!mBoard.SEE(move, probcutBeta - plyDataPtr->eval)) 
                 continue;
 
             makeMove(move, ply + 1);

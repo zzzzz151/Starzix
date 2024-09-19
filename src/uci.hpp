@@ -218,8 +218,8 @@ inline void go(const std::vector<std::string> &tokens, const Board &board)
 
     i32 maxDepth = MAX_DEPTH;
     i64 milliseconds = I64_MAX;
-    i64 incrementMs = 0;
-    i64 movesToGo = 0;
+    [[maybe_unused]] i64 incrementMs = 0;
+    [[maybe_unused]] i64 movesToGo = 0;
     bool isMoveTime = false;
     i64 maxNodes = I64_MAX;
 
