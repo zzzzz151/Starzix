@@ -2,8 +2,6 @@
 
 #pragma once
 
-#include <limits>
-
 enum class MoveGenStage : int {
     TT_MOVE_NEXT = 0, TT_MOVE_YIELDED, GEN_SCORE_NOISIES, GOOD_NOISIES, 
     KILLER_NEXT, KILLER_YIELDED, GEN_SCORE_QUIETS, QUIETS, BAD_NOISIES, END
@@ -56,11 +54,12 @@ struct MovePicker {
     }
 
     inline Move next(Board &board, const Move ttMove, const Move killer, 
-        const MultiArray<HistoryEntry, 2, 6, 64> &movesHistory) 
+        const MultiArray<HistoryEntry, 2, 6, 64> &movesHistory, Move excludedMove = MOVE_NONE) 
     {
         Move move = MOVE_NONE;
 
         assert(killer == MOVE_NONE || board.isQuiet(killer));
+        assert(ttMove == MOVE_NONE || excludedMove == MOVE_NONE);
 
         switch (mStage) 
         {
@@ -92,16 +91,14 @@ struct MovePicker {
             while (i < mNoisies.size())
             {
                 move = mNoisies[i];
+                assert(!board.isQuiet(move));
                 assert(move != killer);
-
-                // Assert move is noisy
-                assert(board.captured(move) != PieceType::NONE || move.promotion() != PieceType::NONE);
 
                 // Assert no underpromotions
                 assert(move.promotion() == PieceType::NONE || move.promotion() == PieceType::QUEEN);
 
-                // Remove TT move from list
-                if (move == ttMove) {
+                // Remove TT move and excluded move from list
+                if (move == ttMove || move == excludedMove) {
                     mNoisies.swap(i, mNoisies.size() - 1);
                     mNoisies.pop_back();
                     continue;
@@ -132,9 +129,8 @@ struct MovePicker {
             while (++mNoisiesIdx < int(mNoisies.size())) 
             {
                 move = partialSelectionSort(mNoisies, mNoisiesScores, mNoisiesIdx);
-                assert(move == mNoisies[mNoisiesIdx]);
 
-                if (mNoisiesScores[mNoisiesIdx] < 0) {
+                if (moveScore() < 0) {
                     mBadNoisyReady = true;
                     break;
                 }
@@ -148,7 +144,7 @@ struct MovePicker {
         }
         case MoveGenStage::KILLER_NEXT:
         {
-            if (board.isPseudolegal(killer) && board.isPseudolegalLegal(killer))
+            if (killer != excludedMove && board.isPseudolegal(killer) && board.isPseudolegalLegal(killer))
             {
                 mStage = MoveGenStage::KILLER_YIELDED;
                 return killer;
@@ -168,24 +164,21 @@ struct MovePicker {
             board.pseudolegalMoves(mQuiets, MoveGenType::QUIETS, false);
 
             const int stm = int(board.sideToMove());
+            const Color nstm = board.oppSide();
 
             const std::array<Move, 3> lastMoves = { 
                 board.lastMove(), board.nthToLastMove(2), board.nthToLastMove(4) 
             };
-
-            const Color nstm = board.oppSide();
 
             // Score moves
             size_t j = 0;
             while (j < mQuiets.size())
             {
                 move = mQuiets[j];
+                assert(board.isQuiet(move));
 
-                // Assert move is quiet
-                assert(board.captured(move) == PieceType::NONE && move.promotion() == PieceType::NONE);
-
-                // Remove TT move and mKiller move from list
-                if (move == ttMove || move == killer)
+                // Remove TT move and killer move and excluded move from list
+                if (move == ttMove || move == killer || move == excludedMove)
                 {
                     mQuiets.swap(j, mQuiets.size() - 1);
                     mQuiets.pop_back();
@@ -216,7 +209,6 @@ struct MovePicker {
             while (++mQuietsIdx < int(mQuiets.size())) 
             {
                 move = partialSelectionSort(mQuiets, mQuietsScores, mQuietsIdx);
-                assert(move == mQuiets[mQuietsIdx]);
 
                 if (board.isPseudolegalLegal(move))
                     return move;
@@ -228,7 +220,7 @@ struct MovePicker {
         case MoveGenStage::BAD_NOISIES:
         {
             if (mBadNoisyReady) {
-                assert(mNoisiesScores[mNoisiesIdx] < 0);
+                assert(moveScore() < 0);
                 mBadNoisyReady = false;
 
                 if (board.isPseudolegalLegal(mNoisies[mNoisiesIdx]))
@@ -240,7 +232,7 @@ struct MovePicker {
             while (++mNoisiesIdx < int(mNoisies.size())) 
             {
                 move = partialSelectionSort(mNoisies, mNoisiesScores, mNoisiesIdx);
-                assert(move == mNoisies[mNoisiesIdx] && mNoisiesScores[mNoisiesIdx] < 0);
+                assert(moveScore() < 0);
 
                 if (board.isPseudolegalLegal(move))
                     return move;
@@ -253,6 +245,6 @@ struct MovePicker {
             return MOVE_NONE;
         }
 
-        return next(board, ttMove, killer, movesHistory);
+        return next(board, ttMove, killer, movesHistory, excludedMove);
     }
 };

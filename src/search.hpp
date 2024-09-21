@@ -489,9 +489,9 @@ class SearchThread {
         MovePicker movePicker = MovePicker(false);
         Move move;
 
-        while ((move = movePicker.next(mBoard, ttMove, plyDataPtr->killer, mMovesHistory)) != MOVE_NONE)
+        while ((move = movePicker.next(mBoard, ttMove, plyDataPtr->killer, mMovesHistory, singularMove)) != MOVE_NONE)
         {
-            if (move == singularMove) continue;
+            assert(move != singularMove);
 
             legalMovesSeen++;
             const bool isQuiet = mBoard.isQuiet(move);
@@ -815,7 +815,7 @@ class SearchThread {
                            ? move == plyDataPtr->killer && isQuiet
                            : (isQuiet ? stage == MoveGenStage::QUIETS : isNoisiesStage);
 
-                return isNoisiesStage;
+                return isNoisiesStage && !isQuiet;
             }());
 
             // If in check, skip quiets and bad noisy moves
@@ -879,6 +879,8 @@ class SearchThread {
                 ? move == ttMove
                 : movePicker.stage() == MoveGenStage::GOOD_NOISIES || movePicker.stage() == MoveGenStage::BAD_NOISIES
             );
+
+            assert(!mBoard.isQuiet(move));
 
             // SEE pruning (skip bad noisy moves)
             if (!mBoard.SEE(move, probcutBeta - plyDataPtr->eval)) 

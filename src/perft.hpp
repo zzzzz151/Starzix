@@ -20,14 +20,13 @@ inline u64 perft(Board &board, const int depth)
         return nodes;
     }
 
-    for (const Move move : moves) {
+    for (const Move move : moves) 
         if (board.isPseudolegalLegal(move))
         {
             board.makeMove(move);
             nodes += perft(board, depth - 1);
             board.undoMove();
         }
-    }
 
     return nodes;
 }

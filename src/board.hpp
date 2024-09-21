@@ -511,13 +511,13 @@ class Board {
         return attacksBb;
     } 
 
-    inline u64 attacks(const Color color) const 
+    inline u64 attacks(const Color color)
     { 
         return color == sideToMove() 
                ? attacks(color, occupancy())
                : mState->enemyAttacks > 0
                ? mState->enemyAttacks
-               : mState->enemyAttacks = attacks(oppSide(), occupancy());
+               : (mState->enemyAttacks = attacks(oppSide(), occupancy()));
     }
 
     inline bool isSquareAttacked(const Square square, const Color colorAttacking, const u64 occ) const 
@@ -870,18 +870,12 @@ class Board {
             if (attacks::pawnAttacks(from, sideToMove()) & bitboard(to))
                 return them() & bitboard(to);
 
-            // Pawn one up
-            const Square squareOneUp = sideToMove() == Color::WHITE ? from + 8 : from - 8;
-            if (to == squareOneUp) return !isOccupied(squareOneUp);
+            // Pawn push
 
-            // Pawn two up
+            if (isOccupied(to)) return false;
 
-            assert((sideToMove() == Color::WHITE && squareRank(from) == Rank::RANK_2) 
-                || (sideToMove() == Color::BLACK && squareRank(from) == Rank::RANK_7));
-
-            const Square squareTwoUp = sideToMove() == Color::WHITE ? from + 16 : from - 16;
-            assert(to == squareTwoUp);
-            return !isOccupied(squareOneUp) && !isOccupied(squareTwoUp);
+            return move.flag() != Move::PAWN_TWO_UP_FLAG 
+                   || !isOccupied(sideToMove() == Color::WHITE ? from + 8 : from - 8);
         }
 
         if (move.flag() == Move::CASTLING_FLAG)
@@ -902,7 +896,6 @@ class Board {
             return isLongCastle 
                    ? !isOccupied(from - 1) && !isOccupied(from - 2) && !isOccupied(from - 3)
                    : !isOccupied(from + 1) && !isOccupied(from + 2);
-
         }
 
         const u64 attacks = pt == PieceType::KNIGHT ? attacks::knightAttacks(from)
@@ -918,12 +911,12 @@ class Board {
     {
         assert(isPseudolegal(move));
 
-        const auto moveFlag = move.flag();
         const Square from = move.from();
-        const Square to = move.to();
+        const Square to   = move.to();
+
         const Color oppSide = this->oppSide();
 
-        if (moveFlag == Move::CASTLING_FLAG)
+        if (move.flag() == Move::CASTLING_FLAG)
             return to > from
                    // Short castle
                    ? !isSquareAttacked(from + 1, oppSide) && !isSquareAttacked(from + 2, oppSide)
@@ -932,7 +925,7 @@ class Board {
 
         const Square kingSquare = this->kingSquare();
 
-        if (moveFlag == Move::EN_PASSANT_FLAG) 
+        if (move.flag() == Move::EN_PASSANT_FLAG) 
         {
             const Square capturedSq = sideToMove() == Color::WHITE ? to - 8 : to + 8;
             const u64 occAfter = occupancy() ^ bitboard(from) ^ bitboard(capturedSq) ^ bitboard(to);
