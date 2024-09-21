@@ -109,10 +109,6 @@ inline void runCommand(std::string &command, Board &board, std::vector<TTEntry> 
             }, tunableParam);
         }
     }
-    else if (tokens[0] == "isPseudolegal")
-        std::cout << board.isPseudolegal(board.uciToMove(tokens[1])) << std::endl;
-    else if (tokens[0] == "isPseudolegalLegal")
-        std::cout << board.isPseudolegalLegal(board.uciToMove(tokens[1])) << std::endl;
 }
 
 inline void uci() {

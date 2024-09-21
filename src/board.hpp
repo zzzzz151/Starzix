@@ -224,12 +224,11 @@ class Board {
 
     inline Move lastMove() const { return mState->lastMove; }
 
-    inline Move nthToLastMove(const int n) const {
+    inline Move nthToLastMove(const size_t n) const {
         assert(n >= 1);
 
-        return (int)mStates.size() - n < 0 
-               ? MOVE_NONE 
-               : Move(mStates[mStates.size() - n].lastMove);
+        return n > mStates.size()
+               ? MOVE_NONE : Move(mStates[mStates.size() - n].lastMove);
     }
 
     inline PieceType captured() const { return mState->captured; }
@@ -858,11 +857,7 @@ class Board {
             ||  attacks::pawnAttacks(from, oppSide()) & bitboard(to))
                 return false;
 
-            // If promotion, is target square empty or capturable?
-            if (move.promotion() != PieceType::NONE)
-                return !(us() & bitboard(to));
-
-            // If en passant, is this board's en passant square the move's target square?
+            // If en passant, is en passant square the move's target square?
             if (move.flag() == Move::EN_PASSANT_FLAG)
                 return mState->enPassantSquare == to;
 
@@ -1337,7 +1332,7 @@ class Board {
 
                 removePiece(enemyColor, PieceType::PAWN, capturedPawnSquare);
 
-                const bool enPassantLegal = !isSquareAttacked(kingSquare, enemyColor);
+                const bool enPassantLegal = !isSquareAttacked(kingSquare, enemyColor, occupancy());
 
                 // Undo the en passant move
                 mState->colorBitboards = colorBitboards;

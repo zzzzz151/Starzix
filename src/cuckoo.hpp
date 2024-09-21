@@ -57,8 +57,6 @@ constexpr void init()
             count += initPiece(color, (PieceType)pt);
 
     assert(count == 3668);
-
-    if (count != 3668) exit(EXIT_FAILURE);
 }
 
 } // namespace cuckoo
