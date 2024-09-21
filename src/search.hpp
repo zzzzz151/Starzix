@@ -766,12 +766,10 @@ class SearchThread {
         const auto ttEntryIdx = TTEntryIndex(mBoard.zobristHash(), ttPtr->size());
         TTEntry ttEntry = (*ttPtr)[ttEntryIdx];
         const bool ttHit = mBoard.zobristHash() == ttEntry.zobristHash;
-        Move ttMove = MOVE_NONE;
 
         // TT cutoff
         if (ttHit) {
             ttEntry.adjustScore(ply);
-            ttMove = Move(ttEntry.move);
 
             if (ttEntry.bound() == Bound::EXACT
             || (ttEntry.bound() == Bound::LOWER && ttEntry.score >= beta) 
@@ -800,6 +798,7 @@ class SearchThread {
 
         MovePicker movePicker = MovePicker(!mBoard.inCheck());
         Move move;
+        const Move ttMove = !ttHit || !mBoard.inCheck() ? MOVE_NONE : Move(ttEntry.move);
 
         while ((move = movePicker.next(mBoard, ttMove, plyDataPtr->killer, mMovesHistory)) != MOVE_NONE)
         {
@@ -811,11 +810,10 @@ class SearchThread {
                 if (!mBoard.inCheck() && isQuiet) 
                     return false;
 
-                if (stage == MoveGenStage::TT_MOVE_YIELDED)
-                    return move == ttMove;
-
                 if (mBoard.inCheck())
-                    return stage == MoveGenStage::KILLER_YIELDED 
+                    return stage == MoveGenStage::TT_MOVE_YIELDED
+                           ? move == ttMove
+                           : stage == MoveGenStage::KILLER_YIELDED 
                            ? move == plyDataPtr->killer && isQuiet
                            : (isQuiet ? stage == MoveGenStage::QUIETS : isNoisiesStage);
 
