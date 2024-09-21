@@ -44,6 +44,8 @@ struct BoardState {
     std::array<u64, 2> nonPawnsHash = {}; // [pieceColor]
     u16 lastMove = MOVE_NONE.encoded();
     PieceType captured = PieceType::NONE;
+    u64 pinned = ONES;
+    u64 enemyAttacks = 0;
 } __attribute__((packed));
 
 class Board {
@@ -117,7 +119,7 @@ class Board {
                                    : thisChar == 'r' ? PieceType::ROOK
                                    : thisChar == 'q' ? PieceType::QUEEN
                                    : PieceType::KING;
-                             
+                
                 placePiece(color, pt, sq);
                 currentFile++;
             }
@@ -406,6 +408,10 @@ class Board {
                : pieceTypeAt(move.to());
     }
 
+    inline bool isQuiet(const Move move) const {
+        return !isCapture(move) && move.promotion() == PieceType::NONE;
+    }
+
     inline bool isRepetition(const int searchPly = 100000) const {
         assert(searchPly >= 0);
         
@@ -442,43 +448,6 @@ class Board {
             return true;
 
         return isRepetition(searchPly);
-    }
-
-    inline bool isSquareAttacked(const Square square, const Color colorAttacking, const u64 occ) const {
-        // Idea: put a super piece in this square and see if its attacks intersect with an enemy piece
-
-        // Pawn
-        if (attacks::pawnAttacks(square, oppColor(colorAttacking)) 
-        & getBb(colorAttacking, PieceType::PAWN))
-            return true;
-
-        // Knight
-        if (attacks::knightAttacks(square) 
-        & getBb(colorAttacking, PieceType::KNIGHT))
-            return true;
-
-        // Bishop and queen
-        if (attacks::bishopAttacks(square, occ)
-        & (getBb(colorAttacking, PieceType::BISHOP) 
-        | getBb(colorAttacking, PieceType::QUEEN)))
-            return true;
- 
-        // Rook and queen
-        if (attacks::rookAttacks(square, occ)
-        & (getBb(colorAttacking, PieceType::ROOK) 
-        | getBb(colorAttacking, PieceType::QUEEN)))
-            return true;
-
-        // King
-        if (attacks::kingAttacks(square) 
-        & getBb(colorAttacking, PieceType::KING)) 
-            return true;
-
-        return false;
-    }
-
-    inline bool isSquareAttacked(const Square square, const Color colorAttacking) const {
-        return isSquareAttacked(square, colorAttacking, occupancy());
     }
 
     inline u64 attackers(const Square square, const u64 occ) const
@@ -542,11 +511,60 @@ class Board {
         return attacksBb;
     } 
 
-    inline u64 attacks(const Color color) const { 
-        return attacks(color, occupancy()); 
+    inline u64 attacks(const Color color) const 
+    { 
+        return color == sideToMove() 
+               ? attacks(color, occupancy())
+               : mState->enemyAttacks > 0
+               ? mState->enemyAttacks
+               : mState->enemyAttacks = attacks(oppSide(), occupancy());
     }
 
-    inline u64 pinned() const { 
+    inline bool isSquareAttacked(const Square square, const Color colorAttacking, const u64 occ) const 
+    {
+        // Idea: put a super piece in this square and see if its attacks intersect with an enemy piece
+
+        // Pawn
+        if (attacks::pawnAttacks(square, oppColor(colorAttacking)) 
+        & getBb(colorAttacking, PieceType::PAWN))
+            return true;
+
+        // Knight
+        if (attacks::knightAttacks(square) 
+        & getBb(colorAttacking, PieceType::KNIGHT))
+            return true;
+
+        // Bishop and queen
+        if (attacks::bishopAttacks(square, occ)
+        & (getBb(colorAttacking, PieceType::BISHOP) 
+        | getBb(colorAttacking, PieceType::QUEEN)))
+            return true;
+ 
+        // Rook and queen
+        if (attacks::rookAttacks(square, occ)
+        & (getBb(colorAttacking, PieceType::ROOK) 
+        | getBb(colorAttacking, PieceType::QUEEN)))
+            return true;
+
+        // King
+        if (attacks::kingAttacks(square) 
+        & getBb(colorAttacking, PieceType::KING)) 
+            return true;
+
+        return false;
+    }
+
+    inline bool isSquareAttacked(const Square square, const Color colorAttacking) const 
+    {
+        if (mState->enemyAttacks > 0 && colorAttacking != sideToMove()) 
+            return mState->enemyAttacks & bitboard(square);
+
+        return isSquareAttacked(square, colorAttacking, occupancy());
+    }
+
+    inline u64 pinned() {
+        if (mState->pinned != ONES) return mState->pinned;
+
         const Square kingSquare = this->kingSquare();
         const u64 theirBishopsQueens = them() & (getBb(PieceType::BISHOP) | getBb(PieceType::QUEEN));
         const u64 theirRooksQueens   = them() & (getBb(PieceType::ROOK)   | getBb(PieceType::QUEEN));
@@ -554,17 +572,17 @@ class Board {
         u64 potentialAttackers = theirBishopsQueens & attacks::bishopAttacks(kingSquare, them());
         potentialAttackers    |= theirRooksQueens   & attacks::rookAttacks(kingSquare, them());  
     
-        u64 pinnedBitboard = 0;
+        mState->pinned = 0;
 
         while (potentialAttackers > 0) {
             const Square attackerSquare = poplsb(potentialAttackers);
             const u64 maybePinned = us() & BETWEEN[attackerSquare][kingSquare];
 
             if (std::popcount(maybePinned) == 1)
-                pinnedBitboard |= maybePinned;
+                mState->pinned |= maybePinned;
         }
 
-        return pinnedBitboard;
+        return mState->pinned;
      }
 
      // SEE (Static exchange evaluation)
@@ -599,7 +617,7 @@ class Board {
 
         if (score >= 0) return true;
 
-        const Square from = move.from();
+        const Square from   = move.from();
         const Square square = move.to();
 
         const u64 bishopsQueens = getBb(PieceType::BISHOP) | getBb(PieceType::QUEEN);
@@ -656,160 +674,6 @@ class Board {
         return sideToMove() != us;
     }
 
-    inline Move uciToMove(const std::string uciMove) const
-    {
-        const Square from = strToSquare(uciMove.substr(0,2));
-        const Square to = strToSquare(uciMove.substr(2,4));
-        const PieceType pieceType = pieceTypeAt(from);
-        u16 moveFlag = (u16)pieceType + 1;
-
-        if (uciMove.size() == 5) // promotion
-        {
-            const char promotionLowerCase = uciMove.back(); // last char of string
-
-            if (promotionLowerCase == 'n') 
-                moveFlag = Move::KNIGHT_PROMOTION_FLAG;
-            else if (promotionLowerCase == 'b') 
-                moveFlag = Move::BISHOP_PROMOTION_FLAG;
-            else if (promotionLowerCase == 'r') 
-                moveFlag = Move::ROOK_PROMOTION_FLAG;
-            else
-                moveFlag = Move::QUEEN_PROMOTION_FLAG;
-        }
-        else if (pieceType == PieceType::KING)
-        {
-            if (abs((int)to - (int)from) == 2)
-                moveFlag = Move::CASTLING_FLAG;
-        }
-        else if (pieceType == PieceType::PAWN)
-        { 
-            const int bitboardSquaresTraveled = abs((int)to - (int)from);
-
-            if (bitboardSquaresTraveled == 16)
-                moveFlag = Move::PAWN_TWO_UP_FLAG;
-            else if (bitboardSquaresTraveled != 8 && !isOccupied(to))
-                moveFlag = Move::EN_PASSANT_FLAG;
-        }
-
-        return Move(from, to, moveFlag);
-    }
-
-    inline void makeMove(const std::string uciMove) {
-        makeMove(uciToMove(uciMove));
-    }
-
-    inline void makeMove(const Move move)
-    {
-        assert(mStates.size() >= 1 && mState == &mStates.back());
-        const BoardState copy = *mState;
-        mStates.push_back(copy);
-        mState = &mStates.back();
-
-        const Color oppSide = this->oppSide();
-        mState->lastMove = move.encoded();
-
-        if (move == MOVE_NONE) {
-            assert(!inCheck());
-
-            mState->colorToMove = oppSide;
-            mState->zobristHash ^= ZOBRIST_COLOR;
-
-            if (mState->enPassantSquare != SQUARE_NONE)
-            {
-                mState->zobristHash ^= ZOBRIST_FILES[(int)squareFile(mState->enPassantSquare)];
-                mState->enPassantSquare = SQUARE_NONE;
-            }
-
-            mState->pliesSincePawnOrCapture++;
-
-            if (sideToMove() == Color::WHITE)
-                mState->currentMoveCounter++;
-
-            mState->captured = PieceType::NONE;
-            return;
-        }
-
-        const Square from = move.from();
-        const Square to = move.to();
-        const auto moveFlag = move.flag();
-        const PieceType promotion = move.promotion();
-        const PieceType pieceType = move.pieceType();
-        Square capturedPieceSquare = to;
-
-        removePiece(sideToMove(), pieceType, from);
-
-        if (moveFlag == Move::CASTLING_FLAG)
-        {
-            placePiece(sideToMove(), PieceType::KING, to);
-            const auto [rookFrom, rookTo] = CASTLING_ROOK_FROM_TO[to];
-            removePiece(sideToMove(), PieceType::ROOK, rookFrom);
-            placePiece(sideToMove(), PieceType::ROOK, rookTo);
-            mState->captured = PieceType::NONE;
-        }
-        else if (moveFlag == Move::EN_PASSANT_FLAG)
-        {
-            capturedPieceSquare = sideToMove() == Color::WHITE ? to - 8 : to + 8;
-            removePiece(oppSide, PieceType::PAWN, capturedPieceSquare);
-            placePiece(sideToMove(), PieceType::PAWN, to);
-            mState->captured = PieceType::PAWN;
-        }
-        else {
-            if ((mState->captured = pieceTypeAt(to)) != PieceType::NONE)
-                removePiece(oppSide, mState->captured, to);
-
-            placePiece(sideToMove(), 
-                       promotion != PieceType::NONE ? promotion : pieceType, 
-                       to);
-        }
-
-        mState->zobristHash ^= mState->castlingRights; // XOR old castling rights out
-
-        // Update castling rights
-        if (pieceType == PieceType::KING)
-        {
-            mState->castlingRights &= ~CASTLING_MASKS[(int)sideToMove()][CASTLE_SHORT]; 
-            mState->castlingRights &= ~CASTLING_MASKS[(int)sideToMove()][CASTLE_LONG]; 
-        }
-        else if (bitboard(from) & mState->castlingRights)
-            mState->castlingRights &= ~bitboard(from);
-        if (bitboard(to) & mState->castlingRights)
-            mState->castlingRights &= ~bitboard(to);
-
-        mState->zobristHash ^= mState->castlingRights; // XOR new castling rights in
-
-        // Update en passant square
-        if (mState->enPassantSquare != SQUARE_NONE)
-        {
-            mState->zobristHash ^= ZOBRIST_FILES[(int)squareFile(mState->enPassantSquare)];
-            mState->enPassantSquare = SQUARE_NONE;
-        }
-        if (moveFlag == Move::PAWN_TWO_UP_FLAG)
-        { 
-            mState->enPassantSquare = sideToMove() == Color::WHITE ? to - 8 : to + 8;
-            mState->zobristHash ^= ZOBRIST_FILES[(int)squareFile(mState->enPassantSquare)];
-        }
-
-        mState->colorToMove = oppSide;
-        mState->zobristHash ^= ZOBRIST_COLOR;
-
-        if (pieceType == PieceType::PAWN || mState->captured != PieceType::NONE)
-            mState->pliesSincePawnOrCapture = 0;
-        else
-            mState->pliesSincePawnOrCapture++;
-
-        if (sideToMove() == Color::WHITE)
-            mState->currentMoveCounter++;
-
-        mState->checkers = attackers(kingSquare()) & them();
-    }
-
-    inline void undoMove()
-    {
-        assert(mStates.size() >= 2 && mState == &mStates.back());
-        mStates.pop_back();
-        mState = &mStates.back();
-    }
-
     inline void pseudolegalMoves(
         ArrayVec<Move, 256> &moves, const MoveGenType moveGenType, const bool underpromotions = true) const
     {
@@ -840,18 +704,19 @@ class Board {
         while (ourPiecesBbs[PAWN] > 0) {
             const Square sq = poplsb(ourPiecesBbs[PAWN]);
             bool pawnHasntMoved = false, willPromote = false;
+
             const Rank rank = squareRank(sq);
+            assert(rank != Rank::RANK_1 && rank != Rank::RANK_8);
 
             if (rank == Rank::RANK_2) {
                 pawnHasntMoved = sideToMove() == Color::WHITE;
-                willPromote = sideToMove() == Color::BLACK;
+                willPromote    = sideToMove() == Color::BLACK;
             } else if (rank == Rank::RANK_7) {
                 pawnHasntMoved = sideToMove() == Color::BLACK;
-                willPromote = sideToMove() == Color::WHITE;
+                willPromote    = sideToMove() == Color::WHITE;
             }
 
             u64 pawnAttacks;
-            const Square squareOneUp = sideToMove() == Color::WHITE ? sq + 8 : sq - 8;
 
             if (moveGenType == MoveGenType::QUIETS) goto pawnPushes;
 
@@ -861,23 +726,26 @@ class Board {
 
             while (pawnAttacks > 0) {
                 const Square targetSquare = poplsb(pawnAttacks);
+
                 if (willPromote) 
                     addPromotions(moves, sq, targetSquare, underpromotions);
                 else 
                     moves.push_back(Move(sq, targetSquare, Move::PAWN_FLAG));
             }
 
-            if (isOccupied(squareOneUp))
-                continue;
+            pawnPushes:
+
+            const Square squareOneUp = sideToMove() == Color::WHITE ? sq + 8 : sq - 8;
+            if (isOccupied(squareOneUp)) continue;
 
             if (willPromote) {
-                addPromotions(moves, sq, squareOneUp, underpromotions);
+                if (moveGenType != MoveGenType::QUIETS)
+                    addPromotions(moves, sq, squareOneUp, underpromotions);
+
                 continue;
             }
 
             if (moveGenType == MoveGenType::NOISIES) continue;
-
-            pawnPushes:
 
             // pawn 1 square up
             moves.push_back(Move(sq, squareOneUp, Move::PAWN_FLAG));
@@ -975,8 +843,8 @@ class Board {
     {
         if (move == MOVE_NONE) return false;
 
-        const Square from = move.from();
-        const Square to = move.to();
+        const Square from  = move.from();
+        const Square to    = move.to();
         const PieceType pt = move.pieceType();
 
         // Do we have the move's piece on origin square?
@@ -984,9 +852,15 @@ class Board {
             return false;
 
         if (pt == PieceType::PAWN) {
-            // If promotion, is target square free?
+            // Pawn moving in wrong direction?
+            if (to == (sideToMove() == Color::WHITE ? from - 8 : from + 8)
+            ||  to == (sideToMove() == Color::WHITE ? from - 16 : from + 16)
+            ||  attacks::pawnAttacks(from, oppSide()) & bitboard(to))
+                return false;
+
+            // If promotion, is target square empty or capturable?
             if (move.promotion() != PieceType::NONE)
-                return !isOccupied(to);
+                return !(us() & bitboard(to));
 
             // If en passant, is this board's en passant square the move's target square?
             if (move.flag() == Move::EN_PASSANT_FLAG)
@@ -996,16 +870,15 @@ class Board {
             if (attacks::pawnAttacks(from, sideToMove()) & bitboard(to))
                 return them() & bitboard(to);
 
-            // We have a pawn push, are the squares in front of the pawn free?
-
-            assert((sideToMove() == Color::WHITE && squareRank(from) == Rank::RANK_2) 
-                || (sideToMove() == Color::BLACK && squareRank(from) == Rank::RANK_7));
-
             // Pawn one up
             const Square squareOneUp = sideToMove() == Color::WHITE ? from + 8 : from - 8;
             if (to == squareOneUp) return !isOccupied(squareOneUp);
 
             // Pawn two up
+
+            assert((sideToMove() == Color::WHITE && squareRank(from) == Rank::RANK_2) 
+                || (sideToMove() == Color::BLACK && squareRank(from) == Rank::RANK_7));
+
             const Square squareTwoUp = sideToMove() == Color::WHITE ? from + 16 : from - 16;
             assert(to == squareTwoUp);
             return !isOccupied(squareOneUp) && !isOccupied(squareTwoUp);
@@ -1020,10 +893,16 @@ class Board {
 
             if (!hasCastlingRight) return false;
 
+            // Do we have rook in the corner?
             const auto [rookFrom, rookTo] = CASTLING_ROOK_FROM_TO[to];
+            if(!(getBb(sideToMove(), PieceType::ROOK) & bitboard(rookFrom)))
+                return false;
 
-            // Do we have the rook on the corner?
-            return getBb(sideToMove(), PieceType::ROOK) & bitboard(rookFrom);
+            // Are the squares between rook and king empty?
+            return isLongCastle 
+                   ? !isOccupied(from - 1) && !isOccupied(from - 2) && !isOccupied(from - 3)
+                   : !isOccupied(from + 1) && !isOccupied(from + 2);
+
         }
 
         const u64 attacks = pt == PieceType::KNIGHT ? attacks::knightAttacks(from)
@@ -1032,12 +911,12 @@ class Board {
                           : pt == PieceType::QUEEN  ? attacks::queenAttacks(from, occupancy())
                           : attacks::kingAttacks(from);
 
-        return attacks & bitboard(to);
+        return attacks & bitboard(to) & ~us();
     }
 
-    inline bool isPseudolegalLegal(const Move move, const u64 pinned) const
+    inline bool isPseudolegalLegal(const Move move)
     {
-        assert(move != MOVE_NONE);
+        assert(isPseudolegal(move));
 
         const auto moveFlag = move.flag();
         const Square from = move.from();
@@ -1073,7 +952,7 @@ class Board {
         if (std::popcount(mState->checkers) > 1) 
             return false;
 
-        if ((pinned & bitboard(from)) > 0 && (LINE_THROUGH[from][to] & bitboard(kingSquare)) == 0)
+        if ((LINE_THROUGH[from][to] & bitboard(kingSquare)) == 0 && (bitboard(from) & pinned()) > 0)
             return false;
 
         // 1 checker
@@ -1083,6 +962,163 @@ class Board {
         }
 
         return true;
+    }
+
+    inline Move uciToMove(const std::string uciMove) const
+    {
+        const Square from = strToSquare(uciMove.substr(0,2));
+        const Square to = strToSquare(uciMove.substr(2,4));
+        const PieceType pieceType = pieceTypeAt(from);
+        u16 moveFlag = (u16)pieceType + 1;
+
+        if (uciMove.size() == 5) // promotion
+        {
+            const char promotionLowerCase = uciMove.back(); // last char of string
+
+            if (promotionLowerCase == 'n') 
+                moveFlag = Move::KNIGHT_PROMOTION_FLAG;
+            else if (promotionLowerCase == 'b') 
+                moveFlag = Move::BISHOP_PROMOTION_FLAG;
+            else if (promotionLowerCase == 'r') 
+                moveFlag = Move::ROOK_PROMOTION_FLAG;
+            else
+                moveFlag = Move::QUEEN_PROMOTION_FLAG;
+        }
+        else if (pieceType == PieceType::KING)
+        {
+            if (abs((int)to - (int)from) == 2)
+                moveFlag = Move::CASTLING_FLAG;
+        }
+        else if (pieceType == PieceType::PAWN)
+        { 
+            const int bitboardSquaresTraveled = abs((int)to - (int)from);
+
+            if (bitboardSquaresTraveled == 16)
+                moveFlag = Move::PAWN_TWO_UP_FLAG;
+            else if (bitboardSquaresTraveled != 8 && !isOccupied(to))
+                moveFlag = Move::EN_PASSANT_FLAG;
+        }
+
+        return Move(from, to, moveFlag);
+    }
+
+    inline void makeMove(const std::string uciMove) {
+        makeMove(uciToMove(uciMove));
+    }
+
+    inline void makeMove(const Move move)
+    {
+        assert(mStates.size() >= 1 && mState == &mStates.back());
+        const BoardState copy = *mState;
+        mStates.push_back(copy);
+        mState = &mStates.back();
+
+        const Color oppSide = this->oppSide();
+        mState->lastMove = move.encoded();
+        mState->pinned = ONES;    // will be calculated and cached when pinned() called
+        mState->enemyAttacks = 0; // will be calculated and cached when attacks() called
+
+        if (move == MOVE_NONE) {
+            assert(!inCheck());
+
+            mState->colorToMove = oppSide;
+            mState->zobristHash ^= ZOBRIST_COLOR;
+
+            if (mState->enPassantSquare != SQUARE_NONE)
+            {
+                mState->zobristHash ^= ZOBRIST_FILES[(int)squareFile(mState->enPassantSquare)];
+                mState->enPassantSquare = SQUARE_NONE;
+            }
+
+            mState->pliesSincePawnOrCapture++;
+
+            if (sideToMove() == Color::WHITE)
+                mState->currentMoveCounter++;
+
+            mState->captured = PieceType::NONE;
+            return;
+        }
+
+        const Square from   = move.from();
+        const Square to     = move.to();
+        const auto moveFlag = move.flag();
+        const PieceType promotion = move.promotion();
+        const PieceType pieceType = move.pieceType();
+        Square capturedPieceSquare = to;
+
+        removePiece(sideToMove(), pieceType, from);
+
+        if (moveFlag == Move::CASTLING_FLAG)
+        {
+            placePiece(sideToMove(), PieceType::KING, to);
+            const auto [rookFrom, rookTo] = CASTLING_ROOK_FROM_TO[to];
+            removePiece(sideToMove(), PieceType::ROOK, rookFrom);
+            placePiece(sideToMove(), PieceType::ROOK, rookTo);
+            mState->captured = PieceType::NONE;
+        }
+        else if (moveFlag == Move::EN_PASSANT_FLAG)
+        {
+            capturedPieceSquare = sideToMove() == Color::WHITE ? to - 8 : to + 8;
+            removePiece(oppSide, PieceType::PAWN, capturedPieceSquare);
+            placePiece(sideToMove(), PieceType::PAWN, to);
+            mState->captured = PieceType::PAWN;
+        }
+        else {
+            if ((mState->captured = pieceTypeAt(to)) != PieceType::NONE)
+                removePiece(oppSide, mState->captured, to);
+            
+            placePiece(sideToMove(), 
+                promotion != PieceType::NONE ? promotion : pieceType, 
+                to
+            );
+        }
+
+        mState->zobristHash ^= mState->castlingRights; // XOR old castling rights out
+
+        // Update castling rights
+        if (pieceType == PieceType::KING)
+        {
+            mState->castlingRights &= ~CASTLING_MASKS[(int)sideToMove()][CASTLE_SHORT]; 
+            mState->castlingRights &= ~CASTLING_MASKS[(int)sideToMove()][CASTLE_LONG]; 
+        }
+        else if (bitboard(from) & mState->castlingRights)
+            mState->castlingRights &= ~bitboard(from);
+        if (bitboard(to) & mState->castlingRights)
+            mState->castlingRights &= ~bitboard(to);
+
+        mState->zobristHash ^= mState->castlingRights; // XOR new castling rights in
+
+        // Update en passant square
+        if (mState->enPassantSquare != SQUARE_NONE)
+        {
+            mState->zobristHash ^= ZOBRIST_FILES[(int)squareFile(mState->enPassantSquare)];
+            mState->enPassantSquare = SQUARE_NONE;
+        }
+        if (moveFlag == Move::PAWN_TWO_UP_FLAG)
+        { 
+            mState->enPassantSquare = sideToMove() == Color::WHITE ? to - 8 : to + 8;
+            mState->zobristHash ^= ZOBRIST_FILES[(int)squareFile(mState->enPassantSquare)];
+        }
+
+        mState->colorToMove = oppSide;
+        mState->zobristHash ^= ZOBRIST_COLOR;
+
+        if (pieceType == PieceType::PAWN || mState->captured != PieceType::NONE)
+            mState->pliesSincePawnOrCapture = 0;
+        else
+            mState->pliesSincePawnOrCapture++;
+
+        if (sideToMove() == Color::WHITE)
+            mState->currentMoveCounter++;
+
+        mState->checkers = attackers(kingSquare()) & them();
+    }
+
+    inline void undoMove()
+    {
+        assert(mStates.size() >= 2 && mState == &mStates.back());
+        mStates.pop_back();
+        mState = &mStates.back();
     }
 
     inline bool hasNonPawnMaterial(const Color color) const
@@ -1130,9 +1166,9 @@ class Board {
             if (cuckoo::KEYS[cuckooIdx = cuckoo::h1(moveKey)] == moveKey 
             ||  cuckoo::KEYS[cuckooIdx = cuckoo::h2(moveKey)] == moveKey)
             {
-                const Move move = cuckoo::MOVES[cuckooIdx];
+                const Move move   = cuckoo::MOVES[cuckooIdx];
                 const Square from = move.from();
-                const Square to = move.to();
+                const Square to   = move.to();
 
                 if (((BETWEEN[from][to] | bitboard(to)) ^ bitboard(to)) & occ)
                     continue;

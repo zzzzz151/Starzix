@@ -5,18 +5,15 @@
 #include <limits>
 
 enum class MoveGenStage : int {
-    TT_MOVE = 0, GEN_SCORE_NOISIES, GOOD_NOISIES, KILLER, 
-    GEN_SCORE_QUIETS, QUIETS, BAD_NOISIES, END
+    TT_MOVE_NEXT = 0, TT_MOVE_YIELDED, GEN_SCORE_NOISIES, GOOD_NOISIES, 
+    KILLER_NEXT, KILLER_YIELDED, GEN_SCORE_QUIETS, QUIETS, BAD_NOISIES, END
 };
 
 // Incremental sorting with partial selection sort
-inline std::pair<Move, i32> partialSelectionSort(
-    ArrayVec<Move, 256> &moves, std::array<i32, 256> &movesScores, int &idx)
+inline Move partialSelectionSort(
+    ArrayVec<Move, 256> &moves, std::array<i32, 256> &movesScores, const int idx)
 {
-    idx++;
-
-    if (idx >= (int)moves.size())
-        return { MOVE_NONE, 0 };
+    assert(idx < int(moves.size()));
 
     for (size_t i = idx + 1; i < moves.size(); i++)
         if (movesScores[i] > movesScores[idx])
@@ -25,44 +22,28 @@ inline std::pair<Move, i32> partialSelectionSort(
             std::swap(movesScores[i], movesScores[idx]);
         }
 
-    return { moves[idx], movesScores[idx] };
+    return moves[idx];
 }
 
 struct MovePicker {
     private:
 
+    MoveGenStage mStage = MoveGenStage::TT_MOVE_NEXT;
     bool mNoisiesOnly;
-    Board* mBoard;
-    u64 mPinned;
-    u64 mEnemyAttacks = 0;
-    Move mTtMove;
-    Move mKiller;
-    MultiArray<HistoryEntry, 2, 6, 64>* mMovesHistory;
-
-    MoveGenStage mStage = MoveGenStage::TT_MOVE;
 
     ArrayVec<Move, 256> mNoisies, mQuiets;
     std::array<i32, 256> mNoisiesScores, mQuietsScores;
-    int mNoisiesIdx = 0, mQuietsIdx = 0;
+    int mNoisiesIdx = -1, mQuietsIdx = -1;
 
     bool mBadNoisyReady = false;
 
     public:
 
-    inline MovePicker(const bool noisiesOnly, Board* board, const Move ttMove, const Move killer, 
-        MultiArray<HistoryEntry, 2, 6, 64>* movesHistory) 
-    {
+    inline MovePicker(const bool noisiesOnly) {
         mNoisiesOnly = noisiesOnly;
-        mBoard = board;
-        mPinned = mBoard->pinned();
-        mTtMove = ttMove;
-        mKiller = killer;
-        mMovesHistory = movesHistory;
     }
 
     inline MoveGenStage stage() const { return mStage; }
-
-    inline u64 enemyAttacks() const { return mEnemyAttacks; }
 
     inline i32 moveScore() const 
     { 
@@ -74,39 +55,53 @@ struct MovePicker {
         return mStage == MoveGenStage::QUIETS ? mQuietsScores[mQuietsIdx] : mNoisiesScores[mNoisiesIdx];
     }
 
-    inline Move next() {
-        size_t i;
+    inline Move next(Board &board, const Move ttMove, const Move killer, 
+        const MultiArray<HistoryEntry, 2, 6, 64> &movesHistory) 
+    {
+        Move move = MOVE_NONE;
+
+        assert(killer == MOVE_NONE || board.isQuiet(killer));
 
         switch (mStage) 
         {
-        case MoveGenStage::TT_MOVE:
+        case MoveGenStage::TT_MOVE_NEXT:
         {
-            if (mBoard->isPseudolegal(mTtMove) && mBoard->isPseudolegalLegal(mTtMove, mPinned))
-                return mTtMove;
+            if (!(mNoisiesOnly && ttMove != MOVE_NONE && board.isQuiet(ttMove)) 
+            && board.isPseudolegal(ttMove) 
+            && board.isPseudolegalLegal(ttMove))
+            {
+                mStage = MoveGenStage::TT_MOVE_YIELDED;
+                return ttMove;
+            }
 
             mStage = MoveGenStage::GEN_SCORE_NOISIES;
-            [[fallthrough]];
+            break;
+        }
+        case MoveGenStage::TT_MOVE_YIELDED:
+        {
+            mStage = MoveGenStage::GEN_SCORE_NOISIES;
+            break;
         }
         case MoveGenStage::GEN_SCORE_NOISIES:
         {
             // Generate pseudolegal noisy moves, except underpromotions
-            mBoard->pseudolegalMoves(mNoisies, MoveGenType::NOISIES, false);
+            board.pseudolegalMoves(mNoisies, MoveGenType::NOISIES, false);
 
             // Score moves
-            i = 0;
+            size_t i = 0;
             while (i < mNoisies.size())
             {
-                const Move move = mNoisies[i];
+                move = mNoisies[i];
+                assert(move != killer);
 
                 // Assert move is noisy
-                assert(mBoard->captured(move) != PieceType::NONE || move.promotion() != PieceType::NONE);
+                assert(board.captured(move) != PieceType::NONE || move.promotion() != PieceType::NONE);
 
                 // Assert no underpromotions
                 assert(move.promotion() == PieceType::NONE || move.promotion() == PieceType::QUEEN);
 
-                // Remove TT move and mKiller move from list
-                if (move == mTtMove || move == mKiller)
-                {
+                // Remove TT move from list
+                if (move == ttMove) {
                     mNoisies.swap(i, mNoisies.size() - 1);
                     mNoisies.pop_back();
                     continue;
@@ -116,130 +111,148 @@ struct MovePicker {
 
                 mNoisiesScores[i] = mNoisiesOnly 
                                     ? (move.promotion() == PieceType::QUEEN ? 1'000'000 : 0)
-                                    : (mBoard->SEE(move)
+                                    : (board.SEE(move)
                                        ? (move.promotion() == PieceType::QUEEN ? GOOD_NOISY_SCORE * 2 : GOOD_NOISY_SCORE)
                                        : -GOOD_NOISY_SCORE
                                       );
 
                 // MVVLVA (most valuable victim, least valuable attacker)
-                mNoisiesScores[i] += 100 * (i32)mBoard->captured(move) - (i32)move.pieceType();
+                mNoisiesScores[i] += 100 * (i32)board.captured(move) - (i32)move.pieceType();
 
                 i++;
             }
 
             mStage = MoveGenStage::GOOD_NOISIES;
-            [[fallthrough]];
+            break;
         }
         case MoveGenStage::GOOD_NOISIES:
         {
-            while (true) {
-                auto [nextMove, moveScore] = partialSelectionSort(mNoisies, mNoisiesScores, mNoisiesIdx);
+            move = MOVE_NONE;
 
-                if (nextMove == MOVE_NONE) break;
+            while (++mNoisiesIdx < int(mNoisies.size())) 
+            {
+                move = partialSelectionSort(mNoisies, mNoisiesScores, mNoisiesIdx);
+                assert(move == mNoisies[mNoisiesIdx]);
 
-                if (moveScore < 0) {
+                if (mNoisiesScores[mNoisiesIdx] < 0) {
                     mBadNoisyReady = true;
                     break;
                 }
 
-                if (mBoard->isPseudolegalLegal(nextMove, mPinned))
-                    return nextMove;
+                if (board.isPseudolegalLegal(move))
+                    return move;
             }
 
-            mStage = mNoisiesOnly ? MoveGenStage::BAD_NOISIES : MoveGenStage::KILLER;
-            return next();
+            mStage = mNoisiesOnly ? MoveGenStage::BAD_NOISIES : MoveGenStage::KILLER_NEXT;
+            break;
         }
-        case MoveGenStage::KILLER:
+        case MoveGenStage::KILLER_NEXT:
         {
-            if (mBoard->isPseudolegal(mKiller) && mBoard->isPseudolegalLegal(mKiller, mPinned))
-                return mKiller;
+            if (board.isPseudolegal(killer) && board.isPseudolegalLegal(killer))
+            {
+                mStage = MoveGenStage::KILLER_YIELDED;
+                return killer;
+            }
 
             mStage = MoveGenStage::GEN_SCORE_QUIETS;
-            [[fallthrough]];
+            break;
+        }
+        case MoveGenStage::KILLER_YIELDED:
+        {
+            mStage = MoveGenStage::GEN_SCORE_QUIETS;
+            break;
         }
         case MoveGenStage::GEN_SCORE_QUIETS:
         {
             // Generate pseudolegal quiet moves (underpromotions excluded)
-            mBoard->pseudolegalMoves(mQuiets, MoveGenType::QUIETS, false);
+            board.pseudolegalMoves(mQuiets, MoveGenType::QUIETS, false);
 
-            const int stm = int(mBoard->sideToMove());
-
-            assert(mEnemyAttacks == 0);
-            mEnemyAttacks = mBoard->attacks(mBoard->oppSide());
+            const int stm = int(board.sideToMove());
 
             const std::array<Move, 3> lastMoves = { 
-                mBoard->lastMove(), mBoard->nthToLastMove(2), mBoard->nthToLastMove(4) 
+                board.lastMove(), board.nthToLastMove(2), board.nthToLastMove(4) 
             };
 
+            const Color nstm = board.oppSide();
+
             // Score moves
-            i = 0;
-            while (i < mQuiets.size())
+            size_t j = 0;
+            while (j < mQuiets.size())
             {
-                const Move move = mQuiets[i];
+                move = mQuiets[j];
 
                 // Assert move is quiet
-                assert(mBoard->captured(move) == PieceType::NONE && move.promotion() == PieceType::NONE);
+                assert(board.captured(move) == PieceType::NONE && move.promotion() == PieceType::NONE);
 
                 // Remove TT move and mKiller move from list
-                if (move == mTtMove || move == mKiller)
+                if (move == ttMove || move == killer)
                 {
-                    mQuiets.swap(i, mQuiets.size() - 1);
+                    mQuiets.swap(j, mQuiets.size() - 1);
                     mQuiets.pop_back();
                     continue;
                 }
 
                 const int pt = (int)move.pieceType();
-                
-                mQuietsScores[i] = (*mMovesHistory)[stm][pt][move.to()].quietHistory(
-                    mEnemyAttacks & bitboard(move.from()), 
-                    mEnemyAttacks & bitboard(move.to()), 
-                    lastMoves);
 
-                i++;
+                // Calling attacks(board.oppSide()) will cache enemy attacks and speedup isSquareAttacked()
+                board.attacks(board.oppSide()); 
+                
+                mQuietsScores[j] = movesHistory[stm][pt][move.to()].quietHistory(
+                    board.isSquareAttacked(move.from(), nstm), 
+                    board.isSquareAttacked(move.to(),   nstm), 
+                    lastMoves
+                );
+
+                j++;
             }
 
             mStage = MoveGenStage::QUIETS;
-            [[fallthrough]];
+            break;
         }
         case MoveGenStage::QUIETS:
         {
-            while (true) {
-                auto [nextMove, moveScore] = partialSelectionSort(mQuiets, mQuietsScores, mQuietsIdx);
+            move = MOVE_NONE;
 
-                if (nextMove == MOVE_NONE) break;
+            while (++mQuietsIdx < int(mQuiets.size())) 
+            {
+                move = partialSelectionSort(mQuiets, mQuietsScores, mQuietsIdx);
+                assert(move == mQuiets[mQuietsIdx]);
 
-                if (mBoard->isPseudolegalLegal(nextMove, mPinned))
-                    return nextMove;
+                if (board.isPseudolegalLegal(move))
+                    return move;
             }
 
             mStage = MoveGenStage::BAD_NOISIES;
-            [[fallthrough]];
+            break;
         }
         case MoveGenStage::BAD_NOISIES:
         {
             if (mBadNoisyReady) {
+                assert(mNoisiesScores[mNoisiesIdx] < 0);
                 mBadNoisyReady = false;
 
-                if (mBoard->isPseudolegalLegal(mNoisies[mNoisiesIdx], mPinned))
+                if (board.isPseudolegalLegal(mNoisies[mNoisiesIdx]))
                     return mNoisies[mNoisiesIdx];
             }
 
-            while (true) {
-                auto [nextMove, moveScore] = partialSelectionSort(mNoisies, mNoisiesScores, mNoisiesIdx);
+            move = MOVE_NONE;
 
-                if (nextMove == MOVE_NONE) break;
+            while (++mNoisiesIdx < int(mNoisies.size())) 
+            {
+                move = partialSelectionSort(mNoisies, mNoisiesScores, mNoisiesIdx);
+                assert(move == mNoisies[mNoisiesIdx] && mNoisiesScores[mNoisiesIdx] < 0);
 
-                assert(moveScore < 0);
-
-                if (mBoard->isPseudolegalLegal(nextMove, mPinned))
-                    return nextMove;
+                if (board.isPseudolegalLegal(move))
+                    return move;
             }
 
             mStage = MoveGenStage::END;
-            [[fallthrough]];
+            break;
         }
         default:
             return MOVE_NONE;
         }
+
+        return next(board, ttMove, killer, movesHistory);
     }
 };

@@ -42,9 +42,17 @@ struct Move {
 
     inline Move(const Square from, const Square to, const u16 flag)
     {
+        assert(from <= 63 && to <= 63);
         mMove = (u16)from << 10;
         mMove |= (u16)to << 4;
         mMove |= flag;
+
+        // No pawns in backranks
+        assert(!(
+            pieceType() == PieceType::PAWN 
+            && (squareRank(to) == Rank::RANK_1 || squareRank(to) == Rank::RANK_8) 
+            && promotion() == PieceType::NONE
+        ));
     }
 
     inline Move(std::string from, std::string to, u16 flag) 
