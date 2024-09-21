@@ -569,13 +569,14 @@ class SearchThread {
                     newDepth -= 2;
             }
 
-            const PieceType captured = mBoard.captured(move);
-
             const u64 nodesBefore = mNodes;
             makeMove(move, ply + 1);
 
             int pt = (int)move.pieceType();
             HistoryEntry &historyEntry = mMovesHistory[stm][pt][move.to()];
+
+            i16* noisyHistoryPtr;
+            if (!isQuiet) noisyHistoryPtr = historyEntry.noisyHistoryPtr(mBoard.captured());
 
             i32 score = 0;
 
@@ -598,7 +599,7 @@ class SearchThread {
                 // reduce moves with good history less and vice versa
                 lmr -= round(
                     isQuiet ? float(movePicker.moveScore()) / (float)lmrQuietHistoryDiv()
-                            : float(historyEntry.noisyHistory(captured)) / (float)lmrNoisyHistoryDiv()
+                            : float(*noisyHistoryPtr) / (float)lmrNoisyHistoryDiv()
                 );
 
                 if (lmr < 0) lmr = 0; // dont extend
@@ -637,7 +638,7 @@ class SearchThread {
                 if (isQuiet) 
                     failLowQuiets.push_back(move);
                 else
-                    failLowNoisiesHistory.push_back(historyEntry.noisyHistoryPtr(captured));
+                    failLowNoisiesHistory.push_back(noisyHistoryPtr);
 
                 continue;
             }
@@ -672,7 +673,7 @@ class SearchThread {
 
             if (!isQuiet) {
                 // History bonus: increase this move's history
-                updateHistory(historyEntry.noisyHistoryPtr(captured), bonus);
+                updateHistory(noisyHistoryPtr, bonus);
                 break;
             }
 

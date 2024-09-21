@@ -394,11 +394,6 @@ class Board {
         std::cout << std::endl;
     }
 
-    inline bool isCapture(const Move move) const {
-        assert(move != MOVE_NONE);
-        return isOccupied(move.to()) || move.flag() == Move::EN_PASSANT_FLAG;
-    }
-
     inline PieceType captured(const Move move) const {
         assert(move != MOVE_NONE);
 
@@ -408,7 +403,11 @@ class Board {
     }
 
     inline bool isQuiet(const Move move) const {
-        return !isCapture(move) && move.promotion() == PieceType::NONE;
+        assert(move != MOVE_NONE);
+
+        return !isOccupied(move.to()) 
+               && move.promotion() == PieceType::NONE
+               && move.flag() != Move::EN_PASSANT_FLAG;
     }
 
     inline bool isRepetition(const int searchPly = 100000) const {
