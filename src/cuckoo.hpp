@@ -50,7 +50,7 @@ constexpr int initPiece(const Color color, const PieceType pieceType)
 
 constexpr void init()
 {
-    int count = 0;
+    [[maybe_unused]] int count = 0;
 
     for (const Color color : {Color::WHITE, Color::BLACK})
         for (int pt = KNIGHT; pt <= KING; pt++)
