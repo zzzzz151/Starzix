@@ -9,7 +9,7 @@ constexpr i32 INF = 32000,
 #include "board.hpp"
 #include "search_params.hpp"
 #include "history_entry.hpp"
-#include "ply_data.hpp"
+#include "move_picker.hpp"
 #include "tt.hpp"
 #include "nnue.hpp"
 
@@ -34,6 +34,13 @@ class SearchThread;
 
 // in main.cpp, main thread is created and gMainThread = &gSearchThreads[0]
 SearchThread* gMainThread = nullptr;
+
+struct PlyData {
+    public:
+    ArrayVec<Move, MAX_DEPTH+1> pvLine = {};
+    Move killer = MOVE_NONE;
+    i32 eval = VALUE_NONE;
+};
 
 class SearchThread {
     private:
@@ -91,9 +98,8 @@ class SearchThread {
     }
 
     inline Move bestMoveRoot() const {
-        return mPliesData[0].mPvLine.size() == 0 
-               ? MOVE_NONE 
-               : mPliesData[0].mPvLine[0];
+        return mPliesData[0].pvLine.size() == 0 
+               ? MOVE_NONE : mPliesData[0].pvLine[0];
     }
 
     inline i32 search(const Board &board, const i32 maxDepth, const auto startTime, 
@@ -170,8 +176,12 @@ class SearchThread {
             std::cout << " nodes " << nodes
                       << " nps "   << nodes * 1000 / std::max(msElapsed, (u64)1)
                       << " time "  << msElapsed
-                      << " pv "    << mPliesData[0].pvString()
-                      << std::endl;
+                      << " pv";
+
+            for (const Move move : mPliesData[0].pvLine)
+                std::cout << " " << move.toUci();
+
+            std::cout << std::endl;
 
             // Check soft time limit (in case one exists)
 
@@ -249,7 +259,12 @@ class SearchThread {
         // update seldepth
         if (newPly > mMaxPlyReached) mMaxPlyReached = newPly;
 
-        mPliesData[newPly].softReset();
+        mPliesData[newPly].pvLine.clear();
+        mPliesData[newPly].eval = VALUE_NONE;
+
+        // Killer move must be quiet move
+        if (mPliesData[newPly].killer != MOVE_NONE && !mBoard.isQuiet(mPliesData[newPly].killer))
+            mPliesData[newPly].killer = MOVE_NONE;
         
         if (move != MOVE_NONE) {
             mAccumulatorPtr++;
@@ -331,7 +346,7 @@ class SearchThread {
     }
 
     inline i32 search(i32 depth, const i32 ply, i32 alpha, i32 beta, 
-        const bool cutNode, u8 doubleExtsLeft, const bool singular = false) 
+        const bool cutNode, u8 doubleExtsLeft, const Move singularMove = MOVE_NONE) 
     {
         assert(ply >= 0 && ply <= mMaxDepth);
         assert(alpha >= -INF && alpha <= INF);
@@ -356,7 +371,7 @@ class SearchThread {
 
         // Probe TT
         const auto ttEntryIdx = TTEntryIndex(mBoard.zobristHash(), ttPtr->size());
-        TTEntry ttEntry = singular ? TTEntry() : (*ttPtr)[ttEntryIdx];
+        TTEntry ttEntry = singularMove != MOVE_NONE ? TTEntry() : (*ttPtr)[ttEntryIdx];
         const bool ttHit = mBoard.zobristHash() == ttEntry.zobristHash;
         Move ttMove = MOVE_NONE;
 
@@ -377,22 +392,22 @@ class SearchThread {
 
         // Max ply cutoff
         if (ply >= mMaxDepth) 
-            return mBoard.inCheck() ? 0 : updateAccumulatorAndEval(plyDataPtr->mEval);
+            return mBoard.inCheck() ? 0 : updateAccumulatorAndEval(plyDataPtr->eval);
 
-        const i32 eval = updateAccumulatorAndEval(plyDataPtr->mEval);
+        const i32 eval = updateAccumulatorAndEval(plyDataPtr->eval);
 
         const int improving = ply <= 1 || mBoard.inCheck() || mBoard.inCheck2PliesAgo()
                               ? 0
-                              : eval - (plyDataPtr - 2)->mEval >= improvingThreshold()
+                              : eval - (plyDataPtr - 2)->eval >= improvingThreshold()
                               ? 1
-                              : eval - (plyDataPtr - 2)->mEval <= -improvingThreshold()
+                              : eval - (plyDataPtr - 2)->eval <= -improvingThreshold()
                               ? -1
                               : 0;
 
-        (plyDataPtr + 1)->mKiller = MOVE_NONE;
+        (plyDataPtr + 1)->killer = MOVE_NONE;
 
         // Node pruning
-        if (!pvNode && !mBoard.inCheck() && !singular) 
+        if (!pvNode && !mBoard.inCheck() && singularMove == MOVE_NONE) 
         {
             // RFP (Reverse futility pruning) / Static NMP
             if (depth <= rfpMaxDepth() 
@@ -452,17 +467,14 @@ class SearchThread {
         // IIR (Internal iterative reduction)
         if (depth >= iirMinDepth() 
         && (ttMove == MOVE_NONE || ttEntry.depth() < depth - iirMinDepth()) 
-        && !singular 
+        && singularMove == MOVE_NONE 
         && (pvNode || cutNode))
             depth--;
 
+        const bool lmrImproving = ply > 1 && !mBoard.inCheck() && !mBoard.inCheck2PliesAgo() 
+                                  && eval > (plyDataPtr - 2)->eval;
+
         const int stm = (int)mBoard.sideToMove();
-
-        // gen and score all moves, except underpromotions
-        if (!singular) plyDataPtr->genAndScoreMoves(mBoard, ttMove, mMovesHistory);
-
-        assert(!singular || plyDataPtr->mCurrentMoveIdx == 0);
-
         int legalMovesSeen = 0;
         i32 bestScore = -INF;
         Move bestMove = MOVE_NONE;
@@ -472,21 +484,35 @@ class SearchThread {
         ArrayVec<Move, 256> failLowQuiets;
         ArrayVec<i16*, 256> failLowNoisiesHistory;
 
-        const bool lmrImproving = ply > 1 && !mBoard.inCheck() && !mBoard.inCheck2PliesAgo() 
-                                  && eval > (plyDataPtr - 2)->mEval;
-
         // Moves loop
-        for (auto [move, moveScore] = plyDataPtr->nextMove(mBoard); 
-             move != MOVE_NONE; 
-             std::tie(move, moveScore) = plyDataPtr->nextMove(mBoard))
-        {
-            legalMovesSeen++;
 
-            const PieceType captured = mBoard.captured(move);
-            const bool isQuiet = captured == PieceType::NONE && move.promotion() == PieceType::NONE;
+        MovePicker movePicker = MovePicker(false);
+        Move move;
+
+        while ((move = movePicker.next(mBoard, ttMove, plyDataPtr->killer, mMovesHistory, singularMove)) != MOVE_NONE)
+        {
+            assert(move != singularMove);
+
+            legalMovesSeen++;
+            const bool isQuiet = mBoard.isQuiet(move);
+
+            assert([&]() {
+                const MoveGenStage stage = movePicker.stage();
+
+                return stage == MoveGenStage::TT_MOVE_YIELDED 
+                       ? move == ttMove && legalMovesSeen == 1
+                       : stage == MoveGenStage::KILLER_YIELDED 
+                       ? move == plyDataPtr->killer && isQuiet
+                       : (isQuiet ? stage == MoveGenStage::QUIETS
+                                  : stage == MoveGenStage::GOOD_NOISIES || stage == MoveGenStage::BAD_NOISIES
+                         );
+            }());
 
             // Moves loop pruning
-            if (ply > 0 && bestScore > -MIN_MATE_SCORE && legalMovesSeen >= 3 && moveScore < KILLER_SCORE)
+            if (ply > 0 
+            && bestScore > -MIN_MATE_SCORE 
+            && legalMovesSeen >= 3 
+            && (movePicker.stage() == MoveGenStage::QUIETS || movePicker.stage() == MoveGenStage::BAD_NOISIES))
             {
                 // LMP (Late move pruning)
                 if (legalMovesSeen >= lmpMinMoves() + pvNode + mBoard.inCheck()
@@ -525,7 +551,7 @@ class SearchThread {
                 // search this node at a shallower depth with TT move excluded
 
                 const i32 singularScore = search(
-                    (depth - 1) / 2, ply, singularBeta - 1, singularBeta, cutNode, doubleExtsLeft, true);
+                    (depth - 1) / 2, ply, singularBeta - 1, singularBeta, cutNode, doubleExtsLeft, ttMove);
 
                 // Double extension
                 if (!pvNode && singularScore < singularBeta - doubleExtensionMargin() && doubleExtsLeft > 0) {
@@ -541,8 +567,6 @@ class SearchThread {
                 // Negative extension
                 else if (cutNode)
                     newDepth -= 2;
-                    
-                plyDataPtr->mCurrentMoveIdx = 0; // reset since the singular search used this
             }
 
             const u64 nodesBefore = mNodes;
@@ -550,6 +574,9 @@ class SearchThread {
 
             int pt = (int)move.pieceType();
             HistoryEntry &historyEntry = mMovesHistory[stm][pt][move.to()];
+
+            i16* noisyHistoryPtr;
+            if (!isQuiet) noisyHistoryPtr = historyEntry.noisyHistoryPtr(mBoard.captured());
 
             i32 score = 0;
 
@@ -559,17 +586,20 @@ class SearchThread {
             // PVS (Principal variation search)
 
             // LMR (Late move reductions)
-            if (depth >= 2 && !mBoard.inCheck() && legalMovesSeen >= 2 && moveScore < KILLER_SCORE)
+            if (depth >= 2 
+            && !mBoard.inCheck() 
+            && legalMovesSeen >= 2 
+            && (movePicker.stage() == MoveGenStage::QUIETS || movePicker.stage() == MoveGenStage::BAD_NOISIES))
             {
                 i32 lmr = LMR_TABLE[isQuiet][depth][legalMovesSeen]
                           - pvNode       // reduce pv nodes less
                           - lmrImproving // reduce less if were improving
                           + 2 * cutNode; // reduce more if we expect to fail high
-                
+
                 // reduce moves with good history less and vice versa
                 lmr -= round(
-                    isQuiet ? moveScore / (float)lmrQuietHistoryDiv()
-                            : historyEntry.noisyHistory(captured) / (float)lmrNoisyHistoryDiv()
+                    isQuiet ? float(movePicker.moveScore()) / (float)lmrQuietHistoryDiv()
+                            : float(*noisyHistoryPtr) / (float)lmrNoisyHistoryDiv()
                 );
 
                 if (lmr < 0) lmr = 0; // dont extend
@@ -608,8 +638,8 @@ class SearchThread {
                 if (isQuiet) 
                     failLowQuiets.push_back(move);
                 else
-                    failLowNoisiesHistory.push_back(historyEntry.noisyHistoryPtr(captured));
-                
+                    failLowNoisiesHistory.push_back(noisyHistoryPtr);
+
                 continue;
             }
 
@@ -618,7 +648,15 @@ class SearchThread {
             isBestMoveQuiet = isQuiet;
             bound = Bound::EXACT;
 
-            if (pvNode) plyDataPtr->updatePV(move);
+            // If PV node, update PV line
+            if (pvNode) { 
+                plyDataPtr->pvLine.clear();
+                plyDataPtr->pvLine.push_back(move);
+
+                // Copy child's PV line
+                for (const Move move : (plyDataPtr + 1)->pvLine)
+                    plyDataPtr->pvLine.push_back(move);
+            }
 
             if (score < beta) continue;
 
@@ -635,41 +673,48 @@ class SearchThread {
 
             if (!isQuiet) {
                 // History bonus: increase this move's history
-                updateHistory(historyEntry.noisyHistoryPtr(captured), bonus);
+                updateHistory(noisyHistoryPtr, bonus);
                 break;
             }
 
             // This move is a fail high quiet
 
-            plyDataPtr->mKiller = move;
-            
+            plyDataPtr->killer = move;
+            const Color nstm = mBoard.oppSide();
+
+            if (failLowQuiets.size() > 0)
+                // Calling attacks(nstm) will cache enemy attacks and speedup isSquareAttacked()
+                mBoard.attacks(nstm);
+
             const std::array<Move, 3> lastMoves = { 
                 mBoard.lastMove(), mBoard.nthToLastMove(2), mBoard.nthToLastMove(4) 
             };
-            
+
             // History bonus: increase this move's history
             historyEntry.updateQuietHistories(
-                plyDataPtr->mEnemyAttacks & bitboard(move.from()), 
-                plyDataPtr->mEnemyAttacks & bitboard(move.to()), 
-                lastMoves,
-                bonus);
+                mBoard.isSquareAttacked(move.from(), nstm), 
+                mBoard.isSquareAttacked(move.to(),   nstm),
+                lastMoves, 
+                bonus
+            );
 
             // History malus: decrease history of fail low quiets
             for (const Move failLow : failLowQuiets) {
                 pt = (int)failLow.pieceType();
 
                 mMovesHistory[stm][pt][failLow.to()].updateQuietHistories(
-                    plyDataPtr->mEnemyAttacks & bitboard(failLow.from()), 
-                    plyDataPtr->mEnemyAttacks & bitboard(failLow.to()),  
+                    mBoard.isSquareAttacked(failLow.from(), nstm),
+                    mBoard.isSquareAttacked(failLow.to(),   nstm),
                     lastMoves,
-                    malus);
+                    malus
+                );
             }
 
             break;
         }
 
         if (legalMovesSeen == 0) {
-            if (singular) return alpha;
+            if (singularMove != MOVE_NONE) return alpha;
 
             assert(!mBoard.hasLegalMove());
 
@@ -679,7 +724,7 @@ class SearchThread {
 
         assert(mBoard.hasLegalMove());
 
-        if (!singular) {
+        if (singularMove == MOVE_NONE) {
             // Store in TT
             (*ttPtr)[ttEntryIdx].update(mBoard.zobristHash(), depth, ply, bestScore, bestMove, bound, mTTAge);
 
@@ -736,33 +781,47 @@ class SearchThread {
 
         // Max ply cutoff
         if (ply >= mMaxDepth)
-            return mBoard.inCheck() ? 0 : updateAccumulatorAndEval(plyDataPtr->mEval);
+            return mBoard.inCheck() ? 0 : updateAccumulatorAndEval(plyDataPtr->eval);
 
-        const i32 eval = updateAccumulatorAndEval(plyDataPtr->mEval);
+        const i32 eval = updateAccumulatorAndEval(plyDataPtr->eval);
 
         if (!mBoard.inCheck()) {
             if (eval >= beta) return eval; 
             if (eval > alpha) alpha = eval;
-
-            // not in check, generate and score noisy moves (except underpromotions)
-            plyDataPtr->genAndScoreNoisyMoves(mBoard);
         }
-        else 
-            // in check, generate and score all moves (except underpromotions)
-            plyDataPtr->genAndScoreMoves(mBoard, ttHit ? Move(ttEntry.move) : MOVE_NONE, mMovesHistory);
-        
         
         i32 bestScore = mBoard.inCheck() ? -INF : eval;
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::UPPER;
 
         // Moves loop
-        for (auto [move, moveScore] = plyDataPtr->nextMove(mBoard); 
-             move != MOVE_NONE; 
-             std::tie(move, moveScore) = plyDataPtr->nextMove(mBoard))
+
+        MovePicker movePicker = MovePicker(!mBoard.inCheck());
+        Move move;
+        const Move ttMove = !ttHit || !mBoard.inCheck() ? MOVE_NONE : Move(ttEntry.move);
+
+        while ((move = movePicker.next(mBoard, ttMove, plyDataPtr->killer, mMovesHistory)) != MOVE_NONE)
         {
+            assert([&]() {
+                const MoveGenStage stage = movePicker.stage();
+                const bool isNoisiesStage = stage == MoveGenStage::GOOD_NOISIES || stage == MoveGenStage::BAD_NOISIES;
+                const bool isQuiet = mBoard.isQuiet(move);
+
+                if (!mBoard.inCheck() && isQuiet) 
+                    return false;
+
+                if (mBoard.inCheck())
+                    return stage == MoveGenStage::TT_MOVE_YIELDED
+                           ? move == ttMove
+                           : stage == MoveGenStage::KILLER_YIELDED 
+                           ? move == plyDataPtr->killer && isQuiet
+                           : (isQuiet ? stage == MoveGenStage::QUIETS : isNoisiesStage);
+
+                return isNoisiesStage && !isQuiet;
+            }());
+
             // If in check, skip quiets and bad noisy moves
-            if (mBoard.inCheck() && bestScore > -MIN_MATE_SCORE && moveScore <= KILLER_SCORE)
+            if (mBoard.inCheck() && bestScore > -MIN_MATE_SCORE && int(movePicker.stage()) > int(MoveGenStage::GOOD_NOISIES))
                 break;
 
             // If not in check, skip bad noisy moves
@@ -811,16 +870,22 @@ class SearchThread {
     {
         PlyData* plyDataPtr = &mPliesData[ply];
 
-        // generate and score noisy moves (except underpromotions)
-        plyDataPtr->genAndScoreNoisyMoves(mBoard, ttMove);
-
         // Moves loop
-        for (auto [move, moveScore] = plyDataPtr->nextMove(mBoard); 
-             move != MOVE_NONE; 
-             std::tie(move, moveScore) = plyDataPtr->nextMove(mBoard))
+
+        MovePicker movePicker = MovePicker(true);
+        Move move;
+
+        while ((move = movePicker.next(mBoard, ttMove, plyDataPtr->killer, mMovesHistory)) != MOVE_NONE)
         {
+            assert(movePicker.stage() == MoveGenStage::TT_MOVE_YIELDED
+                ? move == ttMove
+                : movePicker.stage() == MoveGenStage::GOOD_NOISIES || movePicker.stage() == MoveGenStage::BAD_NOISIES
+            );
+
+            assert(!mBoard.isQuiet(move));
+
             // SEE pruning (skip bad noisy moves)
-            if (!mBoard.SEE(move, probcutBeta - plyDataPtr->mEval)) 
+            if (!mBoard.SEE(move, probcutBeta - plyDataPtr->eval)) 
                 continue;
 
             makeMove(move, ply + 1);

@@ -2,7 +2,8 @@
 
 #pragma once
 
-inline void updateHistory(i16* history, const i32 bonus) {
+inline void updateHistory(i16* history, const i32 bonus) 
+{
     *history += bonus - abs(bonus) * i32(*history) / historyMax();
     assert(*history >= -historyMax() && *history <= historyMax());
 }

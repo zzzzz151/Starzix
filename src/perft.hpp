@@ -9,19 +9,19 @@ inline u64 perft(Board &board, const int depth)
     if (depth <= 0) return 1;
 
     ArrayVec<Move, 256> moves;
-    board.pseudolegalMoves(moves);
+    board.pseudolegalMoves(moves, MoveGenType::ALL);
+
     u64 nodes = 0;
-    const u64 pinned = board.pinned();
 
     if (depth == 1) {
          for (const Move move : moves)
-            nodes += board.isPseudolegalLegal(move, pinned);
+            nodes += board.isPseudolegalLegal(move);
 
         return nodes;
     }
 
-    for (const Move move : moves)
-        if (board.isPseudolegalLegal(move, pinned))
+    for (const Move move : moves) 
+        if (board.isPseudolegalLegal(move))
         {
             board.makeMove(move);
             nodes += perft(board, depth - 1);
@@ -40,20 +40,20 @@ inline void perftSplit(Board &board, const int depth)
               << std::endl;
 
     ArrayVec<Move, 256> moves;
-    board.pseudolegalMoves(moves);
+    board.pseudolegalMoves(moves, MoveGenType::ALL);
+
     u64 totalNodes = 0;
-    const u64 pinned = board.pinned();
 
     if (depth == 1) {
         for (const Move move : moves)
-            if (board.isPseudolegalLegal(move, pinned))
+            if (board.isPseudolegalLegal(move))
                 std::cout << move.toUci() << ": 1" << std::endl;   
 
         return;
     }
 
     for (const Move move : moves) 
-        if (board.isPseudolegalLegal(move, pinned))
+        if (board.isPseudolegalLegal(move))
         {
             board.makeMove(move);
             const u64 nodes = perft(board, depth - 1);
