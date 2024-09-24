@@ -59,13 +59,13 @@ struct MovePicker {
         Move move = MOVE_NONE;
 
         assert(killer == MOVE_NONE || board.isQuiet(killer));
-        assert(ttMove == MOVE_NONE || excludedMove == MOVE_NONE);
 
         switch (mStage) 
         {
         case MoveGenStage::TT_MOVE_NEXT:
         {
-            if (!(mNoisiesOnly && ttMove != MOVE_NONE && board.isQuiet(ttMove)) 
+            if (ttMove != excludedMove
+            && !(mNoisiesOnly && ttMove != MOVE_NONE && board.isQuiet(ttMove)) 
             && board.isPseudolegal(ttMove) 
             && board.isPseudolegalLegal(ttMove))
             {
@@ -92,7 +92,6 @@ struct MovePicker {
             {
                 move = mNoisies[i];
                 assert(!board.isQuiet(move));
-                assert(move != killer);
 
                 // Assert no underpromotions
                 assert(move.promotion() == PieceType::NONE || move.promotion() == PieceType::QUEEN);

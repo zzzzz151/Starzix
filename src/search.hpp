@@ -807,9 +807,6 @@ class SearchThread {
                 const bool isNoisiesStage = stage == MoveGenStage::GOOD_NOISIES || stage == MoveGenStage::BAD_NOISIES;
                 const bool isQuiet = mBoard.isQuiet(move);
 
-                if (!mBoard.inCheck() && isQuiet) 
-                    return false;
-
                 if (mBoard.inCheck())
                     return stage == MoveGenStage::TT_MOVE_YIELDED
                            ? move == ttMove
