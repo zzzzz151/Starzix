@@ -36,11 +36,11 @@ TunableParam<float> evalMaterialScaleMax = TunableParam<float>(1.02, 1.0, 1.5, 0
 constexpr i32 MATERIAL_MAX = 62;
 
 // SEE
-TunableParam<i32> seePawnValue  = TunableParam<i32>(156, 1, 201, 50);
-TunableParam<i32> seeMinorValue = TunableParam<i32>(346, 150, 450, 50);
-TunableParam<i32> seeRookValue  = TunableParam<i32>(519, 300, 700, 50);
-TunableParam<i32> seeQueenValue = TunableParam<i32>(1079 , 600, 1200, 100);
-TunableParam<float> seeNoisyHistMul = TunableParam<float>(0.25, 0.0, 0.5, 0.1);
+TunableParam<i32> seePawnValue    = TunableParam<i32>(156, 1, 201, 50);
+TunableParam<i32> seeMinorValue   = TunableParam<i32>(346, 150, 450, 50);
+TunableParam<i32> seeRookValue    = TunableParam<i32>(519, 300, 700, 50);
+TunableParam<i32> seeQueenValue   = TunableParam<i32>(1079 , 600, 1200, 100);
+TunableParam<i32> seeNoisyHistDiv = TunableParam<i32>(16, 2, 32, 2);
 
 // Aspiration windows
 TunableParam<i32>    aspMinDepth        = TunableParam<i32>(6, 6, 10, 1);
@@ -142,7 +142,7 @@ tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
     {stringify(seeMinorValue), &seeMinorValue},
     {stringify(seeRookValue), &seeRookValue},
     {stringify(seeQueenValue), &seeQueenValue},
-    {stringify(seeNoisyHistMul), &seeNoisyHistMul},
+    {stringify(seeNoisyHistDiv), &seeNoisyHistDiv},
     {stringify(aspMinDepth), &aspMinDepth},
     {stringify(aspInitialDelta), &aspInitialDelta},
     {stringify(aspDeltaMultiplier), &aspDeltaMultiplier},
