@@ -35,6 +35,13 @@ TunableParam<float> evalMaterialScaleMin = TunableParam<float>(0.7, 0.5, 1.0, 0.
 TunableParam<float> evalMaterialScaleMax = TunableParam<float>(1.02, 1.0, 1.5, 0.1);
 constexpr i32 MATERIAL_MAX = 62;
 
+// SEE
+TunableParam<i32> seePawnValue  = TunableParam<i32>(156, 1, 201, 50);
+TunableParam<i32> seeMinorValue = TunableParam<i32>(346, 150, 450, 50);
+TunableParam<i32> seeRookValue  = TunableParam<i32>(519, 300, 700, 50);
+TunableParam<i32> seeQueenValue = TunableParam<i32>(1079 , 600, 1200, 100);
+TunableParam<float> seeNoisyHistMul = TunableParam<float>(0.25, 0.0, 0.5, 0.1);
+
 // Aspiration windows
 TunableParam<i32>    aspMinDepth        = TunableParam<i32>(6, 6, 10, 1);
 TunableParam<i32>    aspInitialDelta    = TunableParam<i32>(13, 5, 25, 5);
@@ -119,12 +126,6 @@ TunableParam<float> contHist4PlyWeight = TunableParam<float>(0.47, 0.2, 4.0, 0.2
 TunableParam<i32> corrHistScale = TunableParam<i32>(292, 50, 550, 50);
 TunableParam<i32> corrHistMax   = TunableParam<i32>(16384, 4096, 24576, 2048);
 
-// SEE piece values
-TunableParam<i32> seePawnValue  = TunableParam<i32>(156, 1, 201, 50);
-TunableParam<i32> seeMinorValue = TunableParam<i32>(346, 150, 450, 50);
-TunableParam<i32> seeRookValue  = TunableParam<i32>(519, 300, 700, 50);
-TunableParam<i32> seeQueenValue = TunableParam<i32>(1079 , 600, 1200, 100);
-
 using TunableParamVariant = std::variant<
     TunableParam<u64>*,
     TunableParam<i32>*, 
@@ -137,6 +138,11 @@ tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
     {stringify(softTimePercentage), &softTimePercentage},
     {stringify(evalMaterialScaleMin), &evalMaterialScaleMin},
     {stringify(evalMaterialScaleMax), &evalMaterialScaleMax},
+    {stringify(seePawnValue), &seePawnValue},
+    {stringify(seeMinorValue), &seeMinorValue},
+    {stringify(seeRookValue), &seeRookValue},
+    {stringify(seeQueenValue), &seeQueenValue},
+    {stringify(seeNoisyHistMul), &seeNoisyHistMul},
     {stringify(aspMinDepth), &aspMinDepth},
     {stringify(aspInitialDelta), &aspInitialDelta},
     {stringify(aspDeltaMultiplier), &aspDeltaMultiplier},
@@ -184,8 +190,4 @@ tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
     {stringify(contHist4PlyWeight), &contHist4PlyWeight},
     {stringify(corrHistScale), &corrHistScale},
     {stringify(corrHistMax), &corrHistMax},
-    {stringify(seePawnValue), &seePawnValue},
-    {stringify(seeMinorValue), &seeMinorValue},
-    {stringify(seeRookValue), &seeRookValue},
-    {stringify(seeQueenValue), &seeQueenValue}
 };
