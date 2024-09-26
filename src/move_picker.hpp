@@ -56,9 +56,10 @@ struct MovePicker {
     inline Move next(Board &board, const Move ttMove, const Move killer, 
         const MultiArray<HistoryEntry, 2, 6, 64> &movesHistory, Move excludedMove = MOVE_NONE) 
     {
-        Move move = MOVE_NONE;
-
         assert(killer == MOVE_NONE || board.isQuiet(killer));
+
+        Move move = MOVE_NONE;
+        const int stm = int(board.sideToMove());
 
         switch (mStage) 
         {
@@ -105,15 +106,21 @@ struct MovePicker {
 
                 constexpr i32 GOOD_NOISY_SCORE = 1'000'000;
 
-                mNoisiesScores[i] = mNoisiesOnly 
-                                    ? (move.promotion() == PieceType::QUEEN ? 1'000'000 : 0)
-                                    : (board.SEE(move)
-                                       ? (move.promotion() == PieceType::QUEEN ? GOOD_NOISY_SCORE * 2 : GOOD_NOISY_SCORE)
-                                       : -GOOD_NOISY_SCORE
-                                      );
+                const PieceType captured = board.captured(move);
+
+                if (mNoisiesOnly)
+                    mNoisiesScores[i] = move.promotion() == PieceType::QUEEN ? 1'000'000 : 0;
+                else if (move.promotion() == PieceType::QUEEN)
+                    mNoisiesScores[i] = board.SEE(move, 0) ? GOOD_NOISY_SCORE * 2 : -GOOD_NOISY_SCORE;
+                else {
+                    const int pt = int(move.pieceType());
+                    const i32 noisyHist = movesHistory[stm][pt][move.to()].noisyHistory(captured);
+
+                    mNoisiesScores[i] = board.SEE(move, -noisyHist / seeNoisyHistDiv()) ? GOOD_NOISY_SCORE : -GOOD_NOISY_SCORE;
+                }
 
                 // MVVLVA (most valuable victim, least valuable attacker)
-                mNoisiesScores[i] += 100 * (i32)board.captured(move) - (i32)move.pieceType();
+                mNoisiesScores[i] += 100 * (i32)captured - (i32)move.pieceType();
 
                 i++;
             }
@@ -162,7 +169,6 @@ struct MovePicker {
             // Generate pseudolegal quiet moves (underpromotions excluded)
             board.pseudolegalMoves(mQuiets, MoveGenType::QUIETS, false);
 
-            const int stm = int(board.sideToMove());
             const Color nstm = board.oppSide();
 
             const std::array<Move, 3> lastMoves = { 
