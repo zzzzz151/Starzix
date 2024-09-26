@@ -114,9 +114,9 @@ struct MovePicker {
                     mNoisiesScores[i] = board.SEE(move, 0) ? GOOD_NOISY_SCORE * 2 : -GOOD_NOISY_SCORE;
                 else {
                     const int pt = int(move.pieceType());
+                    const float noisyHist = movesHistory[stm][pt][move.to()].noisyHistory(captured);
 
-                    mNoisiesScores[i] = board.SEE(move, movesHistory[stm][pt][move.to()].noisyHistory(captured) * seeNoisyHistMul())
-                                        ? GOOD_NOISY_SCORE : -GOOD_NOISY_SCORE;
+                    mNoisiesScores[i] = board.SEE(move, -noisyHist * seeNoisyHistMul()) ? GOOD_NOISY_SCORE : -GOOD_NOISY_SCORE;
                 }
 
                 // MVVLVA (most valuable victim, least valuable attacker)
