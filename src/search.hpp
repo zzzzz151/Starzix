@@ -300,7 +300,7 @@ class SearchThread {
                 if (corrHist != nullptr) 
                     correction += i32(*corrHist);
 
-            eval += correction / corrHistScale();
+            eval += correction / corrHistDiv();
 
             // Clamp to avoid false mate scores and invalid scores
             eval = std::clamp(eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
