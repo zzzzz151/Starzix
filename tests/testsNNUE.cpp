@@ -55,8 +55,8 @@ int main()
     for (const auto& [fen, expectedEval] : FENS_EVAL) 
     {
         const Board board = Board(fen);
-        const BothAccumulators acc = BothAccumulators(board);
-        const auto eval = nnue::evaluate(&acc, board.sideToMove());
+        const BothAccumulators bothAccs = BothAccumulators(board);
+        const auto eval = nnue::evaluate(&bothAccs, board.sideToMove());
 
         if (eval != expectedEval) 
             std::cout << "Expected eval " << expectedEval

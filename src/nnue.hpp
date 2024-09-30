@@ -44,9 +44,8 @@ struct Net {
     // [color][hiddenNeuronIdx]
     alignas(sizeof(Vec)) MultiArray<i16, 2, HIDDEN_LAYER_SIZE> hiddenBiases;
 
-    // [hiddenNeuronIdx]
-    alignas(sizeof(Vec)) std::array<i16, HIDDEN_LAYER_SIZE> outputWeightsStm;
-    alignas(sizeof(Vec)) std::array<i16, HIDDEN_LAYER_SIZE> outputWeightsNstm;
+    // [0 = stm | 1 = nstm][hiddenNeuronIdx]
+    alignas(sizeof(Vec)) MultiArray<i16, 2, HIDDEN_LAYER_SIZE> outputWeights;
 
     i16 outputBias;
 };
@@ -204,12 +203,12 @@ struct BothAccumulators {
 
     public:
 
-    inline void update(BothAccumulators* oldAcc, const Board &board, FinnyTable &finnyTable)
+    inline void update(BothAccumulators* prevBothAccs, const Board &board, FinnyTable &finnyTable)
     {
-        assert(oldAcc->mUpdated && !mUpdated);
+        assert(prevBothAccs->mUpdated && !mUpdated);
 
-        mMirrorHorizontally = oldAcc->mMirrorHorizontally;
-        mInputBucket = oldAcc->mInputBucket;
+        mMirrorHorizontally = prevBothAccs->mMirrorHorizontally;
+        mInputBucket = prevBothAccs->mInputBucket;
 
         const Color colorMoving = board.oppSide();
         const Color notColorMoving = oppColor(colorMoving);
@@ -230,13 +229,13 @@ struct BothAccumulators {
             mMirrorHorizontally[iColorMoving] = (int)squareFile(to) >= (int)File::E;
 
         // Our input bucket may change if our HM toggled or if we captured a queen
-        if (mMirrorHorizontally[iColorMoving] != oldAcc->mMirrorHorizontally[iColorMoving] 
+        if (mMirrorHorizontally[iColorMoving] != prevBothAccs->mMirrorHorizontally[iColorMoving] 
         || board.captured() == PieceType::QUEEN)
             setInputBucket(colorMoving, board.getBb(notColorMoving, PieceType::QUEEN));
 
         // If our HM toggled or our input bucket changed, reset our accumulator
-        if  (mMirrorHorizontally[iColorMoving] != oldAcc->mMirrorHorizontally[iColorMoving]
-        || mInputBucket[iColorMoving] != oldAcc->mInputBucket[iColorMoving])
+        if  (mMirrorHorizontally[iColorMoving] != prevBothAccs->mMirrorHorizontally[iColorMoving]
+        || mInputBucket[iColorMoving] != prevBothAccs->mInputBucket[iColorMoving])
             updateFinnyEntryAndAccumulator(finnyTable, colorMoving, board);
 
         // If our queen moved or we promoted to a queen, enemy's input bucket may have changed
@@ -245,7 +244,7 @@ struct BothAccumulators {
             setInputBucket(notColorMoving, board.getBb(colorMoving, PieceType::QUEEN));
 
             // If their input bucket changed, reset their accumulator
-            if  (mInputBucket[!iColorMoving] != oldAcc->mInputBucket[!iColorMoving])
+            if  (mInputBucket[!iColorMoving] != prevBothAccs->mInputBucket[!iColorMoving])
                 updateFinnyEntryAndAccumulator(finnyTable, notColorMoving, board);
         }
 
@@ -257,7 +256,7 @@ struct BothAccumulators {
             const auto inputBucket = mInputBucket[color];
 
             // No need to update this color's accumulator if we just reset it
-            if (hm != oldAcc->mMirrorHorizontally[color] || inputBucket != oldAcc->mInputBucket[color]) 
+            if (hm != prevBothAccs->mMirrorHorizontally[color] || inputBucket != prevBothAccs->mInputBucket[color]) 
                 continue;
 
             const auto subPieceFeature768 = feature768(colorMoving, pieceType, from, hm);
@@ -270,7 +269,7 @@ struct BothAccumulators {
 
                 for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
                     mAccumulators[color][i] = 
-                        oldAcc->mAccumulators[color][i]
+                        prevBothAccs->mAccumulators[color][i]
                         - NET->featuresWeights[color][inputBucket][subPieceFeature768][i]  
                         + NET->featuresWeights[color][inputBucket][addPieceFeature768][i]
                         - NET->featuresWeights[color][inputBucket][subCapturedFeature768][i];
@@ -283,7 +282,7 @@ struct BothAccumulators {
 
                 for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
                     mAccumulators[color][i] = 
-                        oldAcc->mAccumulators[color][i] 
+                        prevBothAccs->mAccumulators[color][i] 
                         - NET->featuresWeights[color][inputBucket][subPieceFeature768][i]  
                         + NET->featuresWeights[color][inputBucket][addPieceFeature768][i]
                         - NET->featuresWeights[color][inputBucket][subRookFeature768][i]  
@@ -292,7 +291,7 @@ struct BothAccumulators {
             else {
                 for (int i = 0; i < HIDDEN_LAYER_SIZE; i++) 
                     mAccumulators[color][i] = 
-                        oldAcc->mAccumulators[color][i]
+                        prevBothAccs->mAccumulators[color][i]
                         - NET->featuresWeights[color][inputBucket][subPieceFeature768][i]  
                         + NET->featuresWeights[color][inputBucket][addPieceFeature768][i];
             }
@@ -303,9 +302,9 @@ struct BothAccumulators {
 
 }; // struct BothAccumulators
 
-inline i32 evaluate(const BothAccumulators* accumulator, const Color sideToMove)
+inline i32 evaluate(const BothAccumulators* bothAccs, const Color sideToMove)
 {
-    assert(accumulator->mUpdated);
+    assert(bothAccs->mUpdated);
 
     const int stm = (int)sideToMove;
     i32 sum = 0;
@@ -314,60 +313,46 @@ inline i32 evaluate(const BothAccumulators* accumulator, const Color sideToMove)
     // SCReLU(hiddenNeuron) = clamp(hiddenNeuron, 0, QA)^2
 
     #if defined(__AVX2__) || (defined(__AVX512F__) && defined(__AVX512BW__))
-        // N is 32 if avx512 else 16 if avx2
+        // N is 16 and 32 for avx2 and avx512, respectively
 
         const Vec vecZero = setEpi16(0);  // N i16 zeros
         const Vec vecQA   = setEpi16(QA); // N i16 QA's
         Vec vecSum = vecZero; // N/2 i32 zeros, the total running sum
 
-        // Takes N i16 hidden neurons, along with N i16 output weights
-        // Activates the hidden neurons (SCReLU) and multiplies each with its output weight
-        // End result is N/2 i32's, which are summed to 'vecSum'
-        auto sumSlice = [&](const i16 &accumulatorStart, const i16 &outputWeightsStart) -> void
-        {
-            // Load N hidden neurons and clamp them to [0, QA]
-            Vec hiddenNeurons = loadVec((Vec*)&accumulatorStart);
-            hiddenNeurons = clampVec(hiddenNeurons, vecZero, vecQA);
+        for (const int color : {stm, 1 - stm})
+            for (int i = 0; i < HIDDEN_LAYER_SIZE; i += sizeof(Vec) / sizeof(i16))
+            {
+                // Load the next N hidden neurons and clamp them to [0, QA]
+                const i16 &accStart = bothAccs->mAccumulators[color][i];
+                Vec hiddenNeurons = loadVec((Vec*)&accStart);
+                hiddenNeurons = clampVec(hiddenNeurons, vecZero, vecQA);
 
-            // Load the respective N output weights
-            Vec outputWeights = loadVec((Vec*)&outputWeightsStart);
+                // Load the respective N output weights
+                const i16 &outputWeightsStart = NET->outputWeights[color != stm][i];
+                const Vec outputWeights = loadVec((Vec*)&outputWeightsStart);
 
-            // Multiply each hidden neuron with its respective output weight
-            // We use mullo, which multiplies in the i32 world but returns the results as i16's
-            // since we know the results fit in an i16
-            Vec result = mulloEpi16(hiddenNeurons, outputWeights);
+                // Multiply each hidden neuron with its respective output weight
+                // We use mullo, which multiplies in the i32 world but returns the results as i16's
+                // since we know the results fit in an i16
+                Vec result = mulloEpi16(hiddenNeurons, outputWeights);
 
-            // Multiply with hidden neurons again (square part of SCReLU)
-            // We use madd, which multiplies in the i32 world and adds adjacent pairs
-            // 'result' becomes N/2 i32's
-            result = maddEpi16(result, hiddenNeurons);
+                // Multiply with hidden neurons again (square part of SCReLU activation)
+                // We use madd, which multiplies in the i32 world and adds adjacent pairs
+                // 'result' becomes N/2 i32's
+                result = maddEpi16(result, hiddenNeurons);
 
-            vecSum = addEpi32(vecSum, result); // Add 'result' to 'vecSum'
-        };
-
-        for (int i = 0; i < HIDDEN_LAYER_SIZE; i += sizeof(Vec) / sizeof(i16))
-        {
-            // From each accumulator, take the next N i16 hidden neurons 
-            // and their i16 output weights (1 per hidden neuron, so N)
-            sumSlice(accumulator->mAccumulators[stm][i], NET->outputWeightsStm[i]);
-            sumSlice(accumulator->mAccumulators[!stm][i], NET->outputWeightsNstm[i]);
-        }
+                vecSum = addEpi32(vecSum, result); // Add 'result' to 'vecSum'
+            }
 
         sum = sumVec(vecSum); // Add the N/2 i32's to get final sum (i32)
     #else
-        for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
-        {
-            const i16 clipped = std::clamp<i16>(accumulator->mAccumulators[stm][i], 0, QA);
-            const i16 x = clipped * NET->outputWeightsStm[i];
-            sum += x * clipped;
-        }
-
-        for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
-        {
-            const i16 clipped = std::clamp<i16>(accumulator->mAccumulators[!stm][i], 0, QA);
-            const i16 x = clipped * NET->outputWeightsNstm[i];
-            sum += x * clipped;
-        }
+        for (const int color : {stm, 1 - stm})
+            for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
+            {
+                const i16 clipped = std::clamp<i16>(bothAccs->mAccumulators[color][i], 0, QA);
+                const i16 x = clipped * NET->outputWeights[color != stm][i];
+                sum += x * clipped;
+            }
     #endif
 
     return (sum / QA + NET->outputBias) * SCALE / (QA * QB);
