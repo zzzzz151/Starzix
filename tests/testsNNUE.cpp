@@ -52,8 +52,6 @@ int main()
     initUtils();
     initZobrist();
 
-    std::cout << "Testing BothAccumulators(Board) ..." << std::endl;
-
     for (const auto& [fen, expectedEval] : FENS_EVAL) 
     {
         const Board board = Board(fen);

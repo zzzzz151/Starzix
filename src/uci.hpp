@@ -158,12 +158,10 @@ inline void setoption(const std::vector<std::string> &tokens, std::vector<TTEntr
         while (gSearchThreads.size() > 1)
             gSearchThreads.pop_back();
 
-        while ((int)gSearchThreads.size() < numThreads)
+        while (int(gSearchThreads.size()) < numThreads)
             gSearchThreads.push_back(SearchThread(&tt));
 
         gSearchThreads.shrink_to_fit();
-
-        gMainThread = &gSearchThreads[0]; // push_back() or shrink_to_fit() may reallocate
 
         std::cout << "Threads set to " << numThreads << std::endl;
     }
@@ -215,42 +213,43 @@ inline void go(const std::vector<std::string> &tokens, const Board &board)
 {
     const std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
 
-    i32 maxDepth = MAX_DEPTH;
-    i64 milliseconds = I64_MAX;
+    u8 maxDepth = MAX_DEPTH;
+    i64 maxNodes = std::numeric_limits<i64>::max();
+    i64 milliseconds = std::numeric_limits<i64>::max();
     [[maybe_unused]] i64 incrementMs = 0;
     [[maybe_unused]] i64 movesToGo = 0;
     bool isMoveTime = false;
-    i64 maxNodes = I64_MAX;
 
-    for (int i = 1; i < (int)tokens.size() - 1; i += 2)
+    for (int i = 1; i < int(tokens.size()) - 1; i += 2)
     {
-        i64 value = std::stoll(tokens[i + 1]);
+        const i64 value = std::max<i64>(std::stoll(tokens[i + 1]), 0);
 
-        if ((tokens[i] == "wtime" && board.sideToMove() == Color::WHITE) 
-        ||  (tokens[i] == "btime" && board.sideToMove() == Color::BLACK))
-            milliseconds = std::max(value, (i64)0);
+        if (tokens[i] == "depth")
+            maxDepth = std::min<i64>(value, MAX_DEPTH);
+        else if (tokens[i] == "nodes")
+            maxNodes = value;
+
+        else if ((tokens[i] == "wtime" && board.sideToMove() == Color::WHITE) 
+        ||       (tokens[i] == "btime" && board.sideToMove() == Color::BLACK))
+            milliseconds = value;
 
         else if ((tokens[i] == "winc" && board.sideToMove() == Color::WHITE) 
         ||       (tokens[i] == "binc" && board.sideToMove() == Color::BLACK))
-            incrementMs = std::max(value, (i64)0);
+            incrementMs = value;
 
         else if (tokens[i] == "movestogo")
-            movesToGo = std::max(value, (i64)1);
+            movesToGo = std::max<i64>(value, 1);
         else if (tokens[i] == "movetime")
         {
-            milliseconds = std::max(value, (i64)0);
             isMoveTime = true;
+            milliseconds = value;
         }
-        else if (tokens[i] == "depth")
-            maxDepth = value;
-        else if (tokens[i] == "nodes")
-            maxNodes = value;
     }
 
     // Calculate search time limits
 
-    u64 hardMilliseconds = std::max((i64)0, milliseconds - 10);
-    u64 softMilliseconds = I64_MAX;
+    i64 hardMilliseconds = std::max<i64>(0, milliseconds - 10);
+    i64 softMilliseconds = std::numeric_limits<i64>::max();
 
     if (!isMoveTime) {
         hardMilliseconds *= hardTimePercentage();
@@ -264,18 +263,18 @@ inline void go(const std::vector<std::string> &tokens, const Board &board)
     for (u64 i = 1; i < gSearchThreads.size(); i++)
         threads.emplace_back([&, i]() {
             gSearchThreads[i].search(
-                board, maxDepth, startTime, hardMilliseconds, softMilliseconds, maxNodes);
+                board, maxDepth, maxNodes, startTime, hardMilliseconds, softMilliseconds);
         });
 
     // Main thread search
-    gMainThread->search(board, maxDepth, startTime, hardMilliseconds, softMilliseconds, maxNodes);
+    mainThreadPtr()->search(board, maxDepth, maxNodes, startTime, hardMilliseconds, softMilliseconds);
 
     // Wait for secondary threads
     for (auto &thread : threads)
         if (thread.joinable())
             thread.join();
 
-    std::cout << "bestmove " << gMainThread->bestMoveRoot().toUci() << std::endl;
+    std::cout << "bestmove " << mainThreadPtr()->bestMoveRoot().toUci() << std::endl;
 }
 
 } // namespace uci

@@ -33,24 +33,19 @@ inline u64 perft(Board &board, const int depth)
 
 inline void perftSplit(Board &board, const int depth)
 {
-    if (depth <= 0) return;
-
     std::cout << "Running split perft depth " << depth 
               << " on " << board.fen() 
               << std::endl;
+
+    if (depth <= 0) {
+        std::cout << "Total: 0" << std::endl;
+        return;
+    }
 
     ArrayVec<Move, 256> moves;
     board.pseudolegalMoves(moves, MoveGenType::ALL);
 
     u64 totalNodes = 0;
-
-    if (depth == 1) {
-        for (const Move move : moves)
-            if (board.isPseudolegalLegal(move))
-                std::cout << move.toUci() << ": 1" << std::endl;   
-
-        return;
-    }
 
     for (const Move move : moves) 
         if (board.isPseudolegalLegal(move))
@@ -65,15 +60,13 @@ inline void perftSplit(Board &board, const int depth)
     std::cout << "Total: " << totalNodes << std::endl;
 }
 
-inline u64 perftBench(Board &board, int depth)
+inline u64 perftBench(Board &board, const int depth)
 {
-    depth = std::max(depth, 0);
     const std::string fen = board.fen();
-
     std::cout << "Running perft depth " << depth << " on " << fen << std::endl;
 
     const std::chrono::steady_clock::time_point start =  std::chrono::steady_clock::now();
-    const u64 nodes = perft(board, depth);
+    const u64 nodes = depth > 0 ? perft(board, depth) : 0;
 
     std::cout << "perft depth " << depth 
               << " nodes " << nodes 

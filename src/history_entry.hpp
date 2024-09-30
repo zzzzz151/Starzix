@@ -36,7 +36,7 @@ struct HistoryEntry {
         for (size_t i = 0; i < moves.size(); i++)
             if ((move = moves[i]) != MOVE_NONE) 
             {
-                const int pt = (int)move.pieceType();
+                const int pt = int(move.pieceType());
                 total += float(mContHist[pt][move.to()]) * CONT_HISTORY_WEIGHTS[i];
             }
 
@@ -50,7 +50,7 @@ struct HistoryEntry {
 
         for (const Move move : moves) 
             if (move != MOVE_NONE) {
-                const int pt = (int)move.pieceType();
+                const int pt = int(move.pieceType());
                 updateHistory(mContHist[pt][move.to()], bonus);
             }
     }

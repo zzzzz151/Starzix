@@ -73,10 +73,16 @@ inline void bench(int depth = 14)
         SearchThread::sSearchStopped = false;
         
         searchThread.search(
-            board, depth, std::chrono::steady_clock::now(), I64_MAX, I64_MAX, I64_MAX);
+            board, 
+            depth, 
+            std::numeric_limits<i64>::max(), 
+            std::chrono::steady_clock::now(), 
+            std::numeric_limits<i64>::max(), 
+            std::numeric_limits<i64>::max()
+        );
 
         totalMilliseconds += searchThread.millisecondsElapsed();
-        totalNodes += searchThread.getNodes();
+        totalNodes += searchThread.nodes();
 
         searchThread.reset();
         resetTT(benchTT);

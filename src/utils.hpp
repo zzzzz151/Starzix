@@ -16,6 +16,7 @@
 #include <bit>
 #include <cmath>
 #include <type_traits>
+#include <limits>
 
 using size_t = size_t;
 using u8 = uint8_t;
@@ -27,9 +28,6 @@ using i8 = int8_t;
 using i16 = int16_t;
 using i32 = int32_t;
 using i64 = int64_t;
-
-constexpr i32 I32_MAX = 2147483647;
-constexpr i64 I64_MAX = 9223372036854775807;
 
 constexpr u64 ONES = 0xffff'ffff'ffff'ffff;
 
@@ -181,7 +179,7 @@ constexpr double ln(const double x) {
     return log(x);
 }
 
-inline auto millisecondsElapsed(const std::chrono::steady_clock::time_point start)
+inline u64 millisecondsElapsed(const std::chrono::steady_clock::time_point start)
 {
     return (std::chrono::steady_clock::now() - start) / std::chrono::milliseconds(1);
 }
