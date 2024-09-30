@@ -38,18 +38,19 @@ struct BoardState {
     Square enPassantSquare = SQUARE_NONE;
     u8 pliesSincePawnOrCapture = 0;
     u16 currentMoveCounter = 1;
-    u64 checkers = 0;
-    u64 zobristHash = 0;
-    u64 pawnsHash = 0;
-    std::array<u64, 2> nonPawnsHash = {}; // [pieceColor]
     u16 lastMove = MOVE_NONE.encoded();
     PieceType captured = PieceType::NONE;
+    u64 checkers = 0;
     u64 pinned = ONES;
     u64 enemyAttacks = 0;
+    u64 zobristHash = 0;
+    u64 pawnsHash = 0;
+    std::array<u64, 2> nonPawnsHashes = {}; // [pieceColor]
 } __attribute__((packed));
 
 class Board {
     private:
+
     std::vector<BoardState> mStates = {};
     BoardState* mState = nullptr;
 
@@ -206,6 +207,17 @@ class Board {
         return occupancy() & bitboard(square);
     }
 
+    inline Move lastMove() const { return mState->lastMove; }
+
+    inline Move nthToLastMove(const size_t n) const {
+        assert(n >= 1);
+
+        return n > mStates.size()
+               ? MOVE_NONE : Move(mStates[mStates.size() - n].lastMove);
+    }
+
+    inline PieceType captured() const { return mState->captured; }
+
     inline u64 checkers() const { return mState->checkers; }
 
     inline bool inCheck() const { return mState->checkers > 0; }
@@ -220,18 +232,7 @@ class Board {
 
     inline u64 pawnsHash() const { return mState->pawnsHash; }
 
-    inline u64 nonPawnsHash(Color color) const { return mState->nonPawnsHash[(int)color]; }
-
-    inline Move lastMove() const { return mState->lastMove; }
-
-    inline Move nthToLastMove(const size_t n) const {
-        assert(n >= 1);
-
-        return n > mStates.size()
-               ? MOVE_NONE : Move(mStates[mStates.size() - n].lastMove);
-    }
-
-    inline PieceType captured() const { return mState->captured; }
+    inline u64 nonPawnsHash(Color color) const { return mState->nonPawnsHashes[(int)color]; }
     
     inline PieceType pieceTypeAt(const Square square) const 
     { 
@@ -281,7 +282,7 @@ class Board {
         if (pieceType == PieceType::PAWN)
             mState->pawnsHash ^= ZOBRIST_PIECES[(int)color][(int)pieceType][square];
         else
-            mState->nonPawnsHash[(int)color] ^= ZOBRIST_PIECES[(int)color][(int)pieceType][square];
+            mState->nonPawnsHashes[(int)color] ^= ZOBRIST_PIECES[(int)color][(int)pieceType][square];
     }
 
     public:
@@ -417,13 +418,13 @@ class Board {
             return false;
 
         const int stateIdxAfterPawnOrCapture = 
-            std::max(0, (int)mStates.size() - (int)mState->pliesSincePawnOrCapture - 1);
+            std::max(0, int(mStates.size()) - int(mState->pliesSincePawnOrCapture) - 1);
 
-        const int rootStateIdx = (int)mStates.size() - searchPly - 1;
+        const int rootStateIdx = int(mStates.size()) - searchPly - 1;
         
         int count = 0;
 
-        for (int i = (int)mStates.size() - 3; i >= stateIdxAfterPawnOrCapture; i -= 2)
+        for (int i = int(mStates.size()) - 3; i >= stateIdxAfterPawnOrCapture; i -= 2)
             if (mStates[i].zobristHash == mState->zobristHash
             && (i > rootStateIdx || ++count == 2))
                 return true;
@@ -1129,24 +1130,22 @@ class Board {
         if (captured != PieceType::NONE)
             hashAfter ^= ZOBRIST_PIECES[!stm][(int)captured][to];
 
-        const int pieceType = (int)move.pieceType();
+        const int pieceType = int(move.pieceType());
         return hashAfter ^ ZOBRIST_PIECES[stm][pieceType][move.from()] ^ ZOBRIST_PIECES[stm][pieceType][to];
     }
 
     // Cuckoo / detect upcoming repetition
-    inline bool hasUpcomingRepetition(const int ply) const {
-        //int stateIdxAfterPawnOrCapture = std::max(0, (int)mStates.size() - (int)mState->pliesSincePawnOrCapture - 1);
-        //int rootStateIdx = (int)mStates.size() - ply - 1;
-
-        const int end = std::min((int)mState->pliesSincePawnOrCapture, (int)mStates.size() - 1);
+    inline bool hasUpcomingRepetition(const int ply) const 
+    {
+        const int end = std::min(int(mState->pliesSincePawnOrCapture), int(mStates.size()) - 1);
         if (end < 3) return false;
 
         const u64 occ = occupancy();
 
         for (int i = 3; i <= end; i += 2)
         {
-            assert((int)mStates.size() - 1 - i >= 0);
-            const u64 moveKey = zobristHash() ^ mStates[(int)mStates.size() - 1 - i].zobristHash;
+            assert(int(mStates.size()) - 1 - i >= 0);
+            const u64 moveKey = zobristHash() ^ mStates[int(mStates.size()) - 1 - i].zobristHash;
 
             int cuckooIdx;
 
@@ -1169,7 +1168,7 @@ class Board {
 
                 // Require one more repetition at and before root
                 for (int j = i + 4; j <= end; j += 2)
-                    if (mStates[(int)mStates.size() - 1 - i].zobristHash == mStates[(int)mStates.size() - 1 - j].zobristHash)
+                    if (mStates[int(mStates.size()) - 1 - i].zobristHash == mStates[int(mStates.size()) - 1 - j].zobristHash)
                         return true;
             }
         }

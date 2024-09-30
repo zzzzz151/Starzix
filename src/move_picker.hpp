@@ -105,7 +105,6 @@ struct MovePicker {
                 }
 
                 constexpr i32 GOOD_NOISY_SCORE = 1'000'000;
-
                 const PieceType captured = board.captured(move);
 
                 if (mNoisiesOnly)
@@ -120,7 +119,7 @@ struct MovePicker {
                 }
 
                 // MVVLVA (most valuable victim, least valuable attacker)
-                mNoisiesScores[i] += 100 * (i32)captured - (i32)move.pieceType();
+                mNoisiesScores[i] += 100 * (i32)captured - i32(move.pieceType());
 
                 i++;
             }
@@ -190,7 +189,7 @@ struct MovePicker {
                     continue;
                 }
 
-                const int pt = (int)move.pieceType();
+                const int pt = int(move.pieceType());
 
                 // Calling attacks(board.oppSide()) will cache enemy attacks and speedup isSquareAttacked()
                 board.attacks(board.oppSide()); 

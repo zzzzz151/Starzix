@@ -75,7 +75,7 @@ inline u64 TTEntryIndex(const u64 zobristHash, const auto numEntries)
 
 inline void printTTSize(const std::vector<TTEntry> &tt) 
 {
-    const double bytes = (u64)tt.size() * (u64)sizeof(TTEntry);
+    const double bytes = u64(tt.size()) * (u64)sizeof(TTEntry);
     const double megabytes = bytes / (1024.0 * 1024.0);
 
     std::cout << "TT size: " << round(megabytes) << " MB"

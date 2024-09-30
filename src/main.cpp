@@ -50,8 +50,7 @@ int main(int argc, char* argv[])
     resizeTT(tt, 32);
     printTTSize(tt);
     
-    gSearchThreads = { SearchThread(&tt) };
-    gMainThread = &gSearchThreads[0];
+    gSearchThreads = { SearchThread(&tt) }; // create main search thread
 
     // If a command is passed in program args, run it and exit
 

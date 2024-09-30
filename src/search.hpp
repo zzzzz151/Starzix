@@ -13,6 +13,8 @@ constexpr i32 INF = 32000,
 #include "tt.hpp"
 #include "nnue.hpp"
 
+class SearchThread;
+inline SearchThread* mainThreadPtr();
 inline u64 totalNodes();
 
 MultiArray<i32, 2, MAX_DEPTH+1, 256> LMR_TABLE = {}; // [isQuietMove][depth][moveIndex]
@@ -30,11 +32,6 @@ inline void initLmrTable()
         }
 }
 
-class SearchThread;
-
-// in main.cpp, main thread is created and gMainThread = &gSearchThreads[0]
-SearchThread* gMainThread = nullptr;
-
 struct PlyData {
     public:
     ArrayVec<Move, MAX_DEPTH+1> pvLine = {};
@@ -49,13 +46,12 @@ class SearchThread {
 
     std::chrono::time_point<std::chrono::steady_clock> mStartTime;
 
-    u64 mHardMilliseconds = I64_MAX,
-        mSoftMilliseconds = I64_MAX,
-        mMaxNodes = I64_MAX;
+    // search limits (passed as arguments of search())
+    u8 mMaxDepth;
+    u64 mMaxNodes, mHardMilliseconds, mSoftMilliseconds;
 
-    u8 mMaxDepth = MAX_DEPTH;
-    u64 mNodes = 0;
-    u8 mMaxPlyReached = 0; // seldepth
+    u64 mNodes;
+    u8 mMaxPlyReached; // seldepth
 
     std::array<PlyData, MAX_DEPTH+1> mPliesData; // [ply]
 
@@ -91,26 +87,30 @@ class SearchThread {
         mTTAge = 0;
     }
 
-    inline u64 getNodes() const { return mNodes; }
-
-    inline u64 millisecondsElapsed() const {
-        return (std::chrono::steady_clock::now() - mStartTime) / std::chrono::milliseconds(1);
-    }
-
     inline Move bestMoveRoot() const {
         return mPliesData[0].pvLine.size() == 0 
                ? MOVE_NONE : mPliesData[0].pvLine[0];
     }
 
-    inline i32 search(const Board &board, const i32 maxDepth, const auto startTime, 
-        const i64 hardMilliseconds, const i64 softMilliseconds, const i64 maxNodes)
+    inline u64 millisecondsElapsed() const {
+        return (std::chrono::steady_clock::now() - mStartTime) / std::chrono::milliseconds(1);
+    }
+
+    inline u64 nodes() const { return mNodes; }
+
+    inline i32 search(const Board &board, 
+        const i32 maxDepth, 
+        const i64 maxNodes, 
+        const std::chrono::time_point<std::chrono::steady_clock> startTime, 
+        const i64 hardMilliseconds, 
+        const i64 softMilliseconds)
     { 
         mBoard = board;
+        mMaxDepth = std::clamp(maxDepth, 1, (i32)MAX_DEPTH);
+        mMaxNodes = std::max(maxNodes, (i64)0);
         mStartTime = startTime;
         mHardMilliseconds = std::max(hardMilliseconds, (i64)0);
         mSoftMilliseconds = std::max(softMilliseconds, (i64)0);
-        mMaxDepth = std::clamp(maxDepth, 1, (i32)MAX_DEPTH);
-        mMaxNodes = std::max(maxNodes, (i64)0);
 
         mPliesData[0] = PlyData();
 
@@ -151,11 +151,11 @@ class SearchThread {
                                        ? aspiration(iterationDepth, score)
                                        : search(iterationDepth, 0, -INF, INF, false, DOUBLE_EXTENSIONS_MAX);
 
-            if (stopSearch()) break;
+            if (shouldStop()) break;
 
             score = iterationScore;
 
-            if (this != gMainThread) continue;
+            if (this != mainThreadPtr()) continue;
 
             // Print uci info
 
@@ -185,7 +185,7 @@ class SearchThread {
 
             // Check soft time limit (in case one exists)
 
-            if (mSoftMilliseconds == I64_MAX) continue;
+            if (mSoftMilliseconds >= std::numeric_limits<i64>::max()) continue;
 
             // Nodes time management: scale soft time limit based on nodes spent on best move
             auto scaledSoftMs = [&]() -> u64 {
@@ -200,7 +200,7 @@ class SearchThread {
         }
 
         // Signal secondary threads to stop
-        if (this == gMainThread) sSearchStopped = true;
+        if (this == mainThreadPtr()) sSearchStopped = true;
 
         if (mTTAge < 127) mTTAge++;
 
@@ -209,17 +209,16 @@ class SearchThread {
 
     private:
 
-    inline bool stopSearch()
+    inline bool shouldStop()
     {
-        // Only check time in main thread
-
         if (sSearchStopped) return true;
 
-        if (this != gMainThread) return false;
+        // Only check time in main thread
+        if (this != mainThreadPtr()) return false;
 
         if (bestMoveRoot() == MOVE_NONE) return false;
 
-        if (mMaxNodes != I64_MAX && totalNodes() >= mMaxNodes) 
+        if (mMaxNodes < std::numeric_limits<i64>::max() && totalNodes() >= mMaxNodes) 
             return sSearchStopped = true;
 
         // Check time every N nodes
@@ -228,12 +227,14 @@ class SearchThread {
 
     inline std::array<i16*, 4> correctionHistories()
     {
-        const int stm = (int)mBoard.sideToMove();
+        const int stm = int(mBoard.sideToMove());
+
+        const Move lastMove = mBoard.lastMove();
         i16* lastMoveCorrHistPtr = nullptr;
 
-        if (mBoard.lastMove() != MOVE_NONE) {
-            const PieceType pt = mBoard.lastMove().pieceType();
-            lastMoveCorrHistPtr = &(mMovesHistory[stm][(int)pt][mBoard.lastMove().to()].mCorrHist);
+        if (lastMove != MOVE_NONE) {
+            const int pt = int(lastMove.pieceType());
+            lastMoveCorrHistPtr = &(mMovesHistory[stm][pt][lastMove.to()].mCorrHist);
         }
 
         return {
@@ -322,7 +323,7 @@ class SearchThread {
         while (true) {
             score = search(depth, 0, alpha, beta, false, DOUBLE_EXTENSIONS_MAX);
 
-            if (stopSearch()) return 0;
+            if (shouldStop()) return 0;
 
             if (score > bestScore) bestScore = score;
 
@@ -353,7 +354,7 @@ class SearchThread {
         assert(beta  >= -INF && beta  <= INF);
         assert(alpha < beta);
 
-        if (stopSearch()) return 0;
+        if (shouldStop()) return 0;
 
         // Cuckoo / detect upcoming repetition
         if (ply > 0 && alpha < 0 && mBoard.hasUpcomingRepetition(ply)) 
@@ -367,7 +368,7 @@ class SearchThread {
 
         if (depth > mMaxDepth) depth = mMaxDepth;
 
-        const bool pvNode = beta > alpha + 1;
+        const bool pvNode = beta > alpha + 1 || ply == 0;
 
         // Probe TT
         const auto ttEntryIdx = TTEntryIndex(mBoard.zobristHash(), ttPtr->size());
@@ -421,7 +422,7 @@ class SearchThread {
             {
                 const i32 score = qSearch(ply, alpha, beta);
 
-                if (stopSearch()) return 0;
+                if (shouldStop()) return 0;
 
                 if (score <= alpha) return score;
             }
@@ -443,7 +444,7 @@ class SearchThread {
 
                 mBoard.undoMove();
 
-                if (stopSearch()) return 0;
+                if (shouldStop()) return 0;
 
                 if (score >= beta) return score >= MIN_MATE_SCORE ? beta : score;
             }
@@ -458,7 +459,7 @@ class SearchThread {
                 const i32 probcutScore = probcut(
                     depth, ply, probcutBeta, cutNode, doubleExtsLeft, ttMove, ttEntryIdx);
 
-                if (stopSearch()) return 0;
+                if (shouldStop()) return 0;
 
                 if (probcutScore != VALUE_NONE) return probcutScore;
             }
@@ -474,7 +475,7 @@ class SearchThread {
         const bool lmrImproving = ply > 1 && !mBoard.inCheck() && !mBoard.inCheck2PliesAgo() 
                                   && eval > (plyDataPtr - 2)->eval;
 
-        const int stm = (int)mBoard.sideToMove();
+        const int stm = int(mBoard.sideToMove());
         int legalMovesSeen = 0;
         i32 bestScore = -INF;
         Move bestMove = MOVE_NONE;
@@ -545,7 +546,7 @@ class SearchThread {
             && ttEntry.depth() >= depth - singularDepthMargin()
             && ttEntry.bound() != Bound::UPPER 
             && abs(ttEntry.score) < MIN_MATE_SCORE
-            && (singularBeta = (i32)ttEntry.score - depth) > -MIN_MATE_SCORE + 1)
+            && (singularBeta = i32(ttEntry.score) - depth) > -MIN_MATE_SCORE + 1)
             {
                 // Singular search: before searching any move, 
                 // search this node at a shallower depth with TT move excluded
@@ -572,7 +573,7 @@ class SearchThread {
             const u64 nodesBefore = mNodes;
             makeMove(move, ply + 1);
 
-            int pt = (int)move.pieceType();
+            int pt = int(move.pieceType());
             HistoryEntry &historyEntry = mMovesHistory[stm][pt][move.to()];
 
             i16* noisyHistoryPtr;
@@ -626,7 +627,7 @@ class SearchThread {
             mBoard.undoMove();
             mAccumulatorPtr--;
 
-            if (stopSearch()) return 0;
+            if (shouldStop()) return 0;
 
             assert(mNodes > nodesBefore);
             if (ply == 0) mMovesNodes[move.encoded()] += mNodes - nodesBefore;
@@ -700,7 +701,7 @@ class SearchThread {
 
             // History malus: decrease history of fail low quiets
             for (const Move failLow : failLowQuiets) {
-                pt = (int)failLow.pieceType();
+                pt = int(failLow.pieceType());
 
                 mMovesHistory[stm][pt][failLow.to()].updateQuietHistories(
                     mBoard.isSquareAttacked(failLow.from(), nstm),
@@ -760,7 +761,7 @@ class SearchThread {
         assert(beta  >= -INF && beta  <= INF);
         assert(alpha < beta);
 
-        if (stopSearch()) return 0;
+        if (shouldStop()) return 0;
 
         // Probe TT
         const auto ttEntryIdx = TTEntryIndex(mBoard.zobristHash(), ttPtr->size());
@@ -832,7 +833,7 @@ class SearchThread {
             mBoard.undoMove();
             mAccumulatorPtr--;
 
-            if (stopSearch()) return 0;
+            if (shouldStop()) return 0;
 
             if (score <= bestScore) continue;
 
@@ -902,7 +903,7 @@ class SearchThread {
             mBoard.undoMove();
             mAccumulatorPtr--;
 
-            if (stopSearch()) return 0;
+            if (shouldStop()) return 0;
 
             if (score >= probcutBeta) {
                 (*ttPtr)[ttEntryIdx].update(mBoard.zobristHash(), depth - 3, ply, score, move, Bound::LOWER, mTTAge);
@@ -916,14 +917,19 @@ class SearchThread {
 
 }; // class SearchThread
 
-// in main.cpp, main thread is created and gMainThread = &gSearchThreads[0]
+// in main.cpp, main thread is created as the first element
 std::vector<SearchThread> gSearchThreads;
+
+inline SearchThread* mainThreadPtr() { 
+    assert(gSearchThreads.size() > 0); 
+    return &gSearchThreads[0];
+}
 
 inline u64 totalNodes() {
     u64 nodes = 0;
 
     for (SearchThread &searchThread : gSearchThreads)
-        nodes += searchThread.getNodes();
+        nodes += searchThread.nodes();
 
     return nodes;
 }
