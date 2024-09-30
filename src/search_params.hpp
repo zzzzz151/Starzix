@@ -122,10 +122,6 @@ TunableParam<float> contHist1PlyWeight = TunableParam<float>(0.88, 0.2, 4.0, 0.2
 TunableParam<float> contHist2PlyWeight = TunableParam<float>(1.136, 0.2, 4.0, 0.2);
 TunableParam<float> contHist4PlyWeight = TunableParam<float>(0.47, 0.2, 4.0, 0.2);
 
-// Correction history
-TunableParam<i32> corrHistScale = TunableParam<i32>(292, 50, 550, 50);
-TunableParam<i32> corrHistMax   = TunableParam<i32>(16384, 4096, 24576, 2048);
-
 using TunableParamVariant = std::variant<
     TunableParam<u64>*,
     TunableParam<i32>*, 
@@ -188,6 +184,4 @@ tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
     {stringify(contHist1PlyWeight), &contHist1PlyWeight},
     {stringify(contHist2PlyWeight), &contHist2PlyWeight},
     {stringify(contHist4PlyWeight), &contHist4PlyWeight},
-    {stringify(corrHistScale), &corrHistScale},
-    {stringify(corrHistMax), &corrHistMax},
 };

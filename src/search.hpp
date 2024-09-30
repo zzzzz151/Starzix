@@ -293,14 +293,9 @@ class SearchThread {
             eval *= materialScale(mBoard); // Scale eval with material
 
             // Correct eval with correction histories
-
-            i32 correction = 0;
-
             for (const i16* corrHist : correctionHistories())
                 if (corrHist != nullptr) 
-                    correction += i32(*corrHist);
-
-            eval += correction / corrHistScale();
+                    eval += i32(*corrHist);
 
             // Clamp to avoid false mate scores and invalid scores
             eval = std::clamp(eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
@@ -736,17 +731,9 @@ class SearchThread {
             && !(bound == Bound::LOWER && bestScore <= eval)
             && !(bound == Bound::UPPER && bestScore >= eval))
             {
-                const i32 newWeight = std::min(depth + depth * depth, corrHistScale());
-
                 for (i16* corrHist : correctionHistories())
-                {
-                    if (corrHist == nullptr) continue;
-
-                    i32 newValue = *corrHist;
-                    newValue *= std::max(corrHistScale() - newWeight, 1);
-                    newValue += (bestScore - eval) * corrHistScale() * newWeight;
-                    *corrHist = std::clamp(newValue / corrHistScale(), -corrHistMax(), corrHistMax());
-                }
+                    if (corrHist != nullptr)
+                        updateHistory(corrHist, (bestScore - eval) * depth);
             }
 
         }
