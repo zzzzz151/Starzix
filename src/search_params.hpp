@@ -104,7 +104,7 @@ TunableParam<i32>    lmrNoisyHistoryDiv = TunableParam<i32>(3499, 1024, 16384, 1
 TunableParam<i32> deeperBase = TunableParam<i32>(41, 15, 90, 15);
 
 // History max
-TunableParam<i32> historyMax = TunableParam<i32>(18395, 8192, 24576, 2048);
+constexpr i32 HISTORY_MAX = 16384;
 
 // History bonus
 TunableParam<i32> historyBonusMultiplier = TunableParam<i32>(300, 50, 600, 50);
@@ -176,7 +176,6 @@ tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
     {stringify(lmrQuietHistoryDiv), &lmrQuietHistoryDiv},
     {stringify(lmrNoisyHistoryDiv), &lmrNoisyHistoryDiv},
     {stringify(deeperBase), &deeperBase},
-    {stringify(historyMax), &historyMax},
     {stringify(historyBonusMultiplier), &historyBonusMultiplier},
     {stringify(historyBonusOffset), &historyBonusOffset},
     {stringify(historyBonusMax), &historyBonusMax},
