@@ -28,3 +28,4 @@ test:
 	$(COMPILER) $(CXXFLAGS) tests/tests.cpp -o testsCore$(SUFFIX)
 	$(COMPILER) $(CXXFLAGS) tests/testsSEE.cpp -o testsSEE$(SUFFIX)
 	$(COMPILER) $(CXXFLAGS) tests/testsNNUE.cpp -o testsNNUE$(SUFFIX)
+	
