@@ -4,9 +4,12 @@
 
 inline void updateHistory(i16* history, i32 bonus) 
 {
+    assert(abs(*history) <= HISTORY_MAX);
+
     bonus = std::clamp(bonus, -HISTORY_MAX, HISTORY_MAX);
     *history += bonus - abs(bonus) * i32(*history) / HISTORY_MAX;
-    assert(*history >= -HISTORY_MAX && *history <= HISTORY_MAX);
+    
+    assert(abs(*history) <= HISTORY_MAX);
 }
 
 inline void updateHistory(i16 &history, const i32 bonus) {
