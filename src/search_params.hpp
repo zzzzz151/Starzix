@@ -104,7 +104,7 @@ TunableParam<i32>    lmrNoisyHistoryDiv = TunableParam<i32>(3499, 1024, 16384, 1
 TunableParam<i32> deeperBase = TunableParam<i32>(41, 15, 90, 15);
 
 // History max
-TunableParam<i32> historyMax = TunableParam<i32>(18395, 8192, 24576, 2048);
+constexpr i32 HISTORY_MAX = 16384;
 
 // History bonus
 TunableParam<i32> historyBonusMultiplier = TunableParam<i32>(300, 50, 600, 50);
@@ -123,8 +123,7 @@ TunableParam<float> contHist2PlyWeight = TunableParam<float>(1.136, 0.2, 4.0, 0.
 TunableParam<float> contHist4PlyWeight = TunableParam<float>(0.47, 0.2, 4.0, 0.2);
 
 // Correction history
-TunableParam<i32> corrHistScale = TunableParam<i32>(292, 50, 550, 50);
-TunableParam<i32> corrHistMax   = TunableParam<i32>(16384, 4096, 24576, 2048);
+TunableParam<i32> corrHistDiv = TunableParam<i32>(165, 32, 512, 32);
 
 using TunableParamVariant = std::variant<
     TunableParam<u64>*,
@@ -177,7 +176,6 @@ tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
     {stringify(lmrQuietHistoryDiv), &lmrQuietHistoryDiv},
     {stringify(lmrNoisyHistoryDiv), &lmrNoisyHistoryDiv},
     {stringify(deeperBase), &deeperBase},
-    {stringify(historyMax), &historyMax},
     {stringify(historyBonusMultiplier), &historyBonusMultiplier},
     {stringify(historyBonusOffset), &historyBonusOffset},
     {stringify(historyBonusMax), &historyBonusMax},
@@ -188,6 +186,5 @@ tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
     {stringify(contHist1PlyWeight), &contHist1PlyWeight},
     {stringify(contHist2PlyWeight), &contHist2PlyWeight},
     {stringify(contHist4PlyWeight), &contHist4PlyWeight},
-    {stringify(corrHistScale), &corrHistScale},
-    {stringify(corrHistMax), &corrHistMax},
+    {stringify(corrHistDiv), &corrHistDiv}
 };
