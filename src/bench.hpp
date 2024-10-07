@@ -2,7 +2,10 @@
 
 #pragma once
 
+#include "utils.hpp"
+#include "board.hpp"
 #include "search.hpp"
+#include <algorithm>
 
 constexpr std::array BENCH_FENS {
     "r3k2r/2pb1ppp/2pp1q2/p7/1nP1B3/1P2P3/P2N1PPP/R2QK2R w KQkq a6 0 14",
@@ -62,7 +65,7 @@ inline void bench(int depth = 14)
     depth = std::clamp(depth, 1, (int)MAX_DEPTH);
 
     std::vector<TTEntry> benchTT;
-    resizeTT(benchTT, 32);
+    resizeTT(&benchTT, 32);
 
     SearchThread searchThread = SearchThread(&benchTT);
 
@@ -70,24 +73,22 @@ inline void bench(int depth = 14)
 
     for (const std::string fen : BENCH_FENS)
     {
-        const Board board = Board(fen);
-
-        SearchThread::sSearchStopped = false;
+        searchThread.mBoard = Board(fen);
         
         searchThread.search(
-            board, 
             depth, 
             std::numeric_limits<i64>::max(), 
             std::chrono::steady_clock::now(), 
             std::numeric_limits<i64>::max(), 
-            std::numeric_limits<i64>::max()
+            std::numeric_limits<i64>::max(),
+            false
         );
 
         totalMilliseconds += searchThread.millisecondsElapsed();
         totalNodes += searchThread.nodes();
 
         searchThread.reset();
-        resetTT(benchTT);
+        resetTT(&benchTT);
     }
 
     std::cout << totalNodes << " nodes "

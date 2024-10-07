@@ -1,6 +1,8 @@
 // clang-format off
+#include "../src/utils.hpp"
 #include "../src/board.hpp"
 #include "../src/nnue.hpp"
+#include "../src/3rdparty/ordered_map.h"
 
 tsl::ordered_map<std::string, int> FENS_EVAL = {
     { START_FEN, 67 },

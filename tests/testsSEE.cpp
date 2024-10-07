@@ -1,7 +1,8 @@
 // clang-format off
 
-#include <fstream>
+#include "../src/utils.hpp"
 #include "../src/board.hpp"
+#include <fstream>
 
 int main() {
     std::ifstream inputFile("tests/SEE.txt");

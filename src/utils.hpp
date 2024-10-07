@@ -30,6 +30,8 @@ using i64 = int64_t;
 
 #define stringify(myVar) (std::string)#myVar
 
+#define ln(x) log(x)
+
 inline void trim(std::string &str) {
     const size_t first = str.find_first_not_of(" \t\n\r");
     const size_t last = str.find_last_not_of(" \t\n\r");
@@ -58,11 +60,6 @@ inline std::vector<std::string> splitString(std::string &str, const char delimit
 }
 
 constexpr int charToInt(const char myChar) { return myChar - '0'; }
-
-constexpr double ln(const double x) {
-    assert(x > 0);
-    return log(x);
-}
 
 inline u64 millisecondsElapsed(const std::chrono::steady_clock::time_point start)
 {

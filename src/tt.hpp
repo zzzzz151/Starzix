@@ -27,10 +27,6 @@ struct TTEntry {
          return Bound((depthBoundAge >> 7) & 0b11);
     }
 
-    constexpr u8 age() const {
-        return depthBoundAge >> 9;
-    }
-
     constexpr void adjustScore(const i16 ply) 
     {
         if (score >= MIN_MATE_SCORE)
@@ -40,22 +36,19 @@ struct TTEntry {
     }
 
     constexpr void update(const u64 newZobristHash, const u8 newDepth, const i16 ply, 
-        const i16 newScore, const Move newBestMove, const Bound newBound, const u8 newAge)
+        const i16 newScore, const Move newBestMove, const Bound newBound)
     {
-        assert((newDepth >> 7) == 0);
-        assert((newAge >> 7) == 0);
+        assert((newDepth & 0b1000'000) == 0);
 
         // Update TT entry if
         if (this->zobristHash != newZobristHash // this entry is empty or a TT collision
         || newBound == Bound::EXACT             // or new bound is exact
         || this->depth() < (i32)newDepth + 4)   // or new depth isn't much lower
-        // || this->age() != newAge)            // or this entry is from a previous search ("go" command)
         {
             this->zobristHash = newZobristHash;
 
             this->depthBoundAge = newDepth;
             this->depthBoundAge |= (u16)newBound << 7;
-            this->depthBoundAge |= (u16)newAge << 9;
 
             this->score = newScore >= MIN_MATE_SCORE  ? newScore + ply 
                         : newScore <= -MIN_MATE_SCORE ? newScore - ply 
@@ -78,30 +71,30 @@ constexpr u64 TTEntryIndex(const u64 zobristHash, const auto numEntries)
     return ((u128)zobristHash * (u128)numEntries) >> 64;
 }
 
-inline void printTTSize(const std::vector<TTEntry> &tt) 
+inline void printTTSize(const std::vector<TTEntry>* ttPtr) 
 {
-    const double bytes = u64(tt.size()) * (u64)sizeof(TTEntry);
+    const double bytes = u64(ttPtr->size()) * (u64)sizeof(TTEntry);
     const double megabytes = bytes / (1024.0 * 1024.0);
 
     std::cout << "TT size: " << round(megabytes) << " MB"
-              << " (" << tt.size() << " entries)" 
+              << " (" << ttPtr->size() << " entries)" 
               << std::endl;
 }
 
-constexpr void resizeTT(std::vector<TTEntry> &tt, i64 newSizeMB) 
+constexpr void resizeTT(std::vector<TTEntry>* ttPtr, i64 newSizeMB) 
 {
     newSizeMB = std::clamp(newSizeMB, (i64)1, (i64)65536);
     const u64 numEntries = (u64)newSizeMB * 1024 * 1024 / (u64)sizeof(TTEntry); 
 
-    tt.clear(); // remove all elements
-    tt.resize(numEntries);
-    tt.shrink_to_fit();
+    ttPtr->clear(); // remove all elements
+    ttPtr->resize(numEntries);
+    ttPtr->shrink_to_fit();
 }
 
-constexpr void resetTT(std::vector<TTEntry> &tt) 
+constexpr void resetTT(std::vector<TTEntry>* ttPtr) 
 {
-    const auto numEntries = tt.size();
-    tt.clear(); // remove all elements
-    tt.resize(numEntries);
-    tt.shrink_to_fit();
+    const auto numEntries = ttPtr->size();
+    ttPtr->clear(); // remove all elements
+    ttPtr->resize(numEntries);
+    ttPtr->shrink_to_fit();
 }

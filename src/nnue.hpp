@@ -1,23 +1,21 @@
 // clang-format off
 
 #pragma once
-/*
+
+#include "utils.hpp"
+#include "board.hpp"
+#include "simd.hpp"
+#include "search_params.hpp"
+#include <algorithm>
+
 // incbin fuckery
 #ifdef _MSC_VER
     #define STARZIX_MSVC
     #pragma push_macro("_MSC_VER")
     #undef _MSC_VER
 #endif
-*/
 
-#include "utils.hpp"
-//#include "board.hpp"
-//#include "simd.hpp"
-//#include "search_params.hpp"
-//#include "3rdparty/incbin.h"
-//#include <algorithm>
-
-/*
+#include "3rdparty/incbin.h"
 
 namespace nnue {
 
@@ -366,7 +364,7 @@ constexpr i32 evaluate(const BothAccumulators* bothAccs, const Color sideToMove)
 
 } // namespace nnue
 
-constexpr float materialScale(const Board &board) 
+MAYBE_CONSTEXPR float materialScale(const Board &board) 
 {
     const float material = 3 * std::popcount(board.getBb(PieceType::KNIGHT))
                          + 3 * std::popcount(board.getBb(PieceType::BISHOP))
@@ -383,4 +381,3 @@ constexpr float materialScale(const Board &board)
 using BothAccumulators = nnue::BothAccumulators;
 using FinnyTableEntry = nnue::FinnyTableEntry;
 using FinnyTable = nnue::FinnyTable;
-*/

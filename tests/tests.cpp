@@ -1,6 +1,6 @@
 // clang-format off
+#include "../src/utils.hpp"
 #include "../src/board.hpp"
-#include "../src/perft.hpp"
 
 const std::string POSITION2_KIWIPETE = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ";
 const std::string POSITION3 = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ";

@@ -26,6 +26,8 @@ all:
 	$(COMPILER) $(CXXFLAGS) src/*.cpp -o $(EXE)$(SUFFIX)
 test:
 	$(COMPILER) $(CXXFLAGS) tests/tests.cpp -o testsCore$(SUFFIX)
-	$(COMPILER) $(CXXFLAGS) tests/testsSEE.cpp -o testsSEE$(SUFFIX)
+	$(COMPILER) $(CXXFLAGS) -DTUNE tests/testsSEE.cpp -o testsSEE$(SUFFIX)
 	$(COMPILER) $(CXXFLAGS) tests/testsNNUE.cpp -o testsNNUE$(SUFFIX)
+tune:
+	$(COMPILER) $(CXXFLAGS) -DNDEBUG -DTUNE src/*.cpp -o $(EXE)$(SUFFIX)
 	

@@ -7,7 +7,7 @@
 #include "search_params.hpp"
 #include <algorithm>
 
-constexpr void updateHistory(i16* history, i32 bonus) 
+MAYBE_CONSTEXPR void updateHistory(i16* history, i32 bonus) 
 {
     assert(abs(*history) <= HISTORY_MAX);
 
@@ -35,9 +35,11 @@ struct HistoryEntry {
     constexpr i32 quietHistory(
         const bool enemyAttacksOrigin, const bool enemyAttacksDst, const std::array<Move, 3> moves) const
     {
-        const std::array<float, 3> CONT_HISTORY_WEIGHTS = { 
-            contHist1PlyWeight(), contHist2PlyWeight(), contHist4PlyWeight() 
-        };
+        #if defined(TUNE)
+            CONT_HISTORY_WEIGHTS = { 
+                contHist1PlyWeight(), contHist2PlyWeight(), contHist4PlyWeight() 
+            };
+        #endif
 
         float total = float(mMainHist[enemyAttacksOrigin][enemyAttacksDst]) * mainHistoryWeight();
 

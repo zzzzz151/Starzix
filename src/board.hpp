@@ -566,15 +566,17 @@ class Board {
     {
         assert(move != MOVE_NONE);
 
-        const std::array<i32, 7> SEE_PIECE_VALUES = {
-            seePawnValue(),  // Pawn
-            seeMinorValue(), // Knight
-            seeMinorValue(), // Bishop
-            seeRookValue(),  // Rook
-            seeQueenValue(), // Queen
-            0,               // King
-            0                // None
-        };
+        #if defined(TUNE)
+            SEE_PIECE_VALUES = {
+                seePawnValue(),  // Pawn
+                seeMinorValue(), // Knight
+                seeMinorValue(), // Bishop
+                seeRookValue(),  // Rook
+                seeQueenValue(), // Queen
+                0,               // King
+                0                // None
+            };
+        #endif
 
         i32 score = -threshold;
 
@@ -1361,3 +1363,30 @@ class Board {
     }
 
 }; // class Board
+
+constexpr u64 perft(Board &board, const int depth)
+{
+    if (depth <= 0) return 1;
+
+    ArrayVec<Move, 256> moves;
+    board.pseudolegalMoves(moves, MoveGenType::ALL);
+
+    u64 nodes = 0;
+
+    if (depth == 1) {
+         for (const Move move : moves)
+            nodes += board.isPseudolegalLegal(move);
+
+        return nodes;
+    }
+
+    for (const Move move : moves) 
+        if (board.isPseudolegalLegal(move))
+        {
+            board.makeMove(move);
+            nodes += perft(board, depth - 1);
+            board.undoMove();
+        }
+
+    return nodes;
+}
