@@ -50,7 +50,6 @@ tsl::ordered_map<std::string, int> FENS_EVAL = {
 int main()
 {
     initUtils();
-    initZobrist();
 
     for (const auto& [fen, expectedEval] : FENS_EVAL) 
     {

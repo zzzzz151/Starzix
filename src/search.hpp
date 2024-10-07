@@ -17,20 +17,23 @@ class SearchThread;
 inline SearchThread* mainThreadPtr();
 inline u64 totalNodes();
 
-MultiArray<i32, 2, MAX_DEPTH+1, 256> LMR_TABLE = {}; // [isQuietMove][depth][moveIndex]
-
-inline void initLmrTable()
+// [isQuietMove][depth][moveIndex]
+constexpr MultiArray<i32, 2, MAX_DEPTH+1, 256> LMR_TABLE = []() constexpr
 {
-    for (u64 depth = 1; depth < MAX_DEPTH+1; depth++)
-        for (u64 move = 1; move < 256; move++)
-        {
-            LMR_TABLE[0][depth][move] 
-                = round(lmrBaseNoisy() + ln(depth) * ln(move) * lmrMultiplierNoisy());
+    MultiArray<i32, 2, MAX_DEPTH + 1, 256> lmrTable;
 
-            LMR_TABLE[1][depth][move] 
-                = round(lmrBaseQuiet() + ln(depth) * ln(move) * lmrMultiplierQuiet());
+    for (int depth = 1; depth < MAX_DEPTH + 1; depth++)
+        for (int move = 1; move < 256; move++)
+        {
+            lmrTable[false][depth][move] 
+                = round(lmrBaseNoisy() + __builtin_log(depth) * __builtin_log(move) * lmrMultiplierNoisy());
+
+            lmrTable[true][depth][move] 
+                = round(lmrBaseQuiet() + __builtin_log(depth) * __builtin_log(move) * lmrMultiplierQuiet());
         }
-}
+
+    return lmrTable;
+}();
 
 struct PlyData {
     public:

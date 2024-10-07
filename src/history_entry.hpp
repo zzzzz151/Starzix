@@ -2,7 +2,7 @@
 
 #pragma once
 
-inline void updateHistory(i16* history, i32 bonus) 
+constexpr void updateHistory(i16* history, i32 bonus) 
 {
     assert(abs(*history) <= HISTORY_MAX);
 
@@ -12,7 +12,7 @@ inline void updateHistory(i16* history, i32 bonus)
     assert(abs(*history) <= HISTORY_MAX);
 }
 
-inline void updateHistory(i16 &history, const i32 bonus) {
+constexpr void updateHistory(i16 &history, const i32 bonus) {
     updateHistory(&history, bonus);
 }
 
@@ -27,7 +27,7 @@ struct HistoryEntry {
     
     i16 mCorrHist = 0;
 
-    inline i32 quietHistory(
+    constexpr i32 quietHistory(
         const bool enemyAttacksOrigin, const bool enemyAttacksDst, const std::array<Move, 3> moves) const
     {
         const std::array<float, 3> CONT_HISTORY_WEIGHTS = { 
@@ -47,7 +47,7 @@ struct HistoryEntry {
         return total;
     }
 
-    inline void updateQuietHistories(
+    constexpr void updateQuietHistories(
         const bool enemyAttacksOrigin, const bool enemyAttacksDst, const std::array<Move, 3> moves, const i32 bonus)
     {
         updateHistory(mMainHist[enemyAttacksOrigin][enemyAttacksDst], bonus);
@@ -59,11 +59,11 @@ struct HistoryEntry {
             }
     }
 
-    inline i32 noisyHistory(const PieceType captured) const  {
+    constexpr i32 noisyHistory(const PieceType captured) const  {
         return mNoisyHist[(int)captured];
     }
 
-    inline i16* noisyHistoryPtr(const PieceType captured) {
+    constexpr i16* noisyHistoryPtr(const PieceType captured) {
         return &mNoisyHist[(int)captured];
     }
 

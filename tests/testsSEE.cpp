@@ -5,7 +5,6 @@
 
 int main() {
     initUtils();
-    initZobrist();
 
     std::ifstream inputFile("tests/SEE.txt");
     assert(inputFile.is_open());

@@ -11,7 +11,6 @@ const std::string POSITION5 = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w 
 int main()
 {   
     initUtils();
-    initZobrist();
 
     // Test utils.hpp
 

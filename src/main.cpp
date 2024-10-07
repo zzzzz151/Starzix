@@ -40,9 +40,6 @@ int main(int argc, char* argv[])
     #endif
 
     initUtils();
-    initZobrist();
-    cuckoo::init();
-    initLmrTable();
 
     Board board = Board(START_FEN);
 

@@ -29,8 +29,6 @@ using i16 = int16_t;
 using i32 = int32_t;
 using i64 = int64_t;
 
-constexpr u64 ONES = 0xffff'ffff'ffff'ffff;
-
 const std::string START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 using Square = u8;
@@ -57,10 +55,6 @@ enum class File : u8 {
     A = 0, B = 1, C = 2, D = 3, E = 4, F = 5, G = 6, H = 7
 };
 
-enum class MoveGenType : u8 {
-    ALL = 0, NOISIES = 1, QUIETS = 2
-};
-
 const std::string SQUARE_TO_STR[64] = {
     "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1",
     "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2",
@@ -84,12 +78,26 @@ constexpr Rank squareRank(const Square square) { return (Rank)(square / 8); }
 
 constexpr File squareFile(const Square square) { return (File)(square % 8); }
 
-constexpr u64 bitboard(const Square sq) { 
+constexpr u64 ONES = 0xffff'ffff'ffff'ffff;
+
+constexpr std::array<u64, 8> RANK_BB = {
+    0xffULL, 0xff00ULL, 0xff0000ULL, 0xff000000ULL, 
+    0xff00000000ULL, 0xff0000000000ULL, 0xff000000000000ULL, 0xff00000000000000ULL
+};
+
+constexpr std::array<u64, 8> FILE_BB = {
+    0x101010101010101ULL, 0x202020202020202ULL, 0x404040404040404ULL, 0x808080808080808ULL,
+    0x1010101010101010ULL, 0x2020202020202020ULL, 0x4040404040404040ULL, 0x8080808080808080ULL
+};
+
+constexpr u64 bitboard(const Square sq) 
+{ 
     assert(sq >= 0 && sq <= 63);
     return 1ULL << sq; 
 }
 
-constexpr u8 lsb(const u64 bb) {
+constexpr u8 lsb(const u64 bb) 
+{
     assert(bb > 0);
     return std::countr_zero(bb);
 }
@@ -101,31 +109,18 @@ constexpr u8 poplsb(u64 &bb)
     return idx;
 }
 
-constexpr u64 pdep(const u64 val, u64 mask) {
-    u64 res = 0;
-
-    for (u64 bb = 1; mask; bb += bb) 
-    {
-        if (val & bb)
-            res |= mask & -mask;
-
-        mask &= mask - 1;
-    }
-
-    return res;
+constexpr u8 msb(const u64 bb)
+{
+    assert(bb > 0);
+    return 63 - __builtin_clzll(bb);
 }
 
-constexpr u64 shiftRight(const u64 bb) {
-    return (bb << 1ULL) & 0xfefefefefefefefeULL;
+constexpr u8 popmsb(u64 &bb)
+{
+    auto idx = msb(bb);
+    bb &= ~(1ULL << idx);
+    return idx;
 }
-
-constexpr u64 shiftLeft(const u64 bb) {
-    return (bb >> 1ULL) & 0x7f7f7f7f7f7f7f7fULL;
-}
-
-constexpr u64 shiftUp(const u64 bb) { return bb << 8ULL; }
-
-constexpr u64 shiftDown(const u64 bb) { return bb >> 8ULL; }
 
 inline void printBitboard(const u64 bb)
 {
@@ -143,6 +138,20 @@ inline void printBitboard(const u64 bb)
 
         std::cout << std::endl;
     }
+}
+
+constexpr u64 pdep(const u64 val, u64 mask) {
+    u64 res = 0;
+
+    for (u64 bb = 1; mask; bb += bb) 
+    {
+        if (val & bb)
+            res |= mask & -mask;
+
+        mask &= mask - 1;
+    }
+
+    return res;
 }
 
 inline void trim(std::string &str) {
@@ -184,18 +193,17 @@ inline u64 millisecondsElapsed(const std::chrono::steady_clock::time_point start
     return (std::chrono::steady_clock::now() - start) / std::chrono::milliseconds(1);
 }
 
-u64 gRngState = 1070372;
-
-inline void resetRng() { 
-    gRngState = 1070372;
+constexpr u64 nextU64(u64 &state)
+{
+    state ^= state >> 12;
+    state ^= state << 25;
+    state ^= state >> 27;
+    return state * 2685821657736338717LL;
 }
 
-inline u64 randomU64() {
-    gRngState ^= gRngState >> 12;
-    gRngState ^= gRngState << 25;
-    gRngState ^= gRngState >> 27;
-    return gRngState * 2685821657736338717LL;
-}
+enum class MoveGenType : u8 {
+    ALL = 0, NOISIES = 1, QUIETS = 2
+};
 
 // [color][CASTLE_SHORT or CASTLE_LONG or isLongCastle]
 constexpr MultiArray<u64, 2, 2> CASTLING_MASKS = {{
@@ -214,8 +222,6 @@ MultiArray<u64, 64, 64> BETWEEN = {}, LINE_THROUGH = {};
 #include "attacks.hpp"
 
 constexpr void initUtils() {
-    attacks::init();
-
     CASTLING_ROOK_FROM_TO[6] = {7, 5};    // White short castle
     CASTLING_ROOK_FROM_TO[2] = {0, 3};    // White long castle
     CASTLING_ROOK_FROM_TO[62] = {63, 61}; // Black short castle
@@ -228,15 +234,15 @@ constexpr void initUtils() {
 
             LINE_THROUGH[sq1][sq2] = bitboard(sq1) | bitboard(sq2);
 
-            if (attacks::bishopAttacks(sq1, 0) & bitboard(sq2)) 
+            if (getBishopAttacks(sq1, 0) & bitboard(sq2)) 
             {
-                BETWEEN[sq1][sq2] = attacks::bishopAttacks(sq1, bitboard(sq2)) & attacks::bishopAttacks(sq2, bitboard(sq1));
-                LINE_THROUGH[sq1][sq2] |= attacks::bishopAttacks(sq1, 0) & attacks::bishopAttacks(sq2, 0);
+                BETWEEN[sq1][sq2] = getBishopAttacks(sq1, bitboard(sq2)) & getBishopAttacks(sq2, bitboard(sq1));
+                LINE_THROUGH[sq1][sq2] |= getBishopAttacks(sq1, 0) & getBishopAttacks(sq2, 0);
             }
-            else  if (attacks::rookAttacks(sq1, 0) & bitboard(sq2)) 
+            else  if (getRookAttacks(sq1, 0) & bitboard(sq2)) 
             {
-                BETWEEN[sq1][sq2] = attacks::rookAttacks(sq1, bitboard(sq2)) & attacks::rookAttacks(sq2, bitboard(sq1));
-                LINE_THROUGH[sq1][sq2] |= attacks::rookAttacks(sq1, 0) & attacks::rookAttacks(sq2, 0);
+                BETWEEN[sq1][sq2] = getRookAttacks(sq1, bitboard(sq2)) & getRookAttacks(sq2, bitboard(sq1));
+                LINE_THROUGH[sq1][sq2] |= getRookAttacks(sq1, 0) & getRookAttacks(sq2, 0);
             }
 
       }

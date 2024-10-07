@@ -82,7 +82,7 @@ struct BothAccumulators {
 
     bool mUpdated = false;
 
-    inline bool operator==(const BothAccumulators other) const 
+    constexpr bool operator==(const BothAccumulators other) const 
     {
         return mAccumulators == other.mAccumulators
                && mMirrorHorizontally == other.mMirrorHorizontally
@@ -90,7 +90,7 @@ struct BothAccumulators {
                && mUpdated == other.mUpdated;
     }
 
-    inline BothAccumulators() = default;
+    constexpr BothAccumulators() = default;
 
     inline BothAccumulators(const Board &board) 
     {
@@ -132,7 +132,7 @@ struct BothAccumulators {
 
     private:
 
-    inline int setInputBucket(const Color color, const u64 enemyQueensBb)
+    constexpr int setInputBucket(const Color color, const u64 enemyQueensBb)
     {
         if (std::popcount(enemyQueensBb) != 1) 
             mInputBucket[(int)color] = 0;
@@ -148,7 +148,7 @@ struct BothAccumulators {
         return mInputBucket[(int)color];
     }
 
-    inline int feature768(
+    constexpr int feature768(
         const Color pieceColor, const PieceType pt, Square sq, const bool mirrorHorizontally) const
     {
         if (mirrorHorizontally) sq ^= 7;
@@ -158,7 +158,7 @@ struct BothAccumulators {
         return (int)pieceColor * 384 + (int)pt * 64 + (int)sq;
     }
 
-    inline void updateFinnyEntryAndAccumulator(FinnyTable &finnyTable, const Color accColor, const Board &board) 
+    constexpr void updateFinnyEntryAndAccumulator(FinnyTable &finnyTable, const Color accColor, const Board &board) 
     {
         const int iAccColor = (int)accColor;
         const auto hm = mMirrorHorizontally[iAccColor];
@@ -203,7 +203,7 @@ struct BothAccumulators {
 
     public:
 
-    inline void update(BothAccumulators* prevBothAccs, const Board &board, FinnyTable &finnyTable)
+    constexpr void update(BothAccumulators* prevBothAccs, const Board &board, FinnyTable &finnyTable)
     {
         assert(prevBothAccs->mUpdated && !mUpdated);
 
@@ -360,7 +360,7 @@ inline i32 evaluate(const BothAccumulators* bothAccs, const Color sideToMove)
 
 } // namespace nnue
 
-inline float materialScale(const Board &board) 
+constexpr float materialScale(const Board &board) 
 {
     const float material = 3 * std::popcount(board.getBb(PieceType::KNIGHT))
                          + 3 * std::popcount(board.getBb(PieceType::BISHOP))

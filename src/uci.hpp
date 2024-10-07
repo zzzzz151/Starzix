@@ -88,6 +88,7 @@ inline void runCommand(std::string &command, Board &board, std::vector<TTEntry> 
     }
     else if (tokens[0] == "undomove")
         board.undoMove();
+    /*
     else if (command == "spsainput") 
     {
         for (auto &pair : tunableParams) {
@@ -109,6 +110,7 @@ inline void runCommand(std::string &command, Board &board, std::vector<TTEntry> 
             }, tunableParam);
         }
     }
+    */
 }
 
 inline void uci() {
@@ -165,6 +167,7 @@ inline void setoption(const std::vector<std::string> &tokens, std::vector<TTEntr
 
         std::cout << "Threads set to " << numThreads << std::endl;
     }
+    /*
     else if (tunableParams.count(optionName) > 0) 
     {
         auto tunableParam = tunableParams[optionName];
@@ -182,6 +185,7 @@ inline void setoption(const std::vector<std::string> &tokens, std::vector<TTEntr
             std::cout << optionName << " set to " << myParam->value << std::endl;
         }, tunableParam);
     }
+    */
 }
 
 inline void position(const std::vector<std::string> &tokens, Board &board)

@@ -8,7 +8,7 @@ enum class MoveGenStage : int {
 };
 
 // Incremental sorting with partial selection sort
-inline Move partialSelectionSort(
+constexpr Move partialSelectionSort(
     ArrayVec<Move, 256> &moves, std::array<i32, 256> &movesScores, const int idx)
 {
     assert(idx < int(moves.size()));
@@ -37,13 +37,13 @@ struct MovePicker {
 
     public:
 
-    inline MovePicker(const bool noisiesOnly) {
+    constexpr MovePicker(const bool noisiesOnly) {
         mNoisiesOnly = noisiesOnly;
     }
 
-    inline MoveGenStage stage() const { return mStage; }
+    constexpr MoveGenStage stage() const { return mStage; }
 
-    inline i32 moveScore() const 
+    constexpr i32 moveScore() const 
     { 
         assert(mStage == MoveGenStage::QUIETS 
             || mStage == MoveGenStage::GOOD_NOISIES 
@@ -53,7 +53,7 @@ struct MovePicker {
         return mStage == MoveGenStage::QUIETS ? mQuietsScores[mQuietsIdx] : mNoisiesScores[mNoisiesIdx];
     }
 
-    inline Move next(Board &board, const Move ttMove, const Move killer, 
+    constexpr Move next(Board &board, const Move ttMove, const Move killer, 
         const MultiArray<HistoryEntry, 2, 6, 64> &movesHistory, Move excludedMove = MOVE_NONE) 
     {
         assert(killer == MOVE_NONE || board.isQuiet(killer));
