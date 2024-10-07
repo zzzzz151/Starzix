@@ -2,9 +2,10 @@
 
 #pragma once
 
+#include "utils.hpp"
 #include "board.hpp"
 
-inline u64 perft(Board &board, const int depth)
+constexpr u64 perft(Board &board, const int depth)
 {
     if (depth <= 0) return 1;
 

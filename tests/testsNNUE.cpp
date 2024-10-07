@@ -49,8 +49,6 @@ tsl::ordered_map<std::string, int> FENS_EVAL = {
 
 int main()
 {
-    initUtils();
-
     for (const auto& [fen, expectedEval] : FENS_EVAL) 
     {
         const Board board = Board(fen);

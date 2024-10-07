@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "utils.hpp"
 #include <immintrin.h>
 
 #if (defined(__AVX512F__) && defined(__AVX512BW__)) || defined(__AVX2__)
@@ -12,7 +13,7 @@
         using Vec = __m256i;
     #endif
 
-    inline Vec setEpi16(const i16 x) 
+    constexpr Vec setEpi16(const i16 x) 
     {
         #if defined(__AVX512F__) && defined(__AVX512BW__)
             return _mm512_set1_epi16(x);
@@ -21,7 +22,7 @@
         #endif
     }
 
-    inline Vec loadVec(const Vec* vecPtr)
+    constexpr Vec loadVec(const Vec* vecPtr)
     {
         #if defined(__AVX512F__) && defined(__AVX512BW__)
             return _mm512_load_si512(vecPtr);
@@ -30,7 +31,7 @@
         #endif
     }
 
-    inline Vec clampVec(const Vec vec, const Vec minVec, const Vec maxVec)
+    constexpr Vec clampVec(const Vec vec, const Vec minVec, const Vec maxVec)
     {
         #if defined(__AVX512F__) && defined(__AVX512BW__)
             return _mm512_min_epi16(_mm512_max_epi16(vec, minVec), maxVec);
@@ -39,7 +40,7 @@
         #endif
     }
 
-    inline Vec mulloEpi16(const Vec a, const Vec b)
+    constexpr Vec mulloEpi16(const Vec a, const Vec b)
     {
         #if defined(__AVX512F__) && defined(__AVX512BW__)
             return _mm512_mullo_epi16(a, b);
@@ -48,7 +49,7 @@
         #endif
     }
 
-    inline Vec maddEpi16(const Vec a, const Vec b)
+    constexpr Vec maddEpi16(const Vec a, const Vec b)
     {
         #if defined(__AVX512F__) && defined(__AVX512BW__)
             return _mm512_madd_epi16(a, b);
@@ -57,7 +58,7 @@
         #endif
     }
 
-    inline Vec addEpi32(const Vec a, const Vec b) 
+    constexpr Vec addEpi32(const Vec a, const Vec b) 
     {
         #if defined(__AVX512F__) && defined(__AVX512BW__)
             return _mm512_add_epi32(a, b);
@@ -67,7 +68,7 @@
     }
 
     // Adds the i16's in vec, returning an i32
-    inline i32 sumVec(const Vec vec) 
+    constexpr i32 sumVec(const Vec vec) 
     {
         #if defined(__AVX512F__) && defined(__AVX512BW__)
             return _mm512_reduce_add_epi32(vec);

@@ -2,10 +2,6 @@
 
 #pragma once
 
-constexpr i32 INF = 32000, 
-              MIN_MATE_SCORE = INF - 256,
-              VALUE_NONE = INF + 1;
-
 #include "board.hpp"
 #include "search_params.hpp"
 #include "history_entry.hpp"
@@ -18,7 +14,7 @@ inline SearchThread* mainThreadPtr();
 inline u64 totalNodes();
 
 // [isQuietMove][depth][moveIndex]
-constexpr MultiArray<i32, 2, MAX_DEPTH+1, 256> LMR_TABLE = []() constexpr
+const MultiArray<i32, 2, MAX_DEPTH+1, 256> LMR_TABLE = []()
 {
     MultiArray<i32, 2, MAX_DEPTH + 1, 256> lmrTable;
 
@@ -26,10 +22,10 @@ constexpr MultiArray<i32, 2, MAX_DEPTH+1, 256> LMR_TABLE = []() constexpr
         for (int move = 1; move < 256; move++)
         {
             lmrTable[false][depth][move] 
-                = round(lmrBaseNoisy() + __builtin_log(depth) * __builtin_log(move) * lmrMultiplierNoisy());
+                = round(lmrBaseNoisy() + ln(depth) * ln(move) * lmrMultiplierNoisy());
 
             lmrTable[true][depth][move] 
-                = round(lmrBaseQuiet() + __builtin_log(depth) * __builtin_log(move) * lmrMultiplierQuiet());
+                = round(lmrBaseQuiet() + ln(depth) * ln(move) * lmrMultiplierQuiet());
         }
 
     return lmrTable;

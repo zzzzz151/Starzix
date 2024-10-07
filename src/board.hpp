@@ -3,31 +3,9 @@
 #pragma once
 
 #include "utils.hpp"
+#include "attacks.hpp"
 #include "move.hpp"
 #include "search_params.hpp" // SEE piece values
-
-constexpr u64 ZOBRIST_COLOR = 591679071752537765ULL;
-
-// [color][pieceType][square]
-constexpr MultiArray<u64, 2, 6, 64> ZOBRIST_PIECES = []() consteval
-{
-    MultiArray<u64, 2, 6, 64> zobristPieces;
-    u64 rngState = 35907035218217ULL;
-
-    for (const int color : {WHITE, BLACK})
-        for (int pieceType = PAWN; pieceType <= KING; pieceType++)
-            for (Square sq = 0; sq < 64; sq++)
-                zobristPieces[color][pieceType][sq] = nextU64(rngState);
-
-    return zobristPieces;
-}();
-
-// [file]
-constexpr std::array<u64, 8> ZOBRIST_FILES = {
-    12228382040141709029ULL, 2494223668561036951ULL, 7849557628814744642ULL, 16000570245257669890ULL,
-    16614404541835922253ULL, 17787301719840479309ULL, 6371708097697762807ULL, 7487338029351702425ULL,
-};
-
 #include "cuckoo.hpp"
 
 struct BoardState {
@@ -42,7 +20,7 @@ struct BoardState {
     u16 lastMove = MOVE_NONE.encoded();
     PieceType captured = PieceType::NONE;
     u64 checkers = 0;
-    u64 pinned = ONES;
+    u64 pinned = ONES_BB;
     u64 enemyAttacks = 0;
     u64 zobristHash = 0;
     u64 pawnsHash = 0;
@@ -70,12 +48,12 @@ class Board {
 
     constexpr Board() = default;
 
-    constexpr Board(const Board &other) {
+    inline Board(const Board &other) {
         mStates = other.mStates;
         mState = mStates.empty() ? nullptr : &mStates.back();
     }
 
-    constexpr Board(std::string fen)
+    inline Board(std::string fen)
     {
         mStates = {};
         mStates.reserve(512);
@@ -286,7 +264,7 @@ class Board {
 
     public:
 
-    constexpr std::string fen() const {
+    inline std::string fen() const {
         std::string myFen = "";
 
         for (int rank = 7; rank >= 0; rank--)
@@ -357,7 +335,7 @@ class Board {
         return myFen;
     }
 
-    constexpr void print() const { 
+    inline void print() const { 
         std::string str = "";
 
         for (int i = 7; i >= 0; i--) {
@@ -561,7 +539,7 @@ class Board {
     }
 
     constexpr u64 pinned() {
-        if (mState->pinned != ONES) return mState->pinned;
+        if (mState->pinned != ONES_BB) return mState->pinned;
 
         const Square kingSquare = this->kingSquare();
         const u64 theirBishopsQueens = them() & (getBb(PieceType::BISHOP) | getBb(PieceType::QUEEN));
@@ -574,7 +552,7 @@ class Board {
 
         while (potentialAttackers > 0) {
             const Square attackerSquare = poplsb(potentialAttackers);
-            const u64 maybePinned = us() & BETWEEN[attackerSquare][kingSquare];
+            const u64 maybePinned = us() & BETWEEN_EXCLUSIVE_BB[attackerSquare][kingSquare];
 
             if (std::popcount(maybePinned) == 1)
                 mState->pinned |= maybePinned;
@@ -811,12 +789,12 @@ class Board {
         {
             // Short castle
             if ((mState->castlingRights & CASTLING_MASKS[(int)sideToMove()][false])
-            && !(occ & BETWEEN[kingSquare][kingSquare+3]))
+            && !(occ & BETWEEN_EXCLUSIVE_BB[kingSquare][kingSquare+3]))
                 moves.push_back(Move(kingSquare, kingSquare + 2, Move::CASTLING_FLAG));
 
             // Long castle
             if ((mState->castlingRights & CASTLING_MASKS[(int)sideToMove()][true])
-            && !(occ & BETWEEN[kingSquare][kingSquare-4]))
+            && !(occ & BETWEEN_EXCLUSIVE_BB[kingSquare][kingSquare-4]))
                 moves.push_back(Move(kingSquare, kingSquare - 2, Move::CASTLING_FLAG));
         }
     }
@@ -939,19 +917,19 @@ class Board {
         if (std::popcount(mState->checkers) > 1) 
             return false;
 
-        if ((LINE_THROUGH[from][to] & bitboard(kingSquare)) == 0 && (bitboard(from) & pinned()) > 0)
+        if ((LINE_THRU_BB[from][to] & bitboard(kingSquare)) == 0 && (bitboard(from) & pinned()) > 0)
             return false;
 
         // 1 checker
         if (mState->checkers > 0) {
             Square checkerSquare = lsb(mState->checkers);
-            return bitboard(to) & (BETWEEN[kingSquare][checkerSquare] | mState->checkers);
+            return bitboard(to) & (BETWEEN_EXCLUSIVE_BB[kingSquare][checkerSquare] | mState->checkers);
         }
 
         return true;
     }
 
-    constexpr Move uciToMove(const std::string uciMove) const
+    inline Move uciToMove(const std::string uciMove) const
     {
         const Square from = strToSquare(uciMove.substr(0,2));
         const Square to = strToSquare(uciMove.substr(2,4));
@@ -989,7 +967,7 @@ class Board {
         return Move(from, to, moveFlag);
     }
 
-    constexpr void makeMove(const std::string uciMove) {
+    inline void makeMove(const std::string uciMove) {
         makeMove(uciToMove(uciMove));
     }
 
@@ -1002,7 +980,7 @@ class Board {
 
         const Color oppSide = this->oppSide();
         mState->lastMove = move.encoded();
-        mState->pinned = ONES;    // will be calculated and cached when pinned() called
+        mState->pinned = ONES_BB;    // will be calculated and cached when pinned() called
         mState->enemyAttacks = 0; // will be calculated and cached when attacks() called
 
         if (move == MOVE_NONE) {
@@ -1155,7 +1133,7 @@ class Board {
                 const Square from = move.from();
                 const Square to   = move.to();
 
-                if (((BETWEEN[from][to] | bitboard(to)) ^ bitboard(to)) & occ)
+                if (((BETWEEN_EXCLUSIVE_BB[from][to] | bitboard(to)) ^ bitboard(to)) & occ)
                     continue;
 
                 if (ply > i) return true; // Repetition after root
@@ -1196,7 +1174,7 @@ class Board {
         // If in double check, only king moves are allowed
         if (numCheckers > 1) return false;
 
-        u64 movableBb = ONES;
+        u64 movableBb = ONES_BB;
         
         if (numCheckers == 1) {
             movableBb = mState->checkers;
@@ -1204,7 +1182,7 @@ class Board {
             if (mState->checkers & (getBb(PieceType::BISHOP) | getBb(PieceType::ROOK) | getBb(PieceType::QUEEN)))
             {
                 const Square checkerSquare = lsb(mState->checkers);
-                movableBb |= BETWEEN[kingSquare][checkerSquare];
+                movableBb |= BETWEEN_EXCLUSIVE_BB[kingSquare][checkerSquare];
             }
         }
 
@@ -1241,7 +1219,7 @@ class Board {
         
         while (pinnersNonDiagonal) {
             const Square pinnerSquare = poplsb(pinnersNonDiagonal);
-            pinnedNonDiagonal |= BETWEEN[pinnerSquare][kingSquare] & us();
+            pinnedNonDiagonal |= BETWEEN_EXCLUSIVE_BB[pinnerSquare][kingSquare] & us();
         }
 
         // Get pinnedDiagonal
@@ -1256,7 +1234,7 @@ class Board {
 
         while (pinnersDiagonal) {
             const Square pinnerSquare = poplsb(pinnersDiagonal);
-            pinnedDiagonal |= BETWEEN[pinnerSquare][kingSquare] & us();
+            pinnedDiagonal |= BETWEEN_EXCLUSIVE_BB[pinnerSquare][kingSquare] & us();
         }
 
         // Check if other pieces have a legal move (not king)
@@ -1281,7 +1259,7 @@ class Board {
             u64 bishopMoves = getBishopAttacks(sq, occ) & ~us() & movableBb;
 
             if (bitboard(sq) & pinnedDiagonal)
-                bishopMoves &= LINE_THROUGH[kingSquare][sq];
+                bishopMoves &= LINE_THRU_BB[kingSquare][sq];
 
             if (bishopMoves > 0) return true;
         }
@@ -1291,7 +1269,7 @@ class Board {
             u64 rookMoves = getRookAttacks(sq, occ) & ~us() & movableBb;
 
             if (bitboard(sq) & pinnedNonDiagonal)
-                rookMoves &= LINE_THROUGH[kingSquare][sq];
+                rookMoves &= LINE_THRU_BB[kingSquare][sq];
 
             if (rookMoves > 0) return true;
         }
@@ -1301,7 +1279,7 @@ class Board {
             u64 queenMoves = getQueenAttacks(sq, occ) & ~us() & movableBb;
 
             if (bitboard(sq) & (pinnedDiagonal | pinnedNonDiagonal))
-                queenMoves &= LINE_THROUGH[kingSquare][sq];
+                queenMoves &= LINE_THRU_BB[kingSquare][sq];
 
             if (queenMoves > 0) return true;
         }
@@ -1349,7 +1327,7 @@ class Board {
             u64 pawnAttacks = getPawnAttacks(sq, sideToMove()) & them() & movableBb;
 
             if (bitboard(sq) & (pinnedDiagonal | pinnedNonDiagonal)) 
-                pawnAttacks &= LINE_THROUGH[kingSquare][sq];
+                pawnAttacks &= LINE_THRU_BB[kingSquare][sq];
 
             if (pawnAttacks > 0) return true;
 
@@ -1357,7 +1335,7 @@ class Board {
 
             if (bitboard(sq) & pinnedDiagonal) continue;
 
-            const u64 pinRay = LINE_THROUGH[sq][kingSquare];
+            const u64 pinRay = LINE_THRU_BB[sq][kingSquare];
             const bool pinnedHorizontally = (bitboard(sq) & pinnedNonDiagonal) > 0 && (pinRay & (pinRay << 1)) > 0;
 
             if (pinnedHorizontally) continue;

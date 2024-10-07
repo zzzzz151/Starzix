@@ -2,21 +2,18 @@
 
 #pragma once
 
-#define stringify(myVar) (std::string)#myVar
-
 #include "array_extensions.hpp"
 #include <iostream>
 #include <string>
 #include <vector>
-#include <sstream>
 #include <cassert>
-#include <algorithm>
 #include <bitset>
 #include <chrono>
-#include <bit>
+#include <sstream>
 #include <cmath>
-#include <type_traits>
-#include <limits>
+#include <bit>
+
+// Integer types
 
 using size_t = size_t;
 using u8 = uint8_t;
@@ -29,31 +26,61 @@ using i16 = int16_t;
 using i32 = int32_t;
 using i64 = int64_t;
 
+// General utils
+
+#define stringify(myVar) (std::string)#myVar
+
+inline void trim(std::string &str) {
+    const size_t first = str.find_first_not_of(" \t\n\r");
+    const size_t last = str.find_last_not_of(" \t\n\r");
+    
+    str = first == std::string::npos 
+          ? "" 
+          : str.substr(first, last - first + 1);
+}
+
+inline std::vector<std::string> splitString(std::string &str, const char delimiter)
+{
+    trim(str);
+    if (str == "") return std::vector<std::string>{};
+
+    std::vector<std::string> strSplit;
+    std::stringstream ss(str);
+    std::string token;
+
+    while (getline(ss, token, delimiter)) 
+    {
+        trim(token);
+        strSplit.push_back(token);
+    }
+
+    return strSplit;
+}
+
+constexpr int charToInt(const char myChar) { return myChar - '0'; }
+
+constexpr double ln(const double x) {
+    assert(x > 0);
+    return log(x);
+}
+
+inline u64 millisecondsElapsed(const std::chrono::steady_clock::time_point start)
+{
+    return (std::chrono::steady_clock::now() - start) / std::chrono::milliseconds(1);
+}
+
+// Chess
+
 const std::string START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+enum class MoveGenType : u8 {
+    ALL = 0, NOISIES = 1, QUIETS = 2
+};
+
+// Square
 
 using Square = u8;
 constexpr Square SQUARE_NONE = 255;
-
-enum class Color : i8 {
-    WHITE = 0, BLACK = 1
-};
-
-constexpr int WHITE = 0, BLACK = 1;
-
-enum class PieceType : u8 {
-    PAWN = 0, KNIGHT = 1, BISHOP = 2, ROOK = 3, QUEEN = 4, KING = 5, NONE = 6
-};
-
-constexpr int PAWN = 0, KNIGHT = 1, BISHOP = 2, ROOK = 3, QUEEN = 4, KING = 5;
-
-enum class Rank : u8 {
-    RANK_1 = 0, RANK_2 = 1, RANK_3 = 2, RANK_4 = 3,
-    RANK_5 = 4, RANK_6 = 5, RANK_7 = 6, RANK_8 = 7
-};
-
-enum class File : u8 {
-    A = 0, B = 1, C = 2, D = 3, E = 4, F = 5, G = 6, H = 7
-};
 
 const std::string SQUARE_TO_STR[64] = {
     "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1",
@@ -70,15 +97,44 @@ inline Square strToSquare(const std::string strSquare) {
     return (strSquare[0] - 'a') + (strSquare[1] - '1') * 8;
 }
 
+// Color
+
+enum class Color : i8 {
+    WHITE = 0, BLACK = 1
+};
+
+constexpr int WHITE = 0, BLACK = 1;
+
 constexpr Color oppColor(const Color color) { 
     return color == Color::WHITE ? Color::BLACK : Color::WHITE;
 }
 
-constexpr Rank squareRank(const Square square) { return (Rank)(square / 8); }
+// Piece type
 
-constexpr File squareFile(const Square square) { return (File)(square % 8); }
+enum class PieceType : u8 {
+    PAWN = 0, KNIGHT = 1, BISHOP = 2, ROOK = 3, QUEEN = 4, KING = 5, NONE = 6
+};
 
-constexpr u64 ONES = 0xffff'ffff'ffff'ffff;
+constexpr int PAWN = 0, KNIGHT = 1, BISHOP = 2, ROOK = 3, QUEEN = 4, KING = 5;
+
+// Rank and file
+
+enum class Rank : u8 {
+    RANK_1 = 0, RANK_2 = 1, RANK_3 = 2, RANK_4 = 3,
+    RANK_5 = 4, RANK_6 = 5, RANK_7 = 6, RANK_8 = 7
+};
+
+enum class File : u8 {
+    A = 0, B = 1, C = 2, D = 3, E = 4, F = 5, G = 6, H = 7
+};
+
+constexpr Rank squareRank(const Square square) { return Rank(square / 8); }
+
+constexpr File squareFile(const Square square) { return File(square % 8); }
+
+// Bitboards
+
+constexpr u64 ONES_BB = 0xffff'ffff'ffff'ffff;
 
 constexpr std::array<u64, 8> RANK_BB = {
     0xffULL, 0xff00ULL, 0xff0000ULL, 0xff000000ULL, 
@@ -154,44 +210,30 @@ constexpr u64 pdep(const u64 val, u64 mask) {
     return res;
 }
 
-inline void trim(std::string &str) {
-    const size_t first = str.find_first_not_of(" \t\n\r");
-    const size_t last = str.find_last_not_of(" \t\n\r");
-    
-    str = first == std::string::npos 
-          ? "" 
-          : str.substr(first, (last - first + 1));
-}
+// Castling
 
-inline std::vector<std::string> splitString(std::string &str, const char delimiter)
+// [color][isLongCastle]
+constexpr MultiArray<u64, 2, 2> CASTLING_MASKS = {{
+    // White short and long castle
+    { bitboard(7), bitboard(0) },
+    // Black short and long castle
+    { bitboard(63), bitboard(56) } 
+}};
+
+// [kingTargetSquare]
+constexpr std::array<std::pair<Square, Square>, 64> CASTLING_ROOK_FROM_TO = []() consteval
 {
-    trim(str);
-    if (str == "") return std::vector<std::string>{};
+    std::array<std::pair<Square, Square>, 64> castlingRookFromTo = {};
 
-    std::vector<std::string> strSplit;
-    std::stringstream ss(str);
-    std::string token;
+    castlingRookFromTo[6]  = { 7, 5 };   // White short castle
+    castlingRookFromTo[2]  = { 0, 3 };   // White long castle
+    castlingRookFromTo[62] = { 63, 61 }; // Black short castle
+    castlingRookFromTo[58] = { 56, 59 }; // Black long castle
 
-    while (getline(ss, token, delimiter)) 
-    {
-        trim(token);
-        strSplit.push_back(token);
-    }
+    return castlingRookFromTo;
+}();
 
-    return strSplit;
-}
-
-constexpr int charToInt(const char myChar) { return myChar - '0'; }
-
-constexpr double ln(const double x) {
-    assert(x > 0);
-    return log(x);
-}
-
-inline u64 millisecondsElapsed(const std::chrono::steady_clock::time_point start)
-{
-    return (std::chrono::steady_clock::now() - start) / std::chrono::milliseconds(1);
-}
+// Zobrist hashing
 
 constexpr u64 nextU64(u64 &state)
 {
@@ -201,50 +243,24 @@ constexpr u64 nextU64(u64 &state)
     return state * 2685821657736338717LL;
 }
 
-enum class MoveGenType : u8 {
-    ALL = 0, NOISIES = 1, QUIETS = 2
+constexpr u64 ZOBRIST_COLOR = 591679071752537765ULL;
+
+// [color][pieceType][square]
+constexpr MultiArray<u64, 2, 6, 64> ZOBRIST_PIECES = []() consteval
+{
+    MultiArray<u64, 2, 6, 64> zobristPieces;
+    u64 rngState = 35907035218217ULL;
+
+    for (const int color : {WHITE, BLACK})
+        for (int pieceType = PAWN; pieceType <= KING; pieceType++)
+            for (Square sq = 0; sq < 64; sq++)
+                zobristPieces[color][pieceType][sq] = nextU64(rngState);
+
+    return zobristPieces;
+}();
+
+// [file]
+constexpr std::array<u64, 8> ZOBRIST_FILES = {
+    12228382040141709029ULL, 2494223668561036951ULL, 7849557628814744642ULL, 16000570245257669890ULL,
+    16614404541835922253ULL, 17787301719840479309ULL, 6371708097697762807ULL, 7487338029351702425ULL,
 };
-
-// [color][CASTLE_SHORT or CASTLE_LONG or isLongCastle]
-constexpr MultiArray<u64, 2, 2> CASTLING_MASKS = {{
-    // White short and long castle
-    { bitboard(7), bitboard(0) },
-    // Black short and long castle
-    { bitboard(63), bitboard(56) } 
-}};
-
-// [kingTargetSquare]
-std::array<std::pair<Square, Square>, 64> CASTLING_ROOK_FROM_TO = {};
-
-// [from][to] (BETWEEN excludes from and to)
-MultiArray<u64, 64, 64> BETWEEN = {}, LINE_THROUGH = {};
-
-#include "attacks.hpp"
-
-constexpr void initUtils() {
-    CASTLING_ROOK_FROM_TO[6] = {7, 5};    // White short castle
-    CASTLING_ROOK_FROM_TO[2] = {0, 3};    // White long castle
-    CASTLING_ROOK_FROM_TO[62] = {63, 61}; // Black short castle
-    CASTLING_ROOK_FROM_TO[58] = {56, 59}; // Black long castle
-
-    for (Square sq1 = 0; sq1 < 64; sq1++) {
-        for (Square sq2 = 0; sq2 < 64; sq2++) 
-        {
-            if (sq1 == sq2) continue;
-
-            LINE_THROUGH[sq1][sq2] = bitboard(sq1) | bitboard(sq2);
-
-            if (getBishopAttacks(sq1, 0) & bitboard(sq2)) 
-            {
-                BETWEEN[sq1][sq2] = getBishopAttacks(sq1, bitboard(sq2)) & getBishopAttacks(sq2, bitboard(sq1));
-                LINE_THROUGH[sq1][sq2] |= getBishopAttacks(sq1, 0) & getBishopAttacks(sq2, 0);
-            }
-            else  if (getRookAttacks(sq1, 0) & bitboard(sq2)) 
-            {
-                BETWEEN[sq1][sq2] = getRookAttacks(sq1, bitboard(sq2)) & getRookAttacks(sq2, bitboard(sq1));
-                LINE_THROUGH[sq1][sq2] |= getRookAttacks(sq1, 0) & getRookAttacks(sq2, 0);
-            }
-
-      }
-    }
-}

@@ -10,8 +10,6 @@ const std::string POSITION5 = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w 
 
 int main()
 {   
-    initUtils();
-
     // Test utils.hpp
 
     assert(bitboard(lsb(12)) == 4);
@@ -21,8 +19,8 @@ int main()
     assert(squareFile(9) == File::B);
     assert(squareRank(41) == Rank::RANK_6);
 
-    assert(BETWEEN[32][59] == (bitboard(41) | bitboard(50)));
-    assert(LINE_THROUGH[41][50] == (bitboard(32) | bitboard(41) | bitboard(50) | bitboard(59)));
+    assert(BETWEEN_EXCLUSIVE_BB[32][59] == (bitboard(41) | bitboard(50)));
+    assert(LINE_THRU_BB[41][50] == (bitboard(32) | bitboard(41) | bitboard(50) | bitboard(59)));
 
     // Move tests
     

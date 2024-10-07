@@ -1,18 +1,23 @@
 // clang-format off
 
 #pragma once
-
+/*
 // incbin fuckery
 #ifdef _MSC_VER
     #define STARZIX_MSVC
     #pragma push_macro("_MSC_VER")
     #undef _MSC_VER
 #endif
+*/
 
-#include "3rdparty/incbin.h"
-#include "board.hpp"
-#include "search_params.hpp"
-#include "simd.hpp"
+#include "utils.hpp"
+//#include "board.hpp"
+//#include "simd.hpp"
+//#include "search_params.hpp"
+//#include "3rdparty/incbin.h"
+//#include <algorithm>
+
+/*
 
 namespace nnue {
 
@@ -34,6 +39,7 @@ constexpr std::array<int, 64> INPUT_BUCKETS = {
     3, 3, 3, 3, 4, 4, 4, 4, // 7 
     3, 3, 3, 3, 4, 4, 4, 4  // 8
 };
+
 
 struct Net {
     public:
@@ -105,7 +111,7 @@ struct BothAccumulators {
         setInputBucket(Color::WHITE, board.getBb(Color::BLACK, PieceType::QUEEN));
         setInputBucket(Color::BLACK, board.getBb(Color::WHITE, PieceType::QUEEN));
 
-        auto activatePiece = [&](Color pieceColor, PieceType pt) -> void
+        auto activatePiece = [&](Color pieceColor, PieceType pt) constexpr -> void
         {
             u64 bb = board.getBb(pieceColor, pt);
 
@@ -302,7 +308,7 @@ struct BothAccumulators {
 
 }; // struct BothAccumulators
 
-inline i32 evaluate(const BothAccumulators* bothAccs, const Color sideToMove)
+constexpr i32 evaluate(const BothAccumulators* bothAccs, const Color sideToMove)
 {
     assert(bothAccs->mUpdated);
 
@@ -377,3 +383,4 @@ constexpr float materialScale(const Board &board)
 using BothAccumulators = nnue::BothAccumulators;
 using FinnyTableEntry = nnue::FinnyTableEntry;
 using FinnyTable = nnue::FinnyTable;
+*/

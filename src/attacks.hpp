@@ -71,7 +71,7 @@ constexpr std::array<u64, 64> KING_ATTACKS = []() consteval
     return kingAttacks;
 }();
 
-constexpr u64 bishopAttacksSlow(const Square sq, const u64 occupied)
+consteval u64 bishopAttacksSlow(const Square sq, const u64 occupied)
 {
     u64 attacks = 0ULL;
     int r, f;
@@ -117,7 +117,7 @@ constexpr u64 bishopAttacksSlow(const Square sq, const u64 occupied)
     return attacks;
 }
 
-constexpr u64 rookAttacksSlow(const Square sq, const u64 occupied)
+consteval u64 rookAttacksSlow(const Square sq, const u64 occupied)
 {
     u64 attacks = 0ULL;
     int r, f;
@@ -343,3 +343,45 @@ constexpr u64 getQueenAttacks(const Square square, const u64 occupancy) {
 constexpr u64 getKingAttacks(const Square square)  {        
     return internal::KING_ATTACKS[square];
 }
+
+// [from][to]
+constexpr MultiArray<u64, 64, 64> BETWEEN_EXCLUSIVE_BB = []() consteval
+{
+    MultiArray<u64, 64, 64> betweenExclusiveBb = { };
+
+    for (Square sq1 = 0; sq1 < 64; sq1++) {
+        for (Square sq2 = 0; sq2 < 64; sq2++) 
+        {
+            if (sq1 == sq2) continue;
+
+            if (getBishopAttacks(sq1, 0) & bitboard(sq2)) 
+                betweenExclusiveBb[sq1][sq2] = getBishopAttacks(sq1, bitboard(sq2)) & getBishopAttacks(sq2, bitboard(sq1));
+            else  if (getRookAttacks(sq1, 0) & bitboard(sq2)) 
+                betweenExclusiveBb[sq1][sq2] = getRookAttacks(sq1, bitboard(sq2)) & getRookAttacks(sq2, bitboard(sq1));
+      }
+    }
+
+    return betweenExclusiveBb;
+}();
+
+// [from][to]
+constexpr MultiArray<u64, 64, 64> LINE_THRU_BB = []() consteval
+{
+    MultiArray<u64, 64, 64> lineThruBb = { };
+
+    for (Square sq1 = 0; sq1 < 64; sq1++) {
+        for (Square sq2 = 0; sq2 < 64; sq2++) 
+        {
+            if (sq1 == sq2) continue;
+
+            lineThruBb[sq1][sq2] = bitboard(sq1) | bitboard(sq2);
+
+            if (getBishopAttacks(sq1, 0) & bitboard(sq2)) 
+                lineThruBb[sq1][sq2] |= getBishopAttacks(sq1, 0) & getBishopAttacks(sq2, 0);
+            else  if (getRookAttacks(sq1, 0) & bitboard(sq2)) 
+                lineThruBb[sq1][sq2] |= getRookAttacks(sq1, 0) & getRookAttacks(sq2, 0);
+      }
+    }
+
+    return lineThruBb;
+}();

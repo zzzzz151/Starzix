@@ -55,7 +55,7 @@ struct Move {
         ));
     }
 
-    constexpr Move(std::string from, std::string to, u16 flag) 
+    inline Move(std::string from, std::string to, u16 flag) 
     : Move(strToSquare(from), strToSquare(to), flag) { }
 
     constexpr u16 encoded() const { return mMove; }
@@ -88,7 +88,7 @@ struct Move {
         return PieceType::NONE;
     }
 
-    constexpr std::string toUci() const
+    inline std::string toUci() const
     {
         std::string str = SQUARE_TO_STR[from()] + SQUARE_TO_STR[to()];
         const u16 flag = this->flag();

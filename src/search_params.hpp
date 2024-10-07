@@ -2,8 +2,9 @@
 
 #pragma once
 
-#include "3rdparty/ordered_map.h"
-#include <variant>
+#include "utils.hpp"
+//#include "3rdparty/ordered_map.h"
+//#include <variant>
 
 template <typename T> struct TunableParam {
     public:
@@ -23,6 +24,10 @@ template <typename T> struct TunableParam {
     }
 
 };
+
+constexpr i32 INF = 32000;
+constexpr i32 MIN_MATE_SCORE = INF - 256;
+constexpr i32 VALUE_NONE = INF + 1;
 
 constexpr u8 MAX_DEPTH = 100;
 

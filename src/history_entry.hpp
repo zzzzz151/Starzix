@@ -2,6 +2,11 @@
 
 #pragma once
 
+#include "utils.hpp"
+#include "move.hpp"
+#include "search_params.hpp"
+#include <algorithm>
+
 constexpr void updateHistory(i16* history, i32 bonus) 
 {
     assert(abs(*history) <= HISTORY_MAX);

@@ -2,6 +2,11 @@
 
 #pragma once
 
+#include "utils.hpp"
+#include "move.hpp"
+#include "search_params.hpp"
+#include <algorithm>
+
 enum class Bound {
     NONE = 0, EXACT = 1, LOWER = 2, UPPER = 3
 };
@@ -14,19 +19,19 @@ struct TTEntry {
     u16 move = MOVE_NONE.encoded();
     u16 depthBoundAge; // from lowest to highest bits: 7 for depth, 2 for bound, 7 for age
 
-    inline i32 depth() const {
+    constexpr i32 depth() const {
         return depthBoundAge & 0b1111111;
     }
 
-    inline Bound bound() const {
+    constexpr Bound bound() const {
          return Bound((depthBoundAge >> 7) & 0b11);
     }
 
-    inline u8 age() const {
+    constexpr u8 age() const {
         return depthBoundAge >> 9;
     }
 
-    inline void adjustScore(const i16 ply) 
+    constexpr void adjustScore(const i16 ply) 
     {
         if (score >= MIN_MATE_SCORE)
             score -= ply;
@@ -34,7 +39,7 @@ struct TTEntry {
             score += ply;
     }
 
-    inline void update(const u64 newZobristHash, const u8 newDepth, const i16 ply, 
+    constexpr void update(const u64 newZobristHash, const u8 newDepth, const i16 ply, 
         const i16 newScore, const Move newBestMove, const Bound newBound, const u8 newAge)
     {
         assert((newDepth >> 7) == 0);
@@ -68,7 +73,7 @@ struct TTEntry {
 
 static_assert(sizeof(TTEntry) == 8 + 2 + 2 + 2);
 
-inline u64 TTEntryIndex(const u64 zobristHash, const auto numEntries) 
+constexpr u64 TTEntryIndex(const u64 zobristHash, const auto numEntries) 
 {
     return ((u128)zobristHash * (u128)numEntries) >> 64;
 }
@@ -83,7 +88,7 @@ inline void printTTSize(const std::vector<TTEntry> &tt)
               << std::endl;
 }
 
-inline void resizeTT(std::vector<TTEntry> &tt, i64 newSizeMB) 
+constexpr void resizeTT(std::vector<TTEntry> &tt, i64 newSizeMB) 
 {
     newSizeMB = std::clamp(newSizeMB, (i64)1, (i64)65536);
     const u64 numEntries = (u64)newSizeMB * 1024 * 1024 / (u64)sizeof(TTEntry); 
@@ -93,7 +98,7 @@ inline void resizeTT(std::vector<TTEntry> &tt, i64 newSizeMB)
     tt.shrink_to_fit();
 }
 
-inline void resetTT(std::vector<TTEntry> &tt) 
+constexpr void resetTT(std::vector<TTEntry> &tt) 
 {
     const auto numEntries = tt.size();
     tt.clear(); // remove all elements

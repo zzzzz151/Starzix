@@ -4,8 +4,6 @@
 #include "../src/board.hpp"
 
 int main() {
-    initUtils();
-
     std::ifstream inputFile("tests/SEE.txt");
     assert(inputFile.is_open());
 

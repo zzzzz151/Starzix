@@ -2,6 +2,10 @@
 
 #pragma once
 
+#include "utils.hpp"
+#include "move.hpp"
+#include "attacks.hpp"
+
 struct CuckooTable {
     public:
     std::array<u64,  8192> keys  = { };

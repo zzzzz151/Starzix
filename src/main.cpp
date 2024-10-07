@@ -5,6 +5,15 @@
     #include <sys/resource.h>
 #endif
 
+#include "nnue.hpp"
+
+int main() {
+    //std::cout << "hi" << std::endl;
+    return 0;
+}
+
+/*
+
 #include "board.hpp"
 #include "search.hpp"
 #include "uci.hpp"
@@ -39,8 +48,6 @@ int main(int argc, char* argv[])
 
     #endif
 
-    initUtils();
-
     Board board = Board(START_FEN);
 
     std::vector<TTEntry> tt;
@@ -71,3 +78,5 @@ int main(int argc, char* argv[])
 
     return 0;
 }
+
+*/

@@ -2,6 +2,10 @@
 
 #pragma once
 
+#include "utils.hpp"
+#include "board.hpp"
+#include "history_entry.hpp"
+
 enum class MoveGenStage : int {
     TT_MOVE_NEXT = 0, TT_MOVE_YIELDED, GEN_SCORE_NOISIES, GOOD_NOISIES, 
     KILLER_NEXT, KILLER_YIELDED, GEN_SCORE_QUIETS, QUIETS, BAD_NOISIES, END
