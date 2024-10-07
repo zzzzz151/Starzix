@@ -34,7 +34,7 @@ MAYBE_CONST MultiArray<i32, 2, MAX_DEPTH+1, 256> LMR_TABLE = getLmrTable();
 
 struct PlyData {
     public:
-    ArrayVec<Move, MAX_DEPTH+1> pvLine = {};
+    ArrayVec<Move, MAX_DEPTH+1> pvLine = { };
     Move killer = MOVE_NONE;
     i32 eval = VALUE_NONE;
 };
@@ -58,13 +58,13 @@ class SearchThread {
     std::array<BothAccumulators, MAX_DEPTH+1> mAccumulators;
     BothAccumulators* mAccumulatorPtr = &mAccumulators[0];
 
-    MultiArray<HistoryEntry, 2, 6, 64> mMovesHistory = {}; // [stm][pieceType][targetSquare]
+    MultiArray<HistoryEntry, 2, 6, 64> mMovesHistory = { }; // [stm][pieceType][targetSquare]
 
     std::array<u64, 1ULL << 17> mMovesNodes; // [move]
 
     // Correction histories
-    MultiArray<i16, 2, 16384>    mPawnsCorrHist    = {}; // [stm][Board.pawnsHash() % 16384]
-    MultiArray<i16, 2, 2, 16384> mNonPawnsCorrHist = {}; // [stm][pieceColor][Board.nonPawnsHash(pieceColor) % 16384]
+    MultiArray<i16, 2, 16384>    mPawnsCorrHist    = { }; // [stm][Board.pawnsHash() % 16384]
+    MultiArray<i16, 2, 2, 16384> mNonPawnsCorrHist = { }; // [stm][pieceColor][Board.nonPawnsHash(pieceColor) % 16384]
 
     FinnyTable mFinnyTable; // [color][mirrorHorizontally][inputBucket]
 
@@ -80,9 +80,9 @@ class SearchThread {
 
     inline void reset() {
         mBoard = Board(START_FEN);
-        mMovesHistory     = {};
-        mPawnsCorrHist    = {};
-        mNonPawnsCorrHist = {};
+        mMovesHistory     = { };
+        mPawnsCorrHist    = { };
+        mNonPawnsCorrHist = { };
     }
 
     inline Move bestMoveRoot() const {
@@ -101,7 +101,7 @@ class SearchThread {
         const std::chrono::time_point<std::chrono::steady_clock> startTime, 
         const i64 hardMilliseconds, 
         const i64 softMilliseconds,
-        bool printInfo)
+        const bool printInfo)
     { 
         mMaxDepth = std::clamp(maxDepth, 1, (i32)MAX_DEPTH);
         mMaxNodes = std::max(maxNodes, (i64)0);
@@ -112,7 +112,7 @@ class SearchThread {
         mStopSearch = false;
 
         mNodes = 0;
-        mMovesNodes = {};
+        mMovesNodes = { };
 
         mPliesData[0] = PlyData();
 
@@ -135,8 +135,8 @@ class SearchThread {
                     }
                     else {
                         finnyEntry.accumulator = nnue::NET->hiddenBiases[color];
-                        finnyEntry.colorBitboards  = {};
-                        finnyEntry.piecesBitboards = {};
+                        finnyEntry.colorBitboards  = { };
+                        finnyEntry.piecesBitboards = { };
                     }
                 }
 

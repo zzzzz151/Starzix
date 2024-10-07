@@ -44,7 +44,7 @@ inline void trim(std::string &str) {
 inline std::vector<std::string> splitString(std::string &str, const char delimiter)
 {
     trim(str);
-    if (str == "") return std::vector<std::string>{};
+    if (str == "") return std::vector<std::string> { };
 
     std::vector<std::string> strSplit;
     std::stringstream ss(str);
@@ -220,7 +220,7 @@ constexpr MultiArray<u64, 2, 2> CASTLING_MASKS = {{
 // [kingTargetSquare]
 constexpr std::array<std::pair<Square, Square>, 64> CASTLING_ROOK_FROM_TO = []() consteval
 {
-    std::array<std::pair<Square, Square>, 64> castlingRookFromTo = {};
+    std::array<std::pair<Square, Square>, 64> castlingRookFromTo = { };
 
     castlingRookFromTo[6]  = { 7, 5 };   // White short castle
     castlingRookFromTo[2]  = { 0, 3 };   // White long castle

@@ -93,22 +93,22 @@ struct make_void {
 };
 
 template <typename T, typename = void>
-struct has_is_transparent : std::false_type {};
+struct has_is_transparent : std::false_type { };
 
 template <typename T>
 struct has_is_transparent<T,
                           typename make_void<typename T::is_transparent>::type>
-    : std::true_type {};
+    : std::true_type { };
 
 template <typename T, typename = void>
-struct is_vector : std::false_type {};
+struct is_vector : std::false_type { };
 
 template <typename T>
 struct is_vector<T,
                  typename std::enable_if<std::is_same<
                      T, std::vector<typename T::value_type,
                                     typename T::allocator_type>>::value>::type>
-    : std::true_type {};
+    : std::true_type { };
 
 // Only available in C++17, we need to be compatible with C++11
 template <class T>
@@ -127,7 +127,7 @@ static T numeric_cast(U value,
   const bool is_same_signedness =
       (std::is_unsigned<T>::value && std::is_unsigned<U>::value) ||
       (std::is_signed<T>::value && std::is_signed<U>::value);
-  if (!is_same_signedness && (ret < T{}) != (value < U{})) {
+  if (!is_same_signedness && (ret < T{ }) != (value < U{ })) {
     TSL_OH_THROW_OR_TERMINATE(std::runtime_error, error_message);
   }
 
@@ -180,7 +180,7 @@ class bucket_entry {
           std::numeric_limits<std::uint_least32_t>::max(),
       std::uint_least32_t, std::size_t>::type;
 
-  bucket_entry() noexcept : m_index(EMPTY_MARKER_INDEX), m_hash(0) {}
+  bucket_entry() noexcept : m_index(EMPTY_MARKER_INDEX), m_hash(0) { }
 
   bool empty() const noexcept { return m_index == EMPTY_MARKER_INDEX; }
 
@@ -344,7 +344,7 @@ class ordered_hash : private Hash, private KeyEqual {
         IsConst, typename values_container_type::const_iterator,
         typename values_container_type::iterator>::type;
 
-    ordered_iterator(iterator it) noexcept : m_iterator(it) {}
+    ordered_iterator(iterator it) noexcept : m_iterator(it) { }
 
    public:
     using iterator_category = std::random_access_iterator_tag;
@@ -353,13 +353,13 @@ class ordered_hash : private Hash, private KeyEqual {
     using reference = value_type&;
     using pointer = value_type*;
 
-    ordered_iterator() noexcept {}
+    ordered_iterator() noexcept { }
 
     // Copy constructor from iterator to const_iterator.
     template <bool TIsConst = IsConst,
               typename std::enable_if<TIsConst>::type* = nullptr>
     ordered_iterator(const ordered_iterator<!TIsConst>& other) noexcept
-        : m_iterator(other.m_iterator) {}
+        : m_iterator(other.m_iterator) { }
 
     ordered_iterator(const ordered_iterator& other) = default;
     ordered_iterator(ordered_iterator&& other) = default;
@@ -520,7 +520,7 @@ class ordered_hash : private Hash, private KeyEqual {
         m_values(other.m_values),
         m_load_threshold(other.m_load_threshold),
         m_max_load_factor(other.m_max_load_factor),
-        m_grow_on_next_insert(other.m_grow_on_next_insert) {}
+        m_grow_on_next_insert(other.m_grow_on_next_insert) { }
 
   ordered_hash(ordered_hash&& other) noexcept(
       std::is_nothrow_move_constructible<
@@ -1292,7 +1292,7 @@ class ordered_hash : private Hash, private KeyEqual {
 
   template <class T = values_container_type,
             typename std::enable_if<!is_vector<T>::value>::type* = nullptr>
-  void reserve_space_for_values(size_type /*count*/) {}
+  void reserve_space_for_values(size_type /*count*/) { }
 
   /**
    * Swap the empty bucket with the values on its right until we cross another

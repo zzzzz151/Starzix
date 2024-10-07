@@ -11,8 +11,8 @@
 struct BoardState {
     public:
     Color colorToMove = Color::WHITE;
-    std::array<u64, 2> colorBitboards  = {}; // [color]
-    std::array<u64, 6> piecesBitboards = {}; // [pieceType]
+    std::array<u64, 2> colorBitboards  = { }; // [color]
+    std::array<u64, 6> piecesBitboards = { }; // [pieceType]
     u64 castlingRights = 0;
     Square enPassantSquare = SQUARE_NONE;
     u8 pliesSincePawnOrCapture = 0;
@@ -24,13 +24,13 @@ struct BoardState {
     u64 enemyAttacks = 0;
     u64 zobristHash = 0;
     u64 pawnsHash = 0;
-    std::array<u64, 2> nonPawnsHashes = {}; // [pieceColor]
+    std::array<u64, 2> nonPawnsHashes = { }; // [pieceColor]
 } __attribute__((packed));
 
 class Board {
     private:
 
-    std::vector<BoardState> mStates = {};
+    std::vector<BoardState> mStates = { };
     BoardState* mState = nullptr;
 
     public:
@@ -55,7 +55,7 @@ class Board {
 
     inline Board(std::string fen)
     {
-        mStates = {};
+        mStates = { };
         mStates.reserve(512);
         mStates.push_back(BoardState());
         mState = &mStates[0];
@@ -71,8 +71,8 @@ class Board {
 
         // Parse pieces
 
-        mState->colorBitboards  = {};
-        mState->piecesBitboards = {};
+        mState->colorBitboards  = { };
+        mState->piecesBitboards = { };
 
         const std::string fenRows = fenSplit[0];
         int currentRank = 7, currentFile = 0; // iterate ranks from top to bottom, files from left to right
@@ -117,7 +117,7 @@ class Board {
                 const char thisChar = fenCastlingRights[i];
                 const Color color = isupper(thisChar) ? Color::WHITE : Color::BLACK;
 
-                const int isLongCastle = thisChar == 'Q' || thisChar == 'q'; 
+                const bool isLongCastle = thisChar == 'Q' || thisChar == 'q'; 
                 mState->castlingRights |= CASTLING_MASKS[(int)color][isLongCastle];
             }
 
@@ -982,7 +982,7 @@ class Board {
 
         const Color oppSide = this->oppSide();
         mState->lastMove = move.encoded();
-        mState->pinned = ONES_BB;    // will be calculated and cached when pinned() called
+        mState->pinned = ONES_BB; // will be calculated and cached when pinned() called
         mState->enemyAttacks = 0; // will be calculated and cached when attacks() called
 
         if (move == MOVE_NONE) {

@@ -358,7 +358,7 @@ constexpr MultiArray<u64, 64, 64> BETWEEN_EXCLUSIVE_BB = []() consteval
                 betweenExclusiveBb[sq1][sq2] = getBishopAttacks(sq1, bitboard(sq2)) & getBishopAttacks(sq2, bitboard(sq1));
             else  if (getRookAttacks(sq1, 0) & bitboard(sq2)) 
                 betweenExclusiveBb[sq1][sq2] = getRookAttacks(sq1, bitboard(sq2)) & getRookAttacks(sq2, bitboard(sq1));
-      }
+        }
     }
 
     return betweenExclusiveBb;
@@ -380,7 +380,7 @@ constexpr MultiArray<u64, 64, 64> LINE_THRU_BB = []() consteval
                 lineThruBb[sq1][sq2] |= getBishopAttacks(sq1, 0) & getBishopAttacks(sq2, 0);
             else  if (getRookAttacks(sq1, 0) & bitboard(sq2)) 
                 lineThruBb[sq1][sq2] |= getRookAttacks(sq1, 0) & getRookAttacks(sq2, 0);
-      }
+        }
     }
 
     return lineThruBb;
