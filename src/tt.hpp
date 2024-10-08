@@ -5,7 +5,6 @@
 #include "utils.hpp"
 #include "move.hpp"
 #include "search_params.hpp"
-#include <algorithm>
 
 enum class Bound {
     NONE = 0, EXACT = 1, LOWER = 2, UPPER = 3

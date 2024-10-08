@@ -9,7 +9,6 @@
 #include "tt.hpp"
 #include "history_entry.hpp"
 #include "nnue.hpp"
-#include <algorithm>
 
 // [isQuietMove][depth][moveIndex]
 inline MultiArray<i32, 2, MAX_DEPTH + 1, 256> getLmrTable() 

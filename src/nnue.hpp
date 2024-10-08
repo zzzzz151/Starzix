@@ -6,7 +6,6 @@
 #include "board.hpp"
 #include "simd.hpp"
 #include "search_params.hpp"
-#include <algorithm>
 
 // incbin fuckery
 #ifdef _MSC_VER
