@@ -68,7 +68,7 @@
     }
 
     // Adds the i16's in vec, returning an i32
-    constexpr i32 sumVec(const Vec vec) 
+    inline i32 sumVec(const Vec vec) 
     {
         #if defined(__AVX512F__) && defined(__AVX512BW__)
             return _mm512_reduce_add_epi32(vec);
