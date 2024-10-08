@@ -1,4 +1,4 @@
-CXXFLAGS = -std=c++20 -march=native -O3 -funroll-loops -flto -fuse-ld=lld -fno-exceptions -Wunused -Wall -Wextra
+CXXFLAGS = -std=c++20 -march=native -O3 -funroll-loops -flto -fuse-ld=lld -fno-exceptions -Wunused -Wall -Wextra -fconstexpr-steps=100000000
 SUFFIX =
 
 ifeq ($(OS), Windows_NT)
@@ -26,6 +26,8 @@ all:
 	$(COMPILER) $(CXXFLAGS) -DNDEBUG src/*.cpp -o $(EXE)$(SUFFIX)
 test:
 	$(COMPILER) $(CXXFLAGS) tests/tests.cpp -o testsCore$(SUFFIX)
-	$(COMPILER) $(CXXFLAGS) tests/testsSEE.cpp -o testsSEE$(SUFFIX)
+	$(COMPILER) $(CXXFLAGS) -DTUNE tests/testsSEE.cpp -o testsSEE$(SUFFIX)
 	$(COMPILER) $(CXXFLAGS) tests/testsNNUE.cpp -o testsNNUE$(SUFFIX)
+tune:
+	$(COMPILER) $(CXXFLAGS) -DNDEBUG -DTUNE src/*.cpp -o $(EXE)$(SUFFIX)
 	

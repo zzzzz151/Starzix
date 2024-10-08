@@ -34,54 +34,54 @@ struct ArrayVec
 
     public:
 
-    inline ArrayVec() = default;
+    constexpr ArrayVec() = default;
 
-    inline T operator[](const std::size_t i) const
+    constexpr T operator[](const std::size_t i) const
     {
         assert(i < mSize);
         return mArr[i];
     }
 
-    inline T& operator[](const std::size_t i)
+    constexpr T& operator[](const std::size_t i)
     {
         assert(i < mSize);
         return mArr[i];
     }
 
-    inline T* ptr(const std::size_t i) const
+    constexpr auto begin() const {
+        return mArr.begin();
+    }
+
+    constexpr auto end() const {
+        return mArr.begin() + mSize;
+    }
+
+    constexpr T* ptr(const std::size_t i) const
     {
         assert(i < mSize);
         return &mArr[i];
     }
 
-    inline std::size_t size() const { 
+    constexpr std::size_t size() const { 
         return mSize; 
     }
 
-    inline void clear(){ mSize = 0; }
+    constexpr void clear(){ mSize = 0; }
 
-    inline void push_back(const T elem) { 
+    constexpr void push_back(const T elem) { 
         assert(mSize < N);
         mArr[mSize++] = elem;
     }
 
-    inline void pop_back() { 
+    constexpr void pop_back() { 
         assert(mSize > 0);
         mSize--;
     }
 
-    inline void swap(const std::size_t i, const std::size_t j) 
+    constexpr void swap(const std::size_t i, const std::size_t j) 
     {
         assert(i < mSize && j < mSize);
         std::swap(mArr[i], mArr[j]);
-    }
-
-    inline auto begin() const {
-        return mArr.begin();
-    }
-
-    inline auto end() const {
-        return mArr.begin() + mSize;
     }
 
 }; // struct ArrayVec

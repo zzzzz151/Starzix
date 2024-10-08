@@ -21,3 +21,6 @@ sprt.py
 *.epd
 *.pgn
 
+**/sample.cpp
+**/test.cpp
+

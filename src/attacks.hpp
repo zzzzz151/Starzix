@@ -4,39 +4,74 @@
 
 #include "utils.hpp"
 
-namespace attacks {
-
 namespace internal {
     
-MultiArray<u64, 2, 64> PAWN_ATTACKS; // [color][square]
-std::array<u64, 64> KNIGHT_ATTACKS;  // [square]
-std::array<u64, 64> KING_ATTACKS;    // [square]
-
-std::array<u64, 64> BISHOP_ATKS_EMPTY_BOARD_NO_EDGES; // [square]
-std::array<u64, 64> ROOK_ATKS_EMPTY_BOARD_NO_EDGES;   // [square]
-
-MultiArray<u64, 64, 1ULL << 9ULL>  BISHOP_ATTACKS_TABLE; // [square][index]
-MultiArray<u64, 64, 1ULL << 12ULL> ROOK_ATTACKS_TABLE;   // [square][index]
-
-constexpr u64 pawnAttacksSlow(const Square square, const Color color)
+// [color][square]
+constexpr MultiArray<u64, 2, 64> PAWN_ATTACKS = []() consteval
 {
-    const Rank rank = squareRank(square);
+    MultiArray<u64, 2, 64> pawnAttacks;
 
-    if ((color == Color::WHITE && rank == Rank::RANK_8) 
-    ||  (color == Color::BLACK && rank == Rank::RANK_1))
-        return 0ULL;
+    auto getPawnAttacks = [](const Square square, const Color color) consteval -> u64
+    {   
+        const Rank rank = squareRank(square);
 
-    const File file = squareFile(square);
+        if ((color == Color::WHITE && rank == Rank::RANK_8) 
+        ||  (color == Color::BLACK && rank == Rank::RANK_1))
+            return 0;
 
-    const int squareDiagonalLeft  = (int)square + (color == Color::WHITE ? 7 : -9);
-    const int squareDiagonalRight = (int)square + (color == Color::WHITE ? 9 : -7);
+        const File file = squareFile(square);
 
-    return file == File::A ? bitboard(squareDiagonalRight)
-         : file == File::H ? bitboard(squareDiagonalLeft)
-         : bitboard(squareDiagonalLeft) | bitboard(squareDiagonalRight);
-}
+        const int squareDiagonalLeft  = (int)square + (color == Color::WHITE ? 7 : -9);
+        const int squareDiagonalRight = (int)square + (color == Color::WHITE ? 9 : -7);
 
-constexpr u64 bishopAttacksSlow(const Square sq, const u64 occupied, const bool excludeEdges = false)
+        return file == File::A ? bitboard(squareDiagonalRight)
+             : file == File::H ? bitboard(squareDiagonalLeft)
+             : bitboard(squareDiagonalLeft) | bitboard(squareDiagonalRight);
+    };
+
+    for (const Color color : {Color::WHITE, Color::BLACK})
+        for (Square square = 0; square < 64; square++)
+            pawnAttacks[(int)color][square] = getPawnAttacks(square, color);
+
+    return pawnAttacks;
+}();
+
+// [square]
+constexpr std::array<u64, 64> KNIGHT_ATTACKS = []() consteval
+{
+    std::array<u64, 64> knightAttacks;
+
+    for (Square square = 0; square < 64; square++)
+    {
+        const u64 sqBb = bitboard(square);
+        const u64 h1 = ((sqBb >> 1ULL) & 0x7f7f7f7f7f7f7f7fULL) | ((sqBb << 1ULL) & 0xfefefefefefefefeULL);
+        const u64 h2 = ((sqBb >> 2ULL) & 0x3f3f3f3f3f3f3f3fULL) | ((sqBb << 2ULL) & 0xfcfcfcfcfcfcfcfcULL);
+        knightAttacks[square] = (h1 << 16ULL) | (h1 >> 16ULL) | (h2 << 8ULL) | (h2 >> 8ULL);
+    }
+
+    return knightAttacks;
+}();
+
+// [square]
+constexpr std::array<u64, 64> KING_ATTACKS = []() consteval
+{
+    std::array<u64, 64> kingAttacks;
+
+    for (Square square = 0; square < 64; square++)
+    {
+        const u64 sqBb = bitboard(square);
+        kingAttacks[square] = sqBb;
+        kingAttacks[square] |= (sqBb >> 1ULL) & 0x7f7f7f7f7f7f7f7fULL; // shifted left
+        kingAttacks[square] |= (sqBb << 1ULL) & 0xfefefefefefefefeULL; // shifted right
+        kingAttacks[square] |= kingAttacks[square] << 8ULL; // shifted up
+        kingAttacks[square] |= kingAttacks[square] >> 8ULL; // shifted down
+        kingAttacks[square] ^= sqBb;
+    }
+
+    return kingAttacks;
+}();
+
+consteval u64 bishopAttacksSlow(const Square sq, const u64 occupied)
 {
     u64 attacks = 0ULL;
     int r, f;
@@ -45,9 +80,6 @@ constexpr u64 bishopAttacksSlow(const Square sq, const u64 occupied, const bool 
 
     for (r = rank + 1, f = file + 1; r >= 0 && r <= 7 && f >= 0 && f <= 7; r++, f++)
     {
-        if (excludeEdges && (f == 7 || r == 7))
-            break;
-
         const Square sq = r * 8 + f;
         attacks |= bitboard(sq);
 
@@ -57,9 +89,6 @@ constexpr u64 bishopAttacksSlow(const Square sq, const u64 occupied, const bool 
 
     for (r = rank - 1, f = file + 1; r >= 0 && r <= 7 && f >= 0 && f <= 7; r--, f++)
     {
-        if (excludeEdges && (r == 0 || f == 7))
-            break;
-
         const Square sq = r * 8 + f;
         attacks |= bitboard(sq);
 
@@ -69,9 +98,6 @@ constexpr u64 bishopAttacksSlow(const Square sq, const u64 occupied, const bool 
 
     for (r = rank + 1, f = file - 1; r >= 0 && r <= 7 && f >= 0 && f <= 7; r++, f--)
     {
-        if (excludeEdges && (r == 7 || f == 0))
-            break;
-
         const Square sq = r * 8 + f;
         attacks |= bitboard(sq);
 
@@ -81,9 +107,6 @@ constexpr u64 bishopAttacksSlow(const Square sq, const u64 occupied, const bool 
 
     for (r = rank - 1, f = file - 1; r >= 0 && r <= 7 && f >= 0 && f <= 7; r--, f--)
     {
-        if (excludeEdges && (r == 0 || f == 0))
-            break;
-
         const Square sq = r * 8 + f;
         attacks |= bitboard(sq);
 
@@ -94,7 +117,7 @@ constexpr u64 bishopAttacksSlow(const Square sq, const u64 occupied, const bool 
     return attacks;
 }
 
-constexpr u64 rookAttacksSlow(const Square sq, const u64 occupied, const bool excludeEdges = false)
+consteval u64 rookAttacksSlow(const Square sq, const u64 occupied)
 {
     u64 attacks = 0ULL;
     int r, f;
@@ -103,9 +126,6 @@ constexpr u64 rookAttacksSlow(const Square sq, const u64 occupied, const bool ex
 
     for (r = rank + 1; r >= 0 && r <= 7; r++)
     {
-        if (excludeEdges && r == 7)
-            break;
-
         const Square sq = r * 8 + file;
         attacks |= bitboard(sq);
 
@@ -115,9 +135,6 @@ constexpr u64 rookAttacksSlow(const Square sq, const u64 occupied, const bool ex
 
     for (r = rank - 1; r >= 0 && r <= 7; r--)
     {
-        if (excludeEdges && r == 0)
-            break;
-
         const Square sq = r * 8 + file;
         attacks |= bitboard(sq);
 
@@ -127,9 +144,6 @@ constexpr u64 rookAttacksSlow(const Square sq, const u64 occupied, const bool ex
 
     for (f = file + 1; f >= 0 && f <= 7; f++)
     {
-        if (excludeEdges && f == 7)
-            break;
-
         const Square sq = rank * 8 + f;
         attacks |= bitboard(sq);
 
@@ -139,9 +153,6 @@ constexpr u64 rookAttacksSlow(const Square sq, const u64 occupied, const bool ex
 
     for (f = file - 1; f >= 0 && f <= 7; f--)
     {
-        if (excludeEdges && f == 0)
-            break;
-
         const Square sq = rank * 8 + f;
         attacks |= bitboard(sq);
 
@@ -152,6 +163,50 @@ constexpr u64 rookAttacksSlow(const Square sq, const u64 occupied, const bool ex
     return attacks;
 }
 
+// [square]
+constexpr std::array<u64, 64> BISHOP_ATKS_EMPTY_BOARD_EXCLUDING_LAST_SQ_EACH_DIR = []() consteval
+{
+    std::array<u64, 64> bishopAttacks;
+    constexpr u64 NO_EDGES_BB = 0x7e7e7e7e7e7e00ULL;
+
+    for (Square square = 0; square < 64; square++)
+        bishopAttacks[square] = bishopAttacksSlow(square, 0) & NO_EDGES_BB;
+
+    return bishopAttacks;
+}();
+
+// [square]
+constexpr std::array<u64, 64> ROOK_ATKS_EMPTY_BOARD_EXCLUDING_LAST_SQ_EACH_DIR = []() consteval
+{
+    std::array<u64, 64> rookAttacks;
+
+    for (Square square = 0; square < 64; square++)
+    {
+        rookAttacks[square] = rookAttacksSlow(square, 0);
+
+        // remove corners
+        rookAttacks[square] &= ~(bitboard(0) | bitboard(7) | bitboard(56) | bitboard(63));
+
+        const Rank rank = squareRank(square);
+        const File file = squareFile(square);
+
+        if (rank != Rank::RANK_1) 
+            rookAttacks[square] &= ~RANK_BB[(int)Rank::RANK_1];
+
+        if (rank != Rank::RANK_8) 
+            rookAttacks[square] &= ~RANK_BB[(int)Rank::RANK_8];
+
+        if (file != File::A) 
+            rookAttacks[square] &= ~FILE_BB[(int)File::A];
+
+        if (file != File::H) 
+    	    rookAttacks[square] &= ~FILE_BB[(int)File::H];
+    }
+
+    return rookAttacks;
+}();
+
+// [square]
 constexpr u64 BISHOP_SHIFTS[64] = {
     58, 59, 59, 59, 59, 59, 59, 58, 
     59, 59, 59, 59, 59, 59, 59, 59, 
@@ -163,6 +218,7 @@ constexpr u64 BISHOP_SHIFTS[64] = {
     58, 59, 59, 59, 59, 59, 59, 58
 };
 
+// [square]
 constexpr u64 ROOK_SHIFTS[64] = {
     52, 53, 53, 53, 53, 53, 53, 52, 
     53, 54, 54, 54, 54, 54, 54, 53, 
@@ -174,6 +230,7 @@ constexpr u64 ROOK_SHIFTS[64] = {
     52, 53, 53, 53, 53, 53, 53, 52
 };
 
+// [square]
 constexpr u64 BISHOP_MAGICS[64] = {
     0x89a1121896040240ULL, 0x2004844802002010ULL, 0x2068080051921000ULL, 0x62880a0220200808ULL,
     0x4042004000000ULL, 0x100822020200011ULL, 0xc00444222012000aULL, 0x28808801216001ULL,
@@ -193,6 +250,7 @@ constexpr u64 BISHOP_MAGICS[64] = {
     0x1000042304105ULL, 0x10008830412a00ULL, 0x2520081090008908ULL, 0x40102000a0a60140ULL,
 };
 
+// [square]
 constexpr u64 ROOK_MAGICS[64] = {
     0xa8002c000108020ULL, 0x6c00049b0002001ULL, 0x100200010090040ULL, 0x2480041000800801ULL, 
     0x280028004000800ULL, 0x900410008040022ULL, 0x280020001001080ULL, 0x2880002041000080ULL,
@@ -212,95 +270,118 @@ constexpr u64 ROOK_MAGICS[64] = {
     0x489a000810200402ULL, 0x1004400080a13ULL, 0x4000011008020084ULL, 0x26002114058042ULL,
 };
 
-} // namespace attacks::internal
+// [square][index]
+constexpr MultiArray<u64, 64, 1ULL << 9ULL> BISHOP_ATTACKS_TABLE = []() consteval
+{    
+    MultiArray<u64, 64, 1ULL << 9ULL> bishopAttacksTable = { };
 
-constexpr void init()
-{
-    using namespace internal;
-
-    // Init pawn, king and knight attacks
-    u64 king = 1;
-    for (int square = 0; square < 64; square++)
-    {
-        // Pawn
-        internal::PAWN_ATTACKS[0][square] = pawnAttacksSlow(square, Color::WHITE);
-        internal::PAWN_ATTACKS[1][square] = pawnAttacksSlow(square, Color::BLACK);
-
-        // Knight
-        const u64 sqBb = bitboard(square);
-        const u64 h1 = ((sqBb >> 1ULL) & 0x7f7f7f7f7f7f7f7fULL) | ((sqBb << 1ULL) & 0xfefefefefefefefeULL);
-        const u64 h2 = ((sqBb >> 2ULL) & 0x3f3f3f3f3f3f3f3fULL) | ((sqBb << 2ULL) & 0xfcfcfcfcfcfcfcfcULL);
-        KNIGHT_ATTACKS[square] = (h1 << 16ULL) | (h1 >> 16ULL) | (h2 << 8ULL) | (h2 >> 8ULL);
-
-        // King
-        u64 attacks = shiftLeft(king) | shiftRight(king) | king;
-        attacks = (attacks | shiftUp(attacks) | shiftDown(attacks)) ^ king;
-        KING_ATTACKS[square] = attacks;
-        king <<= 1ULL;
-    }
-
-    // Init slider attacks on an empty board
     for (Square sq = 0; sq < 64; sq++)
     {
-        // last arg true = exclude last square of each direction
-        BISHOP_ATKS_EMPTY_BOARD_NO_EDGES[sq] = bishopAttacksSlow(sq, 0ULL, true);
-        ROOK_ATKS_EMPTY_BOARD_NO_EDGES[sq]   = rookAttacksSlow(sq, 0ULL, true);
-    }
+        const u64 numBlockersArrangements = 1ULL << std::popcount(BISHOP_ATKS_EMPTY_BOARD_EXCLUDING_LAST_SQ_EACH_DIR[sq]);
 
-    // Init slider tables
-    for (Square sq = 0; sq < 64; sq++)
-    {
-        // Bishop
-        u64 numBlockersArrangements = 1ULL << std::popcount(BISHOP_ATKS_EMPTY_BOARD_NO_EDGES[sq]);
         for (u64 n = 0; n < numBlockersArrangements; n++)
         {
-            const u64 blockersArrangement = pdep(n, BISHOP_ATKS_EMPTY_BOARD_NO_EDGES[sq]);
+            const u64 blockersArrangement = pdep(n, BISHOP_ATKS_EMPTY_BOARD_EXCLUDING_LAST_SQ_EACH_DIR[sq]);
             const u64 index = (blockersArrangement * BISHOP_MAGICS[sq]) >> BISHOP_SHIFTS[sq];
-            BISHOP_ATTACKS_TABLE[sq][index] = bishopAttacksSlow(sq, blockersArrangement);
-        }
-
-        // Rook
-        numBlockersArrangements = 1ULL << std::popcount(ROOK_ATKS_EMPTY_BOARD_NO_EDGES[sq]);
-        for (u64 n = 0; n < numBlockersArrangements; n++)
-        {
-            const u64 blockersArrangement = pdep(n, ROOK_ATKS_EMPTY_BOARD_NO_EDGES[sq]);
-            const u64 index = (blockersArrangement * ROOK_MAGICS[sq]) >> ROOK_SHIFTS[sq];
-            ROOK_ATTACKS_TABLE[sq][index] = rookAttacksSlow(sq, blockersArrangement);
+            bishopAttacksTable[sq][index] = bishopAttacksSlow(sq, blockersArrangement);
         }
     }
 
-}
+    return bishopAttacksTable;
+}();
 
-inline u64 pawnAttacks(const Square square, const Color color) {
+// [square][index]
+constexpr MultiArray<u64, 64, 1ULL << 12ULL> ROOK_ATTACKS_TABLE = []() consteval
+{
+    MultiArray<u64, 64, 1ULL << 12ULL> rookAttacksTable = { };
+
+    for (Square sq = 0; sq < 64; sq++)
+    {
+        const u64 numBlockersArrangements = 1ULL << std::popcount(ROOK_ATKS_EMPTY_BOARD_EXCLUDING_LAST_SQ_EACH_DIR[sq]);
+
+        for (u64 n = 0; n < numBlockersArrangements; n++)
+        {
+            const u64 blockersArrangement = pdep(n, ROOK_ATKS_EMPTY_BOARD_EXCLUDING_LAST_SQ_EACH_DIR[sq]);
+            const u64 index = (blockersArrangement * ROOK_MAGICS[sq]) >> ROOK_SHIFTS[sq];
+            rookAttacksTable[sq][index] = rookAttacksSlow(sq, blockersArrangement);
+        }
+    }
+
+    return rookAttacksTable;
+}();
+
+} // namespace internal
+
+constexpr u64 getPawnAttacks(const Square square, const Color color) {
     return internal::PAWN_ATTACKS[(int)color][square];
 }
 
-inline u64 knightAttacks(const Square square)  { 
+constexpr u64 getKnightAttacks(const Square square)  { 
     return internal::KNIGHT_ATTACKS[square];
 }
 
-inline u64 bishopAttacks(const Square square, const u64 occupancy)
+constexpr u64 getBishopAttacks(const Square square, const u64 occupancy)
 {
     using namespace internal;
-    const u64 blockers = occupancy & BISHOP_ATKS_EMPTY_BOARD_NO_EDGES[square];
+    const u64 blockers = occupancy & BISHOP_ATKS_EMPTY_BOARD_EXCLUDING_LAST_SQ_EACH_DIR[square];
     const u64 index = (blockers * BISHOP_MAGICS[square]) >> BISHOP_SHIFTS[square];
     return BISHOP_ATTACKS_TABLE[square][index];
 }
 
-inline u64 rookAttacks(const Square square, const u64 occupancy)
+constexpr u64 getRookAttacks(const Square square, const u64 occupancy)
 {
     using namespace internal;
-    const u64 blockers = occupancy & ROOK_ATKS_EMPTY_BOARD_NO_EDGES[square];
+    const u64 blockers = occupancy & ROOK_ATKS_EMPTY_BOARD_EXCLUDING_LAST_SQ_EACH_DIR[square];
     const u64 index = (blockers * ROOK_MAGICS[square]) >> ROOK_SHIFTS[square];
     return ROOK_ATTACKS_TABLE[square][index];
 }
 
-inline u64 queenAttacks(const Square square, const u64 occupancy) {
-    return bishopAttacks(square, occupancy) | rookAttacks(square, occupancy);
+constexpr u64 getQueenAttacks(const Square square, const u64 occupancy) {
+    return getBishopAttacks(square, occupancy) | getRookAttacks(square, occupancy);
 }
 
-inline u64 kingAttacks(const Square square)  {        
+constexpr u64 getKingAttacks(const Square square)  {        
     return internal::KING_ATTACKS[square];
 }
 
-} // namespace attacks
+// [from][to]
+constexpr MultiArray<u64, 64, 64> BETWEEN_EXCLUSIVE_BB = []() consteval
+{
+    MultiArray<u64, 64, 64> betweenExclusiveBb = { };
+
+    for (Square sq1 = 0; sq1 < 64; sq1++) {
+        for (Square sq2 = 0; sq2 < 64; sq2++) 
+        {
+            if (sq1 == sq2) continue;
+
+            if (getBishopAttacks(sq1, 0) & bitboard(sq2)) 
+                betweenExclusiveBb[sq1][sq2] = getBishopAttacks(sq1, bitboard(sq2)) & getBishopAttacks(sq2, bitboard(sq1));
+            else  if (getRookAttacks(sq1, 0) & bitboard(sq2)) 
+                betweenExclusiveBb[sq1][sq2] = getRookAttacks(sq1, bitboard(sq2)) & getRookAttacks(sq2, bitboard(sq1));
+        }
+    }
+
+    return betweenExclusiveBb;
+}();
+
+// [from][to]
+constexpr MultiArray<u64, 64, 64> LINE_THRU_BB = []() consteval
+{
+    MultiArray<u64, 64, 64> lineThruBb = { };
+
+    for (Square sq1 = 0; sq1 < 64; sq1++) {
+        for (Square sq2 = 0; sq2 < 64; sq2++) 
+        {
+            if (sq1 == sq2) continue;
+
+            lineThruBb[sq1][sq2] = bitboard(sq1) | bitboard(sq2);
+
+            if (getBishopAttacks(sq1, 0) & bitboard(sq2)) 
+                lineThruBb[sq1][sq2] |= getBishopAttacks(sq1, 0) & getBishopAttacks(sq2, 0);
+            else  if (getRookAttacks(sq1, 0) & bitboard(sq2)) 
+                lineThruBb[sq1][sq2] |= getRookAttacks(sq1, 0) & getRookAttacks(sq2, 0);
+        }
+    }
+
+    return lineThruBb;
+}();

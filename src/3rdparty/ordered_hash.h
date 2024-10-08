@@ -118,7 +118,7 @@ const T& clamp(const T& v, const T& lo, const T& hi) {
 
 template <typename T, typename U>
 static T numeric_cast(U value,
-                      const char* error_message [[maybe_unused]] = "numeric_cast() failed.") {
+                      [[maybe_unused]] const char* error_message = "numeric_cast() failed.") {
   T ret = static_cast<T>(value);
   if (static_cast<U>(ret) != value) {
     TSL_OH_THROW_OR_TERMINATE(std::runtime_error, error_message);

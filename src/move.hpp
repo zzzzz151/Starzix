@@ -28,19 +28,19 @@ struct Move {
         QUEEN_PROMOTION_FLAG  = 0x000D,
         CASTLING_FLAG         = 0x000F;
 
-    inline bool operator==(const Move other) const {
+    constexpr bool operator==(const Move other) const {
         return mMove == other.mMove;
     }
 
-    inline bool operator!=(const Move other) const {
+    constexpr bool operator!=(const Move other) const {
         return mMove != other.mMove;
     }
 
-    inline Move() = default;
+    constexpr Move() = default;
 
-    inline Move(const u16 move) { mMove = move; }
+    constexpr Move(const u16 move) { mMove = move; }
 
-    inline Move(const Square from, const Square to, const u16 flag)
+    constexpr Move(const Square from, const Square to, const u16 flag)
     {
         assert(from <= 63 && to <= 63);
         mMove = (u16)from << 10;
@@ -58,15 +58,15 @@ struct Move {
     inline Move(std::string from, std::string to, u16 flag) 
     : Move(strToSquare(from), strToSquare(to), flag) { }
 
-    inline u16 encoded() const { return mMove; }
+    constexpr u16 encoded() const { return mMove; }
 
-    inline Square from() const { return (mMove >> 10) & 0b111111; }
+    constexpr Square from() const { return (mMove >> 10) & 0b111111; }
 
-    inline Square to() const { return (mMove >> 4) & 0b111111; }
+    constexpr Square to() const { return (mMove >> 4) & 0b111111; }
 
-    inline u16 flag() const { return mMove & 0x000F; }
+    constexpr u16 flag() const { return mMove & 0x000F; }
 
-    inline PieceType pieceType() const
+    constexpr PieceType pieceType() const
     {
         const auto flag = this->flag();
         if (flag == NULL_FLAG)
@@ -78,7 +78,7 @@ struct Move {
         return PieceType::PAWN;
     }
 
-    inline PieceType promotion() const
+    constexpr PieceType promotion() const
     {
         const u16 flag = this->flag();
 

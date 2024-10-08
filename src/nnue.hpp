@@ -2,6 +2,12 @@
 
 #pragma once
 
+#include "utils.hpp"
+#include "board.hpp"
+#include "simd.hpp"
+#include "search_params.hpp"
+#include <algorithm>
+
 // incbin fuckery
 #ifdef _MSC_VER
     #define STARZIX_MSVC
@@ -10,9 +16,6 @@
 #endif
 
 #include "3rdparty/incbin.h"
-#include "board.hpp"
-#include "search_params.hpp"
-#include "simd.hpp"
 
 namespace nnue {
 
@@ -34,6 +37,7 @@ constexpr std::array<int, 64> INPUT_BUCKETS = {
     3, 3, 3, 3, 4, 4, 4, 4, // 7 
     3, 3, 3, 3, 4, 4, 4, 4  // 8
 };
+
 
 struct Net {
     public:
@@ -82,7 +86,7 @@ struct BothAccumulators {
 
     bool mUpdated = false;
 
-    inline bool operator==(const BothAccumulators other) const 
+    constexpr bool operator==(const BothAccumulators other) const 
     {
         return mAccumulators == other.mAccumulators
                && mMirrorHorizontally == other.mMirrorHorizontally
@@ -90,7 +94,7 @@ struct BothAccumulators {
                && mUpdated == other.mUpdated;
     }
 
-    inline BothAccumulators() = default;
+    constexpr BothAccumulators() = default;
 
     inline BothAccumulators(const Board &board) 
     {
@@ -105,7 +109,7 @@ struct BothAccumulators {
         setInputBucket(Color::WHITE, board.getBb(Color::BLACK, PieceType::QUEEN));
         setInputBucket(Color::BLACK, board.getBb(Color::WHITE, PieceType::QUEEN));
 
-        auto activatePiece = [&](Color pieceColor, PieceType pt) -> void
+        auto activatePiece = [&](Color pieceColor, PieceType pt) constexpr -> void
         {
             u64 bb = board.getBb(pieceColor, pt);
 
@@ -132,7 +136,7 @@ struct BothAccumulators {
 
     private:
 
-    inline int setInputBucket(const Color color, const u64 enemyQueensBb)
+    constexpr int setInputBucket(const Color color, const u64 enemyQueensBb)
     {
         if (std::popcount(enemyQueensBb) != 1) 
             mInputBucket[(int)color] = 0;
@@ -148,7 +152,7 @@ struct BothAccumulators {
         return mInputBucket[(int)color];
     }
 
-    inline int feature768(
+    constexpr int feature768(
         const Color pieceColor, const PieceType pt, Square sq, const bool mirrorHorizontally) const
     {
         if (mirrorHorizontally) sq ^= 7;
@@ -158,7 +162,7 @@ struct BothAccumulators {
         return (int)pieceColor * 384 + (int)pt * 64 + (int)sq;
     }
 
-    inline void updateFinnyEntryAndAccumulator(FinnyTable &finnyTable, const Color accColor, const Board &board) 
+    constexpr void updateFinnyEntryAndAccumulator(FinnyTable &finnyTable, const Color accColor, const Board &board) 
     {
         const int iAccColor = (int)accColor;
         const auto hm = mMirrorHorizontally[iAccColor];
@@ -203,7 +207,7 @@ struct BothAccumulators {
 
     public:
 
-    inline void update(BothAccumulators* prevBothAccs, const Board &board, FinnyTable &finnyTable)
+    constexpr void update(BothAccumulators* prevBothAccs, const Board &board, FinnyTable &finnyTable)
     {
         assert(prevBothAccs->mUpdated && !mUpdated);
 
@@ -302,7 +306,7 @@ struct BothAccumulators {
 
 }; // struct BothAccumulators
 
-inline i32 evaluate(const BothAccumulators* bothAccs, const Color sideToMove)
+constexpr i32 evaluate(const BothAccumulators* bothAccs, const Color sideToMove)
 {
     assert(bothAccs->mUpdated);
 
@@ -360,7 +364,7 @@ inline i32 evaluate(const BothAccumulators* bothAccs, const Color sideToMove)
 
 } // namespace nnue
 
-inline float materialScale(const Board &board) 
+MAYBE_CONSTEXPR float materialScale(const Board &board) 
 {
     const float material = 3 * std::popcount(board.getBb(PieceType::KNIGHT))
                          + 3 * std::popcount(board.getBb(PieceType::BISHOP))

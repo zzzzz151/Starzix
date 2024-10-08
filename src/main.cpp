@@ -1,13 +1,14 @@
 // clang-format off
 
+#include "utils.hpp"
+#include "board.hpp"
+#include "search.hpp"
+#include "uci.hpp"
+
 // On Linux, include the library needed to set stack size
 #if defined(__GNUC__)
     #include <sys/resource.h>
 #endif
-
-#include "board.hpp"
-#include "search.hpp"
-#include "uci.hpp"
 
 int main(int argc, char* argv[])
 {
@@ -39,18 +40,11 @@ int main(int argc, char* argv[])
 
     #endif
 
-    initUtils();
-    initZobrist();
-    cuckoo::init();
-    initLmrTable();
-
-    Board board = Board(START_FEN);
-
     std::vector<TTEntry> tt;
-    resizeTT(tt, 32);
-    printTTSize(tt);
+    resizeTT(&tt, 32);
+    printTTSize(&tt);
     
-    gSearchThreads = { SearchThread(&tt) }; // create main search thread
+    SearchThread searchThread = SearchThread(&tt);
 
     // If a command is passed in program args, run it and exit
 
@@ -62,14 +56,14 @@ int main(int argc, char* argv[])
     trim(command);
 
     if (command != "") {
-        uci::runCommand(command, board, tt);
+        uci::runCommand(command, searchThread);
         return 0;
     }
 
     // UCI loop
     while (true) {
         std::getline(std::cin, command);
-        uci::runCommand(command, board, tt);
+        uci::runCommand(command, searchThread);
     }
 
     return 0;

@@ -1,6 +1,6 @@
 // clang-format off
+#include "../src/utils.hpp"
 #include "../src/board.hpp"
-#include "../src/perft.hpp"
 
 const std::string POSITION2_KIWIPETE = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ";
 const std::string POSITION3 = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ";
@@ -10,9 +10,6 @@ const std::string POSITION5 = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w 
 
 int main()
 {   
-    initUtils();
-    initZobrist();
-
     // Test utils.hpp
 
     assert(bitboard(lsb(12)) == 4);
@@ -22,8 +19,8 @@ int main()
     assert(squareFile(9) == File::B);
     assert(squareRank(41) == Rank::RANK_6);
 
-    assert(BETWEEN[32][59] == (bitboard(41) | bitboard(50)));
-    assert(LINE_THROUGH[41][50] == (bitboard(32) | bitboard(41) | bitboard(50) | bitboard(59)));
+    assert(BETWEEN_EXCLUSIVE_BB[32][59] == (bitboard(41) | bitboard(50)));
+    assert(LINE_THRU_BB[41][50] == (bitboard(32) | bitboard(41) | bitboard(50) | bitboard(59)));
 
     // Move tests
     
