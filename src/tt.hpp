@@ -38,7 +38,7 @@ struct TTEntry {
     constexpr void update(const u64 newZobristHash, const u8 newDepth, const i16 ply, 
         const i16 newScore, const Move newBestMove, const Bound newBound)
     {
-        assert((newDepth & 0b1000'000) == 0);
+        assert((newDepth & 0b1000'0000) == 0);
 
         // Update TT entry if
         if (this->zobristHash != newZobristHash // this entry is empty or a TT collision
