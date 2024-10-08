@@ -5,7 +5,6 @@
 #include "utils.hpp"
 #include "board.hpp"
 #include "search.hpp"
-#include <algorithm>
 
 constexpr std::array BENCH_FENS {
     "r3k2r/2pb1ppp/2pp1q2/p7/1nP1B3/1P2P3/P2N1PPP/R2QK2R w KQkq a6 0 14",

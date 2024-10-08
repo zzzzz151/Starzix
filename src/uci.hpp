@@ -5,7 +5,6 @@
 #include "board.hpp"
 #include "search.hpp"
 #include "bench.hpp"
-#include <algorithm>
 #include <thread>
 
 namespace uci { // Universal chess interface

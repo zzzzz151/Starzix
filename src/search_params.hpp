@@ -54,7 +54,8 @@ MAYBE_CONSTEXPR TunableParam<i32> seePawnValue    = TunableParam<i32>(156, 1, 20
 MAYBE_CONSTEXPR TunableParam<i32> seeMinorValue   = TunableParam<i32>(346, 150, 450, 50);
 MAYBE_CONSTEXPR TunableParam<i32> seeRookValue    = TunableParam<i32>(519, 300, 700, 50);
 MAYBE_CONSTEXPR TunableParam<i32> seeQueenValue   = TunableParam<i32>(1079 , 600, 1200, 100);
-MAYBE_CONSTEXPR TunableParam<i32> seeNoisyHistDiv = TunableParam<i32>(16, 2, 32, 2);
+MAYBE_CONSTEXPR TunableParam<i32> seeNoisyHistDiv = TunableParam<i32>(16, 8, 32, 2);
+MAYBE_CONSTEXPR TunableParam<i32> seeQuietHistDiv = TunableParam<i32>(64, 32, 256, 16); 
 
 MAYBE_CONSTEXPR std::array<i32, 7> SEE_PIECE_VALUES = {
     seePawnValue(),  // Pawn
@@ -170,6 +171,7 @@ MAYBE_CONSTEXPR TunableParam<i32> corrHistDiv = TunableParam<i32>(165, 32, 512, 
         {stringify(seeRookValue), &seeRookValue},
         {stringify(seeQueenValue), &seeQueenValue},
         {stringify(seeNoisyHistDiv), &seeNoisyHistDiv},
+        {stringify(seeQuietHistDiv), &seeQuietHistDiv},
         {stringify(aspMinDepth), &aspMinDepth},
         {stringify(aspInitialDelta), &aspInitialDelta},
         {stringify(aspDeltaMultiplier), &aspDeltaMultiplier},

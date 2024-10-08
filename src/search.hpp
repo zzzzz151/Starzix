@@ -9,7 +9,6 @@
 #include "tt.hpp"
 #include "history_entry.hpp"
 #include "nnue.hpp"
-#include <algorithm>
 
 // [isQuietMove][depth][moveIndex]
 inline MultiArray<i32, 2, MAX_DEPTH + 1, 256> getLmrTable() 
@@ -498,6 +497,12 @@ class SearchThread {
                          );
             }());
 
+            int pt = int(move.pieceType());
+            HistoryEntry &historyEntry = mMovesHistory[stm][pt][move.to()];
+
+            i16* noisyHistoryPtr;
+            if (!isQuiet) noisyHistoryPtr = historyEntry.noisyHistoryPtr(mBoard.captured(move));
+
             // Moves loop pruning
             if (ply > 0 
             && bestScore > -MIN_MATE_SCORE 
@@ -519,7 +524,10 @@ class SearchThread {
                     break;
 
                 // SEE pruning
-                const i32 threshold = depth * (isQuiet ? seeQuietThreshold() : seeNoisyThreshold());
+
+                const i32 threshold = isQuiet ? depth * seeQuietThreshold() - movePicker.moveScore() / seeQuietHistDiv() 
+                                              : depth * seeNoisyThreshold() - i32(*noisyHistoryPtr)  / seeNoisyHistDiv();
+
                 if (depth <= seePruningMaxDepth() && !mBoard.SEE(move, threshold))
                     continue;
             }
@@ -561,12 +569,6 @@ class SearchThread {
 
             const u64 nodesBefore = mNodes;
             makeMove(move, ply + 1);
-
-            int pt = int(move.pieceType());
-            HistoryEntry &historyEntry = mMovesHistory[stm][pt][move.to()];
-
-            i16* noisyHistoryPtr;
-            if (!isQuiet) noisyHistoryPtr = historyEntry.noisyHistoryPtr(mBoard.captured());
 
             i32 score = 0;
 

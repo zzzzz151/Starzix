@@ -5,7 +5,6 @@
 #include "utils.hpp"
 #include "move.hpp"
 #include "search_params.hpp"
-#include <algorithm>
 
 MAYBE_CONSTEXPR void updateHistory(i16* history, i32 bonus) 
 {
