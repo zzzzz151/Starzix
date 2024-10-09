@@ -425,7 +425,7 @@ class SearchThread {
             {
                 makeMove(MOVE_NONE, ply + 1);
 
-                const i32 nmpDepth = depth - nmpBaseReduction() - depth / nmpReductionDivisor();
+                const i32 nmpDepth = depth - nmpBaseReduction() - depth * nmpDepthMul();
                 
                 const i32 score = mBoard.isDraw(ply + 1) ? 0 
                                   : -search(nmpDepth, ply + 1, -beta, -alpha, !cutNode, doubleExtsLeft);
