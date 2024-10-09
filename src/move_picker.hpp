@@ -177,7 +177,7 @@ struct MovePicker {
         }
         case MoveGenStage::GEN_SCORE_QUIETS:
         {
-            // Generate pseudolegal quiet moves (underpromotions excluded)
+            // Generate pseudolegal quiet moves (promotions excluded)
             board.pseudolegalMoves(mQuiets, MoveGenType::QUIETS);
 
             const Color nstm = board.oppSide();
