@@ -98,10 +98,8 @@ struct MovePicker {
             while (i < mNoisies.size())
             {
                 move = mNoisies[i];
-                assert(!board.isQuiet(move));
 
-                // If mNoisiesOnlyNoUnderpromos, assert no underpromos
-                assert(!mNoisiesOnlyNoUnderpromos || move.promotion() == PieceType::NONE || move.promotion() == PieceType::QUEEN);
+                assert(mNoisiesOnlyNoUnderpromos ? board.isNoisyNotUnderpromo(move) : !board.isQuiet(move));
 
                 // Remove TT move and excluded move from list
                 if (move == ttMove || move == excludedMove) {
