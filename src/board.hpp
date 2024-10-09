@@ -388,6 +388,16 @@ class Board {
                && move.flag() != Move::EN_PASSANT_FLAG;
     }
 
+    constexpr bool isNoisyNotUnderpromo(const Move move) const 
+    {
+        assert(move != MOVE_NONE);
+
+        if (isOccupied(move.to()) && move.promotion() == PieceType::NONE)
+            return true;
+
+        return move.promotion() == PieceType::QUEEN || move.flag() == Move::EN_PASSANT_FLAG;
+    }
+
     constexpr bool isRepetition(const int searchPly = 100000) const {
         assert(searchPly >= 0);
         
@@ -809,9 +819,9 @@ class Board {
         moves.push_back(Move(sq, targetSquare, Move::QUEEN_PROMOTION_FLAG));
 
         if (underpromotions) {
+            moves.push_back(Move(sq, targetSquare, Move::KNIGHT_PROMOTION_FLAG));
             moves.push_back(Move(sq, targetSquare, Move::ROOK_PROMOTION_FLAG));
             moves.push_back(Move(sq, targetSquare, Move::BISHOP_PROMOTION_FLAG));
-            moves.push_back(Move(sq, targetSquare, Move::KNIGHT_PROMOTION_FLAG));
         }
     }
 

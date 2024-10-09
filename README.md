@@ -43,20 +43,21 @@ Have clang++ installed and run ```make```
 ### Board
 - Bitboards
 - Zobrist hashing
-- Pseudolegal move generation (magic bitboards for sliders, lookup tables for pawns, knights and king)
+- Pseudolegal move gen (magic bitboards and lookup tables)
 - Copymake make/undo move
 
 ### NNUE evaluation 
 - (768x2x5 -> 1024)x2 -> 1
-- Horizontally mirrored based on friendly king square
+- Inputs mirrored along vertical axis based on king square
 - 5 enemy queen input buckets
-- Lc0 data
+- [Lc0](https://github.com/LeelaChessZero/lc0) data
 - Trained with [my trainer](https://github.com/zzzzz151/nn-trainer)
 
 ### Search
-- Iterative deepening
+- Staged move gen
 - Fail-soft Negamax
 - Principal variation search
+- Iterative deepening
 - Quiescence search
 - Aspiration windows
 - Transposition table
@@ -70,7 +71,7 @@ Have clang++ installed and run ```make```
 - SEE pruning
 - Internal iterative reduction
 - Late move reductions
-- Singular extensions (with negative and double extensions)
+- Singular extensions
 - Correction histories
 - Cuckoo (detect upcoming repetition)
 - Time management (hard limit, soft limit, nodes TM)
@@ -81,7 +82,7 @@ Have clang++ installed and run ```make```
 - Good noisy moves by SEE + MVVLVA
 - Killer move
 - Quiet moves by history
-- Bad noisy moves
+- Bad noisy moves (underpromotions last)
 
 ### Moves history
 - Main history
