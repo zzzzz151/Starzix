@@ -789,16 +789,15 @@ class SearchThread {
             assert([&]() {
                 const MoveGenStage stage = movePicker.stage();
                 const bool isNoisiesStage = stage == MoveGenStage::GOOD_NOISIES || stage == MoveGenStage::BAD_NOISIES;
-                const bool isQuiet = mBoard.isQuiet(move);
 
                 if (mBoard.inCheck())
                     return stage == MoveGenStage::TT_MOVE_YIELDED
                            ? move == ttMove
                            : stage == MoveGenStage::KILLER_YIELDED 
-                           ? move == plyDataPtr->killer && isQuiet
-                           : (isQuiet ? stage == MoveGenStage::QUIETS : isNoisiesStage);
+                           ? move == plyDataPtr->killer && mBoard.isQuiet(move)
+                           : (mBoard.isQuiet(move) ? stage == MoveGenStage::QUIETS : isNoisiesStage);
 
-                return isNoisiesStage && !isQuiet;
+                return isNoisiesStage && mBoard.isNoisyNotUnderpromo(move);
             }());
 
             // If in check, skip quiets and bad noisy moves
@@ -863,7 +862,7 @@ class SearchThread {
                 : movePicker.stage() == MoveGenStage::GOOD_NOISIES || movePicker.stage() == MoveGenStage::BAD_NOISIES
             );
 
-            assert(!mBoard.isQuiet(move));
+            assert(mBoard.isNoisyNotUnderpromo(move));
 
             // SEE pruning (skip bad noisy moves)
             if (!mBoard.SEE(move, probcutBeta - plyDataPtr->eval)) 

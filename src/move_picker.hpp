@@ -72,7 +72,7 @@ struct MovePicker {
         case MoveGenStage::TT_MOVE_NEXT:
         {
             if (ttMove != excludedMove
-            && !(mNoisiesOnlyNoUnderpromos && ttMove != MOVE_NONE && board.isQuiet(ttMove)) 
+            && !(mNoisiesOnlyNoUnderpromos && ttMove != MOVE_NONE && !board.isNoisyNotUnderpromo(ttMove))
             && board.isPseudolegal(ttMove) 
             && board.isPseudolegalLegal(ttMove))
             {

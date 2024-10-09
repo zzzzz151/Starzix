@@ -388,6 +388,16 @@ class Board {
                && move.flag() != Move::EN_PASSANT_FLAG;
     }
 
+    constexpr bool isNoisyNotUnderpromo(const Move move) const 
+    {
+        assert(move != MOVE_NONE);
+
+        if (isOccupied(move.to()) && move.promotion() == PieceType::NONE)
+            return true;
+
+        return move.promotion() == PieceType::QUEEN || move.flag() == Move::EN_PASSANT_FLAG;
+    }
+
     constexpr bool isRepetition(const int searchPly = 100000) const {
         assert(searchPly >= 0);
         
