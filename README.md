@@ -70,7 +70,7 @@ Have clang++ installed and run ```make```
 - SEE pruning
 - Internal iterative reduction
 - Late move reductions
-- Singular extensions (with negative and double extensions)
+- Singular extensions
 - Correction histories
 - Cuckoo (detect upcoming repetition)
 - Time management (hard limit, soft limit, nodes TM)

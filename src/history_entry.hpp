@@ -73,7 +73,7 @@ struct HistoryEntry {
 
     constexpr i32 noisyHistory(const PieceType captured, const PieceType promotion)
     {
-        return i32(*noisyHistoryPtr(captured, promotion));
+        return *noisyHistoryPtr(captured, promotion);
     }
 
 }; // HistoryEntry

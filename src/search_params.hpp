@@ -42,7 +42,7 @@ constexpr u8 MAX_DEPTH = 100;
 
 // Time management
 MAYBE_CONSTEXPR TunableParam<double> hardTimePercentage = TunableParam<double>(0.7, 0.25, 0.75, 0.1);
-MAYBE_CONSTEXPR TunableParam<double> softTimePercentage = TunableParam<double>(0.11, 0.01, 0.15, 0.02);
+MAYBE_CONSTEXPR TunableParam<double> softTimePercentage = TunableParam<double>(0.11, 0.02, 0.20, 0.02);
 
 // Eval scale with material / game phase
 MAYBE_CONSTEXPR TunableParam<float> evalMaterialScaleMin = TunableParam<float>(0.7, 0.5, 1.0, 0.1);
@@ -91,7 +91,7 @@ MAYBE_CONSTEXPR TunableParam<i32>   nmpEvalBetaMargin     = TunableParam<i32>(90
 MAYBE_CONSTEXPR TunableParam<i32>   nmpEvalBetaMultiplier = TunableParam<i32>(13, 4, 40, 4);
 
 // Probcut
-MAYBE_CONSTEXPR TunableParam<i32>   probcutMargin              = TunableParam<i32>(229, 100, 350, 50);
+MAYBE_CONSTEXPR TunableParam<i32>   probcutMargin              = TunableParam<i32>(229, 100, 350, 25);
 MAYBE_CONSTEXPR TunableParam<float> probcutImprovingPercentage = TunableParam<float>(0.28, 0.25, 0.75, 0.1);
 
 // IIR (Internal iterative reduction)
@@ -108,8 +108,8 @@ MAYBE_CONSTEXPR TunableParam<i32> fpMultiplier = TunableParam<i32>(157, 40, 260,
 
 // SEE pruning
 MAYBE_CONSTEXPR TunableParam<i32> seePruningMaxDepth = TunableParam<i32>(8, 7, 11, 1);
-MAYBE_CONSTEXPR TunableParam<i32> seeQuietThreshold  = TunableParam<i32>(-55, -161, -1, 20);
-MAYBE_CONSTEXPR TunableParam<i32> seeNoisyThreshold  = TunableParam<i32>(-124, -161, -1, 20);
+MAYBE_CONSTEXPR TunableParam<i32> seeQuietThreshold  = TunableParam<i32>(-55, -201, -1, 20);
+MAYBE_CONSTEXPR TunableParam<i32> seeNoisyThreshold  = TunableParam<i32>(-124, -201, -1, 20);
 
 // SE (Singular extensions)
 MAYBE_CONSTEXPR TunableParam<i32> singularMinDepth      = TunableParam<i32>(6, 6, 10, 1);
@@ -132,12 +132,12 @@ MAYBE_CONSTEXPR TunableParam<i32> deeperBase = TunableParam<i32>(41, 15, 90, 15)
 MAYBE_CONSTEXPR i32 HISTORY_MAX = 16384;
 
 // History bonus
-MAYBE_CONSTEXPR TunableParam<i32> historyBonusMultiplier = TunableParam<i32>(300, 50, 600, 50);
+MAYBE_CONSTEXPR TunableParam<i32> historyBonusMultiplier = TunableParam<i32>(300, 50, 600, 25);
 MAYBE_CONSTEXPR TunableParam<i32> historyBonusOffset     = TunableParam<i32>(38, 0, 500, 100);
 MAYBE_CONSTEXPR TunableParam<i32> historyBonusMax        = TunableParam<i32>(1730, 500, 2500, 200);
 
 // History malus
-MAYBE_CONSTEXPR TunableParam<i32> historyMalusMultiplier = TunableParam<i32>(272, 50, 600, 50);
+MAYBE_CONSTEXPR TunableParam<i32> historyMalusMultiplier = TunableParam<i32>(272, 50, 600, 25);
 MAYBE_CONSTEXPR TunableParam<i32> historyMalusOffset     = TunableParam<i32>(12, 0, 500, 100);
 MAYBE_CONSTEXPR TunableParam<i32> historyMalusMax        = TunableParam<i32>(1381, 500, 2500, 200);
 
