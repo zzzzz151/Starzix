@@ -809,9 +809,9 @@ class Board {
         moves.push_back(Move(sq, targetSquare, Move::QUEEN_PROMOTION_FLAG));
 
         if (underpromotions) {
+            moves.push_back(Move(sq, targetSquare, Move::KNIGHT_PROMOTION_FLAG));
             moves.push_back(Move(sq, targetSquare, Move::ROOK_PROMOTION_FLAG));
             moves.push_back(Move(sq, targetSquare, Move::BISHOP_PROMOTION_FLAG));
-            moves.push_back(Move(sq, targetSquare, Move::KNIGHT_PROMOTION_FLAG));
         }
     }
 

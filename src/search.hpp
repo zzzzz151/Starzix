@@ -501,7 +501,7 @@ class SearchThread {
             HistoryEntry &historyEntry = mMovesHistory[stm][pt][move.to()];
 
             i16* noisyHistoryPtr;
-            if (!isQuiet) noisyHistoryPtr = historyEntry.noisyHistoryPtr(mBoard.captured(move));
+            if (!isQuiet) noisyHistoryPtr = historyEntry.noisyHistoryPtr(mBoard.captured(move), move.promotion());
 
             // Moves loop pruning
             if (ply > 0 
