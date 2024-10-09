@@ -130,8 +130,13 @@ struct MovePicker {
                 }
 
                 // MVVLVA (most valuable victim, least valuable attacker)
-                if (captured != PieceType::NONE)
-                    mNoisiesScores[i] += 1000 + 100 * (i32)captured - i32(move.pieceType());
+                if (captured != PieceType::NONE) {
+                    mNoisiesScores[i] += 1000 + 100 * (i32)captured;
+
+                    const PieceType attacker = move.pieceType();
+                    if (attacker != PieceType::KING)
+                        mNoisiesScores[i] -= (i32)attacker + 1;
+                }
 
                 i++;
             }
