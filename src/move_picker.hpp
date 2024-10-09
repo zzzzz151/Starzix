@@ -91,7 +91,7 @@ struct MovePicker {
         case MoveGenStage::GEN_SCORE_NOISIES:
         {
             // Generate pseudolegal noisy moves, except underpromotions
-            board.pseudolegalMoves(mNoisies, MoveGenType::NOISIES, !mNoisiesOnlyNoUnderpromos);
+            board.pseudolegalMoves(mNoisies, MoveGenType::NOISIES, false);
 
             // Score moves
             size_t i = 0;
