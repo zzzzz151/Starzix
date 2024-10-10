@@ -288,7 +288,7 @@ class SearchThread {
                 if (corrHist != nullptr) 
                     correction += i32(*corrHist);
 
-            eval += correction / corrHistDiv();
+            eval += correction * corrHistMul();
 
             // Clamp to avoid false mate scores and invalid scores
             eval = std::clamp(eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
@@ -525,8 +525,8 @@ class SearchThread {
 
                 // SEE pruning
 
-                const i32 threshold = isQuiet ? depth * seeQuietThreshold() - movePicker.moveScore() / seeQuietHistDiv() 
-                                              : depth * seeNoisyThreshold() - i32(*noisyHistoryPtr)  / seeNoisyHistDiv();
+                const i32 threshold = isQuiet ? depth * seeQuietThreshold() - movePicker.moveScore() * seeQuietHistMul() 
+                                              : depth * seeNoisyThreshold() - i32(*noisyHistoryPtr)  * seeNoisyHistMul();
 
                 if (depth <= seePruningMaxDepth() && !mBoard.SEE(move, threshold))
                     continue;
