@@ -140,7 +140,7 @@ MAYBE_CONSTEXPR TunableParam<i32>    lmrQuietHistoryDiv = TunableParam<i32>(2975
 MAYBE_CONSTEXPR TunableParam<i32>    lmrNoisyHistoryDiv = TunableParam<i32>(3499, 1024, 16384, 1024);
 
 // Deeper search in PVS with LMR
-MAYBE_CONSTEXPR TunableParam<i32> deeperBase = TunableParam<i32>(41, 15, 115, 20);
+MAYBE_CONSTEXPR TunableParam<i32> deeperBase = TunableParam<i32>(41, 15, 95, 20);
 
 // History max
 MAYBE_CONSTEXPR i32 HISTORY_MAX = 16384;
