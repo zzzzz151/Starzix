@@ -29,11 +29,6 @@ template <typename T> struct TunableParam {
         assert(max > min);
         assert(value >= min && value <= max);
         assert(step > 0);
-
-        [[maybe_unused]] const i64 tempMin = round((double)min * 10000.0);
-        [[maybe_unused]] const i64 tempMax = round((double)max * 10000.0);
-        [[maybe_unused]] const i64 tempStep = round((double)step * 10000.0);
-        assert((tempMax - tempMin) % tempStep == 0);
     }
 
     // overload function operator
@@ -68,17 +63,11 @@ MAYBE_CONSTEXPR TunableParam<i32> seePawnValue  = TunableParam<i32>(156, 50, 200
 MAYBE_CONSTEXPR TunableParam<i32> seeMinorValue = TunableParam<i32>(346, 200, 400, 50);
 MAYBE_CONSTEXPR TunableParam<i32> seeRookValue  = TunableParam<i32>(519, 300, 700, 50);
 MAYBE_CONSTEXPR TunableParam<i32> seeQueenValue = TunableParam<i32>(1079, 600, 1200, 100);
-MAYBE_CONSTEXPR TunableParam<float> seeNoisyHistMul = TunableParam<float>(0.0625f, 0.0, 0.125, 0.025);
-MAYBE_CONSTEXPR TunableParam<float> seeQuietHistMul = TunableParam<float>(0.015625f, 0.0, 0.12, 0.02);
+MAYBE_CONSTEXPR TunableParam<float> seeNoisyHistMul = TunableParam<float>(0.0625, 0.0, 0.125, 0.025);
+MAYBE_CONSTEXPR TunableParam<float> seeQuietHistMul = TunableParam<float>(0.015625, 0.0, 0.12, 0.02);
 
 MAYBE_CONSTEXPR std::array<i32, 7> SEE_PIECE_VALUES = {
-    seePawnValue(),  // Pawn
-    seeMinorValue(), // Knight
-    seeMinorValue(), // Bishop
-    seeRookValue(),  // Rook
-    seeQueenValue(), // Queen
-    0,               // King
-    0                // None
+    seePawnValue(), seeMinorValue(), seeMinorValue(), seeRookValue(),  seeQueenValue(), 0, 0 
 };
 
 // Aspiration windows
@@ -161,12 +150,19 @@ MAYBE_CONSTEXPR TunableParam<float> contHist1PlyWeight = TunableParam<float>(0.8
 MAYBE_CONSTEXPR TunableParam<float> contHist2PlyWeight = TunableParam<float>(1.136, 0.2, 4.0, 0.2);
 MAYBE_CONSTEXPR TunableParam<float> contHist4PlyWeight = TunableParam<float>(0.47, 0.2, 4.0, 0.2);
 
-MAYBE_CONSTEXPR std::array<float, 3> CONT_HISTORY_WEIGHTS = { 
+MAYBE_CONSTEXPR std::array<float, 3> CONT_HIST_WEIGHTS = { 
     contHist1PlyWeight(), contHist2PlyWeight(), contHist4PlyWeight() 
 };
 
-// Correction history
-MAYBE_CONSTEXPR TunableParam<float> corrHistMul = TunableParam<float>(0.006, 0.002, 0.02, 0.001);
+// Correction histories
+constexpr u64 CORR_HIST_SIZE = 16384;
+MAYBE_CONSTEXPR TunableParam<float> corrHistPawnsScale    = TunableParam<float>(0.006, 0.002, 0.02, 0.002);
+MAYBE_CONSTEXPR TunableParam<float> corrHistNonPawnsScale = TunableParam<float>(0.006, 0.002, 0.02, 0.002);
+MAYBE_CONSTEXPR TunableParam<float> corrHistLastMoveScale = TunableParam<float>(0.006, 0.002, 0.02, 0.002);
+
+MAYBE_CONSTEXPR std::array<float, 4> CORR_HISTS_WEIGHTS {
+    corrHistPawnsScale(), corrHistNonPawnsScale(), corrHistNonPawnsScale(), corrHistLastMoveScale()
+};
 
 #if defined(TUNE)
     using TunableParamVariant = std::variant<
@@ -230,6 +226,8 @@ MAYBE_CONSTEXPR TunableParam<float> corrHistMul = TunableParam<float>(0.006, 0.0
         {stringify(contHist1PlyWeight), &contHist1PlyWeight},
         {stringify(contHist2PlyWeight), &contHist2PlyWeight},
         {stringify(contHist4PlyWeight), &contHist4PlyWeight},
-        {stringify(corrHistMul), &corrHistMul}
+        {stringify(corrHistPawnsScale), &corrHistPawnsScale},
+        {stringify(corrHistNonPawnsScale), &corrHistNonPawnsScale},
+        {stringify(corrHistLastMoveScale), &corrHistLastMoveScale},
     };
 #endif

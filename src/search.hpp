@@ -62,8 +62,8 @@ class SearchThread {
     std::array<u64, 1ULL << 17> mMovesNodes; // [move]
 
     // Correction histories
-    MultiArray<i16, 2, 16384>    mPawnsCorrHist    = { }; // [stm][Board.pawnsHash() % 16384]
-    MultiArray<i16, 2, 2, 16384> mNonPawnsCorrHist = { }; // [stm][pieceColor][Board.nonPawnsHash(pieceColor) % 16384]
+    MultiArray<i16, 2, CORR_HIST_SIZE>    mPawnsCorrHist    = { }; // [stm][Board.pawnsHash() % CORR_HIST_SIZE]
+    MultiArray<i16, 2, 2, CORR_HIST_SIZE> mNonPawnsCorrHist = { }; // [stm][pieceColor][Board.nonPawnsHash(pieceColor) % CORR_HIST_SIZE]
 
     FinnyTable mFinnyTable; // [color][mirrorHorizontally][inputBucket]
 
@@ -226,9 +226,9 @@ class SearchThread {
         }
 
         return {
-            &mPawnsCorrHist[stm][mBoard.pawnsHash() % 16384],
-            &mNonPawnsCorrHist[stm][WHITE][mBoard.nonPawnsHash(Color::WHITE) % 16384],
-            &mNonPawnsCorrHist[stm][BLACK][mBoard.nonPawnsHash(Color::BLACK) % 16384],
+            &mPawnsCorrHist[stm][mBoard.pawnsHash() % CORR_HIST_SIZE],
+            &mNonPawnsCorrHist[stm][WHITE][mBoard.nonPawnsHash(Color::WHITE) % CORR_HIST_SIZE],
+            &mNonPawnsCorrHist[stm][BLACK][mBoard.nonPawnsHash(Color::BLACK) % CORR_HIST_SIZE],
             lastMoveCorrHistPtr
         };
     }
@@ -282,13 +282,19 @@ class SearchThread {
 
             // Correct eval with correction histories
 
-            i32 correction = 0;
+            #if defined(TUNE)
+                CORR_HISTS_WEIGHTS = {
+                    corrHistPawnsScale(), corrHistNonPawnsScale(), corrHistNonPawnsScale(), corrHistLastMoveScale()
+                };
+            #endif
 
-            for (const i16* corrHist : correctionHistories())
-                if (corrHist != nullptr) 
-                    correction += i32(*corrHist);
+            const auto corrHists = correctionHistories();
 
-            eval += correction * corrHistMul();
+            for (size_t i = 0; i < corrHists.size() - (corrHists.back() == nullptr); i++)
+            {
+                const float corrHist = *(corrHists[i]);
+                eval += corrHist * CORR_HISTS_WEIGHTS[i];
+            }
 
             // Clamp to avoid false mate scores and invalid scores
             eval = std::clamp(eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
