@@ -284,7 +284,7 @@ class SearchThread {
 
             #if defined(TUNE)
                 CORR_HISTS_WEIGHTS = {
-                    corrHistPawnsScale(), corrHistNonPawnsScale(), corrHistNonPawnsScale(), corrHistLastMoveScale()
+                    corrHistPawnsWeight(), corrHistNonPawnsWeight(), corrHistNonPawnsWeight(), corrHistLastMoveWeight()
                 };
             #endif
 
