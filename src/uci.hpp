@@ -19,9 +19,7 @@ inline void runCommand(std::string &command, SearchThread &searchThread)
     trim(command);
     const std::vector<std::string> tokens = splitString(command, ' ');
 
-    if (!std::cin.good())
-        exit(EXIT_FAILURE);
-    else if (command == "" || tokens.size() == 0)
+    if (command == "" || tokens.size() == 0)
         return;
     // UCI commands
     else if (command == "uci")
