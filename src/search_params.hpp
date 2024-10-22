@@ -21,10 +21,7 @@ template <typename T> struct TunableParam {
 
     MAYBE_CONSTEXPR TunableParam(const T _value, const T _min, const T _max, const T _step) 
     {
-        value = _value;
-        min = _min;
-        max = _max;
-        step = _step;
+        value = _value; min = _min; max = _max; step = _step;
 
         assert(max > min);
         assert(value >= min && value <= max);
@@ -63,35 +60,33 @@ MAYBE_CONSTEXPR TunableParam<i32> seePawnValue  = TunableParam<i32>(160, 50, 200
 MAYBE_CONSTEXPR TunableParam<i32> seeMinorValue = TunableParam<i32>(350, 200, 400, 50);
 MAYBE_CONSTEXPR TunableParam<i32> seeRookValue  = TunableParam<i32>(602, 300, 700, 50);
 MAYBE_CONSTEXPR TunableParam<i32> seeQueenValue = TunableParam<i32>(1106, 600, 1200, 100);
-MAYBE_CONSTEXPR TunableParam<float> seeNoisyHistMul = TunableParam<float>(0.0475, 0.0, 0.125, 0.025);
-MAYBE_CONSTEXPR TunableParam<float> seeQuietHistMul = TunableParam<float>(0.03, 0.0, 0.12, 0.02);
 
 MAYBE_CONSTEXPR std::array<i32, 7> SEE_PIECE_VALUES = {
     seePawnValue(), seeMinorValue(), seeMinorValue(), seeRookValue(),  seeQueenValue(), 0, 0 
 };
 
 // Aspiration windows
-MAYBE_CONSTEXPR TunableParam<i32>    aspMinDepth        = TunableParam<i32>(7, 6, 10, 1);
-MAYBE_CONSTEXPR TunableParam<i32>    aspInitialDelta    = TunableParam<i32>(13, 5, 25, 5);
-MAYBE_CONSTEXPR TunableParam<double> aspDeltaMultiplier = TunableParam<double>(1.37, 1.25, 2.0, 0.15);
+MAYBE_CONSTEXPR TunableParam<i32>    aspMinDepth     = TunableParam<i32>(7, 6, 10, 1);
+MAYBE_CONSTEXPR TunableParam<i32>    aspInitialDelta = TunableParam<i32>(13, 5, 25, 5);
+MAYBE_CONSTEXPR TunableParam<double> aspDeltaMul     = TunableParam<double>(1.37, 1.25, 2.0, 0.15);
 
 // Improving flag
 MAYBE_CONSTEXPR TunableParam<i32> improvingThreshold = TunableParam<i32>(8, 1, 51, 5);
 
 // RFP (Reverse futility pruning)
-MAYBE_CONSTEXPR TunableParam<i32> rfpMaxDepth   = TunableParam<i32>(7, 6, 10, 1);
-MAYBE_CONSTEXPR TunableParam<i32> rfpMultiplier = TunableParam<i32>(71, 40, 130, 10);
+MAYBE_CONSTEXPR TunableParam<i32> rfpMaxDepth = TunableParam<i32>(7, 6, 10, 1);
+MAYBE_CONSTEXPR TunableParam<i32> rfpDepthMul = TunableParam<i32>(71, 40, 130, 10);
 
 // Razoring
-MAYBE_CONSTEXPR TunableParam<i32> razoringMaxDepth   = TunableParam<i32>(6, 2, 6, 2);
-MAYBE_CONSTEXPR TunableParam<i32> razoringMultiplier = TunableParam<i32>(407, 250, 450, 25);
+MAYBE_CONSTEXPR TunableParam<i32> razoringMaxDepth = TunableParam<i32>(6, 2, 6, 2);
+MAYBE_CONSTEXPR TunableParam<i32> razoringDepthMul = TunableParam<i32>(407, 250, 450, 25);
 
 // NMP (Null move pruning)
-MAYBE_CONSTEXPR TunableParam<i32>   nmpMinDepth           = TunableParam<i32>(3, 2, 4, 1);
-MAYBE_CONSTEXPR TunableParam<i32>   nmpBaseReduction      = TunableParam<i32>(4, 2, 4, 1);
-MAYBE_CONSTEXPR TunableParam<float> nmpDepthMul           = TunableParam<float>(0.4, 0.25, 0.55, 0.1);
-MAYBE_CONSTEXPR TunableParam<i32>   nmpEvalBetaMargin     = TunableParam<i32>(100, 40, 250, 30);
-MAYBE_CONSTEXPR TunableParam<i32>   nmpEvalBetaMultiplier = TunableParam<i32>(12, 4, 40, 4);
+MAYBE_CONSTEXPR TunableParam<i32>   nmpMinDepth       = TunableParam<i32>(3, 2, 4, 1);
+MAYBE_CONSTEXPR TunableParam<i32>   nmpBaseReduction  = TunableParam<i32>(4, 2, 4, 1);
+MAYBE_CONSTEXPR TunableParam<float> nmpDepthMul       = TunableParam<float>(0.4, 0.25, 0.55, 0.1);
+MAYBE_CONSTEXPR TunableParam<i32>   nmpEvalBetaMargin = TunableParam<i32>(100, 40, 250, 30);
+MAYBE_CONSTEXPR TunableParam<i32>   nmpEvalBetaMul    = TunableParam<i32>(12, 4, 40, 4);
 
 // Probcut
 MAYBE_CONSTEXPR TunableParam<i32>   probcutMargin              = TunableParam<i32>(237, 100, 340, 30);
@@ -101,18 +96,20 @@ MAYBE_CONSTEXPR TunableParam<float> probcutImprovingPercentage = TunableParam<fl
 MAYBE_CONSTEXPR TunableParam<i32> iirMinDepth = TunableParam<i32>(4, 4, 6, 1);
 
 // LMP (Late move pruning)
-MAYBE_CONSTEXPR TunableParam<i32>   lmpMinMoves   = TunableParam<i32>(2, 2, 4, 1);
-MAYBE_CONSTEXPR TunableParam<float> lmpMultiplier = TunableParam<float>(1.15, 0.75, 1.25, 0.1);
+MAYBE_CONSTEXPR TunableParam<i32>   lmpMinMoves = TunableParam<i32>(2, 2, 4, 1);
+MAYBE_CONSTEXPR TunableParam<float> lmpDepthMul = TunableParam<float>(1.15, 0.75, 1.25, 0.1);
 
 // FP (Futility pruning)
-MAYBE_CONSTEXPR TunableParam<i32> fpMaxDepth   = TunableParam<i32>(7, 6, 10, 1);
-MAYBE_CONSTEXPR TunableParam<i32> fpBase       = TunableParam<i32>(160, 40, 260, 20);
-MAYBE_CONSTEXPR TunableParam<i32> fpMultiplier = TunableParam<i32>(165, 40, 260, 20);
+MAYBE_CONSTEXPR TunableParam<i32> fpMaxDepth = TunableParam<i32>(7, 6, 10, 1);
+MAYBE_CONSTEXPR TunableParam<i32> fpBase     = TunableParam<i32>(160, 40, 260, 20);
+MAYBE_CONSTEXPR TunableParam<i32> fpDepthMul = TunableParam<i32>(165, 40, 260, 20);
 
-// SEE pruning
+// SEE threshold and pruning
 MAYBE_CONSTEXPR TunableParam<i32> seePruningMaxDepth = TunableParam<i32>(9, 7, 11, 1);
-MAYBE_CONSTEXPR TunableParam<i32> seeQuietThreshold  = TunableParam<i32>(-77, -150, -10, 20);
 MAYBE_CONSTEXPR TunableParam<i32> seeNoisyThreshold  = TunableParam<i32>(-103, -150, -10, 20);
+MAYBE_CONSTEXPR TunableParam<i32> seeQuietThreshold  = TunableParam<i32>(-77, -150, -10, 20);
+MAYBE_CONSTEXPR TunableParam<float> seeNoisyHistMul = TunableParam<float>(0.0475, 0.0, 0.125, 0.025);
+MAYBE_CONSTEXPR TunableParam<float> seeQuietHistMul = TunableParam<float>(0.03, 0.0, 0.12, 0.02);
 
 // SE (Singular extensions)
 MAYBE_CONSTEXPR TunableParam<i32> singularMinDepth      = TunableParam<i32>(6, 6, 10, 1);
@@ -135,14 +132,14 @@ MAYBE_CONSTEXPR TunableParam<i32> deeperBase = TunableParam<i32>(54, 15, 95, 20)
 MAYBE_CONSTEXPR i32 HISTORY_MAX = 16384;
 
 // History bonus
-MAYBE_CONSTEXPR TunableParam<i32> historyBonusMultiplier = TunableParam<i32>(313, 50, 600, 25);
-MAYBE_CONSTEXPR TunableParam<i32> historyBonusOffset     = TunableParam<i32>(18, 0, 500, 100);
-MAYBE_CONSTEXPR TunableParam<i32> historyBonusMax        = TunableParam<i32>(1922, 500, 2500, 200);
+MAYBE_CONSTEXPR TunableParam<i32> historyBonusMul    = TunableParam<i32>(313, 50, 600, 25);
+MAYBE_CONSTEXPR TunableParam<i32> historyBonusOffset = TunableParam<i32>(18, 0, 500, 100);
+MAYBE_CONSTEXPR TunableParam<i32> historyBonusMax    = TunableParam<i32>(1922, 500, 2500, 200);
 
 // History malus
-MAYBE_CONSTEXPR TunableParam<i32> historyMalusMultiplier = TunableParam<i32>(272, 50, 600, 25);
-MAYBE_CONSTEXPR TunableParam<i32> historyMalusOffset     = TunableParam<i32>(30, 0, 500, 100);
-MAYBE_CONSTEXPR TunableParam<i32> historyMalusMax        = TunableParam<i32>(1142, 500, 2500, 200);
+MAYBE_CONSTEXPR TunableParam<i32> historyMalusMul    = TunableParam<i32>(272, 50, 600, 25);
+MAYBE_CONSTEXPR TunableParam<i32> historyMalusOffset  = TunableParam<i32>(30, 0, 500, 100);
+MAYBE_CONSTEXPR TunableParam<i32> historyMalusMax     = TunableParam<i32>(1142, 500, 2500, 200);
 
 // History weights
 MAYBE_CONSTEXPR TunableParam<float> mainHistoryWeight  = TunableParam<float>(0.85, 0.2, 4.0, 0.2);
@@ -180,46 +177,46 @@ MAYBE_CONSTEXPR std::array<float, 4> CORR_HISTS_WEIGHTS {
         {stringify(seeMinorValue), &seeMinorValue},
         {stringify(seeRookValue), &seeRookValue},
         {stringify(seeQueenValue), &seeQueenValue},
-        {stringify(seeNoisyHistMul), &seeNoisyHistMul},
-        {stringify(seeQuietHistMul), &seeQuietHistMul},
         {stringify(aspMinDepth), &aspMinDepth},
         {stringify(aspInitialDelta), &aspInitialDelta},
-        {stringify(aspDeltaMultiplier), &aspDeltaMultiplier},
+        {stringify(aspDeltaMul), &aspDeltaMul},
         {stringify(improvingThreshold), &improvingThreshold},
         {stringify(rfpMaxDepth), &rfpMaxDepth},
-        {stringify(rfpMultiplier), &rfpMultiplier},
+        {stringify(rfpDepthMul), &rfpDepthMul},
         {stringify(razoringMaxDepth), &razoringMaxDepth},
-        {stringify(razoringMultiplier), &razoringMultiplier},
+        {stringify(razoringDepthMul), &razoringDepthMul},
         {stringify(nmpMinDepth), &nmpMinDepth},
         {stringify(nmpBaseReduction), &nmpBaseReduction},
         {stringify(nmpDepthMul), &nmpDepthMul},
         {stringify(nmpEvalBetaMargin), &nmpEvalBetaMargin},
-        {stringify(nmpEvalBetaMultiplier), &nmpEvalBetaMultiplier},
+        {stringify(nmpEvalBetaMul), &nmpEvalBetaMul},
         {stringify(probcutMargin), &probcutMargin},
         {stringify(probcutImprovingPercentage), &probcutImprovingPercentage},
         {stringify(iirMinDepth), &iirMinDepth},
         {stringify(lmpMinMoves), &lmpMinMoves},
-        {stringify(lmpMultiplier), &lmpMultiplier},
+        {stringify(lmpDepthMul), &lmpDepthMul},
         {stringify(fpMaxDepth), &fpMaxDepth},
         {stringify(fpBase), &fpBase},
-        {stringify(fpMultiplier), &fpMultiplier},
+        {stringify(fpDepthMul), &fpDepthMul},
         {stringify(seePruningMaxDepth), &seePruningMaxDepth},
-        {stringify(seeQuietThreshold), &seeQuietThreshold},
         {stringify(seeNoisyThreshold), &seeNoisyThreshold},
+        {stringify(seeQuietThreshold), &seeQuietThreshold},
+        {stringify(seeNoisyHistMul), &seeNoisyHistMul},
+        {stringify(seeQuietHistMul), &seeQuietHistMul},
         {stringify(singularMinDepth), &singularMinDepth},
         {stringify(singularDepthMargin), &singularDepthMargin},
         {stringify(doubleExtensionMargin), &doubleExtensionMargin},
         {stringify(lmrBaseQuiet), &lmrBaseQuiet},
-        {stringify(lmrMultiplierQuiet), &lmrMultiplierQuiet},
         {stringify(lmrBaseNoisy), &lmrBaseNoisy},
+        {stringify(lmrMultiplierQuiet), &lmrMultiplierQuiet},
         {stringify(lmrMultiplierNoisy), &lmrMultiplierNoisy},
         {stringify(lmrQuietHistoryDiv), &lmrQuietHistoryDiv},
         {stringify(lmrNoisyHistoryDiv), &lmrNoisyHistoryDiv},
         {stringify(deeperBase), &deeperBase},
-        {stringify(historyBonusMultiplier), &historyBonusMultiplier},
+        {stringify(historyBonusMul), &historyBonusMul},
         {stringify(historyBonusOffset), &historyBonusOffset},
         {stringify(historyBonusMax), &historyBonusMax},
-        {stringify(historyMalusMultiplier), &historyMalusMultiplier},
+        {stringify(historyMalusMul), &historyMalusMul},
         {stringify(historyMalusOffset), &historyMalusOffset},
         {stringify(historyMalusMax), &historyMalusMax},
         {stringify(mainHistoryWeight), &mainHistoryWeight},

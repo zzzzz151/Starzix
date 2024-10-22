@@ -334,7 +334,7 @@ class SearchThread {
             else
                 break;
 
-            delta *= aspDeltaMultiplier();
+            delta *= aspDeltaMul();
         }
 
         return score;
@@ -406,13 +406,13 @@ class SearchThread {
         {
             // RFP (Reverse futility pruning) / Static NMP
             if (depth <= rfpMaxDepth() 
-            && eval >= beta + (depth - improving) * rfpMultiplier())
+            && eval >= beta + (depth - improving) * rfpDepthMul())
                 return eval;
 
             // Razoring
             if (depth <= razoringMaxDepth() 
             && abs(alpha) < 2000
-            && eval + depth * razoringMultiplier() < alpha)
+            && eval + depth * razoringDepthMul() < alpha)
             {
                 const i32 score = qSearch(ply, alpha, beta);
 
@@ -425,7 +425,7 @@ class SearchThread {
             if (depth >= nmpMinDepth() 
             && mBoard.lastMove() != MOVE_NONE 
             && eval >= beta
-            && eval >= beta + nmpEvalBetaMargin() - depth * nmpEvalBetaMultiplier()
+            && eval >= beta + nmpEvalBetaMargin() - depth * nmpEvalBetaMul()
             && !(ttHit && ttEntry.bound() == Bound::UPPER && ttEntry.score < beta)
             && mBoard.hasNonPawnMaterial(mBoard.sideToMove()))
             {
@@ -517,7 +517,7 @@ class SearchThread {
             {
                 // LMP (Late move pruning)
                 if (legalMovesSeen >= lmpMinMoves() + pvNode + mBoard.inCheck()
-                                      + depth * depth * lmpMultiplier())
+                                      + depth * depth * lmpDepthMul())
                     break;
                     
                 const i32 lmrDepth = depth - LMR_TABLE[isQuiet][depth][legalMovesSeen];
@@ -526,7 +526,7 @@ class SearchThread {
                 if (lmrDepth <= fpMaxDepth() 
                 && !mBoard.inCheck()
                 && alpha < MIN_MATE_SCORE
-                && alpha > eval + fpBase() + std::max(lmrDepth + improving, 0) * fpMultiplier())
+                && alpha > eval + fpBase() + std::max(lmrDepth + improving, 0) * fpDepthMul())
                     break;
 
                 // SEE pruning
@@ -662,8 +662,8 @@ class SearchThread {
 
             bound = Bound::LOWER;
 
-            const i32 bonus =  std::clamp(depth * historyBonusMultiplier() - historyBonusOffset(), 0, historyBonusMax());
-            const i32 malus = -std::clamp(depth * historyMalusMultiplier() - historyMalusOffset(), 0, historyMalusMax());
+            const i32 bonus =  std::clamp(depth * historyBonusMul() - historyBonusOffset(), 0, historyBonusMax());
+            const i32 malus = -std::clamp(depth * historyMalusMul() - historyMalusOffset(), 0, historyMalusMax());
 
             // History malus: decrease history of fail low noisy moves
             for (i16* noisyHistoryPtr : failLowNoisiesHistory)
