@@ -108,8 +108,8 @@ MAYBE_CONSTEXPR TunableParam<i32> fpDepthMul = TunableParam<i32>(165, 40, 260, 2
 MAYBE_CONSTEXPR TunableParam<i32> seePruningMaxDepth = TunableParam<i32>(9, 7, 11, 1);
 MAYBE_CONSTEXPR TunableParam<i32> seeNoisyThreshold  = TunableParam<i32>(-103, -150, -10, 20);
 MAYBE_CONSTEXPR TunableParam<i32> seeQuietThreshold  = TunableParam<i32>(-77, -150, -10, 20);
-MAYBE_CONSTEXPR TunableParam<float> seeNoisyHistMul = TunableParam<float>(0.0475, 0.0, 0.125, 0.025);
-MAYBE_CONSTEXPR TunableParam<float> seeQuietHistMul = TunableParam<float>(0.03, 0.0, 0.12, 0.02);
+MAYBE_CONSTEXPR TunableParam<float> seeNoisyHistMul  = TunableParam<float>(0.0475, 0.0, 0.125, 0.025);
+MAYBE_CONSTEXPR TunableParam<float> seeQuietHistMul  = TunableParam<float>(0.03, 0.0, 0.12, 0.02);
 
 // SE (Singular extensions)
 MAYBE_CONSTEXPR TunableParam<i32> singularMinDepth      = TunableParam<i32>(6, 6, 10, 1);
@@ -138,8 +138,8 @@ MAYBE_CONSTEXPR TunableParam<i32> historyBonusMax    = TunableParam<i32>(1922, 5
 
 // History malus
 MAYBE_CONSTEXPR TunableParam<i32> historyMalusMul    = TunableParam<i32>(272, 50, 600, 25);
-MAYBE_CONSTEXPR TunableParam<i32> historyMalusOffset  = TunableParam<i32>(30, 0, 500, 100);
-MAYBE_CONSTEXPR TunableParam<i32> historyMalusMax     = TunableParam<i32>(1142, 500, 2500, 200);
+MAYBE_CONSTEXPR TunableParam<i32> historyMalusOffset = TunableParam<i32>(30, 0, 500, 100);
+MAYBE_CONSTEXPR TunableParam<i32> historyMalusMax    = TunableParam<i32>(1142, 500, 2500, 200);
 
 // History weights
 MAYBE_CONSTEXPR TunableParam<float> mainHistoryWeight  = TunableParam<float>(0.85, 0.2, 4.0, 0.2);
