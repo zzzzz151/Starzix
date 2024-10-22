@@ -1394,3 +1394,5 @@ constexpr u64 perft(Board &board, const int depth)
 
     return nodes;
 }
+
+const Board START_BOARD = Board(START_FEN);

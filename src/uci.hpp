@@ -3,21 +3,22 @@
 #pragma once
 
 #include "board.hpp"
-#include "search.hpp"
+#include "searcher.hpp"
 #include "bench.hpp"
-#include <thread>
 
 namespace uci { // Universal chess interface
 
 inline void uci();
-inline void setoption(const std::vector<std::string> &tokens, std::vector<TTEntry>* ttPtr);
+inline void setoption(const std::vector<std::string> &tokens, Searcher &searcher);
 inline void position(const std::vector<std::string> &tokens, Board &board);
-inline void go(const std::vector<std::string> &tokens, SearchThread &searchThread);
+inline void go(const std::vector<std::string> &tokens, Searcher &searcher);
 
-inline void runCommand(std::string &command, SearchThread &searchThread)
+inline void runCommand(std::string &command, Searcher &searcher)
 {
     trim(command);
     const std::vector<std::string> tokens = splitString(command, ' ');
+
+    Board &board = searcher.mainThreadData()->board;
 
     if (command == "" || tokens.size() == 0)
         return;
@@ -25,21 +26,21 @@ inline void runCommand(std::string &command, SearchThread &searchThread)
     else if (command == "uci")
         uci();
     else if (tokens[0] == "setoption") // e.g. "setoption name Hash value 32"
-        setoption(tokens, searchThread.ttPtr);
+        setoption(tokens, searcher);
     else if (command == "ucinewgame")
-        searchThread.reset();
+        searcher.reset();
     else if (command == "isready")
         std::cout << "readyok" << std::endl;
     else if (tokens[0] == "position")
-        position(tokens, searchThread.mBoard);
+        position(tokens, board);
     else if (tokens[0] == "go")
-        go(tokens, searchThread);
+        go(tokens, searcher);
     else if (command == "quit")
         exit(EXIT_SUCCESS);
     // Non-UCI commands
     else if (command == "print" || command == "d"
     || command == "display" || command == "show")
-        searchThread.mBoard.print();
+        board.print();
     else if (tokens[0] == "bench")
     {
         if (tokens.size() == 1)
@@ -51,23 +52,23 @@ inline void runCommand(std::string &command, SearchThread &searchThread)
     }
     else if (command == "eval") 
     {
-        const BothAccumulators acc = BothAccumulators(searchThread.mBoard);
-        const i32 eval = nnue::evaluate(&acc, searchThread.mBoard.sideToMove());
-        const i32 evalScaled = eval * materialScale(searchThread.mBoard);
+        const BothAccumulators acc = BothAccumulators(board);
+        const i32 eval = nnue::evaluate(&acc, board.sideToMove());
+        const i32 evalScaled = eval * materialScale(board);
 
         std::cout << "eval "    << eval
                   << " scaled " << evalScaled
                   << std::endl;
     }
-    else if (tokens[0] == "perft" || (tokens[0] == "go" && tokens[1] == "perft"))
+    else if (tokens[0] == "perft")
     {
         const int depth = stoi(tokens[1]);
-        const std::string fen = searchThread.mBoard.fen();
+        const std::string fen = board.fen();
 
         std::cout << "perft depth " << depth << " '" << fen << "'" << std::endl;
 
         const std::chrono::steady_clock::time_point start =  std::chrono::steady_clock::now();
-        const u64 nodes = depth > 0 ? perft(searchThread.mBoard, depth) : 0;
+        const u64 nodes = depth > 0 ? perft(board, depth) : 0;
 
         std::cout << "perft depth " << depth 
                   << " nodes " << nodes 
@@ -82,7 +83,7 @@ inline void runCommand(std::string &command, SearchThread &searchThread)
         const int depth = stoi(tokens[1]);
         
         std::cout << "perft split depth " << depth 
-                  << " '" << searchThread.mBoard.fen() << "'"
+                  << " '" << board.fen() << "'"
                   << std::endl;
 
         if (depth <= 0) {
@@ -91,18 +92,18 @@ inline void runCommand(std::string &command, SearchThread &searchThread)
         }
 
         ArrayVec<Move, 256> moves;
-        searchThread.mBoard.pseudolegalMoves(moves, MoveGenType::ALL);
+        board.pseudolegalMoves(moves, MoveGenType::ALL);
 
         u64 totalNodes = 0;
 
         for (const Move move : moves) 
-            if (searchThread.mBoard.isPseudolegalLegal(move))
+            if (board.isPseudolegalLegal(move))
             {
-                searchThread.mBoard.makeMove(move);
-                const u64 nodes = perft(searchThread.mBoard, depth - 1);
+                board.makeMove(move);
+                const u64 nodes = perft(board, depth - 1);
                 std::cout << move.toUci() << ": " << nodes << std::endl;
                 totalNodes += nodes;
-                searchThread.mBoard.undoMove();
+                board.undoMove();
             }
 
         std::cout << "Total: " << totalNodes << std::endl;
@@ -110,13 +111,13 @@ inline void runCommand(std::string &command, SearchThread &searchThread)
     else if (tokens[0] == "makemove")
     {
         if ((tokens[1] == "0000" || tokens[1] == "null" || tokens[1] == "none")
-        && !searchThread.mBoard.inCheck())
-            searchThread.mBoard.makeMove(MOVE_NONE);
+        && !board.inCheck())
+            board.makeMove(MOVE_NONE);
         else
-            searchThread.mBoard.makeMove(tokens[1]);
+            board.makeMove(tokens[1]);
     }
     else if (tokens[0] == "undomove")
-        searchThread.mBoard.undoMove();
+        board.undoMove();
     #if defined(TUNE)
     else if (command == "spsainput") 
     {
@@ -171,15 +172,15 @@ inline void uci() {
     std::cout << "uciok" << std::endl;
 }
 
-inline void setoption(const std::vector<std::string> &tokens, std::vector<TTEntry>* ttPtr)
+inline void setoption(const std::vector<std::string> &tokens, Searcher &searcher)
 {
     const std::string optionName  = tokens[2];
     const std::string optionValue = tokens[4];
 
     if (optionName == "Hash" || optionName == "hash")
     {
-        resizeTT(ttPtr, stoll(optionValue));
-        printTTSize(ttPtr);
+        resizeTT(searcher.mTT, stoll(optionValue));
+        printTTSize(searcher.mTT);
     }
     else if (optionName == "Threads" || optionName == "threads")
     {
@@ -211,7 +212,7 @@ inline void position(const std::vector<std::string> &tokens, Board &board)
     int movesTokenIndex = -1;
 
     if (tokens[1] == "startpos") {
-        board = Board(START_FEN);
+        board = START_BOARD;
         movesTokenIndex = 2;
     }
     else if (tokens[1] == "fen")
@@ -231,7 +232,7 @@ inline void position(const std::vector<std::string> &tokens, Board &board)
         board.makeMove(tokens[i]);
 }
 
-inline void go(const std::vector<std::string> &tokens, SearchThread &searchThread)
+inline void go(const std::vector<std::string> &tokens, Searcher &searcher)
 {
     const std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
 
@@ -246,12 +247,12 @@ inline void go(const std::vector<std::string> &tokens, SearchThread &searchThrea
     {
         const i64 value = std::max<i64>(std::stoll(tokens[i + 1]), 0);
 
-        if ((tokens[i] == "wtime" && searchThread.mBoard.sideToMove() == Color::WHITE) 
-        ||  (tokens[i] == "btime" && searchThread.mBoard.sideToMove() == Color::BLACK))
+        if ((tokens[i] == "wtime" && board.sideToMove() == Color::WHITE) 
+        ||  (tokens[i] == "btime" && board.sideToMove() == Color::BLACK))
             milliseconds = value;
 
-        else if ((tokens[i] == "winc" && searchThread.mBoard.sideToMove() == Color::WHITE) 
-        ||       (tokens[i] == "binc" && searchThread.mBoard.sideToMove() == Color::BLACK))
+        else if ((tokens[i] == "winc" && board.sideToMove() == Color::WHITE) 
+        ||       (tokens[i] == "binc" && board.sideToMove() == Color::BLACK))
             incrementMs = value;
 
         else if (tokens[i] == "movestogo")

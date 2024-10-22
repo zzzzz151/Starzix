@@ -64,7 +64,7 @@ inline void bench(int depth = 14)
     depth = std::clamp(depth, 1, (int)MAX_DEPTH);
 
     std::vector<TTEntry> benchTT;
-    resizeTT(&benchTT, 32);
+    resizeTT(benchTT, 32);
 
     SearchThread searchThread = SearchThread(&benchTT);
 
@@ -87,7 +87,7 @@ inline void bench(int depth = 14)
         totalNodes += searchThread.nodes();
 
         searchThread.reset();
-        resetTT(&benchTT);
+        resetTT(benchTT);
     }
 
     std::cout << totalNodes << " nodes "

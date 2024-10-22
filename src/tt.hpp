@@ -70,30 +70,30 @@ constexpr u64 TTEntryIndex(const u64 zobristHash, const auto numEntries)
     return ((u128)zobristHash * (u128)numEntries) >> 64;
 }
 
-inline void printTTSize(const std::vector<TTEntry>* ttPtr) 
+inline void printTTSize(const std::vector<TTEntry> &tt) 
 {
-    const double bytes = u64(ttPtr->size()) * (u64)sizeof(TTEntry);
+    const double bytes = u64(tt.size()) * (u64)sizeof(TTEntry);
     const double megabytes = bytes / (1024.0 * 1024.0);
 
     std::cout << "TT size: " << round(megabytes) << " MB"
-              << " (" << ttPtr->size() << " entries)" 
+              << " (" << tt.size() << " entries)" 
               << std::endl;
 }
 
-constexpr void resizeTT(std::vector<TTEntry>* ttPtr, i64 newSizeMB) 
+constexpr void resizeTT(std::vector<TTEntry> &tt, i64 newSizeMB) 
 {
     newSizeMB = std::clamp(newSizeMB, (i64)1, (i64)65536);
     const u64 numEntries = (u64)newSizeMB * 1024 * 1024 / (u64)sizeof(TTEntry); 
 
-    ttPtr->clear(); // remove all elements
-    ttPtr->resize(numEntries);
-    ttPtr->shrink_to_fit();
+    tt.clear(); // remove all elements
+    tt.resize(numEntries);
+    tt.shrink_to_fit();
 }
 
-constexpr void resetTT(std::vector<TTEntry>* ttPtr) 
+constexpr void resetTT(std::vector<TTEntry> &tt) 
 {
-    const auto numEntries = ttPtr->size();
-    ttPtr->clear(); // remove all elements
-    ttPtr->resize(numEntries);
-    ttPtr->shrink_to_fit();
+    const auto numEntries = tt.size();
+    tt.clear(); // remove all elements
+    tt.resize(numEntries);
+    tt.shrink_to_fit();
 }

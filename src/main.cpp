@@ -4,6 +4,7 @@
 #include "board.hpp"
 #include "search.hpp"
 #include "uci.hpp"
+#include "searcher.hpp"
 
 // On Linux, include the library needed to set stack size
 #if defined(__GNUC__)
@@ -40,18 +41,14 @@ int main(int argc, char* argv[])
 
     #endif
 
-    std::vector<TTEntry> tt;
-    resizeTT(&tt, 32);
-    printTTSize(&tt);
+    Searcher searcher = Searcher();
     
-    SearchThread searchThread = SearchThread(&tt);
-
     // If a command is passed in program args, run it and exit
 
     std::string command = "";
 
     for (int i = 1; i < argc; i++)
-        command += (std::string)argv[i] + " ";
+        command += std::string(argv[i]) + " ";
 
     trim(command);
 
@@ -63,7 +60,7 @@ int main(int argc, char* argv[])
     // UCI loop
     while (true) {
         std::getline(std::cin, command);
-        uci::runCommand(command, searchThread);
+        uci::runCommand(command, searcher);
     }
 
     return 0;
