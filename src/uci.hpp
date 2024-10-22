@@ -19,9 +19,7 @@ inline void runCommand(std::string &command, SearchThread &searchThread)
     trim(command);
     const std::vector<std::string> tokens = splitString(command, ' ');
 
-    if (!std::cin.good())
-        exit(EXIT_FAILURE);
-    else if (command == "" || tokens.size() == 0)
+    if (command == "" || tokens.size() == 0)
         return;
     // UCI commands
     else if (command == "uci")
@@ -148,7 +146,7 @@ inline void uci() {
     std::cout << "id name Starzix" << std::endl;
     std::cout << "id author zzzzz" << std::endl;
     std::cout << "option name Hash type spin default 32 min 1 max 65536" << std::endl;
-    //std::cout << "option name Threads type spin default 1 min 1 max 256" << std::endl;
+    std::cout << "option name Threads type spin default 1 min 1 max 1" << std::endl;
 
     #if defined(TUNE)
         for (auto &pair : tunableParams) {

@@ -578,13 +578,7 @@ class Board {
 
         #if defined(TUNE)
             SEE_PIECE_VALUES = {
-                seePawnValue(),  // Pawn
-                seeMinorValue(), // Knight
-                seeMinorValue(), // Bishop
-                seeRookValue(),  // Rook
-                seeQueenValue(), // Queen
-                0,               // King
-                0                // None
+                seePawnValue(), seeMinorValue(), seeMinorValue(), seeRookValue(),  seeQueenValue(), 0, 0 
             };
         #endif
 

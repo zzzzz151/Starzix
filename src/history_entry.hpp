@@ -35,7 +35,7 @@ struct HistoryEntry {
         const bool enemyAttacksOrigin, const bool enemyAttacksDst, const std::array<Move, 3> moves) const
     {
         #if defined(TUNE)
-            CONT_HISTORY_WEIGHTS = { 
+            CONT_HIST_WEIGHTS = { 
                 contHist1PlyWeight(), contHist2PlyWeight(), contHist4PlyWeight() 
             };
         #endif
@@ -47,7 +47,7 @@ struct HistoryEntry {
             if ((move = moves[i]) != MOVE_NONE) 
             {
                 const int pt = int(move.pieceType());
-                total += float(mContHist[pt][move.to()]) * CONT_HISTORY_WEIGHTS[i];
+                total += float(mContHist[pt][move.to()]) * CONT_HIST_WEIGHTS[i];
             }
 
         return total;

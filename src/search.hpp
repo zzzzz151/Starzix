@@ -62,8 +62,8 @@ class SearchThread {
     std::array<u64, 1ULL << 17> mMovesNodes; // [move]
 
     // Correction histories
-    MultiArray<i16, 2, 16384>    mPawnsCorrHist    = { }; // [stm][Board.pawnsHash() % 16384]
-    MultiArray<i16, 2, 2, 16384> mNonPawnsCorrHist = { }; // [stm][pieceColor][Board.nonPawnsHash(pieceColor) % 16384]
+    MultiArray<i16, 2, CORR_HIST_SIZE>    mPawnsCorrHist    = { }; // [stm][Board.pawnsHash() % CORR_HIST_SIZE]
+    MultiArray<i16, 2, 2, CORR_HIST_SIZE> mNonPawnsCorrHist = { }; // [stm][pieceColor][Board.nonPawnsHash(pieceColor) % CORR_HIST_SIZE]
 
     FinnyTable mFinnyTable; // [color][mirrorHorizontally][inputBucket]
 
@@ -226,9 +226,9 @@ class SearchThread {
         }
 
         return {
-            &mPawnsCorrHist[stm][mBoard.pawnsHash() % 16384],
-            &mNonPawnsCorrHist[stm][WHITE][mBoard.nonPawnsHash(Color::WHITE) % 16384],
-            &mNonPawnsCorrHist[stm][BLACK][mBoard.nonPawnsHash(Color::BLACK) % 16384],
+            &mPawnsCorrHist[stm][mBoard.pawnsHash() % CORR_HIST_SIZE],
+            &mNonPawnsCorrHist[stm][WHITE][mBoard.nonPawnsHash(Color::WHITE) % CORR_HIST_SIZE],
+            &mNonPawnsCorrHist[stm][BLACK][mBoard.nonPawnsHash(Color::BLACK) % CORR_HIST_SIZE],
             lastMoveCorrHistPtr
         };
     }
@@ -282,13 +282,19 @@ class SearchThread {
 
             // Correct eval with correction histories
 
-            i32 correction = 0;
+            #if defined(TUNE)
+                CORR_HISTS_WEIGHTS = {
+                    corrHistPawnsWeight(), corrHistNonPawnsWeight(), corrHistNonPawnsWeight(), corrHistLastMoveWeight()
+                };
+            #endif
 
-            for (const i16* corrHist : correctionHistories())
-                if (corrHist != nullptr) 
-                    correction += i32(*corrHist);
+            const auto corrHists = correctionHistories();
 
-            eval += correction / corrHistDiv();
+            for (size_t i = 0; i < corrHists.size() - (corrHists.back() == nullptr); i++)
+            {
+                const float corrHist = *(corrHists[i]);
+                eval += corrHist * CORR_HISTS_WEIGHTS[i];
+            }
 
             // Clamp to avoid false mate scores and invalid scores
             eval = std::clamp(eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
@@ -328,7 +334,7 @@ class SearchThread {
             else
                 break;
 
-            delta *= aspDeltaMultiplier();
+            delta *= aspDeltaMul();
         }
 
         return score;
@@ -400,13 +406,13 @@ class SearchThread {
         {
             // RFP (Reverse futility pruning) / Static NMP
             if (depth <= rfpMaxDepth() 
-            && eval >= beta + (depth - improving) * rfpMultiplier())
+            && eval >= beta + (depth - improving) * rfpDepthMul())
                 return eval;
 
             // Razoring
             if (depth <= razoringMaxDepth() 
             && abs(alpha) < 2000
-            && eval + depth * razoringMultiplier() < alpha)
+            && eval + depth * razoringDepthMul() < alpha)
             {
                 const i32 score = qSearch(ply, alpha, beta);
 
@@ -419,7 +425,7 @@ class SearchThread {
             if (depth >= nmpMinDepth() 
             && mBoard.lastMove() != MOVE_NONE 
             && eval >= beta
-            && eval >= beta + nmpEvalBetaMargin() - depth * nmpEvalBetaMultiplier()
+            && eval >= beta + nmpEvalBetaMargin() - depth * nmpEvalBetaMul()
             && !(ttHit && ttEntry.bound() == Bound::UPPER && ttEntry.score < beta)
             && mBoard.hasNonPawnMaterial(mBoard.sideToMove()))
             {
@@ -511,7 +517,7 @@ class SearchThread {
             {
                 // LMP (Late move pruning)
                 if (legalMovesSeen >= lmpMinMoves() + pvNode + mBoard.inCheck()
-                                      + depth * depth * lmpMultiplier())
+                                      + depth * depth * lmpDepthMul())
                     break;
                     
                 const i32 lmrDepth = depth - LMR_TABLE[isQuiet][depth][legalMovesSeen];
@@ -520,13 +526,13 @@ class SearchThread {
                 if (lmrDepth <= fpMaxDepth() 
                 && !mBoard.inCheck()
                 && alpha < MIN_MATE_SCORE
-                && alpha > eval + fpBase() + std::max(lmrDepth + improving, 0) * fpMultiplier())
+                && alpha > eval + fpBase() + std::max(lmrDepth + improving, 0) * fpDepthMul())
                     break;
 
                 // SEE pruning
 
-                const i32 threshold = isQuiet ? depth * seeQuietThreshold() - movePicker.moveScore() / seeQuietHistDiv() 
-                                              : depth * seeNoisyThreshold() - i32(*noisyHistoryPtr)  / seeNoisyHistDiv();
+                const i32 threshold = isQuiet ? depth * seeQuietThreshold() - movePicker.moveScore() * seeQuietHistMul() 
+                                              : depth * seeNoisyThreshold() - i32(*noisyHistoryPtr)  * seeNoisyHistMul();
 
                 if (depth <= seePruningMaxDepth() && !mBoard.SEE(move, threshold))
                     continue;
@@ -656,8 +662,8 @@ class SearchThread {
 
             bound = Bound::LOWER;
 
-            const i32 bonus =  std::clamp(depth * historyBonusMultiplier() - historyBonusOffset(), 0, historyBonusMax());
-            const i32 malus = -std::clamp(depth * historyMalusMultiplier() - historyMalusOffset(), 0, historyMalusMax());
+            const i32 bonus =  std::clamp(depth * historyBonusMul() - historyBonusOffset(), 0, historyBonusMax());
+            const i32 malus = -std::clamp(depth * historyMalusMul() - historyMalusOffset(), 0, historyMalusMax());
 
             // History malus: decrease history of fail low noisy moves
             for (i16* noisyHistoryPtr : failLowNoisiesHistory)
