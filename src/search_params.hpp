@@ -164,7 +164,7 @@ MAYBE_CONSTEXPR std::array<float, 4> CORR_HISTS_WEIGHTS {
 // [isQuietMove][depth][moveIndex]
 inline MultiArray<i32, 2, MAX_DEPTH + 1, 256> getLmrTable() 
 {
-    MultiArray<i32, 2, MAX_DEPTH + 1, 256> lmrTable;
+    MultiArray<i32, 2, MAX_DEPTH + 1, 256> lmrTable = { };
 
     for (int depth = 1; depth < MAX_DEPTH + 1; depth++)
         for (int move = 1; move < 256; move++)
