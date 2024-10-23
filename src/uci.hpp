@@ -15,13 +15,13 @@ inline void setoption(const std::vector<std::string> &tokens, Searcher &searcher
 inline void position(const std::vector<std::string> &tokens, Board &board);
 inline void go(const std::vector<std::string> &tokens, Searcher &searcher);
 
-inline void runCommand(std::string &command, Searcher &searcher)
+inline bool runCommand(std::string &command, Searcher &searcher)
 {
     trim(command);
     const std::vector<std::string> tokens = splitString(command, ' ');
 
     if (command == "" || tokens.size() == 0)
-        return;
+        return true;
     // UCI commands
     else if (command == "uci")
         uci();
@@ -36,7 +36,7 @@ inline void runCommand(std::string &command, Searcher &searcher)
     else if (tokens[0] == "go")
         go(tokens, searcher);
     else if (command == "quit")
-        exit(EXIT_SUCCESS);
+        return false;
     // Non-UCI commands
     else if (command == "print" || command == "d"
     || command == "display" || command == "show")
@@ -88,7 +88,7 @@ inline void runCommand(std::string &command, Searcher &searcher)
 
         if (depth <= 0) {
             std::cout << "Total: 0" << std::endl;
-            return;
+            return true;
         }
 
         ArrayVec<Move, 256> moves;
@@ -141,6 +141,8 @@ inline void runCommand(std::string &command, Searcher &searcher)
         }
     }
     #endif
+
+    return true;
 }
 
 inline void uci() {

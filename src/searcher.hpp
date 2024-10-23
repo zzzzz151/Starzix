@@ -33,25 +33,31 @@ class Searcher {
 
     inline Searcher() {
         resizeTT(mTT, 32);
-        printTTSize(mTT);
-
         addThread();
+    }
+
+    ~Searcher() {
+        while (!mThreadsData.empty())
+            removeThread();
     }
 
     inline void ucinewgame() 
     {
         board() = START_BOARD;
+        mainThreadData()->pliesData[0].pvLine.clear(); // reset best root move
+
         resetTT(mTT);
 
         for (ThreadData* td : mThreadsData)
         {
+            td->nodes = 0;
             td->historyTable     = { };
             td->pawnsCorrHist    = { };
             td->nonPawnsCorrHist = { };
         }
     }
 
-    inline Board& board() { return mainThreadData()->board; }
+    inline Board& board() const { return mainThreadData()->board; }
 
     inline Move bestMoveRoot() const 
     {
@@ -98,18 +104,6 @@ class Searcher {
         return true;
     }
 
-    inline void wake(const ThreadState newState) 
-    {
-        for (ThreadData* td : mThreadsData)
-            td->blockUntilSleep();
-
-        for (ThreadData* td : mThreadsData)
-            td->wake(newState);
-
-        for (ThreadData* td : mThreadsData)
-            td->blockUntilSleep();
-    }
-
     inline void loop(ThreadData* td)
     {
         while (true) {
@@ -149,7 +143,7 @@ class Searcher {
     inline std::pair<Move, i32> search(
         const i32 maxDepth, 
         const u64 maxNodes,
-        std::chrono::time_point<std::chrono::steady_clock> startTime, 
+        const std::chrono::time_point<std::chrono::steady_clock> startTime, 
         const u64 hardMs, 
         const u64 softMs)
     {
@@ -161,11 +155,18 @@ class Searcher {
 
         mStopSearch = false;
 
+        for (ThreadData* td : mThreadsData)
+            td->blockUntilSleep();
+
         // Set the board of auxiliar threads
         for (size_t i = 1; i < mThreadsData.size(); i++)
             mThreadsData[i]->board = board();
 
-        wake(ThreadState::SEARCHING);
+        for (ThreadData* td : mThreadsData)
+            td->wake(ThreadState::SEARCHING);
+
+        for (ThreadData* td : mThreadsData)
+            td->blockUntilSleep();
 
         return { bestMoveRoot(), mainThreadData()->score };
     }   
@@ -323,7 +324,7 @@ class Searcher {
     }
 
     inline i32 search(ThreadData &td, i32 depth, const i32 ply, i32 alpha, i32 beta, 
-        const bool cutNode, u8 doubleExtsLeft, const Move singularMove = MOVE_NONE) 
+        const bool cutNode, i32 doubleExtsLeft, const Move singularMove = MOVE_NONE) 
     {
         assert(ply >= 0 && ply <= mMaxDepth);
         assert(alpha >= -INF && alpha <= INF);

@@ -100,7 +100,7 @@ struct ThreadData {
         };
     }
 
-    inline void makeMove(const Move move, const i32 newPly, std::vector<TTEntry> &tt)
+    inline void makeMove(const Move move, const i32 newPly, const std::vector<TTEntry> &tt)
     {
         // If not a special move, we can probably correctly predict the zobrist hash after it
         // and prefetch the TT entry

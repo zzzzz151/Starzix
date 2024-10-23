@@ -40,6 +40,7 @@ int main(int argc, char* argv[])
     #endif
 
     Searcher searcher = Searcher();
+    printTTSize(searcher.mTT);
     
     // If a command is passed in program args, run it and exit
 
@@ -56,10 +57,8 @@ int main(int argc, char* argv[])
     }
 
     // UCI loop
-    while (true) {
+    while (uci::runCommand(command, searcher))
         std::getline(std::cin, command);
-        uci::runCommand(command, searcher);
-    }
 
     return 0;
 }
