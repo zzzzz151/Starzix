@@ -4,7 +4,7 @@
 
 #include "utils.hpp"
 #include "board.hpp"
-#include "searcher.hpp"
+#include "search.hpp"
 #include "bench.hpp"
 #include "nnue.hpp"
 

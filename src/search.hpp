@@ -9,15 +9,14 @@
 #include "history_entry.hpp"
 #include "tt.hpp"
 #include "nnue.hpp"
-#include <deque>
 #include <thread>
 #include <atomic>
 
 class Searcher {
     private:
 
-    std::deque<ThreadData*> mThreadsData   = { };
-    std::deque<std::thread> mNativeThreads = { };
+    std::vector<ThreadData*> mThreadsData   = { };
+    std::vector<std::thread> mNativeThreads = { };
 
     // Search limits
     i32 mMaxDepth = MAX_DEPTH;

@@ -1,7 +1,7 @@
 // clang-format off
 
 #include "utils.hpp"
-#include "searcher.hpp"
+#include "search.hpp"
 #include "uci.hpp"
 
 int main(int argc, char* argv[])
