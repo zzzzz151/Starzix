@@ -22,7 +22,7 @@ else
 endif
 
 all:
-	$(COMPILER) $(CXXFLAGS) src/*.cpp -o $(EXE)$(SUFFIX)
+	$(COMPILER) $(CXXFLAGS) -DNDEBUG src/*.cpp -o $(EXE)$(SUFFIX)
 test:
 	$(COMPILER) $(CXXFLAGS) tests/tests.cpp -o testsCore$(SUFFIX)
 	$(COMPILER) $(CXXFLAGS) -DTUNE tests/testsSEE.cpp -o testsSEE$(SUFFIX)
