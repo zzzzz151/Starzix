@@ -65,16 +65,6 @@ struct ThreadData {
         cv.notify_one();
     }
 
-    inline void signalAndAwaitShutdown() 
-    {
-        wake(ThreadState::EXIT_ASAP);
-
-        {
-            std::unique_lock<std::mutex> lock(mutex);
-            cv.wait(lock, [this]{ return threadState == ThreadState::EXITED; });
-        }
-    }
-
     inline std::array<i16*, 4> correctionHistories()
     {
         const int stm = int(board.sideToMove());
