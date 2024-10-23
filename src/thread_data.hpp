@@ -27,6 +27,8 @@ struct ThreadData {
 
     Board board = START_BOARD;
 
+    i32 score = 0;
+
     u64 nodes = 0;
     i32 maxPlyReached = 0;
 

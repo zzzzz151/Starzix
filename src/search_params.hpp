@@ -44,7 +44,7 @@ constexpr i32 INF = 32000;
 constexpr i32 MIN_MATE_SCORE = INF - 256;
 constexpr i32 VALUE_NONE = INF + 1;
 
-constexpr u8 MAX_DEPTH = 100;
+constexpr i32 MAX_DEPTH = 100;
 
 // Time management
 MAYBE_CONSTEXPR TunableParam<double> hardTimePercentage = TunableParam<double>(0.73, 0.5, 0.75, 0.25 / 4.0);

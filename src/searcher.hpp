@@ -11,6 +11,7 @@
 #include "nnue.hpp"
 #include <deque>
 #include <thread>
+#include <atomic>
 
 class Searcher {
     private:
@@ -24,7 +25,7 @@ class Searcher {
     std::chrono::time_point<std::chrono::steady_clock> mStartTime;
     u64 mHardMs, mSoftMs;
 
-    bool mStopSearch = false;
+    std::atomic<bool> mStopSearch = false;
 
     public:
 
@@ -37,17 +38,20 @@ class Searcher {
         addThread();
     }
 
-    inline ThreadData* mainThreadData() const { return mThreadsData[0]; }
+    inline void ucinewgame() 
+    {
+        board() = START_BOARD;
+        resetTT(mTT);
 
-    inline void reset() {
         for (ThreadData* td : mThreadsData)
         {
-            td->board = START_BOARD;
             td->historyTable     = { };
             td->pawnsCorrHist    = { };
             td->nonPawnsCorrHist = { };
         }
     }
+
+    inline Board& board() { return mainThreadData()->board; }
 
     inline Move bestMoveRoot() const 
     {
@@ -65,6 +69,10 @@ class Searcher {
 
         return nodes;
     }
+
+    private:
+
+    inline ThreadData* mainThreadData() const { return mThreadsData[0]; }
 
     inline void addThread() 
     {
@@ -92,13 +100,12 @@ class Searcher {
 
     inline void wake(const ThreadState newState) 
     {
-        assert(newState != ThreadState::SEARCHING);
+        for (ThreadData* td : mThreadsData)
+            td->blockUntilSleep();
 
         for (ThreadData* td : mThreadsData)
             td->wake(newState);
-    }
 
-    inline void blockUntilReady() {
         for (ThreadData* td : mThreadsData)
             td->blockUntilSleep();
     }
@@ -124,27 +131,48 @@ class Searcher {
         td->cv.notify_all();
     }
 
-    inline i32 search(const i32 maxDepth, 
+    public:
+
+    inline int setThreads(int numThreads) 
+    {
+        numThreads = std::clamp(numThreads, 1, 256);
+
+        while (mThreadsData.size() > 1)
+            removeThread();
+
+        while (int(mThreadsData.size()) < numThreads)
+            addThread();
+
+        return numThreads;
+    }
+
+    inline std::pair<Move, i32> search(
+        const i32 maxDepth, 
         const u64 maxNodes,
         std::chrono::time_point<std::chrono::steady_clock> startTime, 
         const u64 hardMs, 
         const u64 softMs)
     {
-        mMaxDepth = maxDepth;
+        mMaxDepth = std::clamp(maxDepth, 1, MAX_DEPTH);
         mMaxNodes = maxNodes;
         mStartTime = startTime;
         mHardMs = hardMs;
         mSoftMs = softMs;
 
-        for (ThreadData* td : mThreadsData)
-            td->wake(ThreadState::SEARCHING);
+        mStopSearch = false;
 
-        return 0;
+        // Set the board of auxiliar threads
+        for (size_t i = 1; i < mThreadsData.size(); i++)
+            mThreadsData[i]->board = board();
+
+        wake(ThreadState::SEARCHING);
+
+        return { bestMoveRoot(), mainThreadData()->score };
     }   
 
     private:
 
-    inline i32 search(ThreadData &td)
+    inline void search(ThreadData &td)
     { 
         td.nodes = 0;
         td.nodesByMove = { };
@@ -176,18 +204,18 @@ class Searcher {
                 }
 
         // ID (Iterative deepening)
-        i32 score = 0;
+        td.score = 0;
         for (i32 iterationDepth = 1; iterationDepth <= mMaxDepth; iterationDepth++)
         {
             td.maxPlyReached = 0;
 
             const i32 iterationScore = iterationDepth >= aspMinDepth() 
-                                       ? aspiration(td, iterationDepth, score)
+                                       ? aspiration(td, iterationDepth)
                                        : search(td, iterationDepth, 0, -INF, INF, false, DOUBLE_EXTENSIONS_MAX);
 
             if (shouldStop(td)) break;
 
-            score = iterationScore;
+            td.score = iterationScore;
 
             // If not main thread, continue
             if (&td != mainThreadData()) continue;
@@ -198,11 +226,11 @@ class Searcher {
                       << " depth "    << iterationDepth
                       << " seldepth " << td.maxPlyReached;
 
-            if (abs(score) < MIN_MATE_SCORE)
-                std::cout << " score cp " << score;
+            if (abs(td.score) < MIN_MATE_SCORE)
+                std::cout << " score cp " << td.score;
             else {
-                const i32 movesTillMate = round((INF - abs(score)) / 2.0);
-                std::cout << " score mate " << (score > 0 ? movesTillMate : -movesTillMate);
+                const i32 movesTillMate = round((INF - abs(td.score)) / 2.0);
+                std::cout << " score mate " << (td.score > 0 ? movesTillMate : -movesTillMate);
             }
 
             const u64 nodes = totalNodes();
@@ -234,14 +262,16 @@ class Searcher {
                 break;
         }
 
-        return score;
+        // If main thread, signal other threads to stop searching
+        if (&td == mainThreadData()) mStopSearch = true;
     }
 
     inline bool shouldStop(const ThreadData &td) 
     {
-        if (mStopSearch) return true;
+        if (mStopSearch.load(std::memory_order_relaxed)) 
+            return true;
 
-        // Only check stop conditions in main thread
+        // Only check stop conditions and modify mStopSearch in main thread
         // Don't stop searching until a best root move is set
         if (&td != mainThreadData() || bestMoveRoot() == MOVE_NONE) 
             return false;
@@ -255,19 +285,19 @@ class Searcher {
         return mStopSearch = (millisecondsElapsed(mStartTime) >= mHardMs);
     }
 
-    inline i32 aspiration(ThreadData &td, const i32 iterationDepth, i32 score)
+    inline i32 aspiration(ThreadData &td, const i32 iterationDepth)
     {
         // Aspiration Windows
         // Search with a small window, adjusting it and researching until the score is inside the window
 
         i32 depth = iterationDepth;
         i32 delta = aspInitialDelta();
-        i32 alpha = std::max(-INF, score - delta);
-        i32 beta  = std::min(INF,  score + delta);
-        i32 bestScore = score;
+        i32 alpha = std::max(-INF, td.score - delta);
+        i32 beta  = std::min(INF,  td.score + delta);
+        i32 bestScore = td.score;
 
         while (true) {
-            score = search(td, depth, 0, alpha, beta, false, DOUBLE_EXTENSIONS_MAX);
+            i32 score = search(td, depth, 0, alpha, beta, false, DOUBLE_EXTENSIONS_MAX);
 
             if (shouldStop(td)) return 0;
 
@@ -289,7 +319,7 @@ class Searcher {
             delta *= aspDeltaMul();
         }
 
-        return score;
+        return bestScore;
     }
 
     inline i32 search(ThreadData &td, i32 depth, const i32 ply, i32 alpha, i32 beta, 
