@@ -20,10 +20,11 @@ class Searcher {
     std::deque<std::thread> mNativeThreads = { };
 
     // Search limits
-    i32 mMaxDepth;
-    u64 mMaxNodes;
-    std::chrono::time_point<std::chrono::steady_clock> mStartTime;
-    u64 mHardMs, mSoftMs;
+    i32 mMaxDepth = MAX_DEPTH;
+    u64 mMaxNodes = std::numeric_limits<u64>::max();
+    std::chrono::time_point<std::chrono::steady_clock> mStartTime = std::chrono::steady_clock::now();
+    u64 mHardMs = std::numeric_limits<u64>::max();
+    u64 mSoftMs = std::numeric_limits<u64>::max();
 
     bool mPrintInfo = true;
 
@@ -101,7 +102,10 @@ class Searcher {
 
         {
             std::unique_lock<std::mutex> lock(lastThreadData->mutex);
-            lastThreadData->cv.wait(lock, [lastThreadData]{ return lastThreadData->threadState == ThreadState::EXITED; });
+
+            lastThreadData->cv.wait(lock, [lastThreadData] { 
+                return lastThreadData->threadState == ThreadState::EXITED; 
+            });
         }
 
         if (mNativeThreads.back().joinable())
@@ -488,7 +492,9 @@ class Searcher {
         MovePicker movePicker = MovePicker(false);
         Move move;
 
-        while ((move = movePicker.next(td.board, ttMove, plyDataPtr->killer, td.historyTable, singularMove)) != MOVE_NONE)
+        while ((move = movePicker.next(
+            td.board, ttMove, plyDataPtr->killer, td.historyTable, singularMove
+            )) != MOVE_NONE)
         {
             assert(move != singularMove);
 
