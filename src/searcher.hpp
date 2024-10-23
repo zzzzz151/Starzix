@@ -85,7 +85,7 @@ class Searcher {
     inline void addThread() 
     {
         ThreadData* threadData = new ThreadData();
-        std::thread nativeThread([=]() mutable { loop(threadData); });
+        std::thread nativeThread([=, this]() mutable { loop(threadData); });
 
         mThreadsData.push_back(threadData);
         mNativeThreads.push_back(std::move(nativeThread));
@@ -101,7 +101,7 @@ class Searcher {
 
         {
             std::unique_lock<std::mutex> lock(lastThreadData->mutex);
-            lastThreadData->cv.wait(lock, [this, lastThreadData]{ return lastThreadData->threadState == ThreadState::EXITED; });
+            lastThreadData->cv.wait(lock, [lastThreadData]{ return lastThreadData->threadState == ThreadState::EXITED; });
         }
 
         if (mNativeThreads.back().joinable())
