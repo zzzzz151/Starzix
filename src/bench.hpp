@@ -59,40 +59,33 @@ constexpr std::array BENCH_FENS {
     "2r2b2/5p2/5k2/p1r1pP2/P2pB3/1P3P2/K1P3R1/7R w - - 23 93"
 };
 
-inline void bench(int depth = 14)
+inline void bench(const int depth = 14)
 {
-    /*
-    depth = std::clamp(depth, 1, (int)MAX_DEPTH);
-
-    std::vector<TTEntry> benchTT;
-    resizeTT(benchTT, 32);
-
-    SearchThread searchThread = SearchThread(&benchTT);
+    Searcher searcher = Searcher();
 
     u64 totalNodes = 0, totalMilliseconds = 0;
 
     for (const std::string fen : BENCH_FENS)
     {
-        searchThread.mBoard = Board(fen);
+        searcher.ucinewgame();
+        searcher.board() = Board(fen);
+
+        const std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
         
-        searchThread.search(
+        searcher.search(
             depth, 
-            std::numeric_limits<i64>::max(), 
-            std::chrono::steady_clock::now(), 
-            std::numeric_limits<i64>::max(), 
-            std::numeric_limits<i64>::max(),
+            std::numeric_limits<u64>::max(), 
+            startTime, 
+            std::numeric_limits<u64>::max(), 
+            std::numeric_limits<u64>::max(),
             false
         );
 
-        totalMilliseconds += searchThread.millisecondsElapsed();
-        totalNodes += searchThread.nodes();
-
-        searchThread.reset();
-        resetTT(benchTT);
+        totalMilliseconds += millisecondsElapsed(startTime);
+        totalNodes += searcher.totalNodes();
     }
 
     std::cout << totalNodes << " nodes "
               << totalNodes * 1000 / std::max((u64)totalMilliseconds, (u64)1) << " nps"
               << std::endl;
-    */
 }

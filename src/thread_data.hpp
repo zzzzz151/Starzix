@@ -65,11 +65,6 @@ struct ThreadData {
         cv.notify_one();
     }
 
-    inline void blockUntilSleep() {
-        std::unique_lock<std::mutex> lock(mutex);
-        cv.wait(lock, [&] { return threadState == ThreadState::SLEEPING; });
-    }
-
     inline void signalAndAwaitShutdown() 
     {
         wake(ThreadState::EXIT_ASAP);

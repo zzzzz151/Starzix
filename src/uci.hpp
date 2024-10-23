@@ -281,7 +281,7 @@ inline void go(const std::vector<std::string> &tokens, Searcher &searcher)
         softMs = hardMs * softTimePercentage();
     }
 
-    const auto [bestMove, score] = searcher.search(maxDepth, maxNodes, startTime, hardMs, softMs);
+    const auto [bestMove, score] = searcher.search(maxDepth, maxNodes, startTime, hardMs, softMs, true);
 
     std::cout << "bestmove " << bestMove.toUci() << std::endl;
 }

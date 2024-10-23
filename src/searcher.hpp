@@ -25,6 +25,8 @@ class Searcher {
     std::chrono::time_point<std::chrono::steady_clock> mStartTime;
     u64 mHardMs, mSoftMs;
 
+    bool mPrintInfo = true;
+
     std::atomic<bool> mStopSearch = false;
 
     public:
@@ -61,7 +63,7 @@ class Searcher {
 
     inline Move bestMoveRoot() const 
     {
-        return mainThreadData()->pliesData[0].pvLine.size() == 0
+        return mainThreadData()->pliesData[0].pvLine.size() > 0
                ? mainThreadData()->pliesData[0].pvLine[0] 
                : MOVE_NONE;
     }
@@ -93,13 +95,20 @@ class Searcher {
     {
         if (mThreadsData.empty()) return false;
 
-        mThreadsData.back()->signalAndAwaitShutdown();
+        ThreadData* lastThreadData = mThreadsData.back();
+
+        lastThreadData->wake(ThreadState::EXIT_ASAP);
+
+        {
+            std::unique_lock<std::mutex> lock(lastThreadData->mutex);
+            lastThreadData->cv.wait(lock, [this, lastThreadData]{ return lastThreadData->threadState == ThreadState::EXITED; });
+        }
 
         if (mNativeThreads.back().joinable())
             mNativeThreads.back().join();
 
         mNativeThreads.pop_back();
-        delete mThreadsData.back(), mThreadsData.pop_back();
+        delete lastThreadData, mThreadsData.pop_back();
 
         return true;
     }
@@ -125,6 +134,15 @@ class Searcher {
         td->cv.notify_all();
     }
 
+    inline void blockUntilSleep() 
+    {
+        for (ThreadData* td : mThreadsData) 
+        {
+            std::unique_lock<std::mutex> lock(td->mutex);
+            td->cv.wait(lock, [&] { return td->threadState == ThreadState::SLEEPING; });
+        }
+    }
+
     public:
 
     inline int setThreads(int numThreads) 
@@ -145,7 +163,8 @@ class Searcher {
         const u64 maxNodes,
         const std::chrono::time_point<std::chrono::steady_clock> startTime, 
         const u64 hardMs, 
-        const u64 softMs)
+        const u64 softMs,
+        const bool printInfo)
     {
         mMaxDepth = std::clamp(maxDepth, 1, MAX_DEPTH);
         mMaxNodes = maxNodes;
@@ -153,10 +172,10 @@ class Searcher {
         mHardMs = hardMs;
         mSoftMs = softMs;
 
+        mPrintInfo = printInfo;
         mStopSearch = false;
 
-        for (ThreadData* td : mThreadsData)
-            td->blockUntilSleep();
+        blockUntilSleep();
 
         // Set the board of auxiliar threads
         for (size_t i = 1; i < mThreadsData.size(); i++)
@@ -165,8 +184,7 @@ class Searcher {
         for (ThreadData* td : mThreadsData)
             td->wake(ThreadState::SEARCHING);
 
-        for (ThreadData* td : mThreadsData)
-            td->blockUntilSleep();
+        blockUntilSleep();
 
         return { bestMoveRoot(), mainThreadData()->score };
     }   
@@ -221,31 +239,34 @@ class Searcher {
             // If not main thread, continue
             if (&td != mainThreadData()) continue;
 
-            // Print uci info
-
-            std::cout << "info"
-                      << " depth "    << iterationDepth
-                      << " seldepth " << td.maxPlyReached;
-
-            if (abs(td.score) < MIN_MATE_SCORE)
-                std::cout << " score cp " << td.score;
-            else {
-                const i32 movesTillMate = round((INF - abs(td.score)) / 2.0);
-                std::cout << " score mate " << (td.score > 0 ? movesTillMate : -movesTillMate);
-            }
-
-            const u64 nodes = totalNodes();
             const u64 msElapsed = millisecondsElapsed(mStartTime);
 
-            std::cout << " nodes " << nodes
-                      << " nps "   << nodes * 1000 / std::max(msElapsed, (u64)1)
-                      << " time "  << msElapsed
-                      << " pv";
+            // Print uci info
+            if (mPrintInfo)
+            {
+                std::cout << "info"
+                          << " depth "    << iterationDepth
+                          << " seldepth " << td.maxPlyReached;
 
-            for (const Move move : td.pliesData[0].pvLine)
-                std::cout << " " << move.toUci();
+                if (abs(td.score) < MIN_MATE_SCORE)
+                    std::cout << " score cp " << td.score;
+                else {
+                    const i32 movesTillMate = round((INF - abs(td.score)) / 2.0);
+                    std::cout << " score mate " << (td.score > 0 ? movesTillMate : -movesTillMate);
+                }
 
-            std::cout << std::endl;
+                const u64 nodes = totalNodes();
+
+                std::cout << " nodes " << nodes
+                          << " nps "   << nodes * 1000 / std::max(msElapsed, (u64)1)
+                          << " time "  << msElapsed
+                          << " pv";
+
+                for (const Move move : td.pliesData[0].pvLine)
+                    std::cout << " " << move.toUci();
+
+                std::cout << std::endl;
+            }
 
             // Check soft time limit (in case one exists)
 
