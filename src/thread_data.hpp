@@ -5,6 +5,11 @@
 #include "utils.hpp"
 #include "board.hpp"
 #include "search_params.hpp"
+#include "tt.hpp"
+#include "history_entry.hpp"
+#include "nnue.hpp"
+#include <mutex>
+#include <condition_variable>
 
 struct PlyData {
     public:
@@ -13,12 +18,15 @@ struct PlyData {
     i32 eval = VALUE_NONE;
 };
 
+enum class ThreadState {
+    SLEEPING, SEARCHING, EXIT_ASAP, EXITED
+};
+
 struct ThreadData {
     public:
 
     Board board = START_BOARD;
 
-    i32 maxDepth = MAX_DEPTH;
     u64 nodes = 0;
     i32 maxPlyReached = 0;
 
@@ -47,6 +55,29 @@ struct ThreadData {
 
     inline ThreadData() = default;
 
+    inline void wake(const ThreadState newState) 
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        threadState = newState;
+        lock.unlock();
+        cv.notify_one();
+    }
+
+    inline void blockUntilSleep() {
+        std::unique_lock<std::mutex> lock(mutex);
+        cv.wait(lock, [&] { return threadState == ThreadState::SLEEPING; });
+    }
+
+    inline void signalAndAwaitShutdown() 
+    {
+        wake(ThreadState::EXIT_ASAP);
+
+        {
+            std::unique_lock<std::mutex> lock(mutex);
+            cv.wait(lock, [this]{ return threadState == ThreadState::EXITED; });
+        }
+    }
+
     inline std::array<i16*, 4> correctionHistories()
     {
         const int stm = int(board.sideToMove());
@@ -73,7 +104,7 @@ struct ThreadData {
         // and prefetch the TT entry
         if (move.flag() <= Move::KING_FLAG) {
             const auto ttEntryIdx = TTEntryIndex(board.roughHashAfter(move), tt.size());
-            __builtin_prefetch(tt[ttEntryIdx]);
+            __builtin_prefetch(&tt[ttEntryIdx]);
         }
 
         board.makeMove(move);

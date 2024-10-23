@@ -4,7 +4,7 @@
 
 #include "utils.hpp"
 #include "board.hpp"
-#include "search.hpp"
+#include "searcher.hpp"
 
 constexpr std::array BENCH_FENS {
     "r3k2r/2pb1ppp/2pp1q2/p7/1nP1B3/1P2P3/P2N1PPP/R2QK2R w KQkq a6 0 14",
@@ -61,6 +61,7 @@ constexpr std::array BENCH_FENS {
 
 inline void bench(int depth = 14)
 {
+    /*
     depth = std::clamp(depth, 1, (int)MAX_DEPTH);
 
     std::vector<TTEntry> benchTT;
@@ -93,4 +94,5 @@ inline void bench(int depth = 14)
     std::cout << totalNodes << " nodes "
               << totalNodes * 1000 / std::max((u64)totalMilliseconds, (u64)1) << " nps"
               << std::endl;
+    */
 }

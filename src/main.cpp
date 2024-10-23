@@ -1,10 +1,8 @@
 // clang-format off
 
 #include "utils.hpp"
-#include "board.hpp"
-#include "search.hpp"
-#include "uci.hpp"
 #include "searcher.hpp"
+#include "uci.hpp"
 
 // On Linux, include the library needed to set stack size
 #if defined(__GNUC__)
@@ -53,7 +51,7 @@ int main(int argc, char* argv[])
     trim(command);
 
     if (command != "") {
-        uci::runCommand(command, searchThread);
+        uci::runCommand(command, searcher);
         return 0;
     }
 

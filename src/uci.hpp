@@ -2,9 +2,11 @@
 
 #pragma once
 
+#include "utils.hpp"
 #include "board.hpp"
 #include "searcher.hpp"
 #include "bench.hpp"
+#include "nnue.hpp"
 
 namespace uci { // Universal chess interface
 
@@ -236,11 +238,13 @@ inline void go(const std::vector<std::string> &tokens, Searcher &searcher)
 {
     const std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
 
+    const Board &board = searcher.mainThreadData()->board;
+
     i64 milliseconds = std::numeric_limits<i64>::max();
     [[maybe_unused]] i64 incrementMs = 0;
     [[maybe_unused]] i64 movesToGo = 0;
     bool isMoveTime = false;
-    u8 maxDepth = MAX_DEPTH;
+    i32 maxDepth = MAX_DEPTH;
     i64 maxNodes = std::numeric_limits<i64>::max();
 
     for (int i = 1; i < int(tokens.size()) - 1; i += 2)
@@ -278,9 +282,7 @@ inline void go(const std::vector<std::string> &tokens, Searcher &searcher)
         softMilliseconds = hardMilliseconds * softTimePercentage();
     }
 
-    searchThread.search(maxDepth, maxNodes, startTime, hardMilliseconds, softMilliseconds, true);
-
-    std::cout << "bestmove " << searchThread.bestMoveRoot().toUci() << std::endl;
+    std::cout << "bestmove " << searcher.bestMoveRoot().toUci() << std::endl;
 }
 
 } // namespace uci
