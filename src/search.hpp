@@ -35,12 +35,11 @@ class Searcher {
 
     inline Searcher() {
         resizeTT(mTT, 32);
-        addThread();
+        setThreads(1);
     }
 
     ~Searcher() {
-        while (!mThreadsData.empty())
-            removeThread();
+        setThreads(0);
     }
 
     inline void ucinewgame() 
@@ -82,40 +81,6 @@ class Searcher {
 
     inline ThreadData* mainThreadData() const { return mThreadsData[0]; }
 
-    inline void addThread() 
-    {
-        ThreadData* threadData = new ThreadData();
-        std::thread nativeThread([=, this]() mutable { loop(threadData); });
-
-        mThreadsData.push_back(threadData);
-        mNativeThreads.push_back(std::move(nativeThread));
-    }
-
-    inline bool removeThread() 
-    {
-        if (mThreadsData.empty()) return false;
-
-        ThreadData* lastThreadData = mThreadsData.back();
-
-        lastThreadData->wake(ThreadState::EXIT_ASAP);
-
-        {
-            std::unique_lock<std::mutex> lock(lastThreadData->mutex);
-
-            lastThreadData->cv.wait(lock, [lastThreadData] { 
-                return lastThreadData->threadState == ThreadState::EXITED; 
-            });
-        }
-
-        if (mNativeThreads.back().joinable())
-            mNativeThreads.back().join();
-
-        mNativeThreads.pop_back();
-        delete lastThreadData, mThreadsData.pop_back();
-
-        return true;
-    }
-
     inline void loop(ThreadData* td)
     {
         while (true) {
@@ -150,13 +115,47 @@ class Searcher {
 
     inline int setThreads(int numThreads) 
     {
-        numThreads = std::clamp(numThreads, 1, 256);
+        numThreads = std::clamp(numThreads, 0, 256);
+        
+        blockUntilSleep();
 
-        while (mThreadsData.size() > 1)
-            removeThread();
+        // Remove threads
+        while (!mThreadsData.empty())
+        {
+            ThreadData* lastThreadData = mThreadsData.back();
 
+            lastThreadData->wake(ThreadState::EXIT_ASAP);
+
+            {
+                std::unique_lock<std::mutex> lock(lastThreadData->mutex);
+
+                lastThreadData->cv.wait(lock, [lastThreadData] { 
+                    return lastThreadData->threadState == ThreadState::EXITED; 
+                });
+            }
+
+            if (mNativeThreads.back().joinable())
+                mNativeThreads.back().join();
+
+            mNativeThreads.pop_back();
+            delete lastThreadData, mThreadsData.pop_back();
+        }
+
+        mThreadsData.reserve(numThreads);
+        mNativeThreads.reserve(numThreads);
+
+        // Add threads
         while (int(mThreadsData.size()) < numThreads)
-            addThread();
+        {
+            ThreadData* threadData = new ThreadData();
+            std::thread nativeThread([=, this]() mutable { loop(threadData); });
+
+            mThreadsData.push_back(threadData);
+            mNativeThreads.push_back(std::move(nativeThread));
+        }
+
+        mThreadsData.shrink_to_fit();
+        mNativeThreads.shrink_to_fit();
 
         return numThreads;
     }
