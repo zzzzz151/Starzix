@@ -116,7 +116,7 @@ class Searcher {
     inline int setThreads(int numThreads) 
     {
         numThreads = std::clamp(numThreads, 0, 256);
-        
+
         blockUntilSleep();
 
         // Remove threads
@@ -225,7 +225,7 @@ class Searcher {
                 }
 
         // ID (Iterative deepening)
-        td.score = 0;
+        td.score = VALUE_NONE;
         for (i32 iterationDepth = 1; iterationDepth <= mMaxDepth; iterationDepth++)
         {
             td.maxPlyReached = 0;
@@ -234,14 +234,21 @@ class Searcher {
                                        ? aspiration(td, iterationDepth)
                                        : search(td, iterationDepth, 0, -INF, INF, false, DOUBLE_EXTENSIONS_MAX);
 
-            if (shouldStop(td)) break;
+            if (mStopSearch.load(std::memory_order_relaxed))
+                break;
 
             td.score = iterationScore;
+            u64 msElapsed;
 
-            // If not main thread, continue
-            if (&td != mainThreadData()) continue;
+            if (&td == mainThreadData())
+            {
+                msElapsed = millisecondsElapsed(mStartTime);
 
-            const u64 msElapsed = millisecondsElapsed(mStartTime);
+                mStopSearch = msElapsed >= mHardMs
+                              || (mMaxNodes < std::numeric_limits<i64>::max() && totalNodes() >= mMaxNodes);
+            }
+            else 
+                continue;
 
             // Print uci info
             if (mPrintInfo)
@@ -296,8 +303,8 @@ class Searcher {
             return true;
 
         // Only check stop conditions and modify mStopSearch in main thread
-        // Don't stop searching until a best root move is set
-        if (&td != mainThreadData() || bestMoveRoot() == MOVE_NONE) 
+        // Don't stop searching if depth 1 not completed
+        if (&td != mainThreadData() || mainThreadData()->score == VALUE_NONE) 
             return false;
 
         if (mMaxNodes < std::numeric_limits<i64>::max() && totalNodes() >= mMaxNodes)
