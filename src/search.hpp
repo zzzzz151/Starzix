@@ -71,7 +71,7 @@ class Searcher {
     {
         u64 nodes = 0;
 
-        for (ThreadData* td : mThreadsData)
+        for (const ThreadData* td : mThreadsData)
             nodes += td->nodes;
 
         return nodes;
@@ -88,7 +88,7 @@ class Searcher {
             td->cv.wait(lock, [&] { return td->threadState != ThreadState::SLEEPING; });
 
             if (td->threadState == ThreadState::SEARCHING)
-                search(*td);
+                iterativeDeepening(*td);
             else if (td->threadState == ThreadState::EXIT_ASAP)
                 break;
 
@@ -179,9 +179,36 @@ class Searcher {
 
         blockUntilSleep();
 
-        // Set the board of auxiliar threads
+        mainThreadData()->accumulators[0] = BothAccumulators(mainThreadData()->board);
+
+        // Init main thread's finny table
+        for (const int color : {WHITE, BLACK})
+            for (const int mirrorHorizontally : {false, true})
+                for (int inputBucket = 0; inputBucket < nnue::NUM_INPUT_BUCKETS; inputBucket++)
+                {
+                    FinnyTableEntry &finnyEntry = mainThreadData()->finnyTable[color][mirrorHorizontally][inputBucket];
+
+                    if (mirrorHorizontally == mainThreadData()->accumulators[0].mMirrorHorizontally[color]
+                    && inputBucket == mainThreadData()->accumulators[0].mInputBucket[color])
+                    {
+                        finnyEntry.accumulator = mainThreadData()->accumulators[0].mAccumulators[color];
+                        mainThreadData()->board.getColorBitboards(finnyEntry.colorBitboards);
+                        mainThreadData()->board.getPiecesBitboards(finnyEntry.piecesBitboards);
+                    }
+                    else {
+                        finnyEntry.accumulator = nnue::NET->hiddenBiases[color];
+                        finnyEntry.colorBitboards  = { };
+                        finnyEntry.piecesBitboards = { };
+                    }
+                }
+
+        // Init auxiliar threads
         for (size_t i = 1; i < mThreadsData.size(); i++)
-            mThreadsData[i]->board = board();
+        {
+            mThreadsData[i]->board = mainThreadData()->board;
+            mThreadsData[i]->accumulators[0] = mainThreadData()->accumulators[0];
+            mThreadsData[i]->finnyTable = mainThreadData()->finnyTable;
+        }
 
         for (ThreadData* td : mThreadsData)
             td->wake(ThreadState::SEARCHING);
@@ -193,38 +220,14 @@ class Searcher {
 
     private:
 
-    inline void search(ThreadData &td)
+    inline void iterativeDeepening(ThreadData &td)
     { 
         td.nodes = 0;
         td.nodesByMove = { };
 
         td.pliesData[0] = PlyData();
-
-        td.accumulators[0] = BothAccumulators(td.board);
         td.accumulatorPtr = &(td.accumulators[0]);
 
-        // Reset finny table
-        for (const int color : {WHITE, BLACK})
-            for (const int mirrorHorizontally : {false, true})
-                for (int inputBucket = 0; inputBucket < nnue::NUM_INPUT_BUCKETS; inputBucket++)
-                {
-                    FinnyTableEntry &finnyEntry = td.finnyTable[color][mirrorHorizontally][inputBucket];
-
-                    if (mirrorHorizontally == td.accumulatorPtr->mMirrorHorizontally[color]
-                    && inputBucket == td.accumulatorPtr->mInputBucket[color])
-                    {
-                        finnyEntry.accumulator = td.accumulatorPtr->mAccumulators[color];
-                        td.board.getColorBitboards(finnyEntry.colorBitboards);
-                        td.board.getPiecesBitboards(finnyEntry.piecesBitboards);
-                    }
-                    else {
-                        finnyEntry.accumulator = nnue::NET->hiddenBiases[color];
-                        finnyEntry.colorBitboards  = { };
-                        finnyEntry.piecesBitboards = { };
-                    }
-                }
-
-        // ID (Iterative deepening)
         td.score = VALUE_NONE;
         for (i32 iterationDepth = 1; iterationDepth <= mMaxDepth; iterationDepth++)
         {
