@@ -67,14 +67,6 @@ inline u64 millisecondsElapsed(const std::chrono::steady_clock::time_point start
     return (std::chrono::steady_clock::now() - start) / std::chrono::milliseconds(1);
 }
 
-// Chess
-
-const std::string START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-
-enum class MoveGenType : u8 {
-    ALL = 0, NOISIES = 1, QUIETS = 2
-};
-
 // Square
 
 using Square = u8;

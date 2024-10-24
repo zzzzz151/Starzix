@@ -8,6 +8,12 @@
 #include "search_params.hpp" // SEE piece values
 #include "cuckoo.hpp"
 
+const std::string START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+enum class MoveGenType : u8 {
+    ALL = 0, NOISIES = 1, QUIETS = 2
+};
+
 struct BoardState {
     public:
     Color colorToMove = Color::WHITE;
@@ -1394,3 +1400,5 @@ constexpr u64 perft(Board &board, const int depth)
 
     return nodes;
 }
+
+const Board START_BOARD = Board(START_FEN);

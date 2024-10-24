@@ -1,10 +1,9 @@
-CXXFLAGS = -std=c++20 -march=native -O3 -funroll-loops -flto -fuse-ld=lld -fno-exceptions -Wunused -Wall -Wextra -fconstexpr-steps=100000000
+CXXFLAGS = -std=c++23 -march=native -O3 -funroll-loops -flto -fuse-ld=lld -fno-exceptions -Wunused -Wall -Wextra -fconstexpr-steps=100000000
 SUFFIX =
 
 ifeq ($(OS), Windows_NT)
 	EXE ?= Starzix
 	CLANG_PLUS_PLUS_18 = $(shell where clang++-18 > NUL 2>&1)
-	CXXFLAGS += -Wl,/STACK:16777216
 
 	ENDS_WITH := exe
 	ifneq ($(patsubst %$(ENDS_WITH),,$(lastword $(EXE))),)

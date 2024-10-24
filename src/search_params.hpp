@@ -44,7 +44,7 @@ constexpr i32 INF = 32000;
 constexpr i32 MIN_MATE_SCORE = INF - 256;
 constexpr i32 VALUE_NONE = INF + 1;
 
-constexpr u8 MAX_DEPTH = 100;
+constexpr i32 MAX_DEPTH = 100;
 
 // Time management
 MAYBE_CONSTEXPR TunableParam<double> hardTimePercentage = TunableParam<double>(0.73, 0.5, 0.75, 0.25 / 4.0);
@@ -160,6 +160,27 @@ MAYBE_CONSTEXPR TunableParam<float> corrHistLastMoveWeight = TunableParam<float>
 MAYBE_CONSTEXPR std::array<float, 4> CORR_HISTS_WEIGHTS {
     corrHistPawnsWeight(), corrHistNonPawnsWeight(), corrHistNonPawnsWeight(), corrHistLastMoveWeight()
 };
+
+// [isQuietMove][depth][moveIndex]
+inline MultiArray<i32, 2, MAX_DEPTH + 1, 256> getLmrTable() 
+{
+    MultiArray<i32, 2, MAX_DEPTH + 1, 256> lmrTable = { };
+
+    for (int depth = 1; depth < MAX_DEPTH + 1; depth++)
+        for (int move = 1; move < 256; move++)
+        {
+            lmrTable[false][depth][move] 
+                = round(lmrBaseNoisy() + ln(depth) * ln(move) * lmrMultiplierNoisy());
+
+            lmrTable[true][depth][move] 
+                = round(lmrBaseQuiet() + ln(depth) * ln(move) * lmrMultiplierQuiet());
+        }
+
+    return lmrTable;
+};
+
+// [isQuietMove][depth][moveIndex]
+MAYBE_CONST MultiArray<i32, 2, MAX_DEPTH+1, 256> LMR_TABLE = getLmrTable();
 
 #if defined(TUNE)
     using TunableParamVariant = std::variant<

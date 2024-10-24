@@ -60,7 +60,7 @@ struct MovePicker {
     }
 
     constexpr Move next(Board &board, const Move ttMove, const Move killer, 
-        MultiArray<HistoryEntry, 2, 6, 64> &movesHistory, Move excludedMove = MOVE_NONE) 
+        MultiArray<HistoryEntry, 2, 6, 64> &historyTable, Move excludedMove = MOVE_NONE) 
     {
         assert(killer == MOVE_NONE || board.isQuiet(killer));
 
@@ -124,7 +124,7 @@ struct MovePicker {
                 }
                 else {
                     const int pt = int(move.pieceType());
-                    const i32 noisyHist = movesHistory[stm][pt][move.to()].noisyHistory(captured, promotion);
+                    const i32 noisyHist = historyTable[stm][pt][move.to()].noisyHistory(captured, promotion);
 
                     mNoisiesScores[i] = board.SEE(move, -noisyHist * seeNoisyHistMul()) ? GOOD_SCORE : -GOOD_SCORE;
                 }
@@ -204,7 +204,7 @@ struct MovePicker {
                 // Calling attacks(board.oppSide()) will cache enemy attacks and speedup isSquareAttacked()
                 board.attacks(board.oppSide()); 
                 
-                mQuietsScores[j] = movesHistory[stm][pt][move.to()].quietHistory(
+                mQuietsScores[j] = historyTable[stm][pt][move.to()].quietHistory(
                     board.isSquareAttacked(move.from(), nstm), 
                     board.isSquareAttacked(move.to(),   nstm), 
                     lastMoves
@@ -259,6 +259,6 @@ struct MovePicker {
             return MOVE_NONE;
         }
 
-        return next(board, ttMove, killer, movesHistory, excludedMove);
+        return next(board, ttMove, killer, historyTable, excludedMove);
     }
 };
