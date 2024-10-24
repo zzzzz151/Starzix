@@ -1,4 +1,4 @@
-CXXFLAGS = -std=c++23 -march=native -O3 -funroll-loops -flto -fuse-ld=lld -fno-exceptions -Wunused -Wall -Wextra -fconstexpr-steps=100000000
+CXXFLAGS = -std=c++23 -O3 -funroll-loops -flto -fuse-ld=lld -fno-exceptions -Wunused -Wall -Wextra -fconstexpr-steps=100000000
 SUFFIX =
 
 ifeq ($(OS), Windows_NT)
@@ -22,11 +22,14 @@ else
 endif
 
 all:
-	$(COMPILER) $(CXXFLAGS) -DNDEBUG src/*.cpp -o $(EXE)$(SUFFIX)
+	$(COMPILER) $(CXXFLAGS) -march=native -DNDEBUG src/*.cpp -o $(EXE)$(SUFFIX)
 test:
-	$(COMPILER) $(CXXFLAGS) tests/tests.cpp -o testsCore$(SUFFIX)
-	$(COMPILER) $(CXXFLAGS) -DTUNE tests/testsSEE.cpp -o testsSEE$(SUFFIX)
-	$(COMPILER) $(CXXFLAGS) tests/testsNNUE.cpp -o testsNNUE$(SUFFIX)
+	$(COMPILER) $(CXXFLAGS) -march=native tests/tests.cpp -o testsCore$(SUFFIX)
+	$(COMPILER) $(CXXFLAGS) -march=native -DTUNE tests/testsSEE.cpp -o testsSEE$(SUFFIX)
+	$(COMPILER) $(CXXFLAGS) -march=native tests/testsNNUE.cpp -o testsNNUE$(SUFFIX)
 tune:
-	$(COMPILER) $(CXXFLAGS) -DNDEBUG -DTUNE src/*.cpp -o $(EXE)$(SUFFIX)
+	$(COMPILER) $(CXXFLAGS) -march=native -DNDEBUG -DTUNE src/*.cpp -o $(EXE)$(SUFFIX)
+release:
+	$(COMPILER) $(CXXFLAGS) -march=x86-64-v3 -DNDEBUG -pthread -static -Wl,--no-as-needed src/*.cpp -o $(EXE)-avx2$(SUFFIX)
+	$(COMPILER) $(CXXFLAGS) -march=x86-64-v4 -DNDEBUG -pthread -static -Wl,--no-as-needed src/*.cpp -o $(EXE)-avx512$(SUFFIX)
 	

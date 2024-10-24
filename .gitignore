@@ -4,6 +4,8 @@
 **/*.exe
 **/starzix
 **/*.pdb
+**/starzix-avx2
+**/starzix-avx512
 
 testsCore
 testsSEE
