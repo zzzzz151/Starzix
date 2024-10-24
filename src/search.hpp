@@ -905,7 +905,6 @@ class Searcher {
                 mTT[ttEntryIdx].update(td.board.zobristHash(), depth - 3, ply, score, move, Bound::LOWER);
                 return score;
             }
-
         }
 
         return VALUE_NONE;
