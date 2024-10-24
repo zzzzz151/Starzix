@@ -6,7 +6,7 @@
 
 int main(int argc, char* argv[])
 {
-    std::cout << "Starzix by zzzzz" << std::endl;
+    std::cout << "Starzix 6.0 by zzzzz" << std::endl;
 
     #if defined(__AVX512F__) && defined(__AVX512BW__)
         std::cout << "Using avx512 (fastest)" << std::endl;
