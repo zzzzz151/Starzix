@@ -241,17 +241,14 @@ class Searcher {
                 break;
 
             td.score = iterationScore;
-            u64 msElapsed;
 
-            if (&td == mainThreadData())
-            {
-                msElapsed = millisecondsElapsed(mStartTime);
+            // If not main thread, continue
+            if (&td != mainThreadData()) continue;
 
-                mStopSearch = msElapsed >= mHardMs
-                              || (mMaxNodes < std::numeric_limits<i64>::max() && totalNodes() >= mMaxNodes);
-            }
-            else 
-                continue;
+            const u64 msElapsed = millisecondsElapsed(mStartTime);
+
+            mStopSearch = msElapsed >= mHardMs
+                          || (mMaxNodes < std::numeric_limits<i64>::max() && totalNodes() >= mMaxNodes);
 
             // Print uci info
             if (mPrintInfo)
