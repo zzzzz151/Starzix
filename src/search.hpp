@@ -325,14 +325,11 @@ class Searcher {
         i32 delta = aspInitialDelta();
         i32 alpha = std::max(-INF, td.score - delta);
         i32 beta  = std::min(INF,  td.score + delta);
-        i32 bestScore = td.score;
 
         while (true) {
             i32 score = search(td, depth, 0, alpha, beta, false, DOUBLE_EXTENSIONS_MAX);
 
             if (shouldStop(td)) return 0;
-
-            if (score > bestScore) bestScore = score;
 
             if (score >= beta) {
                 beta = std::min(beta + delta, INF);
@@ -345,12 +342,10 @@ class Searcher {
                 depth = iterationDepth;
             }
             else
-                break;
+                return score;
 
             delta *= aspDeltaMul();
         }
-
-        return bestScore;
     }
 
     inline i32 search(ThreadData &td, i32 depth, const i32 ply, i32 alpha, i32 beta, 
