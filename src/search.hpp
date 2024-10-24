@@ -38,11 +38,11 @@ class Searcher {
         setThreads(1);
     }
 
-    ~Searcher() {
+    inline ~Searcher() {
         setThreads(0);
     }
 
-    inline void ucinewgame() 
+    constexpr void ucinewgame() 
     {
         board() = START_BOARD;
         mainThreadData()->pliesData[0].pvLine.clear(); // reset best root move
@@ -58,16 +58,16 @@ class Searcher {
         }
     }
 
-    inline Board& board() const { return mainThreadData()->board; }
+    constexpr Board& board() const { return mainThreadData()->board; }
 
-    inline Move bestMoveRoot() const 
+    constexpr Move bestMoveRoot() const 
     {
         return mainThreadData()->pliesData[0].pvLine.size() > 0
                ? mainThreadData()->pliesData[0].pvLine[0] 
                : MOVE_NONE;
     }
 
-    inline u64 totalNodes() const
+    constexpr u64 totalNodes() const
     {
         u64 nodes = 0;
 
@@ -79,7 +79,7 @@ class Searcher {
 
     private:
 
-    inline ThreadData* mainThreadData() const { return mThreadsData[0]; }
+    constexpr ThreadData* mainThreadData() const { return mThreadsData[0]; }
 
     inline void loop(ThreadData* td)
     {
@@ -220,7 +220,7 @@ class Searcher {
 
     private:
 
-    inline void iterativeDeepening(ThreadData &td)
+    constexpr void iterativeDeepening(ThreadData &td)
     { 
         td.nodes = 0;
         td.nodesByMove = { };
@@ -297,7 +297,7 @@ class Searcher {
         if (&td == mainThreadData()) mStopSearch = true;
     }
 
-    inline bool shouldStop(const ThreadData &td) 
+    constexpr bool shouldStop(const ThreadData &td) 
     {
         if (mStopSearch.load(std::memory_order_relaxed)) 
             return true;
@@ -316,7 +316,7 @@ class Searcher {
         return mStopSearch = (millisecondsElapsed(mStartTime) >= mHardMs);
     }
 
-    inline i32 aspiration(ThreadData &td, const i32 iterationDepth)
+    constexpr i32 aspiration(ThreadData &td, const i32 iterationDepth)
     {
         // Aspiration Windows
         // Search with a small window, adjusting it and researching until the score is inside the window
@@ -348,7 +348,7 @@ class Searcher {
         }
     }
 
-    inline i32 search(ThreadData &td, i32 depth, const i32 ply, i32 alpha, i32 beta, 
+    constexpr i32 search(ThreadData &td, i32 depth, const i32 ply, i32 alpha, i32 beta, 
         const bool cutNode, i32 doubleExtsLeft, const Move singularMove = MOVE_NONE) 
     {
         assert(ply >= 0 && ply <= mMaxDepth);
@@ -751,7 +751,7 @@ class Searcher {
         return bestScore;
     }
 
-    inline i32 qSearch(ThreadData &td, const i32 ply, i32 alpha, i32 beta)
+    constexpr i32 qSearch(ThreadData &td, const i32 ply, i32 alpha, i32 beta)
     {
         assert(ply > 0 && ply <= mMaxDepth);
         assert(alpha >= -INF && alpha <= INF);
@@ -859,7 +859,7 @@ class Searcher {
         return bestScore;
     }
 
-    inline i32 probcut(ThreadData &td, const i32 depth, const i32 ply, const i32 probcutBeta, 
+    constexpr i32 probcut(ThreadData &td, const i32 depth, const i32 ply, const i32 probcutBeta, 
         const bool cutNode, const u8 doubleExtsLeft, const Move ttMove, const auto ttEntryIdx)
     {
         PlyData* plyDataPtr = &(td.pliesData[ply]);

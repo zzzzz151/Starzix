@@ -55,8 +55,6 @@ struct ThreadData {
     std::mutex mutex;
     std::condition_variable cv;
 
-    inline ThreadData() = default;
-
     inline void wake(const ThreadState newState) 
     {
         std::unique_lock<std::mutex> lock(mutex);
@@ -65,7 +63,7 @@ struct ThreadData {
         cv.notify_one();
     }
 
-    inline std::array<i16*, 4> correctionHistories()
+    constexpr std::array<i16*, 4> correctionHistories()
     {
         const int stm = int(board.sideToMove());
 
@@ -85,7 +83,7 @@ struct ThreadData {
         };
     }
 
-    inline void makeMove(const Move move, const i32 newPly, const std::vector<TTEntry> &tt)
+    constexpr void makeMove(const Move move, const i32 newPly, const std::vector<TTEntry> &tt)
     {
         // If not a special move, we can probably correctly predict the zobrist hash after it
         // and prefetch the TT entry
@@ -113,7 +111,7 @@ struct ThreadData {
         }
     }
 
-    inline i32 updateAccumulatorAndEval(i32 &eval) 
+    constexpr i32 updateAccumulatorAndEval(i32 &eval) 
     {
         assert(accumulatorPtr == &accumulators[0] 
                ? accumulatorPtr->mUpdated 
