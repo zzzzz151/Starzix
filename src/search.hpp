@@ -119,6 +119,8 @@ class Searcher {
 
         blockUntilSleep();
 
+        const Board board = mThreadsData.empty() ? START_BOARD : mainThreadData()->board;
+
         // Remove threads
         while (!mThreadsData.empty())
         {
@@ -156,6 +158,9 @@ class Searcher {
 
         mThreadsData.shrink_to_fit();
         mNativeThreads.shrink_to_fit();
+
+        if (!mThreadsData.empty())
+            mainThreadData()->board = board;
 
         return numThreads;
     }
