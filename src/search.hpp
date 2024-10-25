@@ -184,6 +184,7 @@ class Searcher {
 
         blockUntilSleep();
 
+        mainThreadData()->nodes = 0;
         mainThreadData()->accumulators[0] = BothAccumulators(mainThreadData()->board);
 
         // Init main thread's finny table
@@ -210,13 +211,19 @@ class Searcher {
         // Init auxiliar threads
         for (size_t i = 1; i < mThreadsData.size(); i++)
         {
+            mThreadsData[i]->nodes = 0;
             mThreadsData[i]->board = mainThreadData()->board;
             mThreadsData[i]->accumulators[0] = mainThreadData()->accumulators[0];
             mThreadsData[i]->finnyTable = mainThreadData()->finnyTable;
         }
 
         for (ThreadData* td : mThreadsData)
+        {
+            td->nodesByMove = { };
+            td->pliesData[0] = PlyData();
+            td->accumulatorPtr = &(td->accumulators[0]);
             td->wake(ThreadState::SEARCHING);
+        }
 
         blockUntilSleep();
 
@@ -227,12 +234,6 @@ class Searcher {
 
     constexpr void iterativeDeepening(ThreadData &td)
     { 
-        td.nodes = 0;
-        td.nodesByMove = { };
-
-        td.pliesData[0] = PlyData();
-        td.accumulatorPtr = &(td.accumulators[0]);
-
         td.score = VALUE_NONE;
         for (i32 iterationDepth = 1; iterationDepth <= mMaxDepth; iterationDepth++)
         {
