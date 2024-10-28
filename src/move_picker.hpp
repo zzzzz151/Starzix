@@ -184,6 +184,10 @@ struct MovePicker {
                 board.lastMove(), board.nthToLastMove(2), board.nthToLastMove(4) 
             };
 
+            if (mQuiets.size() > 1)
+                // Calling attacks(board.oppSide()) will cache enemy attacks and speedup isSquareAttacked()
+                board.attacks(board.oppSide()); 
+
             // Score moves
             size_t j = 0;
             while (j < mQuiets.size())
@@ -200,9 +204,6 @@ struct MovePicker {
                 }
 
                 const int pt = int(move.pieceType());
-
-                // Calling attacks(board.oppSide()) will cache enemy attacks and speedup isSquareAttacked()
-                board.attacks(board.oppSide()); 
                 
                 mQuietsScores[j] = historyTable[stm][pt][move.to()].quietHistory(
                     board.isSquareAttacked(move.from(), nstm), 
