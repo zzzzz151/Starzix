@@ -7,7 +7,7 @@
 #include "history_entry.hpp"
 
 enum class MoveGenStage : int {
-    TT_MOVE_NEXT = 0, TT_MOVE_YIELDED, GEN_SCORE_NOISIES, GOOD_NOISIES, 
+    TT_MOVE_NEXT = 0, TT_MOVE_YIELDED, GEN_SCORE_NOISIES, GOOD_NOISIES,
     KILLER_NEXT, KILLER_YIELDED, GEN_SCORE_QUIETS, QUIETS, BAD_NOISIES, END
 };
 
@@ -49,31 +49,31 @@ struct MovePicker {
 
     constexpr MoveGenStage stage() const { return mStage; }
 
-    constexpr i32 moveScore() const 
-    { 
-        assert(mStage == MoveGenStage::QUIETS 
-            || mStage == MoveGenStage::GOOD_NOISIES 
+    constexpr i32 moveScore() const
+    {
+        assert(mStage == MoveGenStage::QUIETS
+            || mStage == MoveGenStage::GOOD_NOISIES
             || mStage == MoveGenStage::BAD_NOISIES
         );
 
         return mStage == MoveGenStage::QUIETS ? mQuietsScores[mQuietsIdx] : mNoisiesScores[mNoisiesIdx];
     }
 
-    constexpr Move next(Board &board, const Move ttMove, const Move killer, 
-        MultiArray<HistoryEntry, 2, 6, 64> &historyTable, Move excludedMove = MOVE_NONE) 
+    constexpr Move next(Board &board, const Move ttMove, const Move killer,
+        MultiArray<HistoryEntry, 2, 6, 64> &historyTable, Move excludedMove = MOVE_NONE)
     {
         assert(killer == MOVE_NONE || board.isQuiet(killer));
 
         Move move = MOVE_NONE;
         const int stm = int(board.sideToMove());
 
-        switch (mStage) 
+        switch (mStage)
         {
         case MoveGenStage::TT_MOVE_NEXT:
         {
             if (ttMove != excludedMove
             && !(mNoisiesOnlyNoUnderpromos && ttMove != MOVE_NONE && !board.isNoisyNotUnderpromo(ttMove))
-            && board.isPseudolegal(ttMove) 
+            && board.isPseudolegal(ttMove)
             && board.isPseudolegalLegal(ttMove))
             {
                 mStage = MoveGenStage::TT_MOVE_YIELDED;
@@ -141,7 +141,7 @@ struct MovePicker {
         }
         case MoveGenStage::GOOD_NOISIES:
         {
-            while (++mNoisiesIdx < int(mNoisies.size())) 
+            while (++mNoisiesIdx < int(mNoisies.size()))
             {
                 move = partialSelectionSort(mNoisies, mNoisiesScores, mNoisiesIdx);
 
@@ -180,13 +180,13 @@ struct MovePicker {
 
             const Color nstm = board.oppSide();
 
-            const std::array<Move, 3> lastMoves = { 
-                board.lastMove(), board.nthToLastMove(2), board.nthToLastMove(4) 
+            const std::array<Move, 3> lastMoves = {
+                board.lastMove(), board.nthToLastMove(2), board.nthToLastMove(4)
             };
 
             if (mQuiets.size() > 1)
                 // Calling attacks(board.oppSide()) will cache enemy attacks and speedup isSquareAttacked()
-                board.attacks(board.oppSide()); 
+                board.attacks(board.oppSide());
 
             // Score moves
             size_t j = 0;
@@ -204,10 +204,10 @@ struct MovePicker {
                 }
 
                 const int pt = int(move.pieceType());
-                
+
                 mQuietsScores[j] = historyTable[stm][pt][move.to()].quietHistory(
-                    board.isSquareAttacked(move.from(), nstm), 
-                    board.isSquareAttacked(move.to(),   nstm), 
+                    board.isSquareAttacked(move.from(), nstm),
+                    board.isSquareAttacked(move.to(),   nstm),
                     lastMoves
                 );
 
@@ -221,7 +221,7 @@ struct MovePicker {
         {
             move = MOVE_NONE;
 
-            while (++mQuietsIdx < int(mQuiets.size())) 
+            while (++mQuietsIdx < int(mQuiets.size()))
             {
                 move = partialSelectionSort(mQuiets, mQuietsScores, mQuietsIdx);
 
@@ -244,7 +244,7 @@ struct MovePicker {
 
             move = MOVE_NONE;
 
-            while (++mNoisiesIdx < int(mNoisies.size())) 
+            while (++mNoisiesIdx < int(mNoisies.size()))
             {
                 move = partialSelectionSort(mNoisies, mNoisiesScores, mNoisiesIdx);
                 assert(moveScore() < GOOD_SCORE);

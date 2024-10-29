@@ -1,6 +1,6 @@
 // clang-format off
 
-#pragma once 
+#pragma once
 
 #include "utils.hpp"
 #include "board.hpp"
@@ -35,7 +35,7 @@ struct ThreadData {
     std::array<PlyData, MAX_DEPTH+1> pliesData; // [ply]
 
     // [stm][pieceType][targetSquare]
-    MultiArray<HistoryEntry, 2, 6, 64> historyTable = { }; 
+    MultiArray<HistoryEntry, 2, 6, 64> historyTable = { };
 
     std::array<u64, 1ULL << 17> nodesByMove; // [move]
 
@@ -45,17 +45,17 @@ struct ThreadData {
     FinnyTable finnyTable; // [color][mirrorHorizontally][inputBucket]
 
     // [stm][board.pawnsHash() % CORR_HIST_SIZE]
-    MultiArray<i16, 2, CORR_HIST_SIZE> pawnsCorrHist = { }; 
+    MultiArray<i16, 2, CORR_HIST_SIZE> pawnsCorrHist = { };
 
     // [stm][pieceColor][board.nonPawnsHash(pieceColor) % CORR_HIST_SIZE]
-    MultiArray<i16, 2, 2, CORR_HIST_SIZE> nonPawnsCorrHist = { }; 
+    MultiArray<i16, 2, 2, CORR_HIST_SIZE> nonPawnsCorrHist = { };
 
     // Threading stuff
     ThreadState threadState = ThreadState::SLEEPING;
     std::mutex mutex;
     std::condition_variable cv;
 
-    inline void wake(const ThreadState newState) 
+    inline void wake(const ThreadState newState)
     {
         std::unique_lock<std::mutex> lock(mutex);
         threadState = newState;
@@ -104,25 +104,25 @@ struct ThreadData {
         // Killer move must be quiet move
         if (pliesData[newPly].killer != MOVE_NONE && !board.isQuiet(pliesData[newPly].killer))
             pliesData[newPly].killer = MOVE_NONE;
-        
+
         if (move != MOVE_NONE) {
             accumulatorPtr++;
             accumulatorPtr->mUpdated = false;
         }
     }
 
-    constexpr i32 updateAccumulatorAndEval(i32 &eval) 
+    constexpr i32 updateAccumulatorAndEval(i32 &eval)
     {
-        assert(accumulatorPtr == &accumulators[0] 
-               ? accumulatorPtr->mUpdated 
+        assert(accumulatorPtr == &accumulators[0]
+               ? accumulatorPtr->mUpdated
                : (accumulatorPtr - 1)->mUpdated);
 
-        if (!accumulatorPtr->mUpdated) 
+        if (!accumulatorPtr->mUpdated)
             accumulatorPtr->update(accumulatorPtr - 1, board, finnyTable);
 
         if (board.inCheck())
-            eval = 0;
-        else if (eval == VALUE_NONE) 
+            eval = VALUE_NONE;
+        else if (eval == VALUE_NONE)
         {
             assert(BothAccumulators(board) == *accumulatorPtr);
 
@@ -134,9 +134,9 @@ struct ThreadData {
 
             #if defined(TUNE)
                 CORR_HISTS_WEIGHTS = {
-                    corrHistPawnsWeight(), 
-                    corrHistNonPawnsWeight(), 
-                    corrHistNonPawnsWeight(), 
+                    corrHistPawnsWeight(),
+                    corrHistNonPawnsWeight(),
+                    corrHistNonPawnsWeight(),
                     corrHistLastMoveWeight()
                 };
             #endif

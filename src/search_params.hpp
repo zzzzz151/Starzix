@@ -19,7 +19,7 @@ template <typename T> struct TunableParam {
     public:
     T value, min, max, step;
 
-    MAYBE_CONSTEXPR TunableParam(const T _value, const T _min, const T _max, const T _step) 
+    MAYBE_CONSTEXPR TunableParam(const T _value, const T _min, const T _max, const T _step)
     {
         value = _value; min = _min; max = _max; step = _step;
 
@@ -62,7 +62,7 @@ MAYBE_CONSTEXPR TunableParam<i32> seeRookValue  = TunableParam<i32>(602, 300, 70
 MAYBE_CONSTEXPR TunableParam<i32> seeQueenValue = TunableParam<i32>(1106, 600, 1200, 100);
 
 MAYBE_CONSTEXPR std::array<i32, 7> SEE_PIECE_VALUES = {
-    seePawnValue(), seeMinorValue(), seeMinorValue(), seeRookValue(),  seeQueenValue(), 0, 0 
+    seePawnValue(), seeMinorValue(), seeMinorValue(), seeRookValue(),  seeQueenValue(), 0, 0
 };
 
 // Aspiration windows
@@ -147,8 +147,8 @@ MAYBE_CONSTEXPR TunableParam<float> contHist1PlyWeight = TunableParam<float>(1.0
 MAYBE_CONSTEXPR TunableParam<float> contHist2PlyWeight = TunableParam<float>(1.16, 0.2, 4.0, 0.2);
 MAYBE_CONSTEXPR TunableParam<float> contHist4PlyWeight = TunableParam<float>(0.64, 0.2, 4.0, 0.2);
 
-MAYBE_CONSTEXPR std::array<float, 3> CONT_HIST_WEIGHTS = { 
-    contHist1PlyWeight(), contHist2PlyWeight(), contHist4PlyWeight() 
+MAYBE_CONSTEXPR std::array<float, 3> CONT_HIST_WEIGHTS = {
+    contHist1PlyWeight(), contHist2PlyWeight(), contHist4PlyWeight()
 };
 
 // Correction histories
@@ -162,17 +162,17 @@ MAYBE_CONSTEXPR std::array<float, 4> CORR_HISTS_WEIGHTS {
 };
 
 // [isQuietMove][depth][moveIndex]
-inline MultiArray<i32, 2, MAX_DEPTH + 1, 256> getLmrTable() 
+inline MultiArray<i32, 2, MAX_DEPTH + 1, 256> getLmrTable()
 {
     MultiArray<i32, 2, MAX_DEPTH + 1, 256> lmrTable = { };
 
     for (int depth = 1; depth < MAX_DEPTH + 1; depth++)
         for (int move = 1; move < 256; move++)
         {
-            lmrTable[false][depth][move] 
+            lmrTable[false][depth][move]
                 = round(lmrBaseNoisy() + ln(depth) * ln(move) * lmrMultiplierNoisy());
 
-            lmrTable[true][depth][move] 
+            lmrTable[true][depth][move]
                 = round(lmrBaseQuiet() + ln(depth) * ln(move) * lmrMultiplierQuiet());
         }
 
@@ -184,7 +184,7 @@ MAYBE_CONST MultiArray<i32, 2, MAX_DEPTH+1, 256> LMR_TABLE = getLmrTable();
 
 #if defined(TUNE)
     using TunableParamVariant = std::variant<
-        TunableParam<i32>*, 
+        TunableParam<i32>*,
         TunableParam<float>*,
         TunableParam<double>*
     >;

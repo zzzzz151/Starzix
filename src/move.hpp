@@ -7,12 +7,12 @@
 struct Move {
     private:
 
-    // 16 bits: ffffff tttttt FFFF (f = from, t = to, F = flag)  
+    // 16 bits: ffffff tttttt FFFF (f = from, t = to, F = flag)
     u16 mMove = 0;
 
     public:
 
-    constexpr static u16 
+    constexpr static u16
         NULL_FLAG             = 0x0000,
         PAWN_FLAG             = 0x0001,
         KNIGHT_FLAG           = 0x0002,
@@ -49,13 +49,13 @@ struct Move {
 
         // No pawns in backranks
         assert(!(
-            pieceType() == PieceType::PAWN 
-            && (squareRank(to) == Rank::RANK_1 || squareRank(to) == Rank::RANK_8) 
+            pieceType() == PieceType::PAWN
+            && (squareRank(to) == Rank::RANK_1 || squareRank(to) == Rank::RANK_8)
             && promotion() == PieceType::NONE
         ));
     }
 
-    inline Move(std::string from, std::string to, u16 flag) 
+    inline Move(std::string from, std::string to, u16 flag)
     : Move(strToSquare(from), strToSquare(to), flag) { }
 
     constexpr u16 encoded() const { return mMove; }
@@ -93,18 +93,18 @@ struct Move {
         std::string str = SQUARE_TO_STR[from()] + SQUARE_TO_STR[to()];
         const u16 flag = this->flag();
 
-        if (flag == QUEEN_PROMOTION_FLAG) 
+        if (flag == QUEEN_PROMOTION_FLAG)
             str += "q";
-        else if (flag == KNIGHT_PROMOTION_FLAG) 
+        else if (flag == KNIGHT_PROMOTION_FLAG)
             str += "n";
-        else if (flag == BISHOP_PROMOTION_FLAG) 
+        else if (flag == BISHOP_PROMOTION_FLAG)
             str += "b";
-        else if (flag == ROOK_PROMOTION_FLAG) 
+        else if (flag == ROOK_PROMOTION_FLAG)
             str += "r";
 
         return str;
     }
-    
+
 }; // struct Move
 
 static_assert(sizeof(Move) == 2); // 2 bytes

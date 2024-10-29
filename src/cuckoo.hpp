@@ -38,7 +38,7 @@ constexpr CuckooTable CUCKOO_TABLE = []() consteval
                 Move move = Move(sq1, sq2, (u16)pieceType + 1);
 
                 u64 key = ZOBRIST_COLOR
-                        ^ ZOBRIST_PIECES[(int)color][(int)pieceType][sq1] 
+                        ^ ZOBRIST_PIECES[(int)color][(int)pieceType][sq1]
                         ^ ZOBRIST_PIECES[(int)color][(int)pieceType][sq2];
 
                 u64 idx = cuckoo_h1(key);

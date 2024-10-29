@@ -18,7 +18,7 @@ int main(int argc, char* argv[])
 
     Searcher searcher = Searcher();
     printTTSize(searcher.mTT);
-    
+
     // If a command is passed in program args, run it and exit
 
     std::string command = "";

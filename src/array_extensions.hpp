@@ -62,23 +62,23 @@ struct ArrayVec
         return &mArr[i];
     }
 
-    constexpr std::size_t size() const { 
-        return mSize; 
+    constexpr std::size_t size() const {
+        return mSize;
     }
 
     constexpr void clear(){ mSize = 0; }
 
-    constexpr void push_back(const T elem) { 
+    constexpr void push_back(const T elem) {
         assert(mSize < N);
         mArr[mSize++] = elem;
     }
 
-    constexpr void pop_back() { 
+    constexpr void pop_back() {
         assert(mSize > 0);
         mSize--;
     }
 
-    constexpr void swap(const std::size_t i, const std::size_t j) 
+    constexpr void swap(const std::size_t i, const std::size_t j)
     {
         assert(i < mSize && j < mSize);
         std::swap(mArr[i], mArr[j]);

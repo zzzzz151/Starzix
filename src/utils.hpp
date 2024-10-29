@@ -36,9 +36,9 @@ using i64 = int64_t;
 inline void trim(std::string &str) {
     const size_t first = str.find_first_not_of(" \t\n\r");
     const size_t last = str.find_last_not_of(" \t\n\r");
-    
-    str = first == std::string::npos 
-          ? "" 
+
+    str = first == std::string::npos
+          ? ""
           : str.substr(first, last - first + 1);
 }
 
@@ -51,7 +51,7 @@ inline std::vector<std::string> splitString(std::string &str, const char delimit
     std::stringstream ss(str);
     std::string token;
 
-    while (getline(ss, token, delimiter)) 
+    while (getline(ss, token, delimiter))
     {
         trim(token);
         strSplit.push_back(token);
@@ -95,7 +95,7 @@ enum class Color : i8 {
 
 constexpr int WHITE = 0, BLACK = 1;
 
-constexpr Color oppColor(const Color color) { 
+constexpr Color oppColor(const Color color) {
     return color == Color::WHITE ? Color::BLACK : Color::WHITE;
 }
 
@@ -127,7 +127,7 @@ constexpr File squareFile(const Square square) { return File(square % 8); }
 constexpr u64 ONES_BB = 0xffff'ffff'ffff'ffff;
 
 constexpr std::array<u64, 8> RANK_BB = {
-    0xffULL, 0xff00ULL, 0xff0000ULL, 0xff000000ULL, 
+    0xffULL, 0xff00ULL, 0xff0000ULL, 0xff000000ULL,
     0xff00000000ULL, 0xff0000000000ULL, 0xff000000000000ULL, 0xff00000000000000ULL
 };
 
@@ -136,13 +136,13 @@ constexpr std::array<u64, 8> FILE_BB = {
     0x1010101010101010ULL, 0x2020202020202020ULL, 0x4040404040404040ULL, 0x8080808080808080ULL
 };
 
-constexpr u64 bitboard(const Square sq) 
-{ 
+constexpr u64 bitboard(const Square sq)
+{
     assert(sq >= 0 && sq <= 63);
-    return 1ULL << sq; 
+    return 1ULL << sq;
 }
 
-constexpr u8 lsb(const u64 bb) 
+constexpr u8 lsb(const u64 bb)
 {
     assert(bb > 0);
     return std::countr_zero(bb);
@@ -172,7 +172,7 @@ inline void printBitboard(const u64 bb)
 {
     std::cout << std::endl;
     const std::bitset<64> b(bb);
-    const std::string str_bitset = b.to_string(); 
+    const std::string str_bitset = b.to_string();
 
     for (int i = 0; i < 64; i += 8)
     {
@@ -189,7 +189,7 @@ inline void printBitboard(const u64 bb)
 constexpr u64 pdep(const u64 val, u64 mask) {
     u64 res = 0;
 
-    for (u64 bb = 1; mask; bb += bb) 
+    for (u64 bb = 1; mask; bb += bb)
     {
         if (val & bb)
             res |= mask & -mask;
@@ -207,7 +207,7 @@ constexpr MultiArray<u64, 2, 2> CASTLING_MASKS = {{
     // White short and long castle
     { bitboard(7), bitboard(0) },
     // Black short and long castle
-    { bitboard(63), bitboard(56) } 
+    { bitboard(63), bitboard(56) }
 }};
 
 // [kingTargetSquare]

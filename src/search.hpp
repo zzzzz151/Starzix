@@ -42,7 +42,7 @@ class Searcher {
         setThreads(0);
     }
 
-    constexpr void ucinewgame() 
+    constexpr void ucinewgame()
     {
         board() = START_BOARD;
         mainThreadData()->pliesData[0].pvLine.clear(); // reset best root move
@@ -60,10 +60,10 @@ class Searcher {
 
     constexpr Board& board() const { return mainThreadData()->board; }
 
-    constexpr Move bestMoveRoot() const 
+    constexpr Move bestMoveRoot() const
     {
         return mainThreadData()->pliesData[0].pvLine.size() > 0
-               ? mainThreadData()->pliesData[0].pvLine[0] 
+               ? mainThreadData()->pliesData[0].pvLine[0]
                : MOVE_NONE;
     }
 
@@ -102,9 +102,9 @@ class Searcher {
         td->cv.notify_all();
     }
 
-    inline void blockUntilSleep() 
+    inline void blockUntilSleep()
     {
-        for (ThreadData* td : mThreadsData) 
+        for (ThreadData* td : mThreadsData)
         {
             std::unique_lock<std::mutex> lock(td->mutex);
             td->cv.wait(lock, [&] { return td->threadState == ThreadState::SLEEPING; });
@@ -113,7 +113,7 @@ class Searcher {
 
     public:
 
-    inline int setThreads(int numThreads) 
+    inline int setThreads(int numThreads)
     {
         numThreads = std::clamp(numThreads, 0, 256);
 
@@ -131,8 +131,8 @@ class Searcher {
             {
                 std::unique_lock<std::mutex> lock(lastThreadData->mutex);
 
-                lastThreadData->cv.wait(lock, [lastThreadData] { 
-                    return lastThreadData->threadState == ThreadState::EXITED; 
+                lastThreadData->cv.wait(lock, [lastThreadData] {
+                    return lastThreadData->threadState == ThreadState::EXITED;
                 });
             }
 
@@ -166,10 +166,10 @@ class Searcher {
     }
 
     inline std::pair<Move, i32> search(
-        const i32 maxDepth, 
+        const i32 maxDepth,
         const u64 maxNodes,
-        const std::chrono::time_point<std::chrono::steady_clock> startTime, 
-        const u64 hardMs, 
+        const std::chrono::time_point<std::chrono::steady_clock> startTime,
+        const u64 hardMs,
         const u64 softMs,
         const bool printInfo)
     {
@@ -228,18 +228,18 @@ class Searcher {
         blockUntilSleep();
 
         return { bestMoveRoot(), mainThreadData()->score };
-    }   
+    }
 
     private:
 
     constexpr void iterativeDeepening(ThreadData &td)
-    { 
+    {
         td.score = VALUE_NONE;
         for (i32 iterationDepth = 1; iterationDepth <= mMaxDepth; iterationDepth++)
         {
             td.maxPlyReached = 0;
 
-            const i32 iterationScore = iterationDepth >= aspMinDepth() 
+            const i32 iterationScore = iterationDepth >= aspMinDepth()
                                        ? aspiration(td, iterationDepth)
                                        : search(td, iterationDepth, 0, -INF, INF, false, DOUBLE_EXTENSIONS_MAX);
 
@@ -294,7 +294,7 @@ class Searcher {
                 assert(bestMoveNodesFraction >= 0.0 && bestMoveNodesFraction <= 1.0);
                 return (double)mSoftMs * (1.5 - bestMoveNodesFraction);
             };
-                         
+
             if (msElapsed >= (iterationDepth >= aspMinDepth() ? scaledSoftMs() : mSoftMs))
                 break;
         }
@@ -303,14 +303,14 @@ class Searcher {
         if (&td == mainThreadData()) mStopSearch = true;
     }
 
-    constexpr bool shouldStop(const ThreadData &td) 
+    constexpr bool shouldStop(const ThreadData &td)
     {
-        if (mStopSearch.load(std::memory_order_relaxed)) 
+        if (mStopSearch.load(std::memory_order_relaxed))
             return true;
 
         // Only check stop conditions and modify mStopSearch in main thread
         // Don't stop searching if depth 1 not completed
-        if (&td != mainThreadData() || mainThreadData()->score == VALUE_NONE) 
+        if (&td != mainThreadData() || mainThreadData()->score == VALUE_NONE)
             return false;
 
         if (mMaxNodes < std::numeric_limits<i64>::max() && totalNodes() >= mMaxNodes)
@@ -354,8 +354,8 @@ class Searcher {
         }
     }
 
-    constexpr i32 search(ThreadData &td, i32 depth, const i32 ply, i32 alpha, i32 beta, 
-        const bool cutNode, i32 doubleExtsLeft, const Move singularMove = MOVE_NONE) 
+    constexpr i32 search(ThreadData &td, i32 depth, const i32 ply, i32 alpha, i32 beta,
+        const bool cutNode, i32 doubleExtsLeft, const Move singularMove = MOVE_NONE)
     {
         assert(ply >= 0 && ply <= mMaxDepth);
         assert(alpha >= -INF && alpha <= INF);
@@ -365,7 +365,7 @@ class Searcher {
         if (shouldStop(td)) return 0;
 
         // Cuckoo / detect upcoming repetition
-        if (ply > 0 && alpha < 0 && td.board.hasUpcomingRepetition(ply)) 
+        if (ply > 0 && alpha < 0 && td.board.hasUpcomingRepetition(ply))
         {
             alpha = 0;
             if (alpha >= beta) return alpha;
@@ -390,9 +390,9 @@ class Searcher {
 
             // TT cutoff (not done in singular searches since ttHit is false)
             if (!pvNode
-            && ttEntry.depth() >= depth 
+            && ttEntry.depth() >= depth
             && (ttEntry.bound() == Bound::EXACT
-            || (ttEntry.bound() == Bound::LOWER && ttEntry.score >= beta) 
+            || (ttEntry.bound() == Bound::LOWER && ttEntry.score >= beta)
             || (ttEntry.bound() == Bound::UPPER && ttEntry.score <= alpha)))
                 return ttEntry.score;
         }
@@ -400,12 +400,12 @@ class Searcher {
         PlyData* plyDataPtr = &(td.pliesData[ply]);
 
         // Max ply cutoff
-        if (ply >= mMaxDepth) 
+        if (ply >= mMaxDepth)
             return td.board.inCheck() ? 0 : td.updateAccumulatorAndEval(plyDataPtr->eval);
 
         const i32 eval = td.updateAccumulatorAndEval(plyDataPtr->eval);
 
-        const int improving = ply <= 1 || td.board.inCheck() || td.board.inCheck2PliesAgo()
+        const int improving = ply <= 1 || eval == VALUE_NONE || (plyDataPtr - 2)->eval == VALUE_NONE
                               ? 0
                               : eval - (plyDataPtr - 2)->eval >= improvingThreshold()
                               ? 1
@@ -416,15 +416,15 @@ class Searcher {
         (plyDataPtr + 1)->killer = MOVE_NONE;
 
         // Node pruning
-        if (!pvNode && !td.board.inCheck() && singularMove == MOVE_NONE) 
+        if (!pvNode && !td.board.inCheck() && singularMove == MOVE_NONE)
         {
             // RFP (Reverse futility pruning) / Static NMP
-            if (depth <= rfpMaxDepth() 
+            if (depth <= rfpMaxDepth()
             && eval >= beta + (depth - improving) * rfpDepthMul())
                 return eval;
 
             // Razoring
-            if (depth <= razoringMaxDepth() 
+            if (depth <= razoringMaxDepth()
             && abs(alpha) < 2000
             && eval + depth * razoringDepthMul() < alpha)
             {
@@ -436,8 +436,8 @@ class Searcher {
             }
 
             // NMP (Null move pruning)
-            if (depth >= nmpMinDepth() 
-            && td.board.lastMove() != MOVE_NONE 
+            if (depth >= nmpMinDepth()
+            && td.board.lastMove() != MOVE_NONE
             && eval >= beta
             && eval >= beta + nmpEvalBetaMargin() - depth * nmpEvalBetaMul()
             && !(ttHit && ttEntry.bound() == Bound::UPPER && ttEntry.score < beta)
@@ -446,8 +446,8 @@ class Searcher {
                 td.makeMove(MOVE_NONE, ply + 1, mTT);
 
                 const i32 nmpDepth = depth - nmpBaseReduction() - depth * nmpDepthMul();
-                
-                const i32 score = td.board.isDraw(ply + 1) ? 0 
+
+                const i32 score = td.board.isDraw(ply + 1) ? 0
                                   : -search(td, nmpDepth, ply + 1, -beta, -alpha, !cutNode, doubleExtsLeft);
 
                 td.board.undoMove();
@@ -474,13 +474,13 @@ class Searcher {
         }
 
         // IIR (Internal iterative reduction)
-        if (depth >= iirMinDepth() 
-        && (ttMove == MOVE_NONE || ttEntry.depth() < depth - iirMinDepth()) 
-        && singularMove == MOVE_NONE 
+        if (depth >= iirMinDepth()
+        && (ttMove == MOVE_NONE || ttEntry.depth() < depth - iirMinDepth())
+        && singularMove == MOVE_NONE
         && (pvNode || cutNode))
             depth--;
 
-        const bool lmrImproving = ply > 1 && !td.board.inCheck() && !td.board.inCheck2PliesAgo() 
+        const bool lmrImproving = ply > 1 && eval != VALUE_NONE && (plyDataPtr - 2)->eval != VALUE_NONE
                                   && eval > (plyDataPtr - 2)->eval;
 
         const int stm = int(td.board.sideToMove());
@@ -510,9 +510,9 @@ class Searcher {
             assert([&]() {
                 const MoveGenStage stage = movePicker.stage();
 
-                return stage == MoveGenStage::TT_MOVE_YIELDED 
+                return stage == MoveGenStage::TT_MOVE_YIELDED
                        ? move == ttMove && legalMovesSeen == 1
-                       : stage == MoveGenStage::KILLER_YIELDED 
+                       : stage == MoveGenStage::KILLER_YIELDED
                        ? move == plyDataPtr->killer && isQuiet
                        : (isQuiet ? stage == MoveGenStage::QUIETS
                                   : stage == MoveGenStage::GOOD_NOISIES || stage == MoveGenStage::BAD_NOISIES
@@ -526,20 +526,20 @@ class Searcher {
             if (!isQuiet) noisyHistoryPtr = historyEntry.noisyHistoryPtr(td.board.captured(move), move.promotion());
 
             // Moves loop pruning
-            if (ply > 0 
-            && bestScore > -MIN_MATE_SCORE 
-            && legalMovesSeen >= 3 
+            if (ply > 0
+            && bestScore > -MIN_MATE_SCORE
+            && legalMovesSeen >= 3
             && (movePicker.stage() == MoveGenStage::QUIETS || movePicker.stage() == MoveGenStage::BAD_NOISIES))
             {
                 // LMP (Late move pruning)
                 if (legalMovesSeen >= lmpMinMoves() + pvNode + td.board.inCheck()
                                       + depth * depth * lmpDepthMul())
                     break;
-                    
+
                 const i32 lmrDepth = depth - LMR_TABLE[isQuiet][depth][legalMovesSeen];
 
                 // FP (Futility pruning)
-                if (lmrDepth <= fpMaxDepth() 
+                if (lmrDepth <= fpMaxDepth()
                 && !td.board.inCheck()
                 && alpha < MIN_MATE_SCORE
                 && alpha > eval + fpBase() + std::max(lmrDepth + improving, 0) * fpDepthMul())
@@ -547,7 +547,7 @@ class Searcher {
 
                 // SEE pruning
 
-                const i32 threshold = isQuiet ? depth * seeQuietThreshold() - movePicker.moveScore() * seeQuietHistMul() 
+                const i32 threshold = isQuiet ? depth * seeQuietThreshold() - movePicker.moveScore() * seeQuietHistMul()
                                               : depth * seeNoisyThreshold() - i32(*noisyHistoryPtr)  * seeNoisyHistMul();
 
                 if (depth <= seePruningMaxDepth() && !td.board.SEE(move, threshold))
@@ -563,11 +563,11 @@ class Searcher {
             && ply > 0
             && depth >= singularMinDepth()
             && ttEntry.depth() >= depth - singularDepthMargin()
-            && ttEntry.bound() != Bound::UPPER 
+            && ttEntry.bound() != Bound::UPPER
             && abs(ttEntry.score) < MIN_MATE_SCORE
             && (singularBeta = i32(ttEntry.score) - depth) > -MIN_MATE_SCORE + 1)
             {
-                // Singular search: before searching any move, 
+                // Singular search: before searching any move,
                 // search this node at a shallower depth with TT move excluded
 
                 const i32 singularScore = search(
@@ -582,7 +582,7 @@ class Searcher {
                 else if (singularScore < singularBeta)
                     newDepth++;
                 // Multicut
-                else if (singularBeta >= beta) 
+                else if (singularBeta >= beta)
                     return singularBeta;
                 // Negative extension
                 else if (cutNode)
@@ -594,15 +594,15 @@ class Searcher {
 
             i32 score = 0;
 
-            if (td.board.isDraw(ply + 1)) 
+            if (td.board.isDraw(ply + 1))
                 goto moveSearched;
 
             // PVS (Principal variation search)
 
             // LMR (Late move reductions)
-            if (depth >= 2 
-            && !td.board.inCheck() 
-            && legalMovesSeen >= 2 
+            if (depth >= 2
+            && !td.board.inCheck()
+            && legalMovesSeen >= 2
             && (movePicker.stage() == MoveGenStage::QUIETS || movePicker.stage() == MoveGenStage::BAD_NOISIES))
             {
                 i32 lmr = LMR_TABLE[isQuiet][depth][legalMovesSeen]
@@ -620,7 +620,7 @@ class Searcher {
 
                 score = -search(td, newDepth - lmr, ply + 1, -alpha - 1, -alpha, true, doubleExtsLeft);
 
-                if (score > alpha && lmr > 0) 
+                if (score > alpha && lmr > 0)
                 {
                     // Deeper or shallower search?
                     newDepth += ply > 0 && score > bestScore + deeperBase() + newDepth * 2;
@@ -644,12 +644,12 @@ class Searcher {
 
             assert(td.nodes > nodesBefore);
             if (ply == 0) td.nodesByMove[move.encoded()] += td.nodes - nodesBefore;
-            
+
             if (score > bestScore) bestScore = score;
 
             // Fail low?
             if (score <= alpha) {
-                if (isQuiet) 
+                if (isQuiet)
                     failLowQuiets.push_back(move);
                 else
                     failLowNoisiesHistory.push_back(noisyHistoryPtr);
@@ -663,7 +663,7 @@ class Searcher {
             bound = Bound::EXACT;
 
             // If PV node, update PV line
-            if (pvNode) { 
+            if (pvNode) {
                 plyDataPtr->pvLine.clear();
                 plyDataPtr->pvLine.push_back(move);
 
@@ -700,15 +700,15 @@ class Searcher {
                 // Calling attacks(nstm) will cache enemy attacks and speedup isSquareAttacked()
                 td.board.attacks(nstm);
 
-            const std::array<Move, 3> lastMoves = { 
-                td.board.lastMove(), td.board.nthToLastMove(2), td.board.nthToLastMove(4) 
+            const std::array<Move, 3> lastMoves = {
+                td.board.lastMove(), td.board.nthToLastMove(2), td.board.nthToLastMove(4)
             };
 
             // History bonus: increase this move's history
             historyEntry.updateQuietHistories(
-                td.board.isSquareAttacked(move.from(), nstm), 
+                td.board.isSquareAttacked(move.from(), nstm),
                 td.board.isSquareAttacked(move.to(),   nstm),
-                lastMoves, 
+                lastMoves,
                 bonus
             );
 
@@ -776,7 +776,7 @@ class Searcher {
             ttEntry.adjustScore(ply);
 
             if (ttEntry.bound() == Bound::EXACT
-            || (ttEntry.bound() == Bound::LOWER && ttEntry.score >= beta) 
+            || (ttEntry.bound() == Bound::LOWER && ttEntry.score >= beta)
             || (ttEntry.bound() == Bound::UPPER && ttEntry.score <= alpha))
                 return ttEntry.score;
         }
@@ -790,10 +790,10 @@ class Searcher {
         const i32 eval = td.updateAccumulatorAndEval(plyDataPtr->eval);
 
         if (!td.board.inCheck()) {
-            if (eval >= beta) return eval; 
+            if (eval >= beta) return eval;
             if (eval > alpha) alpha = eval;
         }
-        
+
         i32 bestScore = td.board.inCheck() ? -INF : eval;
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::UPPER;
@@ -813,7 +813,7 @@ class Searcher {
                 if (td.board.inCheck())
                     return stage == MoveGenStage::TT_MOVE_YIELDED
                            ? move == ttMove
-                           : stage == MoveGenStage::KILLER_YIELDED 
+                           : stage == MoveGenStage::KILLER_YIELDED
                            ? move == plyDataPtr->killer && td.board.isQuiet(move)
                            : (td.board.isQuiet(move) ? stage == MoveGenStage::QUIETS : isNoisiesStage);
 
@@ -827,7 +827,7 @@ class Searcher {
             // If not in check, skip bad noisy moves
             if (!td.board.inCheck() && !td.board.SEE(move))
                 continue;
-                
+
             td.makeMove(move, ply + 1, mTT);
 
             const i32 score = td.board.isDraw(ply + 1) ? 0 : -qSearch(td, ply + 1, -beta, -alpha);
@@ -865,7 +865,7 @@ class Searcher {
         return bestScore;
     }
 
-    constexpr i32 probcut(ThreadData &td, const i32 depth, const i32 ply, const i32 probcutBeta, 
+    constexpr i32 probcut(ThreadData &td, const i32 depth, const i32 ply, const i32 probcutBeta,
         const bool cutNode, const u8 doubleExtsLeft, const Move ttMove, const auto ttEntryIdx)
     {
         PlyData* plyDataPtr = &(td.pliesData[ply]);
@@ -885,7 +885,7 @@ class Searcher {
             assert(td.board.isNoisyNotUnderpromo(move));
 
             // SEE pruning (skip bad noisy moves)
-            if (!td.board.SEE(move, probcutBeta - plyDataPtr->eval)) 
+            if (!td.board.SEE(move, probcutBeta - plyDataPtr->eval))
                 continue;
 
             td.makeMove(move, ply + 1, mTT);

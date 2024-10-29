@@ -71,12 +71,12 @@ inline void bench(const int depth = 14)
         searcher.board() = Board(fen);
 
         const std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
-        
+
         searcher.search(
-            depth, 
-            std::numeric_limits<u64>::max(), 
-            startTime, 
-            std::numeric_limits<u64>::max(), 
+            depth,
+            std::numeric_limits<u64>::max(),
+            startTime,
+            std::numeric_limits<u64>::max(),
             std::numeric_limits<u64>::max(),
             false
         );

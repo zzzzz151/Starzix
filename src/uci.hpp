@@ -50,7 +50,7 @@ inline bool runCommand(std::string &command, Searcher &searcher)
             bench(depth);
         }
     }
-    else if (command == "eval") 
+    else if (command == "eval")
     {
         const BothAccumulators acc = BothAccumulators(searcher.board());
         const i32 eval = nnue::evaluate(&acc, searcher.board().sideToMove());
@@ -70,19 +70,19 @@ inline bool runCommand(std::string &command, Searcher &searcher)
         const std::chrono::steady_clock::time_point start =  std::chrono::steady_clock::now();
         const u64 nodes = depth > 0 ? perft(searcher.board(), depth) : 0;
 
-        std::cout << "perft depth " << depth 
-                  << " nodes " << nodes 
+        std::cout << "perft depth " << depth
+                  << " nodes " << nodes
                   << " nps " << nodes * 1000 / std::max((u64)millisecondsElapsed(start), (u64)1)
                   << " time " << millisecondsElapsed(start)
                   << " fen " << fen
                   << std::endl;
     }
-    else if (tokens[0] == "perftsplit" || tokens[0] == "splitperft" 
+    else if (tokens[0] == "perftsplit" || tokens[0] == "splitperft"
     || tokens[0] == "perftdivide" || tokens[0] == "divideperft")
     {
         const int depth = stoi(tokens[1]);
-        
-        std::cout << "perft split depth " << depth 
+
+        std::cout << "perft split depth " << depth
                   << " '" << searcher.board().fen() << "'"
                   << std::endl;
 
@@ -96,7 +96,7 @@ inline bool runCommand(std::string &command, Searcher &searcher)
 
         u64 totalNodes = 0;
 
-        for (const Move move : moves) 
+        for (const Move move : moves)
             if (searcher.board().isPseudolegalLegal(move))
             {
                 searcher.board().makeMove(move);
@@ -119,17 +119,17 @@ inline bool runCommand(std::string &command, Searcher &searcher)
     else if (tokens[0] == "undomove")
         searcher.board().undoMove();
     #if defined(TUNE)
-    else if (command == "spsainput") 
+    else if (command == "spsainput")
     {
         for (auto &pair : tunableParams) {
             std::string paramName = pair.first;
             auto &tunableParam = pair.second;
 
-            std::visit([&paramName] (auto *myParam) 
+            std::visit([&paramName] (auto *myParam)
             {
                 if (myParam == nullptr) return;
 
-                std::cout << paramName 
+                std::cout << paramName
                           << ", " << (myParam->floatOrDouble() ? "float" : "int")
                           << ", " << myParam->value
                           << ", " << myParam->min
@@ -156,17 +156,17 @@ inline void uci() {
             std::string paramName = pair.first;
             auto &tunableParam = pair.second;
 
-            std::visit([&paramName] (auto *myParam) 
+            std::visit([&paramName] (auto *myParam)
             {
                 if (myParam == nullptr) return;
 
-                std::cout << "option name " << paramName 
+                std::cout << "option name " << paramName
                         << " type string"
                         << " default " << myParam->value
                         << " min "     << myParam->min
                         << " max "     << myParam->max
                         << std::endl;
-                
+
             }, tunableParam);
         }
     #endif
@@ -190,11 +190,11 @@ inline void setoption(const std::vector<std::string> &tokens, Searcher &searcher
         std::cout << "info string Threads set to " << newNumThreads << std::endl;
     }
     #if defined(TUNE)
-    else if (tunableParams.count(optionName) > 0) 
+    else if (tunableParams.count(optionName) > 0)
     {
         auto tunableParam = tunableParams[optionName];
 
-        std::visit([optionName, optionValue] (auto *myParam) 
+        std::visit([optionName, optionValue] (auto *myParam)
         {
             if (myParam == nullptr) return;
 
@@ -222,7 +222,7 @@ inline void position(const std::vector<std::string> &tokens, Board &board)
     {
         std::string fen = "";
         u64 i = 0;
-        
+
         for (i = 2; i < tokens.size() && tokens[i] != "moves"; i++)
             fen += tokens[i] + " ";
 
@@ -250,11 +250,11 @@ inline void go(const std::vector<std::string> &tokens, Searcher &searcher)
     {
         const i64 value = std::max<i64>(std::stoll(tokens[i + 1]), 0);
 
-        if ((tokens[i] == "wtime" && searcher.board().sideToMove() == Color::WHITE) 
+        if ((tokens[i] == "wtime" && searcher.board().sideToMove() == Color::WHITE)
         ||  (tokens[i] == "btime" && searcher.board().sideToMove() == Color::BLACK))
             milliseconds = value;
 
-        else if ((tokens[i] == "winc" && searcher.board().sideToMove() == Color::WHITE) 
+        else if ((tokens[i] == "winc" && searcher.board().sideToMove() == Color::WHITE)
         ||       (tokens[i] == "binc" && searcher.board().sideToMove() == Color::BLACK))
             incrementMs = value;
 
