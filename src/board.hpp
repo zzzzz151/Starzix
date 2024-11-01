@@ -493,11 +493,13 @@ class Board {
 
     constexpr u64 attacks(const Color color)
     {
-        return color == sideToMove()
-               ? attacks(color, occupancy())
-               : state().enemyAttacks > 0
-               ? state().enemyAttacks
-               : (state().enemyAttacks = attacks(oppSide(), occupancy()));
+        if (color == sideToMove())
+            return attacks(color, occupancy());
+
+        if (state().enemyAttacks == 0)
+            state().enemyAttacks = attacks(color, occupancy());
+
+        return state().enemyAttacks;
     }
 
     constexpr bool isSquareAttacked(const Square square, const Color colorAttacking, const u64 occ) const
@@ -651,7 +653,7 @@ class Board {
     }
 
     constexpr void pseudolegalMoves(
-        ArrayVec<Move, 256> &moves, const MoveGenType moveGenType, const bool underpromotions = true) const
+        ArrayVec<Move, 256> &moves, const MoveGenType moveGenType, const bool underpromotions = true)
     {
         moves.clear();
 
@@ -777,7 +779,7 @@ class Board {
         }
 
         const Square kingSquare = this->kingSquare();
-        u64 kingMoves = getKingAttacks(kingSquare) & mask;
+        u64 kingMoves = getKingAttacks(kingSquare) & mask & ~attacks(enemyColor);
 
         while (kingMoves > 0) {
             const Square targetSquare = poplsb(kingMoves);

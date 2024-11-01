@@ -696,10 +696,6 @@ class Searcher {
             plyDataPtr->killer = move;
             const Color nstm = td.board.oppSide();
 
-            if (failLowQuiets.size() > 0)
-                // Calling attacks(nstm) will cache enemy attacks and speedup isSquareAttacked()
-                td.board.attacks(nstm);
-
             const std::array<Move, 3> lastMoves = {
                 td.board.lastMove(), td.board.nthToLastMove(2), td.board.nthToLastMove(4)
             };
