@@ -184,10 +184,6 @@ struct MovePicker {
                 board.lastMove(), board.nthToLastMove(2), board.nthToLastMove(4)
             };
 
-            if (mQuiets.size() > 1)
-                // Calling attacks(board.oppSide()) will cache enemy attacks and speedup isSquareAttacked()
-                board.attacks(board.oppSide());
-
             // Score moves
             size_t j = 0;
             while (j < mQuiets.size())

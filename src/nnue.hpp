@@ -37,7 +37,6 @@ constexpr std::array<int, 64> INPUT_BUCKETS = {
     3, 3, 3, 3, 4, 4, 4, 4  // 8
 };
 
-
 struct Net {
     public:
 
