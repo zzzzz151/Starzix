@@ -12,7 +12,7 @@ namespace uci { // Universal chess interface
 
 inline void uci();
 inline void setoption(const std::vector<std::string> &tokens, Searcher &searcher);
-inline void position(const std::vector<std::string> &tokens, Board &board);
+constexpr void position(const std::vector<std::string> &tokens, Board &board);
 inline void go(const std::vector<std::string> &tokens, Searcher &searcher);
 
 inline bool runCommand(std::string &command, Searcher &searcher)
@@ -210,7 +210,7 @@ inline void setoption(const std::vector<std::string> &tokens, Searcher &searcher
     #endif
 }
 
-inline void position(const std::vector<std::string> &tokens, Board &board)
+constexpr void position(const std::vector<std::string> &tokens, Board &board)
 {
     int movesTokenIndex = -1;
 

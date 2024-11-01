@@ -54,7 +54,7 @@ class Board {
 
     constexpr Board() = default;
 
-    constexpr Board(std::string fen)
+    inline Board(std::string fen)
     {
         mStates = { };
         mStates.reserve(512);
@@ -606,7 +606,7 @@ class Board {
 
         Color us = oppSide();
 
-        auto popLeastValuable = [&] (const u64 attackers) -> PieceType
+        const auto popLeastValuable = [&] (const u64 attackers) constexpr -> PieceType
         {
             for (int pt = PAWN; pt <= KING; pt++)
             {

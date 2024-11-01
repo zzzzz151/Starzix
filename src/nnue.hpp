@@ -107,7 +107,7 @@ struct BothAccumulators {
         setInputBucket(Color::WHITE, board.getBb(Color::BLACK, PieceType::QUEEN));
         setInputBucket(Color::BLACK, board.getBb(Color::WHITE, PieceType::QUEEN));
 
-        auto activatePiece = [&](Color pieceColor, PieceType pt) constexpr -> void
+        const auto activatePiece = [&](Color pieceColor, PieceType pt) constexpr -> void
         {
             u64 bb = board.getBb(pieceColor, pt);
 
@@ -168,7 +168,7 @@ struct BothAccumulators {
 
         FinnyTableEntry &finnyEntry = finnyTable[iAccColor][hm][inputBucket];
 
-        auto updatePiece = [&](Color pieceColor, PieceType pt) -> void
+        const auto updatePiece = [&](Color pieceColor, PieceType pt) constexpr -> void
         {
             const u64 bb = board.getBb(pieceColor, pt);
             const u64 entryBb = finnyEntry.colorBitboards[(int)pieceColor] & finnyEntry.piecesBitboards[(int)pt];

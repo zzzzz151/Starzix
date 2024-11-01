@@ -11,7 +11,7 @@ constexpr MultiArray<u64, 2, 64> PAWN_ATTACKS = []() consteval
 {
     MultiArray<u64, 2, 64> pawnAttacks;
 
-    auto getPawnAttacks = [](const Square square, const Color color) consteval -> u64
+    constexpr auto getPawnAttacks = [](const Square square, const Color color) consteval -> u64
     {
         const Rank rank = squareRank(square);
 

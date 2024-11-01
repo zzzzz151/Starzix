@@ -102,7 +102,7 @@ class Searcher {
         td->cv.notify_all();
     }
 
-    inline void blockUntilSleep()
+    constexpr void blockUntilSleep()
     {
         for (ThreadData* td : mThreadsData)
         {
@@ -288,7 +288,8 @@ class Searcher {
             if (mSoftMs >= std::numeric_limits<i64>::max()) continue;
 
             // Nodes time management: scale soft time limit based on nodes spent on best move
-            auto scaledSoftMs = [&]() -> u64 {
+            const auto scaledSoftMs = [&]() constexpr -> u64
+            {
                 const double bestMoveNodes = td.nodesByMove[bestMoveRoot().encoded()];
                 const double bestMoveNodesFraction = bestMoveNodes / std::max<double>(td.nodes, 1.0);
                 assert(bestMoveNodesFraction >= 0.0 && bestMoveNodesFraction <= 1.0);
