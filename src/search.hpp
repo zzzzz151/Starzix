@@ -446,7 +446,8 @@ class Searcher {
             {
                 td.makeMove(MOVE_NONE, ply + 1, mTT);
 
-                const i32 nmpDepth = depth - nmpBaseReduction() - depth * nmpDepthMul();
+                const i32 nmpDepth = depth - nmpBaseReduction() - depth * nmpDepthMul()
+                                     - (ttMove != MOVE_NONE && !td.board.isQuiet(ttMove));
 
                 const i32 score = td.board.isDraw(ply + 1) ? 0
                                   : -search(td, nmpDepth, ply + 1, -beta, -alpha, !cutNode, doubleExtsLeft);
