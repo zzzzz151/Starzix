@@ -307,57 +307,30 @@ struct BothAccumulators {
 constexpr i32 evaluate(const BothAccumulators* bothAccs, const Color sideToMove)
 {
     assert(bothAccs->mUpdated);
-
-    const int stm = (int)sideToMove;
     i32 sum = 0;
 
-    // Activation function:
-    // SCReLU(hiddenNeuron) = clamp(hiddenNeuron, 0, QA)^2
+    for (const Color color : {sideToMove, oppColor(sideToMove)})
+        for (int i = HIDDEN_LAYER_SIZE / 4; i < HIDDEN_LAYER_SIZE; i++)
+        {
+            // SCReLU activation
+            i32 activated = std::clamp<i16>(bothAccs->mAccumulators[(int)color][i], 0, QA);
+            activated *= activated;
 
-    #if defined(__AVX2__) || (defined(__AVX512F__) && defined(__AVX512BW__))
-        // N is 16 and 32 for avx2 and avx512, respectively
+            sum += activated * i32(NET->outputWeights[color != sideToMove][i]);
+        }
 
-        const Vec vecZero = setEpi16(0);  // N i16 zeros
-        const Vec vecQA   = setEpi16(QA); // N i16 QA's
-        Vec vecSum = vecZero; // N/2 i32 zeros, the total running sum
+    sum /= QA;
 
-        for (const int color : {stm, 1 - stm})
-            for (int i = 0; i < HIDDEN_LAYER_SIZE; i += sizeof(Vec) / sizeof(i16))
-            {
-                // Load the next N hidden neurons and clamp them to [0, QA]
-                const i16 &accStart = bothAccs->mAccumulators[color][i];
-                Vec hiddenNeurons = loadVec((Vec*)&accStart);
-                hiddenNeurons = clampVec(hiddenNeurons, vecZero, vecQA);
+    for (const Color color : {sideToMove, oppColor(sideToMove)})
+        for (int i = 0; i < HIDDEN_LAYER_SIZE / 4; i++)
+        {
+            // ReLU activation
+            const i32 activated = std::max<i16>(bothAccs->mAccumulators[(int)color][i], 0);
 
-                // Load the respective N output weights
-                const i16 &outputWeightsStart = NET->outputWeights[color != stm][i];
-                const Vec outputWeights = loadVec((Vec*)&outputWeightsStart);
+            sum += activated * i32(NET->outputWeights[color != sideToMove][i]);
+        }
 
-                // Multiply each hidden neuron with its respective output weight
-                // We use mullo, which multiplies in the i32 world but returns the results as i16's
-                // since we know the results fit in an i16
-                Vec result = mulloEpi16(hiddenNeurons, outputWeights);
-
-                // Multiply with hidden neurons again (square part of SCReLU activation)
-                // We use madd, which multiplies in the i32 world and adds adjacent pairs
-                // 'result' becomes N/2 i32's
-                result = maddEpi16(result, hiddenNeurons);
-
-                vecSum = addEpi32(vecSum, result); // Add 'result' to 'vecSum'
-            }
-
-        sum = sumVec(vecSum); // Add the N/2 i32's to get final sum (i32)
-    #else
-        for (const int color : {stm, 1 - stm})
-            for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
-            {
-                const i16 clipped = std::clamp<i16>(bothAccs->mAccumulators[color][i], 0, QA);
-                const i16 x = clipped * NET->outputWeights[color != stm][i];
-                sum += x * clipped;
-            }
-    #endif
-
-    return (sum / QA + NET->outputBias) * SCALE / (QA * QB);
+    return (sum + NET->outputBias) * SCALE / (QA * QB);
 }
 
 } // namespace nnue
