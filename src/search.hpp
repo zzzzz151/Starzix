@@ -239,7 +239,7 @@ class Searcher {
         {
             td.maxPlyReached = 0;
 
-            const i32 iterationScore = iterationDepth >= aspMinDepth()
+            const i32 iterationScore = iterationDepth >= 4
                                        ? aspiration(td, iterationDepth)
                                        : search(td, iterationDepth, 0, -INF, INF, false, DOUBLE_EXTENSIONS_MAX);
 
@@ -296,7 +296,7 @@ class Searcher {
                 return (double)mSoftMs * (1.5 - bestMoveNodesFraction);
             };
 
-            if (msElapsed >= (iterationDepth >= aspMinDepth() ? scaledSoftMs() : mSoftMs))
+            if (msElapsed >= (iterationDepth >= 6 ? scaledSoftMs() : mSoftMs))
                 break;
         }
 
@@ -420,12 +420,12 @@ class Searcher {
         if (!pvNode && !td.board.inCheck() && singularMove == MOVE_NONE)
         {
             // RFP (Reverse futility pruning) / Static NMP
-            if (depth <= rfpMaxDepth()
+            if (depth <= 8
             && eval >= beta + (depth - improving) * rfpDepthMul())
                 return eval;
 
             // Razoring
-            if (depth <= razoringMaxDepth()
+            if (depth <= 4
             && abs(alpha) < 2000
             && eval + depth * razoringDepthMul() < alpha)
             {
@@ -437,7 +437,7 @@ class Searcher {
             }
 
             // NMP (Null move pruning)
-            if (depth >= nmpMinDepth()
+            if (depth >= 3
             && td.board.lastMove() != MOVE_NONE
             && eval >= beta
             && eval >= beta + nmpEvalBetaMargin() - depth * nmpEvalBetaMul()
@@ -476,8 +476,8 @@ class Searcher {
         }
 
         // IIR (Internal iterative reduction)
-        if (depth >= iirMinDepth()
-        && (ttMove == MOVE_NONE || ttEntry.depth() < depth - iirMinDepth())
+        if (depth >= 4
+        && (ttMove == MOVE_NONE || ttEntry.depth() < depth - 4)
         && singularMove == MOVE_NONE
         && (pvNode || cutNode))
             depth--;
@@ -534,14 +534,14 @@ class Searcher {
             && (movePicker.stage() == MoveGenStage::QUIETS || movePicker.stage() == MoveGenStage::BAD_NOISIES))
             {
                 // LMP (Late move pruning)
-                if (legalMovesSeen >= lmpMinMoves() + pvNode + td.board.inCheck()
-                                      + depth * depth * lmpDepthMul())
+                if (legalMovesSeen >= 3 + pvNode + td.board.inCheck()
+                                      + roundI32(depth * depth * lmpDepthMul()))
                     break;
 
                 const i32 lmrDepth = depth - LMR_TABLE[isQuiet][depth][legalMovesSeen];
 
                 // FP (Futility pruning)
-                if (lmrDepth <= fpMaxDepth()
+                if (lmrDepth <= 10
                 && !td.board.inCheck()
                 && alpha < MIN_MATE_SCORE
                 && alpha > eval + fpBase() + std::max(lmrDepth + improving, 0) * fpDepthMul())
@@ -552,7 +552,7 @@ class Searcher {
                 const i32 threshold = isQuiet ? depth * seeQuietThreshold() - movePicker.moveScore() * seeQuietHistMul()
                                               : depth * seeNoisyThreshold() - i32(*noisyHistoryPtr)  * seeNoisyHistMul();
 
-                if (depth <= seePruningMaxDepth() && !td.board.SEE(move, threshold))
+                if (!td.board.SEE(move, threshold))
                     continue;
             }
 
@@ -563,8 +563,8 @@ class Searcher {
             i32 singularBeta;
             if (move == ttMove
             && ply > 0
-            && depth >= singularMinDepth()
-            && ttEntry.depth() >= depth - singularDepthMargin()
+            && depth >= 7
+            && ttEntry.depth() >= depth - 3
             && ttEntry.bound() != Bound::UPPER
             && abs(ttEntry.score) < MIN_MATE_SCORE
             && (singularBeta = i32(ttEntry.score) - depth) > -MIN_MATE_SCORE + 1)

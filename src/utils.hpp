@@ -67,6 +67,9 @@ inline u64 millisecondsElapsed(const std::chrono::steady_clock::time_point start
     return (std::chrono::steady_clock::now() - start) / std::chrono::milliseconds(1);
 }
 
+constexpr i32 roundI32(const float x)  { return round(x); }
+constexpr i32 roundI32(const double x) { return round(x); }
+
 // Square
 
 using Square = u8;
