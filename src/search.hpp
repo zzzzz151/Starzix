@@ -372,12 +372,12 @@ class Searcher {
             if (alpha >= beta) return alpha;
         }
 
+        const bool pvNode = beta > alpha + 1 || ply == 0;
+
         // Quiescence search at leaf nodes
-        if (depth <= 0) return qSearch(td, ply, alpha, beta);
+        if (depth <= 0) return qSearch(td, ply, alpha, beta, pvNode);
 
         if (depth > mMaxDepth) depth = mMaxDepth;
-
-        const bool pvNode = beta > alpha + 1 || ply == 0;
 
         // Probe TT
         const auto ttEntryIdx = TTEntryIndex(td.board.zobristHash(), mTT.size());
@@ -429,7 +429,7 @@ class Searcher {
             && abs(alpha) < 2000
             && eval + depth * razoringDepthMul() < alpha)
             {
-                const i32 score = qSearch(td, ply, alpha, beta);
+                const i32 score = qSearch(td, ply, alpha, beta, pvNode);
 
                 if (shouldStop(td)) return 0;
 
@@ -755,7 +755,7 @@ class Searcher {
         return bestScore;
     }
 
-    constexpr i32 qSearch(ThreadData &td, const i32 ply, i32 alpha, i32 beta)
+    constexpr i32 qSearch(ThreadData &td, const i32 ply, i32 alpha, i32 beta, const bool pvNode)
     {
         assert(ply > 0 && ply <= mMaxDepth);
         assert(alpha >= -INF && alpha <= INF);
@@ -770,7 +770,7 @@ class Searcher {
         const bool ttHit = td.board.zobristHash() == ttEntry.zobristHash;
 
         // TT cutoff
-        if (ttHit) {
+        if (ttHit && !pvNode) {
             ttEntry.adjustScore(ply);
 
             if (ttEntry.bound() == Bound::EXACT
@@ -828,7 +828,7 @@ class Searcher {
 
             td.makeMove(move, ply + 1, mTT);
 
-            const i32 score = td.board.isDraw(ply + 1) ? 0 : -qSearch(td, ply + 1, -beta, -alpha);
+            const i32 score = td.board.isDraw(ply + 1) ? 0 : -qSearch(td, ply + 1, -beta, -alpha, pvNode);
 
             td.board.undoMove();
             td.accumulatorPtr--;
@@ -893,7 +893,7 @@ class Searcher {
             if (td.board.isDraw(ply + 1))
                 goto moveSearched;
 
-            score = -qSearch(td, ply + 1, -probcutBeta, -probcutBeta + 1);
+            score = -qSearch(td, ply + 1, -probcutBeta, -probcutBeta + 1, false);
 
             if (score >= probcutBeta)
                 score = -search(td, depth - 4, ply + 1, -probcutBeta, -probcutBeta + 1, !cutNode, doubleExtsLeft);
