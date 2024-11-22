@@ -478,9 +478,11 @@ class Searcher {
         // IIR (Internal iterative reduction)
         if (depth >= iirMinDepth()
         && (ttMove == MOVE_NONE || ttEntry.depth() < depth - iirMinDepth())
-        && singularMove == MOVE_NONE
-        && (pvNode || cutNode))
-            depth--;
+        && singularMove == MOVE_NONE)
+        {
+            depth -= pvNode;
+            depth -= cutNode;
+        }
 
         const bool lmrImproving = ply > 1 && eval != VALUE_NONE && (plyDataPtr - 2)->eval != VALUE_NONE
                                   && eval > (plyDataPtr - 2)->eval;
