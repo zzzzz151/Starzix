@@ -602,13 +602,13 @@ class Searcher {
             // PVS (Principal variation search)
 
             // LMR (Late move reductions)
-            if (depth >= 2
-            && !td.board.inCheck()
-            && legalMovesSeen >= 2
-            && (movePicker.stage() == MoveGenStage::QUIETS || movePicker.stage() == MoveGenStage::BAD_NOISIES))
+            if (depth >= 2 && !td.board.inCheck() && legalMovesSeen >= 2)
             {
                 i32 lmr = LMR_TABLE[isQuiet][depth][legalMovesSeen]
-                          - pvNode       // reduce pv nodes less
+                          // reduce pv nodes less
+                          - pvNode
+                          // reduce good noisies less
+                          - (movePicker.stage() == MoveGenStage::GOOD_NOISIES)
                           - lmrImproving // reduce less if were improving
                           + 2 * cutNode; // reduce more if we expect to fail high
 
