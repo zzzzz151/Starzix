@@ -111,10 +111,10 @@ public:
         mSize = 0;
     }
 
-    constexpr void push_back(const T elem)
+    constexpr void push_back(const T x)
     {
         assert(mSize < N);
-        mArr[mSize++] = elem;
+        mArr[mSize++] = x;
     }
 
     constexpr void pop_back()
@@ -127,6 +127,15 @@ public:
     {
         assert(i < mSize && j < mSize);
         std::swap(mArr[i], mArr[j]);
+    }
+
+    constexpr bool contains(const T x) const
+    {
+        for (const T elem : *this)
+            if (elem == x)
+                return true;
+
+        return false;
     }
 
 }; // struct ArrayVec

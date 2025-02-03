@@ -40,7 +40,8 @@ constexpr EnumArray<size_t, Square> INPUT_BUCKETS_MAP = {
 // [hiddenNeuronIdx]
 using HLArray = std::array<i16, HIDDEN_LAYER_SIZE>;
 
-struct Net {
+struct Net
+{
 public:
 
     using FtWeightsForBucket = EnumArray<HLArray, Color, PieceType, Square>;
@@ -61,7 +62,8 @@ public:
 INCBIN(NetFile, "src/net.bin");
 const Net* NET = reinterpret_cast<const Net*>(gNetFileData);
 
-struct FinnyTableEntry {
+struct FinnyTableEntry
+{
 public:
 
     alignas(sizeof(Vec)) HLArray accumulator; // [hiddenNeuronIdx]
@@ -76,7 +78,8 @@ using FinnyTableForColor = MultiArray<FinnyTableEntry, 2, NUM_INPUT_BUCKETS>;
 // [color][mirrorVAxis][inputBucket]
 using FinnyTable = EnumArray<FinnyTableForColor, Color>;
 
-struct BothAccumulators {
+struct BothAccumulators
+{
 public:
 
     // [color][hiddenNeuronIdx]

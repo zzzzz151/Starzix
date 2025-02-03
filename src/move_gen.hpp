@@ -268,6 +268,17 @@ constexpr bool isPseudolegalLegal(Position& pos, const Move move)
     return true;
 }
 
+constexpr bool hasLegalMove(Position& pos)
+{
+    const auto pseudolegals = pseudolegalMoves(pos, MoveGenType::AllMoves, false);
+
+    for (const Move move : pseudolegals)
+        if (isPseudolegalLegal(pos, move))
+            return true;
+
+    return false;
+}
+
 constexpr u64 perft(Position& pos, const i32 depth)
 {
     if (depth <= 0) return 1;
@@ -276,7 +287,6 @@ constexpr u64 perft(Position& pos, const i32 depth)
     u64 nodes = 0;
 
     for (const Move move : moves)
-    {
         if (isPseudolegalLegal(pos, move))
         {
             if (depth == 1)
@@ -287,7 +297,6 @@ constexpr u64 perft(Position& pos, const i32 depth)
                 pos.undoMove();
             }
         }
-    }
 
     return nodes;
 }

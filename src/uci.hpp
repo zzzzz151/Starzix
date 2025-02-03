@@ -11,7 +11,7 @@
 namespace uci {
 
 constexpr void position(const std::vector<std::string>& tokens, Position& pos);
-constexpr void go(const Position& pos, Searcher& searcher);
+constexpr void go(Position& pos, Searcher& searcher);
 
 inline void runCommand(std::string& command, Position& pos, Searcher& searcher)
 {
@@ -115,7 +115,7 @@ constexpr void position(const std::vector<std::string>& tokens, Position& pos)
         pos.makeMove(tokens[i]);
 }
 
-constexpr void go(const Position& pos, Searcher& searcher)
+constexpr void go(Position& pos, Searcher& searcher)
 {
     const SearchConfig searchConfig = SearchConfig();
     searcher.search(pos, searchConfig);
