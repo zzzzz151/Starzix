@@ -16,31 +16,25 @@
 
 # How to compile
 
-Have clang++ installed and run ```make```
+Install clang++ and run ```make```
 
-# UCI (Universal Chess Interface)
+# UCI options
 
-### Options
+- Hash (integer, default 32, 1 to 131072) - transposition table size in MiB
 
-- Hash (int, default 32, 1 to 65536) - transposition table size in MB
+- Threads (integer, default 1, 1 to 256) - search threads
 
-- Threads (int, default 1, 1 to 256) - search threads
-
-### Extra commands
+# Extra commands
 
 - display
 
-- eval
-
-- perft \<depth\> 
+- perft \<depth\>
 
 - perftsplit \<depth\>
 
 - bench \<depth\>
 
-- makemove \<move\>
-
-- undomove
+- eval
 
 # Features
 
@@ -50,7 +44,7 @@ Have clang++ installed and run ```make```
 - Pseudolegal move gen (magic bitboards and lookup tables)
 - Copymake make/undo move
 
-### NNUE evaluation 
+### NNUE evaluation
 - (768x2x5 -> 1024)x2 -> 1
 - Inputs mirrored along vertical axis based on king square
 - 5 enemy queen input buckets

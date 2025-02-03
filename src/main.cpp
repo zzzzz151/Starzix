@@ -13,6 +13,7 @@
 //#include "search_params.hpp"
 //#include "thread_data.hpp"
 //#include "search.hpp"
+//#include "bench.hpp"
 #include "uci.hpp"
 #include <iostream>
 

@@ -6,6 +6,7 @@
 #include "position.hpp"
 #include "move_gen.hpp"
 #include "search.hpp"
+#include "bench.hpp"
 
 namespace uci {
 
@@ -25,7 +26,7 @@ inline void runCommand(std::string& command, Position& pos, Searcher& searcher)
     {
         std::cout << "id name Starzix";
         std::cout << "\nid author zzzzz";
-        std::cout << "\noption name Hash type spin default 32 min 1 max 65536";
+        std::cout << "\noption name Hash type spin default 32 min 1 max 131072";
         std::cout << "\noption name Threads type spin default 1 min 1 max 256";
         std::cout << "\nuciok";
         std::cout << std::endl; // flush
@@ -46,12 +47,12 @@ inline void runCommand(std::string& command, Position& pos, Searcher& searcher)
     else if (tokens[0] == "go")
         go(pos, searcher);
     else if (command == "quit")
-    {
         exit(EXIT_SUCCESS);
-    }
     // Non-UCI commands
-    else if (command == "d" || command == "display"
-    || command == "show" || command == "print")
+    else if (command == "d"
+    || command == "display"
+    || command == "show"
+    || command == "print")
     {
         pos.print();
     }
@@ -78,6 +79,13 @@ inline void runCommand(std::string& command, Position& pos, Searcher& searcher)
         const u64 nps = getNps(nodes, millisecondsElapsed(start));
 
         std::cout << nodes << " nodes " << nps << " nps" << std::endl;
+    }
+    else if (command == "bench" || command == "benchmark")
+        bench();
+    else if (command == "eval" || command == "evaluate" || command == "evaluation")
+    {
+        nnue::BothAccumulators bothAccs = nnue::BothAccumulators(pos);
+        std::cout << "eval " << nnue::evaluate(bothAccs, pos.sideToMove()) << std::endl;
     }
 }
 
