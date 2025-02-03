@@ -3,9 +3,8 @@
 #pragma once
 
 #include "utils.hpp"
-#include "board.hpp"
+#include "position.hpp"
 #include "simd.hpp"
-#include "search_params.hpp"
 
 // incbin fuckery
 #ifdef _MSC_VER
@@ -18,14 +17,14 @@
 
 namespace nnue {
 
-constexpr i32 HIDDEN_LAYER_SIZE = 1024,
-              NUM_INPUT_BUCKETS = 5,
-              SCALE = 400,
-              QA = 255,
-              QB = 64;
+constexpr size_t HIDDEN_LAYER_SIZE = 1024;
+constexpr size_t NUM_INPUT_BUCKETS = 5;
+constexpr i32 SCALE = 400;
+constexpr i32 QA = 255;
+constexpr i32 QB = 64;
 
 // Enemy queen input buckets (0 if enemy doesnt have exactly 1 queen)
-constexpr std::array<int, 64> INPUT_BUCKETS = {
+constexpr EnumArray<size_t, Square> INPUT_BUCKETS_MAP = {
 //  A  B  C  D  E  F  G  H
     1, 1, 1, 1, 2, 2, 2, 2, // 1
     1, 1, 1, 1, 2, 2, 2, 2, // 2
@@ -35,280 +34,315 @@ constexpr std::array<int, 64> INPUT_BUCKETS = {
     3, 3, 3, 3, 4, 4, 4, 4, // 6
     3, 3, 3, 3, 4, 4, 4, 4, // 7
     3, 3, 3, 3, 4, 4, 4, 4  // 8
+//  A  B  C  D  E  F  G  H
 };
 
+// [hiddenNeuronIdx]
+using HLArray = std::array<i16, HIDDEN_LAYER_SIZE>;
+
 struct Net {
-    public:
+public:
 
-    // [color][inputBucket][feature768][hiddenNeuronIdx]
-    alignas(sizeof(Vec)) MultiArray<i16, 2, NUM_INPUT_BUCKETS, 768, HIDDEN_LAYER_SIZE> featuresWeights;
+    using FtWeightsForBucket = EnumArray<HLArray, Color, PieceType, Square>;
+    using FtWeightsForColor = std::array<FtWeightsForBucket, NUM_INPUT_BUCKETS>;
 
-    // [color][hiddenNeuronIdx]
-    alignas(sizeof(Vec)) MultiArray<i16, 2, HIDDEN_LAYER_SIZE> hiddenBiases;
+    // [perspectiveColor][inputBucket][pieceColor][pieceType][square][hiddenNeuronIdx]
+    alignas(sizeof(Vec)) EnumArray<FtWeightsForColor, Color> ftWeights;
 
-    // [0 = stm | 1 = nstm][hiddenNeuronIdx]
-    alignas(sizeof(Vec)) MultiArray<i16, 2, HIDDEN_LAYER_SIZE> outputWeights;
+    // [perspectiveColor][hiddenNeuronIdx]
+    alignas(sizeof(Vec)) EnumArray<HLArray, Color> hiddenBiases;
+
+    // [isNotSideToMove][hiddenNeuronIdx]
+    alignas(sizeof(Vec)) std::array<HLArray, 2> outputWeights;
 
     i16 outputBias;
 };
 
 INCBIN(NetFile, "src/net.bin");
-const Net* NET = (const Net*)gNetFileData;
+const Net* NET = reinterpret_cast<const Net*>(gNetFileData);
 
 struct FinnyTableEntry {
-    public:
+public:
 
-    // [hiddenNeuronIdx]
-    alignas(sizeof(Vec)) std::array<i16, HIDDEN_LAYER_SIZE> accumulator;
+    alignas(sizeof(Vec)) HLArray accumulator; // [hiddenNeuronIdx]
 
-    std::array<u64, 2> colorBitboards;  // [color]
-    std::array<u64, 6> piecesBitboards; // [pieceType]
+    EnumArray<Bitboard, Color>     colorBbs;  // [color]
+    EnumArray<Bitboard, PieceType> piecesBbs; // [pieceType]
 };
 
-// [color][mirrorHorizontally][inputBucket]
-using FinnyTable = MultiArray<FinnyTableEntry, 2, 2, NUM_INPUT_BUCKETS>;
+// [mirrorVAxis][inputBucket]
+using FinnyTableForColor = MultiArray<FinnyTableEntry, 2, NUM_INPUT_BUCKETS>;
+
+// [color][mirrorVAxis][inputBucket]
+using FinnyTable = EnumArray<FinnyTableForColor, Color>;
 
 struct BothAccumulators {
-    public:
+public:
 
     // [color][hiddenNeuronIdx]
-    alignas(sizeof(Vec)) MultiArray<i16, 2, HIDDEN_LAYER_SIZE> mAccumulators;
+    alignas(sizeof(Vec)) EnumArray<HLArray, Color> mAccumulators;
 
-    // HM (Horizontal mirroring)
     // If a king is on right side of board,
-    // mirror all pieces horizontally (along vertical axis)
+    // mirror all pieces along vertical axis
     // in that color's accumulator
-    std::array<bool, 2> mMirrorHorizontally = {false, false}; // [color]
+    EnumArray<bool, Color> mMirrorVAxis = { false, false }; // [color]
 
-    std::array<int, 2> mInputBucket = {0, 0}; // [color]
+    EnumArray<size_t, Color> mInputBucket = { 0, 0 }; // [color]
 
     bool mUpdated = false;
 
     constexpr bool operator==(const BothAccumulators other) const
     {
         return mAccumulators == other.mAccumulators
-               && mMirrorHorizontally == other.mMirrorHorizontally
-               && mInputBucket == other.mInputBucket
-               && mUpdated == other.mUpdated;
+            && mMirrorVAxis == other.mMirrorVAxis
+            && mInputBucket == other.mInputBucket
+            && mUpdated == other.mUpdated;
     }
 
     constexpr BothAccumulators() = default;
 
-    inline BothAccumulators(const Board &board)
+    constexpr BothAccumulators(const Position& pos)
     {
-        mAccumulators = NET->hiddenBiases;
-
-        for (const Color color : {Color::WHITE, Color::BLACK})
+        // Init mMirrorVAxis
+        for (const Color color : EnumIter<Color>())
         {
-            const File kingFile = squareFile(board.kingSquare(color));
-            mMirrorHorizontally[(int)color] = (int)kingFile >= (int)File::E;
+            const File kingFile = squareFile(pos.kingSquare(color));
+            mMirrorVAxis[color] = static_cast<i32>(kingFile) >= static_cast<i32>(File::E);
         }
 
-        setInputBucket(Color::WHITE, board.getBb(Color::BLACK, PieceType::QUEEN));
-        setInputBucket(Color::BLACK, board.getBb(Color::WHITE, PieceType::QUEEN));
+        // Init mInputBucket
+        setInputBucket(Color::White, pos.getBb(Color::Black, PieceType::Queen));
+        setInputBucket(Color::Black, pos.getBb(Color::White, PieceType::Queen));
 
-        const auto activatePiece = [&](Color pieceColor, PieceType pt) constexpr -> void
+        // Init mAccumulators
+
+        mAccumulators = NET->hiddenBiases;
+
+        const auto activateFeature = [&] (
+            const Color pieceColor, const PieceType pt, const Square square) constexpr -> void
         {
-            u64 bb = board.getBb(pieceColor, pt);
+            for (const Color color : EnumIter<Color>())
+            {
+                const size_t inputBucket = mInputBucket[color];
+                const Square newSquare = mMirrorVAxis[color] ? flipFile(square) : square;
 
-            while (bb > 0) {
-                Square sq = poplsb(bb);
-
-                for (const int color : {WHITE, BLACK})
+                for (size_t i = 0; i < HIDDEN_LAYER_SIZE; i++)
                 {
-                    const auto inputBucket = mInputBucket[color];
-                    const auto ft768 = feature768(pieceColor, pt, sq, mMirrorHorizontally[color]);
-
-                     for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
-                        mAccumulators[color][i] += NET->featuresWeights[color][inputBucket][ft768][i];
+                    mAccumulators[color][i]
+                        += NET->ftWeights[color][inputBucket][pieceColor][pt][newSquare][i];
                 }
             }
         };
 
-        for (const Color pieceColor : {Color::WHITE, Color::BLACK})
-            for (int pieceType = PAWN; pieceType <= KING; pieceType++)
-                activatePiece(pieceColor, (PieceType)pieceType);
+        for (const Color pieceColor : EnumIter<Color>())
+            for (const PieceType pt : EnumIter<PieceType>())
+            {
+                ITERATE_BITBOARD(pos.getBb(pieceColor, pt), square,
+                {
+                    activateFeature(pieceColor, pt, square);
+                });
+            }
 
+        // Everything initialized
         mUpdated = true;
     }
 
-    private:
+private:
 
-    constexpr int setInputBucket(const Color color, const u64 enemyQueensBb)
+    constexpr size_t setInputBucket(const Color color, const Bitboard enemyQueensBb)
     {
         if (std::popcount(enemyQueensBb) != 1)
-            mInputBucket[(int)color] = 0;
+            mInputBucket[color] = 0;
         else {
             Square enemyQueenSquare = lsb(enemyQueensBb);
 
-            if (mMirrorHorizontally[(int)color])
-                enemyQueenSquare ^= 7;
+            if (mMirrorVAxis[color])
+                enemyQueenSquare = flipFile(enemyQueenSquare);
 
-            mInputBucket[(int)color] = INPUT_BUCKETS[enemyQueenSquare];
+            mInputBucket[color] = INPUT_BUCKETS_MAP[enemyQueenSquare];
         }
 
-        return mInputBucket[(int)color];
+        return mInputBucket[color];
     }
 
-    constexpr int feature768(
-        const Color pieceColor, const PieceType pt, Square sq, const bool mirrorHorizontally) const
+    constexpr void updateFinnyEntryAndAccumulator(
+        FinnyTable& finnyTable, const Color accColor, const Position& pos)
     {
-        if (mirrorHorizontally) sq ^= 7;
+        const size_t inputBucket = mInputBucket[accColor];
+        const bool mirrorVAxis = mMirrorVAxis[accColor];
 
-        assert((int)pieceColor * 384 + (int)pt * 64 + (int)sq < 768);
+        FinnyTableEntry& finnyEntry = finnyTable[accColor][mirrorVAxis][inputBucket];
 
-        return (int)pieceColor * 384 + (int)pt * 64 + (int)sq;
-    }
-
-    constexpr void updateFinnyEntryAndAccumulator(FinnyTable &finnyTable, const Color accColor, const Board &board)
-    {
-        const int iAccColor = (int)accColor;
-        const auto hm = mMirrorHorizontally[iAccColor];
-        const auto inputBucket = mInputBucket[iAccColor];
-
-        FinnyTableEntry &finnyEntry = finnyTable[iAccColor][hm][inputBucket];
-
-        const auto updatePiece = [&](Color pieceColor, PieceType pt) constexpr -> void
+        const auto updatePieces = [&] (
+            const Color pieceColor, const PieceType pt) constexpr -> void
         {
-            const u64 bb = board.getBb(pieceColor, pt);
-            const u64 entryBb = finnyEntry.colorBitboards[(int)pieceColor] & finnyEntry.piecesBitboards[(int)pt];
+            const Bitboard bb = pos.getBb(pieceColor, pt);
+            const Bitboard entryBb = finnyEntry.colorBbs[pieceColor] & finnyEntry.piecesBbs[pt];
 
-            u64 add = bb & ~entryBb;
-            u64 remove = entryBb & ~bb;
+            const Bitboard toRemove = entryBb & ~bb;
+            const Bitboard toAdd    = bb & ~entryBb;
 
-            while (remove > 0) {
-                const Square sq = poplsb(remove);
-                const auto ft768 = feature768(pieceColor, pt, sq, hm);
+            // Remove diff
+            ITERATE_BITBOARD(toRemove, square,
+            {
+                const Square newSquare = mirrorVAxis ? flipFile(square) : square;
 
-                for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
-                    finnyEntry.accumulator[i] -= NET->featuresWeights[iAccColor][inputBucket][ft768][i];
-            }
+                for (size_t i = 0; i < HIDDEN_LAYER_SIZE; i++)
+                {
+                    finnyEntry.accumulator[i]
+                        -= NET->ftWeights[accColor][inputBucket][pieceColor][pt][newSquare][i];
+                }
+            });
 
-            while (add > 0) {
-                const Square sq = poplsb(add);
-                const auto ft768 = feature768(pieceColor, pt, sq, hm);
+            // Add diff
+            ITERATE_BITBOARD(toAdd, square,
+            {
+                const Square newSquare = mirrorVAxis ? flipFile(square) : square;
 
-                for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
-                    finnyEntry.accumulator[i] += NET->featuresWeights[iAccColor][inputBucket][ft768][i];
-            }
+                for (size_t i = 0; i < HIDDEN_LAYER_SIZE; i++)
+                {
+                    finnyEntry.accumulator[i]
+                        += NET->ftWeights[accColor][inputBucket][pieceColor][pt][newSquare][i];
+                }
+            });
         };
 
-        for (const Color pieceColor : {Color::WHITE, Color::BLACK})
-            for (int pieceType = PAWN; pieceType <= KING; pieceType++)
-                updatePiece(pieceColor, (PieceType)pieceType);
+        for (const Color pieceColor : EnumIter<Color>())
+            for (const PieceType pt : EnumIter<PieceType>())
+                updatePieces(pieceColor, pt);
 
-        mAccumulators[iAccColor] = finnyEntry.accumulator;
+        mAccumulators[accColor] = finnyEntry.accumulator;
 
-        board.getColorBitboards(finnyEntry.colorBitboards);
-        board.getPiecesBitboards(finnyEntry.piecesBitboards);
+        finnyEntry.colorBbs  = pos.colorBbs();
+        finnyEntry.piecesBbs = pos.piecesBbs();
     }
 
     public:
 
-    constexpr void update(BothAccumulators* prevBothAccs, const Board &board, FinnyTable &finnyTable)
+    constexpr void update(
+        const BothAccumulators& prevBothAccs, const Position& pos, FinnyTable& finnyTable)
     {
-        assert(prevBothAccs->mUpdated && !mUpdated);
+        assert(prevBothAccs.mUpdated && !mUpdated);
 
-        mMirrorHorizontally = prevBothAccs->mMirrorHorizontally;
-        mInputBucket = prevBothAccs->mInputBucket;
+        mMirrorVAxis = prevBothAccs.mMirrorVAxis;
+        mInputBucket = prevBothAccs.mInputBucket;
 
-        const Color colorMoving = board.oppSide();
+        // Move already made in the position
+        const Color colorMoving = pos.notSideToMove();
         const Color notColorMoving = oppColor(colorMoving);
-        const int iColorMoving = (int)colorMoving;
 
-        const Move move = board.lastMove();
+        const Move move = pos.lastMove();
         assert(move != MOVE_NONE);
 
-        const int from = move.from();
-        const int to = move.to();
+        const Square from = move.from();
+        const Square to   = move.to();
+
         const PieceType pieceType = move.pieceType();
-        const PieceType promotion = move.promotion();
-        const PieceType place = promotion != PieceType::NONE ? promotion : pieceType;
+        const std::optional<PieceType> promotion = move.promotion();
+        const PieceType place = promotion ? *promotion : pieceType;
 
-        // If king moved, we update mMirrorHorizontally[colorMoving]
-        // Our HM toggles if our king just crossed vertical axis
-        if (pieceType == PieceType::KING)
-            mMirrorHorizontally[iColorMoving] = (int)squareFile(to) >= (int)File::E;
+        // If king moved, we update mMirrorVAxis[colorMoving]
+        // Our vertical axis mirroring toggles if our king just crossed vertical axis
+        if (pieceType == PieceType::King)
+        {
+            mMirrorVAxis[colorMoving]
+                = static_cast<i32>(squareFile(to)) >= static_cast<i32>(File::E);
+        }
 
-        // Our input bucket may change if our HM toggled or if we captured a queen
-        if (mMirrorHorizontally[iColorMoving] != prevBothAccs->mMirrorHorizontally[iColorMoving]
-        || board.captured() == PieceType::QUEEN)
-            setInputBucket(colorMoving, board.getBb(notColorMoving, PieceType::QUEEN));
+        // Our input bucket may change if
+        // our vertical axis mirroring toggled
+        // or if we captured a queen
+        if (mMirrorVAxis[colorMoving] != prevBothAccs.mMirrorVAxis[colorMoving]
+        || pos.captured() == PieceType::Queen)
+            setInputBucket(colorMoving, pos.getBb(notColorMoving, PieceType::Queen));
 
-        // If our HM toggled or our input bucket changed, reset our accumulator
-        if  (mMirrorHorizontally[iColorMoving] != prevBothAccs->mMirrorHorizontally[iColorMoving]
-        || mInputBucket[iColorMoving] != prevBothAccs->mInputBucket[iColorMoving])
-            updateFinnyEntryAndAccumulator(finnyTable, colorMoving, board);
+        // If our vertical axis mirroring toggled or our input bucket changed, reset our accumulator
+        if  (mMirrorVAxis[colorMoving] != prevBothAccs.mMirrorVAxis[colorMoving]
+        || mInputBucket[colorMoving] != prevBothAccs.mInputBucket[colorMoving])
+            updateFinnyEntryAndAccumulator(finnyTable, colorMoving, pos);
 
         // If our queen moved or we promoted to a queen, enemy's input bucket may have changed
-        if (pieceType == PieceType::QUEEN || promotion == PieceType::QUEEN)
+        if (pieceType == PieceType::Queen || promotion == PieceType::Queen)
         {
-            setInputBucket(notColorMoving, board.getBb(colorMoving, PieceType::QUEEN));
+            setInputBucket(notColorMoving, pos.getBb(colorMoving, PieceType::Queen));
 
             // If their input bucket changed, reset their accumulator
-            if  (mInputBucket[!iColorMoving] != prevBothAccs->mInputBucket[!iColorMoving])
-                updateFinnyEntryAndAccumulator(finnyTable, notColorMoving, board);
+            if  (mInputBucket[notColorMoving] != prevBothAccs.mInputBucket[notColorMoving])
+                updateFinnyEntryAndAccumulator(finnyTable, notColorMoving, pos);
         }
 
         // Update accumulators with the move played
 
-        for (const int color : {WHITE, BLACK})
+        for (const Color color : EnumIter<Color>())
         {
-            const bool hm = mMirrorHorizontally[color];
-            const auto inputBucket = mInputBucket[color];
+            const size_t inputBucket = mInputBucket[color];
 
             // No need to update this color's accumulator if we just reset it
-            if (hm != prevBothAccs->mMirrorHorizontally[color] || inputBucket != prevBothAccs->mInputBucket[color])
+            if (mMirrorVAxis[color] != prevBothAccs.mMirrorVAxis[color]
+            ||  inputBucket != prevBothAccs.mInputBucket[color])
                 continue;
 
-            const auto subPieceFeature768 = feature768(colorMoving, pieceType, from, hm);
-            const auto addPieceFeature768 = feature768(colorMoving, place, to, hm);
+            const Square newFrom = mMirrorVAxis[color] ? flipFile(from) : from;
+            const Square newTo   = mMirrorVAxis[color] ? flipFile(to)   : to;
 
-            if (board.captured() != PieceType::NONE)
+            if (pos.captured())
             {
-                const Square capturedPieceSq = move.flag() == Move::EN_PASSANT_FLAG ? to ^ 8 : to;
-                const auto subCapturedFeature768 = feature768(notColorMoving, board.captured(), capturedPieceSq, hm);
+                const PieceType captured = *(pos.captured());
+                Square capturedSq = move.flag() == MoveFlag::EnPassant ? enPassantRelative(to) : to;
 
-                for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
-                    mAccumulators[color][i] =
-                        prevBothAccs->mAccumulators[color][i]
-                        - NET->featuresWeights[color][inputBucket][subPieceFeature768][i]
-                        + NET->featuresWeights[color][inputBucket][addPieceFeature768][i]
-                        - NET->featuresWeights[color][inputBucket][subCapturedFeature768][i];
+                if (mMirrorVAxis[color])
+                    capturedSq = flipFile(capturedSq);
+
+                for (size_t i = 0; i < HIDDEN_LAYER_SIZE; i++)
+                {
+                    mAccumulators[color][i]
+                        = prevBothAccs.mAccumulators[color][i]
+                        - NET->ftWeights[color][inputBucket][colorMoving][pieceType][newFrom][i]
+                        + NET->ftWeights[color][inputBucket][colorMoving][place][newTo][i]
+                        - NET->ftWeights[color][inputBucket][notColorMoving][captured][capturedSq][i];
+                }
             }
-            else if (move.flag() == Move::CASTLING_FLAG)
+            else if (move.flag() == MoveFlag::Castling)
             {
-                const auto [rookFrom, rookTo] = CASTLING_ROOK_FROM_TO[to];
-                const auto subRookFeature768 = feature768(colorMoving, PieceType::ROOK, rookFrom, hm);
-                const auto addRookFeature768 = feature768(colorMoving, PieceType::ROOK, rookTo, hm);
+                auto [rookFrom, rookTo] = CASTLING_ROOK_FROM_TO[to];
 
-                for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
-                    mAccumulators[color][i] =
-                        prevBothAccs->mAccumulators[color][i]
-                        - NET->featuresWeights[color][inputBucket][subPieceFeature768][i]
-                        + NET->featuresWeights[color][inputBucket][addPieceFeature768][i]
-                        - NET->featuresWeights[color][inputBucket][subRookFeature768][i]
-                        + NET->featuresWeights[color][inputBucket][addRookFeature768][i];
+                if (mMirrorVAxis[color]) {
+                    rookFrom = flipFile(rookFrom);
+                    rookTo   = flipFile(rookTo);
+                }
+
+                for (size_t i = 0; i < HIDDEN_LAYER_SIZE; i++)
+                {
+                    mAccumulators[color][i]
+                        = prevBothAccs.mAccumulators[color][i]
+                        - NET->ftWeights[color][inputBucket][colorMoving][pieceType][newFrom][i]
+                        + NET->ftWeights[color][inputBucket][colorMoving][place][newTo][i]
+                        - NET->ftWeights[color][inputBucket][colorMoving][PieceType::Rook][rookFrom][i]
+                        + NET->ftWeights[color][inputBucket][colorMoving][PieceType::Rook][rookTo][i];
+                }
             }
             else {
-                for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
-                    mAccumulators[color][i] =
-                        prevBothAccs->mAccumulators[color][i]
-                        - NET->featuresWeights[color][inputBucket][subPieceFeature768][i]
-                        + NET->featuresWeights[color][inputBucket][addPieceFeature768][i];
+                for (size_t i = 0; i < HIDDEN_LAYER_SIZE; i++)
+                {
+                    mAccumulators[color][i]
+                        = prevBothAccs.mAccumulators[color][i]
+                        - NET->ftWeights[color][inputBucket][colorMoving][pieceType][newFrom][i]
+                        + NET->ftWeights[color][inputBucket][colorMoving][place][newTo][i];
+                }
             }
         }
 
+        // Everything updated
         mUpdated = true;
     }
 
 }; // struct BothAccumulators
 
-constexpr i32 evaluate(const BothAccumulators* bothAccs, const Color sideToMove)
-{
-    assert(bothAccs->mUpdated);
 
-    const int stm = (int)sideToMove;
+constexpr i32 evaluate(const BothAccumulators& bothAccs, const Color stm)
+{
+    assert(bothAccs.mUpdated);
+
     i32 sum = 0;
 
     // Activation function:
@@ -321,17 +355,17 @@ constexpr i32 evaluate(const BothAccumulators* bothAccs, const Color sideToMove)
         const Vec vecQA   = setEpi16(QA); // N i16 QA's
         Vec vecSum = vecZero; // N/2 i32 zeros, the total running sum
 
-        for (const int color : {stm, 1 - stm})
-            for (int i = 0; i < HIDDEN_LAYER_SIZE; i += sizeof(Vec) / sizeof(i16))
+        for (const Color color : { stm, oppColor(stm) })
+            for (size_t i = 0; i < HIDDEN_LAYER_SIZE; i += sizeof(Vec) / sizeof(i16))
             {
                 // Load the next N hidden neurons and clamp them to [0, QA]
-                const i16 &accStart = bothAccs->mAccumulators[color][i];
-                Vec hiddenNeurons = loadVec((Vec*)&accStart);
+                const i16& accStart = bothAccs.mAccumulators[color][i];
+                Vec hiddenNeurons = loadVec(reinterpret_cast<const Vec*>(&accStart));
                 hiddenNeurons = clampVec(hiddenNeurons, vecZero, vecQA);
 
                 // Load the respective N output weights
-                const i16 &outputWeightsStart = NET->outputWeights[color != stm][i];
-                const Vec outputWeights = loadVec((Vec*)&outputWeightsStart);
+                const i16& outputWeightsStart = NET->outputWeights[color != stm][i];
+                const Vec outputWeights = loadVec(reinterpret_cast<const Vec*>(&outputWeightsStart));
 
                 // Multiply each hidden neuron with its respective output weight
                 // We use mullo, which multiplies in the i32 world but returns the results as i16's
@@ -348,34 +382,16 @@ constexpr i32 evaluate(const BothAccumulators* bothAccs, const Color sideToMove)
 
         sum = sumVec(vecSum); // Add the N/2 i32's to get final sum (i32)
     #else
-        for (const int color : {stm, 1 - stm})
-            for (int i = 0; i < HIDDEN_LAYER_SIZE; i++)
+        for (const Color color : { stm, oppColor(stm) })
+            for (size_t i = 0; i < HIDDEN_LAYER_SIZE; i++)
             {
-                const i16 clipped = std::clamp<i16>(bothAccs->mAccumulators[color][i], 0, QA);
+                const i16 clipped = std::clamp<i16>(bothAccs.mAccumulators[color][i], 0, QA);
                 const i16 x = clipped * NET->outputWeights[color != stm][i];
-                sum += x * clipped;
+                sum += static_cast<i32>(x) * static_cast<i32>(clipped);
             }
     #endif
 
-    return (sum / QA + NET->outputBias) * SCALE / (QA * QB);
+    return (sum / QA + static_cast<i32>(NET->outputBias)) * SCALE / (QA * QB);
 }
 
 } // namespace nnue
-
-MAYBE_CONSTEXPR float materialScale(const Board &board)
-{
-    const float material = 3 * std::popcount(board.getBb(PieceType::KNIGHT))
-                         + 3 * std::popcount(board.getBb(PieceType::BISHOP))
-                         + 5 * std::popcount(board.getBb(PieceType::ROOK))
-                         + 9 * std::popcount(board.getBb(PieceType::QUEEN));
-
-    // Linear lerp from evalMaterialScaleMin to evalMaterialScaleMax
-    // as material goes from 0 to MATERIAL_MAX
-    return evalMaterialScaleMin()
-           + (evalMaterialScaleMax() - evalMaterialScaleMin())
-           * material / (float)MATERIAL_MAX;
-}
-
-using BothAccumulators = nnue::BothAccumulators;
-using FinnyTableEntry = nnue::FinnyTableEntry;
-using FinnyTable = nnue::FinnyTable;

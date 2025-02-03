@@ -1,10 +1,11 @@
 // clang-format off
-#include "../src/utils.hpp"
-#include "../src/board.hpp"
+
+#include "../src/position.hpp"
 #include "../src/nnue.hpp"
 #include "../src/3rdparty/ordered_map.h"
+#include <cassert>
 
-tsl::ordered_map<std::string, int> FENS_EVAL = {
+tsl::ordered_map<std::string, i32> FENS_EVAL = {
     { START_FEN, 67 },
     { "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",  -37 }, // e2e4
     { "rnbqkb1r/pppppppp/5n2/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 1 2", 102 }, // e2e4 g8f6
@@ -51,19 +52,15 @@ tsl::ordered_map<std::string, int> FENS_EVAL = {
 
 int main()
 {
-    for (const auto& [fen, expectedEval] : FENS_EVAL) 
-    {
-        const Board board = Board(fen);
-        const BothAccumulators bothAccs = BothAccumulators(board);
-        const auto eval = nnue::evaluate(&bothAccs, board.sideToMove());
+    std::cout << colored("Running NNUE tests...", ColorCode::Yellow) << std::endl;
 
-        if (eval != expectedEval) 
-            std::cout << "Expected eval " << expectedEval
-                      << " but got " << eval 
-                      << " in '" << fen << "'" 
-                      << std::endl;
+    for (const auto& [fen, expectedEval] : FENS_EVAL)
+    {
+        const Position pos = Position(fen);
+        const nnue::BothAccumulators bothAccs = nnue::BothAccumulators(pos);
+        const auto eval = nnue::evaluate(bothAccs, pos.sideToMove());
+        assert(eval == expectedEval);
     }
 
-    std::cout << "Finished" << std::endl;
-    return 0;
+    std::cout << colored("NNUE tests passed", ColorCode::Green) << std::endl;
 }

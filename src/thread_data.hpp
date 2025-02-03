@@ -3,157 +3,98 @@
 #pragma once
 
 #include "utils.hpp"
-#include "board.hpp"
-#include "search_params.hpp"
-#include "tt.hpp"
-#include "history_entry.hpp"
+#include "position.hpp"
 #include "nnue.hpp"
+#include "search_params.hpp"
 #include <mutex>
 #include <condition_variable>
+#include <algorithm>
 
 struct PlyData {
-    public:
-    ArrayVec<Move, MAX_DEPTH+1> pvLine = { };
-    Move killer = MOVE_NONE;
-    i32 eval = VALUE_NONE;
+public:
+
+    ArrayVec<Move, MAX_DEPTH + 1> pvLine;
+    std::optional<i32> eval = std::nullopt;
 };
 
-enum class ThreadState {
-    SLEEPING, SEARCHING, EXIT_ASAP, EXITED
+enum class ThreadState : i32 {
+    Sleeping, Searching, ExitAsap, Exited
 };
 
 struct ThreadData {
-    public:
+public:
 
-    Board board = START_BOARD;
+    Position pos;
 
     i32 score = 0;
 
     u64 nodes = 0;
-    i32 maxPlyReached = 0;
+    size_t maxPlyReached = 0;
 
-    std::array<PlyData, MAX_DEPTH+1> pliesData; // [ply]
+    std::array<PlyData, MAX_DEPTH + 1> pliesData; // [ply]
 
-    // [stm][pieceType][targetSquare]
-    MultiArray<HistoryEntry, 2, 6, 64> historyTable = { };
+    std::array<u64, 1ULL << 17> nodesByMove; // [Move.asU16()]
 
-    std::array<u64, 1ULL << 17> nodesByMove; // [move]
+    std::array<nnue::BothAccumulators, MAX_DEPTH + 1> bothAccsStack;
+    size_t bothAccsIdx = 0;
 
-    std::array<BothAccumulators, MAX_DEPTH+1> accumulators;
-    BothAccumulators* accumulatorPtr = &accumulators[0];
-
-    FinnyTable finnyTable; // [color][mirrorHorizontally][inputBucket]
-
-    // [stm][board.pawnsHash() % CORR_HIST_SIZE]
-    MultiArray<i16, 2, CORR_HIST_SIZE> pawnsCorrHist = { };
-
-    // [stm][pieceColor][board.nonPawnsHash(pieceColor) % CORR_HIST_SIZE]
-    MultiArray<i16, 2, 2, CORR_HIST_SIZE> nonPawnsCorrHist = { };
+    nnue::FinnyTable finnyTable; // [color][mirrorVAxis][inputBucket]
 
     // Threading stuff
-    ThreadState threadState = ThreadState::SLEEPING;
+    ThreadState threadState = ThreadState::Sleeping;
     std::mutex mutex;
     std::condition_variable cv;
 
-    inline void wake(const ThreadState newState)
-    {
-        std::unique_lock<std::mutex> lock(mutex);
-        threadState = newState;
-        lock.unlock();
-        cv.notify_one();
-    }
-
-    constexpr std::array<i16*, 4> correctionHistories()
-    {
-        const int stm = int(board.sideToMove());
-
-        const Move lastMove = board.lastMove();
-        i16* lastMoveCorrHistPtr = nullptr;
-
-        if (lastMove != MOVE_NONE) {
-            const int pt = int(lastMove.pieceType());
-            lastMoveCorrHistPtr = &(historyTable[stm][pt][lastMove.to()].mCorrHist);
-        }
-
-        return {
-            &pawnsCorrHist[stm][board.pawnsHash() % CORR_HIST_SIZE],
-            &nonPawnsCorrHist[stm][WHITE][board.nonPawnsHash(Color::WHITE) % CORR_HIST_SIZE],
-            &nonPawnsCorrHist[stm][BLACK][board.nonPawnsHash(Color::BLACK) % CORR_HIST_SIZE],
-            lastMoveCorrHistPtr
-        };
-    }
-
-    constexpr void makeMove(const Move move, const i32 newPly, const std::vector<TTEntry> &tt)
-    {
-        // If not a special move, we can probably correctly predict the zobrist hash after it
-        // and prefetch the TT entry
-        if (move.flag() <= Move::KING_FLAG) {
-            const auto ttEntryIdx = TTEntryIndex(board.roughHashAfter(move), tt.size());
-            __builtin_prefetch(&tt[ttEntryIdx]);
-        }
-
-        board.makeMove(move);
-        nodes++;
-
-        // update seldepth
-        if (newPly > maxPlyReached) maxPlyReached = newPly;
-
-        pliesData[newPly].pvLine.clear();
-        pliesData[newPly].eval = VALUE_NONE;
-
-        // Killer move must be quiet move
-        if (pliesData[newPly].killer != MOVE_NONE && !board.isQuiet(pliesData[newPly].killer))
-            pliesData[newPly].killer = MOVE_NONE;
-
-        if (move != MOVE_NONE) {
-            accumulatorPtr++;
-            accumulatorPtr->mUpdated = false;
-        }
-    }
-
-    constexpr i32 updateAccumulatorAndEval(i32 &eval)
-    {
-        assert(accumulatorPtr == &accumulators[0]
-               ? accumulatorPtr->mUpdated
-               : (accumulatorPtr - 1)->mUpdated);
-
-        if (!accumulatorPtr->mUpdated)
-            accumulatorPtr->update(accumulatorPtr - 1, board, finnyTable);
-
-        if (board.inCheck())
-            eval = VALUE_NONE;
-        else if (eval == VALUE_NONE)
-        {
-            assert(BothAccumulators(board) == *accumulatorPtr);
-
-            eval = nnue::evaluate(accumulatorPtr, board.sideToMove());
-
-            eval *= materialScale(board); // Scale eval with material
-
-            // Correct eval with correction histories
-
-            #if defined(TUNE)
-                CORR_HISTS_WEIGHTS = {
-                    corrHistPawnsWeight(),
-                    corrHistNonPawnsWeight(),
-                    corrHistNonPawnsWeight(),
-                    corrHistLastMoveWeight()
-                };
-            #endif
-
-            const auto corrHists = correctionHistories();
-
-            for (size_t i = 0; i < corrHists.size() - (corrHists.back() == nullptr); i++)
-            {
-                const float corrHist = *(corrHists[i]);
-                eval += corrHist * CORR_HISTS_WEIGHTS[i];
-            }
-
-            // Clamp to avoid false mate scores and invalid scores
-            eval = std::clamp(eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
-        }
-
-        return eval;
-    }
-
 }; // struct ThreadData
+
+inline void wakeThread(ThreadData* td, const ThreadState newState)
+{
+    std::unique_lock<std::mutex> lock(td->mutex);
+    td->threadState = newState;
+    lock.unlock();
+    td->cv.notify_one();
+}
+
+constexpr void makeMove(ThreadData& td, const Move move, const size_t newPly)
+{
+    td.pos.makeMove(move);
+    td.nodes++;
+
+    // update seldepth
+    td.maxPlyReached = std::max(td.maxPlyReached, newPly);
+
+    td.pliesData[newPly].pvLine.clear();
+    td.pliesData[newPly].eval = std::nullopt;
+
+    if (move != MOVE_NONE)
+    {
+        td.bothAccsIdx++;
+        td.bothAccsStack[td.bothAccsIdx].mUpdated = false;
+    }
+}
+
+constexpr std::optional<i32> updateBothAccsAndEval(ThreadData& td, const size_t ply)
+{
+    nnue::BothAccumulators& bothAccs = td.bothAccsStack[td.bothAccsIdx];
+    std::optional<i32>& eval = td.pliesData[ply].eval;
+
+    if (!bothAccs.mUpdated)
+    {
+        assert(td.bothAccsIdx > 0);
+        bothAccs.update(td.bothAccsStack[td.bothAccsIdx - 1], td.pos, td.finnyTable);
+    }
+
+    if (td.pos.inCheck())
+        eval = std::nullopt;
+    else if (!eval)
+    {
+        assert(bothAccs == nnue::BothAccumulators(td.pos));
+
+        eval = nnue::evaluate(bothAccs, td.pos.sideToMove());
+
+        // Clamp eval to avoid invalid values and checkmate values
+        eval = std::clamp<i32>(*eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
+    }
+
+    return eval;
+}

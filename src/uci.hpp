@@ -1,289 +1,117 @@
-// clang-format-off
+// clang-format off
 
 #pragma once
 
 #include "utils.hpp"
-#include "board.hpp"
+#include "position.hpp"
+#include "move_gen.hpp"
 #include "search.hpp"
-#include "bench.hpp"
-#include "nnue.hpp"
 
-namespace uci { // Universal chess interface
+namespace uci {
 
-inline void uci();
-inline void setoption(const std::vector<std::string> &tokens, Searcher &searcher);
-constexpr void position(const std::vector<std::string> &tokens, Board &board);
-inline void go(const std::vector<std::string> &tokens, Searcher &searcher);
+constexpr void position(const std::vector<std::string>& tokens, Position& pos);
+constexpr void go(const Position& pos, Searcher& searcher);
 
-inline bool runCommand(std::string &command, Searcher &searcher)
+inline void runCommand(std::string& command, Position& pos, Searcher& searcher)
 {
     trim(command);
     const std::vector<std::string> tokens = splitString(command, ' ');
 
     if (command == "" || tokens.size() == 0)
-        return true;
+        return;
+
     // UCI commands
-    else if (command == "uci")
-        uci();
+    if (command == "uci")
+    {
+        std::cout << "id name Starzix";
+        std::cout << "\nid author zzzzz";
+        std::cout << "\noption name Hash type spin default 32 min 1 max 65536";
+        std::cout << "\noption name Threads type spin default 1 min 1 max 256";
+        std::cout << "\nuciok";
+        std::cout << std::endl; // flush
+    }
     else if (tokens[0] == "setoption") // e.g. "setoption name Hash value 32"
-        setoption(tokens, searcher);
+    {
+
+    }
     else if (command == "ucinewgame")
+    {
+        pos = START_POS;
         searcher.ucinewgame();
+    }
+    else if (tokens[0] == "position")
+        position(tokens, pos);
     else if (command == "isready")
         std::cout << "readyok" << std::endl;
-    else if (tokens[0] == "position")
-        position(tokens, searcher.board());
     else if (tokens[0] == "go")
-        go(tokens, searcher);
+        go(pos, searcher);
     else if (command == "quit")
-        return false;
+    {
+        exit(EXIT_SUCCESS);
+    }
     // Non-UCI commands
-    else if (command == "print" || command == "d"
-    || command == "display" || command == "show")
-        searcher.board().print();
-    else if (tokens[0] == "bench")
+    else if (command == "d" || command == "display"
+    || command == "show" || command == "print")
     {
-        if (tokens.size() == 1)
-            bench();
-        else {
-            const int depth = stoi(tokens[1]);
-            bench(depth);
-        }
+        pos.print();
     }
-    else if (command == "eval")
+    else if (tokens[0] == "perft" && tokens.size() == 2)
     {
-        const BothAccumulators acc = BothAccumulators(searcher.board());
-        const i32 eval = nnue::evaluate(&acc, searcher.board().sideToMove());
-        const i32 evalScaled = eval * materialScale(searcher.board());
+        const i32 depth = stoi(tokens[1]);
 
-        std::cout << "eval "    << eval
-                  << " scaled " << evalScaled
-                  << std::endl;
+        const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+        const u64 nodes = perft(pos, depth);
+        const u64 nps = getNps(nodes, millisecondsElapsed(start));
+
+        std::cout << nodes << " nodes " << nps << " nps" << std::endl;
     }
-    else if (tokens[0] == "perft")
+    else if ((tokens[0] == "perftsplit"
+    || tokens[0] == "splitperft"
+    || tokens[0] == "perftdivide"
+    || tokens[0] == "divideperft")
+    && tokens.size() == 2)
     {
-        const int depth = stoi(tokens[1]);
-        const std::string fen = searcher.board().fen();
+        const i32 depth = stoi(tokens[1]);
 
-        std::cout << "perft depth " << depth << " '" << fen << "'" << std::endl;
+        const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+        const u64 nodes = perftSplit(pos, depth);
+        const u64 nps = getNps(nodes, millisecondsElapsed(start));
 
-        const std::chrono::steady_clock::time_point start =  std::chrono::steady_clock::now();
-        const u64 nodes = depth > 0 ? perft(searcher.board(), depth) : 0;
-
-        std::cout << "perft depth " << depth
-                  << " nodes " << nodes
-                  << " nps " << nodes * 1000 / std::max((u64)millisecondsElapsed(start), (u64)1)
-                  << " time " << millisecondsElapsed(start)
-                  << " fen " << fen
-                  << std::endl;
+        std::cout << nodes << " nodes " << nps << " nps" << std::endl;
     }
-    else if (tokens[0] == "perftsplit" || tokens[0] == "splitperft"
-    || tokens[0] == "perftdivide" || tokens[0] == "divideperft")
-    {
-        const int depth = stoi(tokens[1]);
-
-        std::cout << "perft split depth " << depth
-                  << " '" << searcher.board().fen() << "'"
-                  << std::endl;
-
-        if (depth <= 0) {
-            std::cout << "Total: 0" << std::endl;
-            return true;
-        }
-
-        ArrayVec<Move, 256> moves;
-        searcher.board().pseudolegalMoves(moves, MoveGenType::ALL);
-
-        u64 totalNodes = 0;
-
-        for (const Move move : moves)
-            if (searcher.board().isPseudolegalLegal(move))
-            {
-                searcher.board().makeMove(move);
-                const u64 nodes = perft(searcher.board(), depth - 1);
-                std::cout << move.toUci() << ": " << nodes << std::endl;
-                totalNodes += nodes;
-                searcher.board().undoMove();
-            }
-
-        std::cout << "Total: " << totalNodes << std::endl;
-    }
-    else if (tokens[0] == "makemove")
-    {
-        if ((tokens[1] == "0000" || tokens[1] == "null" || tokens[1] == "none")
-        && !searcher.board().inCheck())
-            searcher.board().makeMove(MOVE_NONE);
-        else
-            searcher.board().makeMove(tokens[1]);
-    }
-    else if (tokens[0] == "undomove")
-        searcher.board().undoMove();
-    #if defined(TUNE)
-    else if (command == "spsainput")
-    {
-        for (auto &pair : tunableParams) {
-            std::string paramName = pair.first;
-            auto &tunableParam = pair.second;
-
-            std::visit([&paramName] (auto *myParam)
-            {
-                if (myParam == nullptr) return;
-
-                std::cout << paramName
-                          << ", " << (myParam->floatOrDouble() ? "float" : "int")
-                          << ", " << myParam->value
-                          << ", " << myParam->min
-                          << ", " << myParam->max
-                          << ", " << myParam->step
-                          << ", 0.002"
-                          << std::endl;
-            }, tunableParam);
-        }
-    }
-    #endif
-
-    return true;
 }
 
-inline void uci() {
-    std::cout << "id name Starzix" << std::endl;
-    std::cout << "id author zzzzz" << std::endl;
-    std::cout << "option name Hash type spin default 32 min 1 max 65536" << std::endl;
-    std::cout << "option name Threads type spin default 1 min 1 max 256" << std::endl;
-
-    #if defined(TUNE)
-        for (auto &pair : tunableParams) {
-            std::string paramName = pair.first;
-            auto &tunableParam = pair.second;
-
-            std::visit([&paramName] (auto *myParam)
-            {
-                if (myParam == nullptr) return;
-
-                std::cout << "option name " << paramName
-                        << " type string"
-                        << " default " << myParam->value
-                        << " min "     << myParam->min
-                        << " max "     << myParam->max
-                        << std::endl;
-
-            }, tunableParam);
-        }
-    #endif
-
-    std::cout << "uciok" << std::endl;
-}
-
-inline void setoption(const std::vector<std::string> &tokens, Searcher &searcher)
+constexpr void position(const std::vector<std::string>& tokens, Position& pos)
 {
-    const std::string optionName  = tokens[2];
-    const std::string optionValue = tokens[4];
+    size_t movesTokenIndex = 0;
 
-    if (optionName == "Hash" || optionName == "hash")
+    if (tokens[1] == "startpos")
     {
-        resizeTT(searcher.mTT, stoll(optionValue));
-        printTTSize(searcher.mTT);
-    }
-    else if (optionName == "Threads" || optionName == "threads")
-    {
-        const int newNumThreads = searcher.setThreads(stoi(optionValue));
-        std::cout << "info string Threads set to " << newNumThreads << std::endl;
-    }
-    #if defined(TUNE)
-    else if (tunableParams.count(optionName) > 0)
-    {
-        auto tunableParam = tunableParams[optionName];
-
-        std::visit([optionName, optionValue] (auto *myParam)
-        {
-            if (myParam == nullptr) return;
-
-            myParam->value = std::stod(optionValue);
-
-            if (optionName == stringify(lmrBaseQuiet) || optionName == stringify(lmrMultiplierQuiet)
-            || optionName == stringify(lmrBaseNoisy) || optionName == stringify(lmrMultiplierNoisy))
-                LMR_TABLE = getLmrTable();
-
-            std::cout << "info string " << optionName << " set to " << myParam->value << std::endl;
-        }, tunableParam);
-    }
-    #endif
-}
-
-constexpr void position(const std::vector<std::string> &tokens, Board &board)
-{
-    int movesTokenIndex = -1;
-
-    if (tokens[1] == "startpos") {
-        board = START_BOARD;
+        pos = START_POS;
         movesTokenIndex = 2;
     }
     else if (tokens[1] == "fen")
     {
         std::string fen = "";
-        u64 i = 0;
+        size_t i = 0;
 
         for (i = 2; i < tokens.size() && tokens[i] != "moves"; i++)
             fen += tokens[i] + " ";
 
         fen.pop_back(); // remove last whitespace
-        board = Board(fen);
+        pos = Position(fen);
         movesTokenIndex = i;
     }
 
-    for (u64 i = movesTokenIndex + 1; i < tokens.size(); i++)
-        board.makeMove(tokens[i]);
+    for (size_t i = movesTokenIndex + 1; i < tokens.size(); i++)
+        pos.makeMove(tokens[i]);
 }
 
-inline void go(const std::vector<std::string> &tokens, Searcher &searcher)
+constexpr void go(const Position& pos, Searcher& searcher)
 {
-    const std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
-
-    i64 milliseconds = std::numeric_limits<i64>::max();
-    [[maybe_unused]] i64 incrementMs = 0;
-    [[maybe_unused]] i64 movesToGo = 0;
-    bool isMoveTime = false;
-    i32 maxDepth = MAX_DEPTH;
-    i64 maxNodes = std::numeric_limits<i64>::max();
-
-    for (int i = 1; i < int(tokens.size()) - 1; i += 2)
-    {
-        const i64 value = std::max<i64>(std::stoll(tokens[i + 1]), 0);
-
-        if ((tokens[i] == "wtime" && searcher.board().sideToMove() == Color::WHITE)
-        ||  (tokens[i] == "btime" && searcher.board().sideToMove() == Color::BLACK))
-            milliseconds = value;
-
-        else if ((tokens[i] == "winc" && searcher.board().sideToMove() == Color::WHITE)
-        ||       (tokens[i] == "binc" && searcher.board().sideToMove() == Color::BLACK))
-            incrementMs = value;
-
-        else if (tokens[i] == "movestogo")
-            movesToGo = std::max<i64>(value, 1);
-        else if (tokens[i] == "movetime")
-        {
-            isMoveTime = true;
-            milliseconds = value;
-        }
-        else if (tokens[i] == "depth")
-            maxDepth = value;
-        else if (tokens[i] == "nodes")
-            maxNodes = value;
-    }
-
-    // Calculate search time limits
-
-    i64 hardMs = std::max<i64>(0, milliseconds - 10);
-    i64 softMs = std::numeric_limits<i64>::max();
-
-    if (!isMoveTime) {
-        hardMs *= hardTimePercentage();
-        softMs = hardMs * softTimePercentage();
-    }
-
-    const auto [bestMove, score] = searcher.search(maxDepth, maxNodes, startTime, hardMs, softMs, true);
-
-    std::cout << "bestmove " << bestMove.toUci() << std::endl;
+    const SearchConfig searchConfig = SearchConfig();
+    searcher.search(pos, searchConfig);
+    std::cout << "bestmove " << searcher.bestMoveAtRoot().toUci() << std::endl;
 }
 
 } // namespace uci
