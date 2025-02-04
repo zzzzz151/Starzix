@@ -11,7 +11,9 @@
 namespace uci {
 
 constexpr void position(const std::vector<std::string>& tokens, Position& pos);
-constexpr void go(Position& pos, Searcher& searcher);
+
+constexpr void go(
+    const std::vector<std::string>& tokens, Position& pos, Searcher& searcher);
 
 inline void runCommand(std::string& command, Position& pos, Searcher& searcher)
 {
@@ -29,7 +31,7 @@ inline void runCommand(std::string& command, Position& pos, Searcher& searcher)
         std::cout << "\noption name Hash type spin default 32 min 1 max 131072";
         std::cout << "\noption name Threads type spin default 1 min 1 max 256";
         std::cout << "\nuciok";
-        std::cout << std::endl; // flush
+        std::cout << std::endl; // Flush
     }
     else if (tokens[0] == "setoption") // e.g. "setoption name Hash value 32"
     {
@@ -45,7 +47,7 @@ inline void runCommand(std::string& command, Position& pos, Searcher& searcher)
     else if (command == "isready")
         std::cout << "readyok" << std::endl;
     else if (tokens[0] == "go")
-        go(pos, searcher);
+        go(tokens, pos, searcher);
     else if (command == "quit")
         exit(EXIT_SUCCESS);
     // Non-UCI commands
@@ -80,8 +82,16 @@ inline void runCommand(std::string& command, Position& pos, Searcher& searcher)
 
         std::cout << nodes << " nodes " << nps << " nps" << std::endl;
     }
-    else if (command == "bench" || command == "benchmark")
-        bench();
+    else if (tokens[0] == "bench" || tokens[0] == "benchmark")
+    {
+        if (tokens.size() > 1)
+        {
+            const i32 depth = stoi(tokens[1]);
+            bench(depth);
+        }
+        else
+            bench();
+    }
     else if (command == "eval" || command == "evaluate" || command == "evaluation")
     {
         nnue::BothAccumulators bothAccs = nnue::BothAccumulators(pos);
@@ -110,7 +120,7 @@ constexpr void position(const std::vector<std::string>& tokens, Position& pos)
         for (i = 2; i < tokens.size() && tokens[i] != "moves"; i++)
             fen += tokens[i] + " ";
 
-        fen.pop_back(); // remove last whitespace
+        fen.pop_back(); // Remove last whitespace
         pos = Position(fen);
         movesTokenIndex = i;
     }
@@ -119,11 +129,54 @@ constexpr void position(const std::vector<std::string>& tokens, Position& pos)
         pos.makeMove(tokens[i]);
 }
 
-constexpr void go(Position& pos, Searcher& searcher)
+constexpr void go(
+    const std::vector<std::string>& tokens, Position& pos, Searcher& searcher)
 {
-    const SearchConfig searchConfig = SearchConfig();
-    searcher.search(pos, searchConfig);
-    std::cout << "bestmove " << searcher.bestMoveAtRoot().toUci() << std::endl;
+    SearchConfig searchConfig = SearchConfig();
+
+    [[maybe_unused]] u64 incrementMs = 0;
+    u64 movesToGo = DEFAULT_MOVES_TO_GO;
+    bool isMoveTime = false;
+
+    for (size_t i = 1; i < tokens.size() - 1; i += 2)
+    {
+        const u64 value = static_cast<u64>(std::max<i64>(std::stoll(tokens[i + 1]), 0));
+
+        if ((tokens[i] == "wtime" && pos.sideToMove() == Color::White)
+        ||  (tokens[i] == "btime" && pos.sideToMove() == Color::Black))
+            searchConfig.hardMs = value;
+
+        else if ((tokens[i] == "winc" && pos.sideToMove() == Color::White)
+        ||       (tokens[i] == "binc" && pos.sideToMove() == Color::Black))
+            incrementMs = value;
+
+        else if (tokens[i] == "movestogo")
+            movesToGo = std::max<u64>(value, 1ULL);
+        else if (tokens[i] == "movetime")
+        {
+            isMoveTime = true;
+            searchConfig.hardMs = value;
+        }
+        else if (tokens[i] == "depth")
+            searchConfig.setMaxDepth(static_cast<i32>(value));
+        else if (tokens[i] == "nodes")
+            searchConfig.maxNodes = value;
+    }
+
+    if (searchConfig.hardMs)
+    {
+        const i64 minusOverhead = static_cast<i64>(*(searchConfig.hardMs))
+                                - static_cast<i64>(OVERHEAD_MS);
+
+        searchConfig.hardMs = static_cast<u64>(std::max<i64>(minusOverhead, 0));
+
+        if (!isMoveTime)
+            *(searchConfig.hardMs) /= movesToGo;
+    }
+
+    const auto [bestMove, score] = searcher.search(pos, searchConfig);
+
+    std::cout << "bestmove " << bestMove.toUci() << std::endl;
 }
 
 } // namespace uci

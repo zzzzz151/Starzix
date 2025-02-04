@@ -59,7 +59,28 @@ constexpr std::array BENCH_FENS {
     "2r2b2/5p2/5k2/p1r1pP2/P2pB3/1P3P2/K1P3R1/7R w - - 23 93"
 };
 
-inline void bench()
+inline void bench(const i32 depth = 4)
 {
-    std::cout << "1 nodes 1200000 nps" << std::endl;
+    Searcher searcher = Searcher();
+
+    SearchConfig searchConfig = SearchConfig();
+    searchConfig.setMaxDepth(depth);
+    searchConfig.printInfo = false;
+
+    u64 totalNodes = 0, totalMs = 0;
+
+    for (const std::string fen : BENCH_FENS)
+    {
+        Position pos = Position(fen);
+        std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
+
+        searcher.search(pos, searchConfig);
+
+        totalMs += millisecondsElapsed(startTime);
+        totalNodes += searcher.totalNodes();
+    }
+
+    std::cout << totalNodes << " nodes "
+              << getNps(totalNodes, totalMs) << " nps"
+              << std::endl;
 }

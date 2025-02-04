@@ -106,10 +106,10 @@ constexpr ArrayVec<Move, 256> pseudolegalMoves(
         if (willPromote || moveGenType == MoveGenType::NoisyOnly)
             continue;
 
-        // pawn single push
+        // Pawn single push
         pseudolegals.push_back(Move(fromSquare, squareOneUp, MoveFlag::Pawn));
 
-        // pawn double push
+        // Pawn double push
 
         if (!pawnHasntMoved) continue;
 

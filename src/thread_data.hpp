@@ -57,12 +57,19 @@ inline void wakeThread(ThreadData* td, const ThreadState newState)
     td->cv.notify_one();
 }
 
+constexpr Move bestMoveAtRoot(const ThreadData* td)
+{
+    return td->pliesData[0].pvLine.size() > 0
+         ? td->pliesData[0].pvLine[0]
+         : MOVE_NONE;
+}
+
 constexpr void makeMove(ThreadData* td, const Move move, const size_t newPly)
 {
     td->pos.makeMove(move);
     td->nodes++;
 
-    // update seldepth
+    // Update seldepth
     td->maxPlyReached = std::max<size_t>(td->maxPlyReached, newPly);
 
     td->pliesData[newPly].pvLine.clear();

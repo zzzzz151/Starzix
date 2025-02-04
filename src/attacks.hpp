@@ -71,10 +71,10 @@ constexpr EnumArray<Bitboard, Square> KING_ATTACKS = [] () consteval
     {
         const Bitboard sqBb = squareBb(square);
         kingAttacks[square] = sqBb;
-        kingAttacks[square] |= (sqBb >> 1ULL) & 0x7f7f7f7f7f7f7f7fULL; // shifted left
-        kingAttacks[square] |= (sqBb << 1ULL) & 0xfefefefefefefefeULL; // shifted right
-        kingAttacks[square] |= kingAttacks[square] << 8ULL; // shifted up
-        kingAttacks[square] |= kingAttacks[square] >> 8ULL; // shifted down
+        kingAttacks[square] |= (sqBb >> 1ULL) & 0x7f7f7f7f7f7f7f7fULL; // Shifted left
+        kingAttacks[square] |= (sqBb << 1ULL) & 0xfefefefefefefefeULL; // Shifted right
+        kingAttacks[square] |= kingAttacks[square] << 8ULL; // Shifted up
+        kingAttacks[square] |= kingAttacks[square] >> 8ULL; // Shifted down
         kingAttacks[square] ^= sqBb;
     }
 
@@ -241,7 +241,7 @@ constexpr EnumArray<MagicEntry, Square> BISHOP_MAGIC_ENTRIES = [] () consteval
     {
         MagicEntry& magicEntry = bishopMagicEntries[square];
 
-        // remove edges from attacks
+        // Remove edges from attacks
         constexpr Bitboard NO_EDGES_BB = 0x7e7e7e7e7e7e00ULL;
         magicEntry.attacksEmptyBoardNoEdges = bishopAttacksSlow(square, 0) & NO_EDGES_BB;
 
@@ -286,7 +286,7 @@ constexpr EnumArray<MagicEntry, Square> ROOK_MAGIC_ENTRIES = [] () consteval
 
         magicEntry.attacksEmptyBoardNoEdges = rookAttacksSlow(square, 0);
 
-        // remove corners
+        // Remove corners
         constexpr Bitboard NO_CORNERS_BB = 0x7effffffffffff7eULL;
         magicEntry.attacksEmptyBoardNoEdges &= NO_CORNERS_BB;
 

@@ -216,7 +216,7 @@ constexpr Square lsb(const Bitboard bb)
 constexpr auto popLsb(Bitboard& bb)
 {
     const auto square = lsb(bb);
-    bb &= bb - 1; // compiler optimizes this to _blsr_u64
+    bb &= bb - 1; // Compiler optimizes this to _blsr_u64
     return square;
 }
 

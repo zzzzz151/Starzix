@@ -373,7 +373,7 @@ public:
             myFen += "/";
         }
 
-        myFen.pop_back(); // remove last '/'
+        myFen.pop_back(); // Remove last '/'
 
         myFen += " ";
         myFen += sideToMove() == Color::White ? "w" : "b";
@@ -441,7 +441,7 @@ public:
         for (size_t i = 1; i < mStates.size(); i++)
             std::cout << " " << Move(mStates[i].lastMove).toUci();
 
-        std::cout << std::endl; // flush
+        std::cout << std::endl; // Flush
     }
 
     constexpr std::optional<PieceType> captured(const Move move) const
@@ -777,7 +777,7 @@ public:
         // Promotion?
         if (uciMove.size() == 5)
         {
-            // last char of string uciMove
+            // Last char of string uciMove
             const char promotion = static_cast<char>(std::tolower(uciMove.back()));
 
             if (promotion == 'n')
@@ -893,7 +893,7 @@ public:
 
             if (optNext) score -= SEE_PIECE_VALUES[*optNext];
 
-            // if our only attacker is our king, but the opponent still has defenders
+            // If our only attacker is our king, but the opponent still has defenders
             if (score >= 0
             && optNext
             && *optNext == PieceType::King

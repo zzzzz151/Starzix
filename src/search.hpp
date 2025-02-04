@@ -18,11 +18,15 @@ private:
 
 public:
 
-    u64 maxNodes = std::numeric_limits<u64>::max();
+    std::optional<u64> maxNodes = std::nullopt;
     std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
-    u64 hardMs = std::numeric_limits<u64>::max();
-    u64 softMs = std::numeric_limits<u64>::max();
+    std::optional<u64> hardMs = std::nullopt;
+    std::optional<u64> softMs = std::nullopt;
     bool printInfo = true;
+
+    constexpr auto getMaxDepth() const {
+        return this->maxDepth;
+    }
 
     constexpr void setMaxDepth(const i32 newMaxDepth)
     {
@@ -66,18 +70,8 @@ public:
 
     constexpr void ucinewgame()
     {
-        // reset best move at root
-        mainThreadData()->pliesData[0].pvLine.clear();
-
         for (ThreadData* td : mThreadsData)
             td->nodes = 0;
-    }
-
-    constexpr Move bestMoveAtRoot() const
-    {
-        return mainThreadData()->pliesData[0].pvLine.size() > 0
-             ? mainThreadData()->pliesData[0].pvLine[0]
-             : MOVE_NONE;
     }
 
     constexpr u64 totalNodes() const
@@ -96,11 +90,15 @@ public:
 
         mSearchConfig = searchConfig;
 
+        if (mSearchConfig.maxNodes && *(mSearchConfig.maxNodes) < std::numeric_limits<u64>::max())
+            *(mSearchConfig.maxNodes) += 1;
+
+        // Initialize node counter of every thread to 1 (root node)
+        for (ThreadData* td : mThreadsData)
+            td->nodes = 1;
+
         if (!hasLegalMove(pos))
-        {
-            ucinewgame();
             return { MOVE_NONE, pos.inCheck() ? -INF : 0 };
-        }
 
         /*
         // Init main thread's root accumulator
@@ -134,9 +132,6 @@ public:
                     initFinnyEntry(color, mirrorVAxis, inputBucket);
         */
 
-        for (ThreadData* td : mThreadsData)
-            td->nodes = 0;
-
         mStopSearch = false;
 
         for (ThreadData* td : mThreadsData)
@@ -160,7 +155,7 @@ public:
 
         blockUntilSleep();
 
-        return { bestMoveAtRoot(), *(mainThreadData()->score) };
+        return { bestMoveAtRoot(mainThreadData()), *(mainThreadData()->score) };
     }
 
 private:
@@ -254,20 +249,71 @@ private:
         if (td != mainThreadData() || !(mainThreadData()->score))
             return false;
 
-        if (mSearchConfig.maxNodes < std::numeric_limits<u64>::max()
-        &&  totalNodes() >= mSearchConfig.maxNodes)
+        if (mSearchConfig.maxNodes && totalNodes() >= *(mSearchConfig.maxNodes))
             return mStopSearch = true;
 
         // Check time every N nodes
-        if (td->nodes % 1024 != 0)
+        if (!mSearchConfig.hardMs || td->nodes % 1024 != 0)
             return false;
 
-        return mStopSearch = (millisecondsElapsed(mSearchConfig.startTime) >= mSearchConfig.hardMs);
+        return mStopSearch = (millisecondsElapsed(mSearchConfig.startTime) >= *(mSearchConfig.hardMs));
     }
 
     constexpr void iterativeDeepening(ThreadData* td)
     {
-        search(td, 1, 0);
+        for (i32 depth = 1; depth <= mSearchConfig.getMaxDepth(); depth++)
+        {
+            const Move bestMoveAtRootBefore = bestMoveAtRoot(td);
+
+            td->maxPlyReached = 0; // Reset seldepth
+
+            const i32 score = search(td, depth, 0);
+
+            if (mStopSearch.load(std::memory_order_relaxed))
+            {
+                td->pliesData[0].pvLine.clear();
+                td->pliesData[0].pvLine.push_back(bestMoveAtRootBefore);
+                break;
+            }
+
+            td->score = score;
+
+            // If not main thread, continue
+            if (td != mainThreadData())
+                continue;
+
+            const u64 msElapsed = millisecondsElapsed(mSearchConfig.startTime);
+            const u64 nodes = totalNodes();
+
+            mStopSearch = (mSearchConfig.hardMs && msElapsed >= *(mSearchConfig.hardMs))
+                       || (mSearchConfig.maxNodes && nodes >= *(mSearchConfig.maxNodes));
+
+            if (!mSearchConfig.printInfo)
+                continue;
+
+            std::cout << "info"
+                      << " depth "    << depth
+                      << " seldepth " << td->maxPlyReached
+                      << " score ";
+
+            if (std::abs(score) < MIN_MATE_SCORE)
+                std::cout << "cp " << score;
+            else {
+                const i32 pliesToMate = INF - std::abs(score);
+                const i32 fullMovesToMate = (pliesToMate + 1) / 2;
+                std::cout << "mate " << (score > 0 ? fullMovesToMate : -fullMovesToMate);
+            }
+
+            std::cout << " nodes " << nodes
+                      << " nps "   << getNps(nodes, msElapsed)
+                      << " time "  << msElapsed
+                      << " pv";
+
+            for (const Move move : td->pliesData[0].pvLine)
+                std::cout << " " << move.toUci();
+
+            std::cout << std::endl;
+        }
 
         // If main thread, signal other threads to stop searching
         if (td == mainThreadData())
