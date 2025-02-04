@@ -2,6 +2,7 @@
 
 #include "../src/position.hpp"
 #include "../src/move_gen.hpp"
+#include "positions.hpp"
 #include <cassert>
 
 int main() {
@@ -14,14 +15,24 @@ int main() {
     assert(!isPseudolegalLegal(pos, pos.uciToMove("e4c4")));
     assert(!isPseudolegalLegal(pos, pos.uciToMove("e4f4")));
 
+    // hasLegalMove()
+    pos = START_POS;
+    assert(hasLegalMove(pos));
+    pos = POS_IN_CHECK;
+    assert(hasLegalMove(pos));
+    pos = POS_CHECKMATE;
+    assert(!hasLegalMove(pos));
+    pos = POS_STALEMATE;
+    assert(!hasLegalMove(pos));
+
     // Perft
 
     Position startPos     = START_POS;
-    Position posKiwipete  = Position("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ");
-    Position pos3         = Position("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1");
-    Position pos4         = Position("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1");
-    Position pos4Mirrored = Position("r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1");
-    Position pos5         = Position("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8");
+    Position posKiwipete  = POS_KIWIPETE;
+    Position pos3         = POS_3;
+    Position pos4         = POS_4;
+    Position pos4Mirrored = POS_4_MIRRORED;
+    Position pos5         = POS_5;
 
     assert(perft(startPos, 0)  == 1ULL); // perft(0)
     assert(perft(startPos, -1) == 1ULL); // perft(-1)

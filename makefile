@@ -24,6 +24,9 @@ test:
 	$(CXX) $(CXXFLAGS) -march=native tests/testMoveGen.cpp -o testMoveGen$(SUFFIX)
 	./testMoveGen$(SUFFIX)
 
+	$(CXX) $(CXXFLAGS) -march=native tests/testGameState.cpp -o testGameState$(SUFFIX)
+	./testGameState$(SUFFIX)
+
 	$(CXX) $(CXXFLAGS) -march=native tests/testSEE.cpp -o testSEE$(SUFFIX)
 	./testSEE$(SUFFIX)
 

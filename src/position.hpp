@@ -6,7 +6,9 @@
 #include "move.hpp"
 #include "attacks.hpp"
 
-const std::string START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+enum class GameState : i32 {
+    Draw, Loss, Ongoing
+};
 
 // [color][isLongCastle]
 constexpr EnumArray<std::array<Bitboard, 2>, Color> CASTLING_MASKS =
@@ -43,7 +45,8 @@ public:
     u16 lastMove = MOVE_NONE.asU16();
     std::optional<PieceType> captured = std::nullopt;
     Bitboard checkers = 0;
-    Bitboard pinned = ~0ULL;
+    std::optional<Bitboard> pinned = std::nullopt;
+    std::optional<Bitboard> enemyAttacksNoStmKing = std::nullopt;
     u64 zobristHash = 0;
     u64 pawnsHash = 0;
     EnumArray<u64, Color> nonPawnsHashes = { }; // [pieceColor]
@@ -161,6 +164,11 @@ public:
         state().checkers = attackers(kingSquare()) & them();
     }
 
+    constexpr size_t numStates() const
+    {
+        return mStates.size();
+    }
+
     constexpr Color sideToMove() const
     {
         return state().colorToMove;
@@ -219,6 +227,11 @@ public:
     constexpr std::optional<Square> enPassantSquare() const
     {
         return state().enPassantSquare;
+    }
+
+    constexpr void setPliesSincePawnOrCapture(const u8 newValue)
+    {
+        state().pliesSincePawnOrCapture = newValue;
     }
 
     constexpr Move lastMove() const {
@@ -446,26 +459,53 @@ public:
         return !captured(move) && !move.promotion();
     }
 
-    constexpr bool isDrawIgnoringStalemate(
-        const std::optional<i32> searchPly = std::nullopt) const
+    constexpr GameState gameState(
+        bool (*fnHasLegalMove) (Position&),
+        const std::optional<i32> searchPly = std::nullopt)
     {
+        if (!fnHasLegalMove(*this))
+            return inCheck() ? GameState::Loss : GameState::Draw;
+
         if (state().pliesSincePawnOrCapture >= 100)
-            return hasLegalMove();
+            return GameState::Draw;
+
+        const auto numPieces = std::popcount(occupied());
 
         // K vs K
-        const auto numPieces = std::popcount(occupied());
-        if (numPieces == 2) return true;
-
-        // KB vs K
+        if (numPieces == 2)
+            return GameState::Draw;
         // KN vs K
-        if (numPieces == 3
-        && (getBb(PieceType::Knight) > 0 || getBb(PieceType::Bishop) > 0))
-            return true;
+        // KB vs K
+        else if (numPieces == 3)
+        {
+            if (getBb(PieceType::Knight) > 0 || getBb(PieceType::Bishop) > 0)
+                return GameState::Draw;
+        }
+        // KNN vs K
+        // KN vs KN
+        // KN vs KB
+        // KB vs KB
+        else if (numPieces == 4)
+        {
+            const auto numWhiteKnights = std::popcount(getBb(Color::White, PieceType::Knight));
+            const auto numBlackKnights = std::popcount(getBb(Color::Black, PieceType::Knight));
+
+            if (numWhiteKnights + numBlackKnights == 2)
+                return GameState::Draw;
+
+            const auto numWhiteBishops = std::popcount(getBb(Color::White, PieceType::Bishop));
+            const auto numBlackBishops = std::popcount(getBb(Color::Black, PieceType::Bishop));
+
+            if ((numWhiteKnights == 1 && numBlackBishops == 1)
+            ||  (numBlackKnights == 1 && numWhiteBishops == 1)
+            ||  (numWhiteBishops == 1 && numBlackBishops == 1))
+                return GameState::Draw;
+        }
 
         // Repetition detection
 
         if (mStates.size() <= 4 || state().pliesSincePawnOrCapture < 4)
-            return false;
+            return GameState::Ongoing;
 
         const i32 numStates = static_cast<i32>(mStates.size());
         const i32 pliesSincePawnOrCapt = static_cast<i32>(state().pliesSincePawnOrCapture);
@@ -480,9 +520,9 @@ public:
         for (i32 i = numStates - 3; i >= stateIdxAfterPawnOrCapture; i -= 2)
             if (mStates[static_cast<size_t>(i)].zobristHash == state().zobristHash
             && (i > rootStateIdx || ++count == 2))
-                return true;
+                return GameState::Draw;
 
-        return false;
+        return GameState::Ongoing;
     }
 
     constexpr bool hasNonPawnMaterial(const Color color) const
@@ -496,8 +536,7 @@ public:
     constexpr Bitboard pinned()
     {
         // Cached?
-        if (state().pinned != ~0ULL)
-            return state().pinned;
+        if (state().pinned) return *(state().pinned);
 
         const Square kingSquare = this->kingSquare();
 
@@ -515,18 +554,16 @@ public:
 
         state().pinned = 0;
 
-        while (potentialAttackers > 0)
+        ITERATE_BITBOARD(potentialAttackers, attackerSquare,
         {
-            const Square attackerSquare = popLsb(potentialAttackers);
-
             const Bitboard maybePinned
                 = us() & BETWEEN_EXCLUSIVE_BB[kingSquare][attackerSquare];
 
             if (std::popcount(maybePinned) == 1)
-                state().pinned |= maybePinned;
-        }
+                *(state().pinned) |= maybePinned;
+        });
 
-        return state().pinned;
+        return *(state().pinned);
     }
 
     constexpr Bitboard attacks(const Color color, const Bitboard occ) const
@@ -570,6 +607,19 @@ public:
         return attacks(color, occupied());
     }
 
+    constexpr Bitboard enemyAttacksNoStmKing()
+    {
+        // If cached, return it
+        if (state().enemyAttacksNoStmKing)
+            return *(state().enemyAttacksNoStmKing);
+
+        // Calculate and cache
+        const Bitboard occNoStmKing = occupied() ^ squareBb(kingSquare());
+        state().enemyAttacksNoStmKing = attacks(notSideToMove(), occNoStmKing);
+
+        return *(state().enemyAttacksNoStmKing);
+    }
+
     constexpr Bitboard attackers(const Square square, const Bitboard occ) const
     {
         const Bitboard bishopsQueens = getBb(PieceType::Bishop) | getBb(PieceType::Queen);
@@ -602,7 +652,10 @@ public:
         mStates.push_back(copy);
 
         state().lastMove = move.asU16();
-        state().pinned = ~0ULL; // will be calculated and cached when pinned() called
+
+        // These will be calculated and cached later
+        state().pinned = std::nullopt;
+        state().enemyAttacksNoStmKing = std::nullopt;
 
         if (move == MOVE_NONE) {
             assert(!inCheck());
@@ -872,8 +925,8 @@ public:
         return hashAfter;
     }
 
-    constexpr bool hasLegalMove() const { return true; }
-
 }; // class Position
 
-const Position START_POS = Position(START_FEN);
+const Position START_POS = Position(
+    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+);

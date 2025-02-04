@@ -2,11 +2,12 @@
 
 #include "../src/position.hpp"
 #include "../src/nnue.hpp"
+#include "positions.hpp"
 #include "../src/3rdparty/ordered_map.h"
 #include <cassert>
 
 tsl::ordered_map<std::string, i32> FENS_EVAL = {
-    { START_FEN, 67 },
+    { FEN_START, 67 },
     { "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",  -37 }, // e2e4
     { "rnbqkb1r/pppppppp/5n2/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 1 2", 102 }, // e2e4 g8f6
     { "rnbkqbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBKQBNR w KQkq - 0 1", 67 }, // bongcloud

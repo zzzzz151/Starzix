@@ -11,7 +11,7 @@
 namespace uci {
 
 constexpr void position(const std::vector<std::string>& tokens, Position& pos);
-constexpr void go(const Position& pos, Searcher& searcher);
+constexpr void go(Position& pos, Searcher& searcher);
 
 inline void runCommand(std::string& command, Position& pos, Searcher& searcher)
 {
@@ -87,6 +87,10 @@ inline void runCommand(std::string& command, Position& pos, Searcher& searcher)
         nnue::BothAccumulators bothAccs = nnue::BothAccumulators(pos);
         std::cout << "eval " << nnue::evaluate(bothAccs, pos.sideToMove()) << std::endl;
     }
+    else if (tokens[0] == "makemove" && tokens.size() == 2)
+        pos.makeMove(tokens[1]);
+    else if (command == "undomove" && pos.numStates() > 1)
+        pos.undoMove();
 }
 
 constexpr void position(const std::vector<std::string>& tokens, Position& pos)
@@ -115,7 +119,7 @@ constexpr void position(const std::vector<std::string>& tokens, Position& pos)
         pos.makeMove(tokens[i]);
 }
 
-constexpr void go(const Position& pos, Searcher& searcher)
+constexpr void go(Position& pos, Searcher& searcher)
 {
     const SearchConfig searchConfig = SearchConfig();
     searcher.search(pos, searchConfig);

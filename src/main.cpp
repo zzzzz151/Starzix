@@ -12,10 +12,12 @@
 //#include "nnue.hpp"
 //#include "search_params.hpp"
 //#include "thread_data.hpp"
+//#include "move_picker.hpp"
 //#include "search.hpp"
 //#include "bench.hpp"
 #include "uci.hpp"
 #include <iostream>
+
 
 int main(int argc, char* argv[])
 {

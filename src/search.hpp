@@ -8,8 +8,10 @@
 #include "nnue.hpp"
 #include "search_params.hpp"
 #include "thread_data.hpp"
+#include "move_picker.hpp"
 
-struct SearchConfig {
+struct SearchConfig
+{
 private:
 
     i32 maxDepth = MAX_DEPTH;
@@ -24,12 +26,13 @@ public:
 
     constexpr void setMaxDepth(const i32 newMaxDepth)
     {
-        this->maxDepth = std::clamp(newMaxDepth, 1, MAX_DEPTH);
+        this->maxDepth = std::clamp<i32>(newMaxDepth, 1, MAX_DEPTH);
     }
 
 }; // struct SearchConfig
 
-class Searcher {
+class Searcher
+{
 private:
 
     std::vector<ThreadData*> mThreadsData   = { };
@@ -63,8 +66,8 @@ public:
 
     constexpr void ucinewgame()
     {
-        mainThreadData()->pos = START_POS;
-        mainThreadData()->pliesData[0].pvLine.clear(); // reset best move at root
+        // reset best move at root
+        mainThreadData()->pliesData[0].pvLine.clear();
 
         for (ThreadData* td : mThreadsData)
             td->nodes = 0;
@@ -87,12 +90,17 @@ public:
         return nodes;
     }
 
-    inline std::pair<Move, i32> search(const Position& pos, const SearchConfig& searchConfig)
+    inline std::pair<Move, i32> search(Position& pos, const SearchConfig& searchConfig)
     {
-        mStopSearch = false;
         blockUntilSleep();
 
         mSearchConfig = searchConfig;
+
+        if (!hasLegalMove(pos))
+        {
+            ucinewgame();
+            return { MOVE_NONE, pos.inCheck() ? -INF : 0 };
+        }
 
         /*
         // Init main thread's root accumulator
@@ -129,9 +137,12 @@ public:
         for (ThreadData* td : mThreadsData)
             td->nodes = 0;
 
+        mStopSearch = false;
+
         for (ThreadData* td : mThreadsData)
         {
             td->pos = pos;
+            td->score = std::nullopt;
             td->pliesData[0] = PlyData();
             td->nodesByMove = { };
             td->bothAccsIdx = 0;
@@ -149,7 +160,7 @@ public:
 
         blockUntilSleep();
 
-        return { bestMoveAtRoot(), mainThreadData()->score };
+        return { bestMoveAtRoot(), *(mainThreadData()->score) };
     }
 
 private:
@@ -194,8 +205,6 @@ private:
     {
         blockUntilSleep();
 
-        const Position pos = mThreadsData.empty() ? START_POS : mainThreadData()->pos;
-
         // Remove threads
         while (!mThreadsData.empty())
         {
@@ -233,30 +242,111 @@ private:
 
         mThreadsData.shrink_to_fit();
         mNativeThreads.shrink_to_fit();
-
-        if (!mThreadsData.empty())
-            mainThreadData()->pos = pos;
     }
 
-    constexpr void iterativeDeepening([[maybe_unused]] ThreadData* td)
+    constexpr bool shouldStop(const ThreadData* td)
     {
-        const auto pseudolegals = pseudolegalMoves(td->pos, MoveGenType::AllMoves, false);
-        ArrayVec<Move, 256> legals = { };
+        if (mStopSearch.load(std::memory_order_relaxed))
+            return true;
 
-        for (const Move pseudolegal : pseudolegals)
-            if (isPseudolegalLegal(td->pos, pseudolegal))
-                legals.push_back(pseudolegal);
+        // Only check stop conditions and modify mStopSearch in main thread
+        // Don't stop searching if depth 1 not completed
+        if (td != mainThreadData() || !(mainThreadData()->score))
+            return false;
 
-        const Move bestMove = legals.size() == 0
-                            ? MOVE_NONE
-                            : legals[td->pos.zobristHash() % legals.size()];
+        if (mSearchConfig.maxNodes < std::numeric_limits<u64>::max()
+        &&  totalNodes() >= mSearchConfig.maxNodes)
+            return mStopSearch = true;
 
-        assert(td->pliesData[0].pvLine.size() == 0);
-        td->pliesData[0].pvLine.push_back(bestMove);
+        // Check time every N nodes
+        if (td->nodes % 1024 != 0)
+            return false;
+
+        return mStopSearch = (millisecondsElapsed(mSearchConfig.startTime) >= mSearchConfig.hardMs);
+    }
+
+    constexpr void iterativeDeepening(ThreadData* td)
+    {
+        search(td, 1, 0);
 
         // If main thread, signal other threads to stop searching
         if (td == mainThreadData())
             mStopSearch = true;
+    }
+
+    constexpr i32 evaluate(const Position& pos)
+    {
+        constexpr EnumArray<i32, PieceType> PIECE_VALUES = {
+            100, 300, 300, 500, 900, 0
+        };
+
+        i32 eval = static_cast<i32>(pos.zobristHash() % 16);
+
+        for (const PieceType pt : EnumIter<PieceType>())
+        {
+            const i32 numOurs   = std::popcount(pos.getBb(pos.sideToMove(),    pt));
+            const i32 numTheirs = std::popcount(pos.getBb(pos.notSideToMove(), pt));
+            eval += (numOurs - numTheirs) * PIECE_VALUES[pt];
+        }
+
+        return eval;
+    }
+
+    constexpr i32 search(ThreadData* td, i32 depth, i32 ply)
+    {
+        assert(hasLegalMove(td->pos));
+        assert(ply >= 0 && ply <= MAX_DEPTH);
+        //assert(alpha >= -INF && alpha <= INF);
+        //assert(beta  >= -INF && beta  <= INF);
+        //assert(alpha < beta);
+
+        if (shouldStop(td)) return 0;
+
+        // Quiescence search at leaf nodes
+        if (depth <= 0) return evaluate(td->pos);
+
+        // Max ply cutoff
+        if (ply >= MAX_DEPTH) return evaluate(td->pos);
+
+        depth = std::min<i32>(depth, MAX_DEPTH);
+
+        [[maybe_unused]] size_t legalMovesSeen = 0;
+        i32 bestScore = -INF;
+        Move bestMove = MOVE_NONE;
+
+        MovePicker movePicker = MovePicker();
+        Move move;
+
+        while ((move = movePicker.nextLegal(td->pos)) != MOVE_NONE)
+        {
+            legalMovesSeen++;
+
+            makeMove(td, move, static_cast<size_t>(ply + 1));
+
+            const GameState gameState = td->pos.gameState(hasLegalMove, ply + 1);
+
+            const i32 score = gameState == GameState::Draw ? 0
+                            : gameState == GameState::Loss ? INF - (ply + 1)
+                            : -search(td, depth - 1, ply + 1);
+
+            undoMove(td);
+
+            if (shouldStop(td)) return 0;
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestMove = move;
+
+                if (ply == 0) {
+                    td->pliesData[0].pvLine.clear();
+                    td->pliesData[0].pvLine.push_back(bestMove);
+                }
+            }
+        }
+
+        assert(legalMovesSeen > 0);
+
+        return bestScore;
     }
 
 }; // class Searcher

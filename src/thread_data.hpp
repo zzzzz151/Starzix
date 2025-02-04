@@ -10,7 +10,8 @@
 #include <condition_variable>
 #include <algorithm>
 
-struct PlyData {
+struct PlyData
+{
 public:
 
     ArrayVec<Move, MAX_DEPTH + 1> pvLine;
@@ -21,12 +22,13 @@ enum class ThreadState : i32 {
     Sleeping, Searching, ExitAsap, Exited
 };
 
-struct ThreadData {
+struct ThreadData
+{
 public:
 
     Position pos;
 
-    i32 score = 0;
+    std::optional<i32> score = std::nullopt;
 
     u64 nodes = 0;
     size_t maxPlyReached = 0;
@@ -55,42 +57,50 @@ inline void wakeThread(ThreadData* td, const ThreadState newState)
     td->cv.notify_one();
 }
 
-constexpr void makeMove(ThreadData& td, const Move move, const size_t newPly)
+constexpr void makeMove(ThreadData* td, const Move move, const size_t newPly)
 {
-    td.pos.makeMove(move);
-    td.nodes++;
+    td->pos.makeMove(move);
+    td->nodes++;
 
     // update seldepth
-    td.maxPlyReached = std::max(td.maxPlyReached, newPly);
+    td->maxPlyReached = std::max<size_t>(td->maxPlyReached, newPly);
 
-    td.pliesData[newPly].pvLine.clear();
-    td.pliesData[newPly].eval = std::nullopt;
+    td->pliesData[newPly].pvLine.clear();
+    td->pliesData[newPly].eval = std::nullopt;
 
     if (move != MOVE_NONE)
     {
-        td.bothAccsIdx++;
-        td.bothAccsStack[td.bothAccsIdx].mUpdated = false;
+        td->bothAccsIdx++;
+        td->bothAccsStack[td->bothAccsIdx].mUpdated = false;
     }
 }
 
-constexpr std::optional<i32> updateBothAccsAndEval(ThreadData& td, const size_t ply)
+constexpr void undoMove(ThreadData* td)
 {
-    nnue::BothAccumulators& bothAccs = td.bothAccsStack[td.bothAccsIdx];
-    std::optional<i32>& eval = td.pliesData[ply].eval;
+    if (td->pos.lastMove() != MOVE_NONE)
+        td->bothAccsIdx--;
+
+    td->pos.undoMove();
+}
+
+constexpr std::optional<i32> updateBothAccsAndEval(ThreadData* td, const size_t ply)
+{
+    nnue::BothAccumulators& bothAccs = td->bothAccsStack[td->bothAccsIdx];
+    std::optional<i32>& eval = td->pliesData[ply].eval;
 
     if (!bothAccs.mUpdated)
     {
-        assert(td.bothAccsIdx > 0);
-        bothAccs.update(td.bothAccsStack[td.bothAccsIdx - 1], td.pos, td.finnyTable);
+        assert(td->bothAccsIdx > 0);
+        bothAccs.update(td->bothAccsStack[td->bothAccsIdx - 1], td->pos, td->finnyTable);
     }
 
-    if (td.pos.inCheck())
+    if (td->pos.inCheck())
         eval = std::nullopt;
     else if (!eval)
     {
-        assert(bothAccs == nnue::BothAccumulators(td.pos));
+        assert(bothAccs == nnue::BothAccumulators(td->pos));
 
-        eval = nnue::evaluate(bothAccs, td.pos.sideToMove());
+        eval = nnue::evaluate(bothAccs, td->pos.sideToMove());
 
         // Clamp eval to avoid invalid values and checkmate values
         eval = std::clamp<i32>(*eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
