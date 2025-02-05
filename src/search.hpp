@@ -267,7 +267,7 @@ private:
 
             td->maxPlyReached = 0; // Reset seldepth
 
-            const i32 score = search(td, depth, 0);
+            const i32 score = search(td, depth, 0, -INF, INF);
 
             if (mStopSearch.load(std::memory_order_relaxed))
             {
@@ -338,13 +338,13 @@ private:
         return eval;
     }
 
-    constexpr i32 search(ThreadData* td, i32 depth, i32 ply)
+    constexpr i32 search(ThreadData* td, i32 depth, i32 ply, i32 alpha, i32 beta)
     {
         assert(hasLegalMove(td->pos));
         assert(ply >= 0 && ply <= MAX_DEPTH);
-        //assert(alpha >= -INF && alpha <= INF);
-        //assert(beta  >= -INF && beta  <= INF);
-        //assert(alpha < beta);
+        assert(alpha >= -INF && alpha <= INF);
+        assert(beta  >= -INF && beta  <= INF);
+        assert(alpha < beta);
 
         if (shouldStop(td)) return 0;
 
@@ -373,21 +373,30 @@ private:
 
             const i32 score = gameState == GameState::Draw ? 0
                             : gameState == GameState::Loss ? INF - (ply + 1)
-                            : -search(td, depth - 1, ply + 1);
+                            : -search(td, depth - 1, ply + 1, -beta, -alpha);
 
             undoMove(td);
 
             if (shouldStop(td)) return 0;
 
-            if (score > bestScore) {
-                bestScore = score;
-                bestMove = move;
+            bestScore = std::max<i32>(bestScore, score);
 
-                if (ply == 0) {
-                    td->pliesData[0].pvLine.clear();
-                    td->pliesData[0].pvLine.push_back(bestMove);
-                }
+            // Fail low?
+            if (score <= alpha) continue;
+
+            alpha = score;
+            bestMove = move;
+
+            if (ply == 0) {
+                td->pliesData[0].pvLine.clear();
+                td->pliesData[0].pvLine.push_back(bestMove);
             }
+
+            if (score < beta) continue;
+
+            // Fail high
+
+            break;
         }
 
         assert(legalMovesSeen > 0);
