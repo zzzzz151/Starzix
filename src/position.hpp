@@ -456,7 +456,10 @@ public:
     constexpr bool isQuiet(const Move move) const
     {
         assert(move != MOVE_NONE);
-        return !captured(move) && !move.promotion();
+
+        return !isOccupied(move.to())
+            && move.flag() != MoveFlag::EnPassant
+            && !move.promotion();
     }
 
     constexpr GameState gameState(

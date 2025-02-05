@@ -338,7 +338,7 @@ private:
         return eval;
     }
 
-    constexpr i32 search(ThreadData* td, i32 depth, i32 ply, i32 alpha, i32 beta)
+    constexpr i32 search(ThreadData* td, i32 depth, const i32 ply, i32 alpha, const i32 beta)
     {
         assert(hasLegalMove(td->pos));
         assert(ply >= 0 && ply <= MAX_DEPTH);
@@ -346,10 +346,10 @@ private:
         assert(beta  >= -INF && beta  <= INF);
         assert(alpha < beta);
 
-        if (shouldStop(td)) return 0;
-
         // Quiescence search at leaf nodes
         if (depth <= 0) return evaluate(td->pos);
+
+        if (shouldStop(td)) return 0;
 
         // Max ply cutoff
         if (ply >= MAX_DEPTH) return evaluate(td->pos);
@@ -400,6 +400,61 @@ private:
         }
 
         assert(legalMovesSeen > 0);
+
+        return bestScore;
+    }
+
+    constexpr i32 qSearch(ThreadData* td, const i32 ply, i32 alpha, const i32 beta)
+    {
+        assert(hasLegalMove(td->pos));
+        assert(ply > 0 && ply <= MAX_DEPTH);
+        assert(alpha >= -INF && alpha <= INF);
+        assert(beta  >= -INF && beta  <= INF);
+        assert(alpha < beta);
+
+        if (shouldStop(td)) return 0;
+
+        const i32 eval = evaluate(td->pos);
+
+        // Max ply cutoff
+        if (ply >= MAX_DEPTH) return eval;
+
+        if (eval >= beta) return eval;
+
+        alpha = std::max<i32>(alpha, eval);
+
+        i32 bestScore = eval;
+        Move bestMove = MOVE_NONE;
+
+        MovePicker movePicker = MovePicker();
+        Move move;
+
+        while ((move = movePicker.nextLegalNoisy(td->pos, false)) != MOVE_NONE)
+        {
+            makeMove(td, move, static_cast<size_t>(ply + 1));
+
+            const GameState gameState = td->pos.gameState(hasLegalMove, ply + 1);
+
+            const i32 score = gameState == GameState::Draw ? 0
+                            : gameState == GameState::Loss ? INF - (ply + 1)
+                            : -qSearch(td, ply + 1, -beta, -alpha);
+
+            undoMove(td);
+
+            if (shouldStop(td)) return 0;
+
+            if (score <= bestScore) continue;
+
+            bestScore = score;
+
+            if (bestScore > alpha) {
+                alpha = bestScore;
+                bestMove = move;
+            }
+
+             // Fail high?
+            if (bestScore >= beta) break;
+        }
 
         return bestScore;
     }

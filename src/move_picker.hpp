@@ -7,71 +7,79 @@
 #include "position.hpp"
 #include "move_gen.hpp"
 
-constexpr Move partialSelectionSort(
-    ArrayVec<Move, 256>& moves, std::array<i32, 256>& movesScores, const size_t idx)
-{
-    assert(idx < moves.size());
-
-    for (size_t i = idx + 1; i < moves.size(); i++)
-        if (movesScores[i] > movesScores[idx])
-        {
-            moves.swap(i, idx);
-            std::swap(movesScores[i], movesScores[idx]);
-        }
-
-    return moves[idx];
-}
-
-struct MovePicker
+struct MovesData
 {
 public:
 
-    ArrayVec<Move, 256> mNoisies, mQuiets;
+    ArrayVec<Move, 256> mMoves;
+    std::array<i32, 256> mScores;
+    std::optional<size_t> mIdx = std::nullopt;
 
-    std::array<i32, 256> mNoisiesScores, mQuietsScores;
+    constexpr Move next()
+    {
+        assert(mIdx);
 
-    i32 mNoisiesIdx = -1, mQuietsIdx = -1;
+        if (*mIdx >= mMoves.size())
+            return MOVE_NONE;
+
+        // Incremental selection sort
+        for (size_t i = *mIdx + 1; i < mMoves.size(); i++)
+            if (mScores[i] > mScores[*mIdx])
+            {
+                mMoves.swap(i, *mIdx);
+                std::swap(mScores[i], mScores[*mIdx]);
+            }
+
+        return mMoves[(*mIdx)++];
+    }
+
+}; // struct MovesData
+
+struct MovePicker
+{
+private:
+
+    MovesData mNoisiesData, mQuietsData;
+
+public:
 
     constexpr Move nextLegal(Position& pos)
     {
-        assert([&] () {
-            if (mNoisiesIdx != -1) return true;
+        Move move;
 
-            const auto allMoves = pseudolegalMoves(pos, MoveGenType::AllMoves);
-            const auto noisies  = pseudolegalMoves(pos, MoveGenType::NoisyOnly);
-            const auto quiets   = pseudolegalMoves(pos, MoveGenType::QuietOnly);
+        if ((move = nextLegalNoisy(pos, false)) != MOVE_NONE)
+            return move;
 
-            assert(noisies.size() + quiets.size() == allMoves.size());
+        if ((move = nextLegalQuiet(pos)) != MOVE_NONE)
+            return move;
 
-            for (const Move move : noisies)
-            {
-                assert(!pos.isQuiet(move));
-                assert(allMoves.contains(move));
-            }
+        if ((move = nextLegalNoisy(pos, true)) != MOVE_NONE)
+            return move;
 
-            for (const Move move : quiets)
-            {
-                assert(pos.isQuiet(move));
-                assert(allMoves.contains(move));
-            }
+        return MOVE_NONE;
+    }
 
-            return true;
-        }());
-
-        if (mNoisiesIdx == -1)
+    constexpr Move nextLegalNoisy(Position& pos, const bool underpromos)
+    {
+        // If noisy moves not generated, generate and score them
+        if (!mNoisiesData.mIdx)
         {
-            mNoisies = pseudolegalMoves(pos, MoveGenType::NoisyOnly);
+            mNoisiesData.mMoves = pseudolegalMoves(pos, MoveGenType::NoisyOnly);
 
-            for (size_t i = 0; i < mNoisies.size(); i++)
+            // Score noisy moves
+            for (size_t i = 0; i < mNoisiesData.mMoves.size(); i++)
             {
-                const Move move = mNoisies[i];
+                const Move move = mNoisiesData.mMoves[i];
                 const std::optional<PieceType> promo = move.promotion();
 
-                mNoisiesScores[i] = promo && *promo == PieceType::Queen ? 10'000
-                                  : promo ? -10'000
-                                  : 0;
+                constexpr EnumArray<i32, PieceType> promoBaseScore = {
+                //  P     N        B        R        Q    K
+                    0, -10'000, -30'000, -20'000, 10'000, 0
+                };
 
-                // MVVLVA
+                mNoisiesData.mScores[i] = promo ? promoBaseScore[*promo] : 0;
+
+                // MVVLVA (most valuable victim, least valuable attacker)
 
                 const std::optional<PieceType> captured = pos.captured(move);
                 const i32 iCaptured = captured ? static_cast<i32>(*captured) + 1 : 0;
@@ -79,30 +87,43 @@ public:
                 const PieceType pt = move.pieceType();
                 const i32 iPieceType = pt == PieceType::King ? 0 : static_cast<i32>(pt) + 1;
 
-                mNoisiesScores[i] += iCaptured * 100 - iPieceType;
+                mNoisiesData.mScores[i] += iCaptured * 100 - iPieceType;
             }
+
+            mNoisiesData.mIdx = 0;
         }
 
-        while (static_cast<size_t>(++mNoisiesIdx) < mNoisies.size())
+        Move move;
+
+        while ((move = mNoisiesData.next()) != MOVE_NONE)
         {
-            const Move move = partialSelectionSort(
-                mNoisies, mNoisiesScores, static_cast<size_t>(mNoisiesIdx)
-            );
+            if (!underpromos && move.isUnderpromotion())
+            {
+                *(mNoisiesData.mIdx) -= 1;
+                return MOVE_NONE;
+            }
 
             if (isPseudolegalLegal(pos, move))
                 return move;
         }
 
-        if (mQuietsIdx == -1)
-            mQuiets = pseudolegalMoves(pos, MoveGenType::QuietOnly);
+        return MOVE_NONE;
+    }
 
-        while (static_cast<size_t>(++mQuietsIdx) < mQuiets.size())
+    constexpr Move nextLegalQuiet(Position& pos)
+    {
+        // If quiet moves not generated, generate and score them
+        if (!mQuietsData.mIdx)
         {
-            const Move move = mQuiets[static_cast<size_t>(mQuietsIdx)];
+            mQuietsData.mMoves = pseudolegalMoves(pos, MoveGenType::QuietOnly);
+            mQuietsData.mIdx = 0;
+        }
 
+        Move move;
+
+        while ((move = mQuietsData.next()) != MOVE_NONE)
             if (isPseudolegalLegal(pos, move))
                 return move;
-        }
 
         return MOVE_NONE;
     }
