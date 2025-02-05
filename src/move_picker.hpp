@@ -74,7 +74,7 @@ public:
                 // MVVLVA
 
                 const std::optional<PieceType> captured = pos.captured(move);
-                const i32 iCaptured  = (captured ? static_cast<i32>(*captured) : 0) + 1;
+                const i32 iCaptured = captured ? static_cast<i32>(*captured) + 1 : 0;
 
                 const PieceType pt = move.pieceType();
                 const i32 iPieceType = pt == PieceType::King ? 0 : static_cast<i32>(pt) + 1;
