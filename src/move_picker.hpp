@@ -47,13 +47,10 @@ public:
     {
         Move move;
 
-        if ((move = nextLegalNoisy(pos, false)) != MOVE_NONE)
+        if ((move = nextLegalNoisy(pos, true)) != MOVE_NONE)
             return move;
 
         if ((move = nextLegalQuiet(pos)) != MOVE_NONE)
-            return move;
-
-        if ((move = nextLegalNoisy(pos, true)) != MOVE_NONE)
             return move;
 
         return MOVE_NONE;
