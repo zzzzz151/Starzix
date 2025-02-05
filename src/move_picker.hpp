@@ -75,7 +75,9 @@ public:
 
                 const std::optional<PieceType> captured = pos.captured(move);
                 const i32 iCaptured  = (captured ? static_cast<i32>(*captured) : 0) + 1;
-                const i32 iPieceType = static_cast<i32>(move.pieceType()) + 1;
+
+                const PieceType pt = move.pieceType();
+                const i32 iPieceType = pt == PieceType::King ? 0 : static_cast<i32>(pt) + 1;
 
                 mNoisiesScores[i] += iCaptured * 100 - iPieceType;
             }
