@@ -75,12 +75,12 @@ public:
                 const Move move = mNoisiesData.mMoves[i];
                 const std::optional<PieceType> promo = move.promotion();
 
-                constexpr EnumArray<i32, PieceType> promoBaseScore = {
+                constexpr EnumArray<i32, PieceType> PROMO_SCORE = {
                 //  P     N        B        R        Q    K
                     0, -10'000, -30'000, -20'000, 10'000, 0
                 };
 
-                mNoisiesData.mScores[i] = promo ? promoBaseScore[*promo] : 0;
+                mNoisiesData.mScores[i] = promo ? PROMO_SCORE[*promo] : 0;
 
                 // MVVLVA (most valuable victim, least valuable attacker)
 
