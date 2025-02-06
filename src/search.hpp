@@ -367,13 +367,9 @@ private:
         {
             legalMovesSeen++;
 
-            makeMove(td, move, static_cast<size_t>(ply + 1));
+            const std::optional<i32> optScore = makeMove(td, move, ply + 1);
 
-            const GameState gameState = td->pos.gameState(hasLegalMove, ply + 1);
-
-            const i32 score = gameState == GameState::Draw ? 0
-                            : gameState == GameState::Loss ? INF - (ply + 1)
-                            : -search(td, depth - 1, ply + 1, -beta, -alpha);
+            const i32 score = optScore ? *optScore : -search(td, depth - 1, ply + 1, -beta, -alpha);
 
             undoMove(td);
 
@@ -431,13 +427,9 @@ private:
 
         while ((move = movePicker.nextLegalNoisy(td->pos, false)) != MOVE_NONE)
         {
-            makeMove(td, move, static_cast<size_t>(ply + 1));
+            const std::optional<i32> optScore = makeMove(td, move, ply + 1);
 
-            const GameState gameState = td->pos.gameState(hasLegalMove, ply + 1);
-
-            const i32 score = gameState == GameState::Draw ? 0
-                            : gameState == GameState::Loss ? INF - (ply + 1)
-                            : -qSearch(td, ply + 1, -beta, -alpha);
+            const i32 score = optScore ? *optScore : -qSearch(td, ply + 1, -beta, -alpha);
 
             undoMove(td);
 

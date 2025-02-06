@@ -47,10 +47,16 @@ public:
     {
         Move move;
 
-        if ((move = nextLegalNoisy(pos, true)) != MOVE_NONE)
+        // Noisies, no underpromos
+        if ((move = nextLegalNoisy(pos, false)) != MOVE_NONE)
             return move;
 
+        // Quiets
         if ((move = nextLegalQuiet(pos)) != MOVE_NONE)
+            return move;
+
+        // Underpromos
+        if ((move = nextLegalNoisy(pos, true)) != MOVE_NONE)
             return move;
 
         return MOVE_NONE;
@@ -118,9 +124,19 @@ public:
 
         Move move;
 
+        while (mQuietsData.mIdx < mQuietsData.mMoves.size())
+        {
+            move = mQuietsData.mMoves[(*(mQuietsData.mIdx))++];
+
+            if (isPseudolegalLegal(pos, move))
+                return move;
+        }
+
+        /*
         while ((move = mQuietsData.next()) != MOVE_NONE)
             if (isPseudolegalLegal(pos, move))
                 return move;
+        */
 
         return MOVE_NONE;
     }

@@ -431,10 +431,10 @@ constexpr bool hasLegalMove(Position& pos)
             // If after the en passant our king is under attack, then en passant was illegal
 
             if (pos.getBb(pos.notSideToMove(), PieceType::Pawn) & getPawnAttacks(kingSquare, stm))
-                return true;
+                return false;
 
             if (pos.getBb(pos.notSideToMove(), PieceType::Knight) & getKnightAttacks(kingSquare))
-                return true;
+                return false;
 
             const Bitboard occAfter = colorBbs[Color::White] | colorBbs[Color::Black];
 
@@ -442,13 +442,13 @@ constexpr bool hasLegalMove(Position& pos)
                 = pos.them() & (pos.getBb(PieceType::Bishop) | pos.getBb(PieceType::Queen));
 
             if (enemyBishopsQueens & getBishopAttacks(kingSquare, occAfter))
-                return true;
+                return false;
 
             const Bitboard enemyRooksQueens
                 = pos.them() & (pos.getBb(PieceType::Rook) | pos.getBb(PieceType::Queen));
 
             if (enemyRooksQueens & getRookAttacks(kingSquare, occAfter))
-                return true;
+                return false;
         });
     }
 
