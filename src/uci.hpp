@@ -10,6 +10,8 @@
 
 namespace uci {
 
+inline void setoption(const std::vector<std::string>& tokens, Searcher& searcher);
+
 constexpr void position(const std::vector<std::string>& tokens, Position& pos);
 
 constexpr void go(
@@ -34,9 +36,7 @@ inline void runCommand(std::string& command, Position& pos, Searcher& searcher)
         std::cout << std::endl; // Flush
     }
     else if (tokens[0] == "setoption") // e.g. "setoption name Hash value 32"
-    {
-
-    }
+        setoption(tokens, searcher);
     else if (command == "ucinewgame")
     {
         pos = START_POS;
@@ -101,6 +101,25 @@ inline void runCommand(std::string& command, Position& pos, Searcher& searcher)
         pos.makeMove(tokens[1]);
     else if (command == "undomove" && pos.numStates() > 1)
         pos.undoMove();
+}
+
+inline void setoption(const std::vector<std::string>& tokens, Searcher& searcher)
+{
+    const std::string optionName  = tokens[2];
+    const std::string optionValue = tokens[4];
+
+    if (optionName == "Hash" || optionName == "hash")
+    {
+        const i64 newMebibytes = std::max<i64>(stoll(optionValue), 1);
+        resizeTT(searcher.mTT, static_cast<size_t>(newMebibytes));
+        printTTSize(searcher.mTT);
+    }
+    else if (optionName == "Threads" || optionName == "threads")
+    {
+        const i64 newNumThreads = std::max<i64>(stoll(optionValue), 1);
+        searcher.setThreads(static_cast<size_t>(newNumThreads));
+        std::cout << "info string Threads set to " << newNumThreads << std::endl;
+    }
 }
 
 constexpr void position(const std::vector<std::string>& tokens, Position& pos)
