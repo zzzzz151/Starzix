@@ -12,24 +12,16 @@ enum class MoveGenType : i32 {
 };
 
 constexpr void addPromotions(
-    ArrayVec<Move, 256>& moves,
-    const Square from,
-    const Square to,
-    const bool underpromos)
+    ArrayVec<Move, 256>& moves, const Square from, const Square to)
 {
     moves.push_back(Move(from, to, MoveFlag::QueenPromo));
-
-    if (underpromos) {
-        moves.push_back(Move(from, to, MoveFlag::KnightPromo));
-        moves.push_back(Move(from, to, MoveFlag::RookPromo));
-        moves.push_back(Move(from, to, MoveFlag::BishopPromo));
-    }
+    moves.push_back(Move(from, to, MoveFlag::KnightPromo));
+    moves.push_back(Move(from, to, MoveFlag::RookPromo));
+    moves.push_back(Move(from, to, MoveFlag::BishopPromo));
 }
 
 constexpr ArrayVec<Move, 256> pseudolegalMoves(
-    Position& pos,
-    const MoveGenType moveGenType,
-    const bool underpromos = true)
+    Position& pos, const MoveGenType moveGenType)
 {
     ArrayVec<Move, 256> pseudolegals;
 
@@ -86,7 +78,7 @@ constexpr ArrayVec<Move, 256> pseudolegalMoves(
         ITERATE_BITBOARD(getPawnAttacks(fromSquare, stm) & pos.them(), toSquare,
         {
             if (willPromote)
-                addPromotions(pseudolegals, fromSquare, toSquare, underpromos);
+                addPromotions(pseudolegals, fromSquare, toSquare);
             else
                 pseudolegals.push_back(Move(fromSquare, toSquare, MoveFlag::Pawn));
         });
@@ -101,7 +93,7 @@ constexpr ArrayVec<Move, 256> pseudolegalMoves(
             continue;
 
         if (willPromote && moveGenType != MoveGenType::QuietOnly)
-            addPromotions(pseudolegals, fromSquare, squareOneUp, underpromos);
+            addPromotions(pseudolegals, fromSquare, squareOneUp);
 
         if (willPromote || moveGenType == MoveGenType::NoisyOnly)
             continue;
@@ -178,7 +170,7 @@ constexpr ArrayVec<Move, 256> pseudolegalMoves(
 
     // If can't castle, return moves now
     if (moveGenType == MoveGenType::NoisyOnly || pos.inCheck())
-        return pseudolegals;
+        goto end;
 
     // Short castling
     if (pos.castlingRights() & CASTLING_MASKS[stm][false])
@@ -207,6 +199,18 @@ constexpr ArrayVec<Move, 256> pseudolegalMoves(
             pseudolegals.push_back(Move(kingSquare, toSquare, MoveFlag::Castling));
         }
     }
+
+    end:
+
+    assert([&] () {
+        if (moveGenType == MoveGenType::AllMoves)
+            return true;
+
+        for (const Move move : pseudolegals)
+            assert(pos.isQuiet(move) == (moveGenType == MoveGenType::QuietOnly));
+
+        return true;
+    }());
 
     return pseudolegals;
 }
@@ -427,10 +431,10 @@ constexpr bool hasLegalMove(Position& pos)
             // If after the en passant our king is under attack, then en passant was illegal
 
             if (pos.getBb(pos.notSideToMove(), PieceType::Pawn) & getPawnAttacks(kingSquare, stm))
-                return true;
+                return false;
 
             if (pos.getBb(pos.notSideToMove(), PieceType::Knight) & getKnightAttacks(kingSquare))
-                return true;
+                return false;
 
             const Bitboard occAfter = colorBbs[Color::White] | colorBbs[Color::Black];
 
@@ -438,13 +442,13 @@ constexpr bool hasLegalMove(Position& pos)
                 = pos.them() & (pos.getBb(PieceType::Bishop) | pos.getBb(PieceType::Queen));
 
             if (enemyBishopsQueens & getBishopAttacks(kingSquare, occAfter))
-                return true;
+                return false;
 
             const Bitboard enemyRooksQueens
                 = pos.them() & (pos.getBb(PieceType::Rook) | pos.getBb(PieceType::Queen));
 
             if (enemyRooksQueens & getRookAttacks(kingSquare, occAfter))
-                return true;
+                return false;
         });
     }
 

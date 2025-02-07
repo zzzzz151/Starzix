@@ -4,6 +4,7 @@
 
 #include "utils.hpp"
 #include "position.hpp"
+#include "move_gen.hpp"
 #include "nnue.hpp"
 #include "search_params.hpp"
 #include <mutex>
@@ -31,7 +32,7 @@ public:
     std::optional<i32> score = std::nullopt;
 
     u64 nodes = 0;
-    size_t maxPlyReached = 0;
+    i32 maxPlyReached = 0;
 
     std::array<PlyData, MAX_DEPTH + 1> pliesData; // [ply]
 
@@ -64,22 +65,30 @@ constexpr Move bestMoveAtRoot(const ThreadData* td)
          : MOVE_NONE;
 }
 
-constexpr void makeMove(ThreadData* td, const Move move, const size_t newPly)
+constexpr std::optional<i32> makeMove(ThreadData* td, const Move move, const i32 newPly)
 {
     td->pos.makeMove(move);
     td->nodes++;
 
     // Update seldepth
-    td->maxPlyReached = std::max<size_t>(td->maxPlyReached, newPly);
+    td->maxPlyReached = std::max<i32>(td->maxPlyReached, newPly);
 
-    td->pliesData[newPly].pvLine.clear();
-    td->pliesData[newPly].eval = std::nullopt;
+    PlyData& newPlyData = td->pliesData[static_cast<size_t>(newPly)];
+
+    newPlyData.pvLine.clear();
+    newPlyData.eval = std::nullopt;
 
     if (move != MOVE_NONE)
     {
         td->bothAccsIdx++;
         td->bothAccsStack[td->bothAccsIdx].mUpdated = false;
     }
+
+    const GameState gameState = td->pos.gameState(hasLegalMove, newPly);
+
+    return gameState == GameState::Draw ? std::optional<i32> { 0 }
+         : gameState == GameState::Loss ? std::optional<i32> { INF - newPly }
+         : std::nullopt;
 }
 
 constexpr void undoMove(ThreadData* td)
