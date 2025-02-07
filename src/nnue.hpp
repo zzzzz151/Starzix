@@ -56,7 +56,7 @@ public:
     // [isNotSideToMove][hiddenNeuronIdx]
     alignas(sizeof(Vec)) std::array<HLArray, 2> outputWeights;
 
-    i16 outputBias;
+    i32 outputBias;
 };
 
 INCBIN(NetFile, "src/net.bin");
@@ -394,7 +394,7 @@ constexpr i32 evaluate(const BothAccumulators& bothAccs, const Color stm)
             }
     #endif
 
-    return (sum / QA + static_cast<i32>(NET->outputBias)) * SCALE / (QA * QB);
+    return (sum / QA + NET->outputBias) * SCALE / (QA * QB);
 }
 
 } // namespace nnue

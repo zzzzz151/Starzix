@@ -93,14 +93,15 @@ public:
         if (mSearchConfig.maxNodes && *(mSearchConfig.maxNodes) < std::numeric_limits<u64>::max())
             *(mSearchConfig.maxNodes) += 1;
 
-        // Initialize node counter of every thread to 1 (root node)
+        // Init node counter of every thread to 1 (root node)
         for (ThreadData* td : mThreadsData)
             td->nodes = 1;
 
         if (!hasLegalMove(pos))
             return { MOVE_NONE, pos.inCheck() ? -INF : 0 };
 
-        /*
+        mStopSearch = false;
+
         // Init main thread's root accumulator
         nnue::BothAccumulators& bothAccs = mainThreadData()->bothAccsStack[0];
         bothAccs = nnue::BothAccumulators(pos);
@@ -115,7 +116,7 @@ public:
             &&  inputBucket == bothAccs.mInputBucket[color])
             {
                 finnyEntry.accumulator = bothAccs.mAccumulators[color];
-                finnyEntry.colorBbs = pos.colorBbs();
+                finnyEntry.colorBbs  = pos.colorBbs();
                 finnyEntry.piecesBbs = pos.piecesBbs();
             }
             else {
@@ -123,16 +124,20 @@ public:
                 finnyEntry.colorBbs  = { };
                 finnyEntry.piecesBbs = { };
             }
-        }
+        };
 
         // Init main thread's finny table
         for (const Color color : EnumIter<Color>())
             for (const bool mirrorVAxis : { false, true })
                 for (size_t inputBucket = 0; inputBucket < nnue::NUM_INPUT_BUCKETS; inputBucket++)
                     initFinnyEntry(color, mirrorVAxis, inputBucket);
-        */
 
-        mStopSearch = false;
+        // Init root accumulator and finny table of secondary threads
+        for (size_t i = 1; i < mThreadsData.size(); i++)
+        {
+            mThreadsData[i]->bothAccsStack[0] = bothAccs;
+            mThreadsData[i]->finnyTable = mainThreadData()->finnyTable;
+        }
 
         for (ThreadData* td : mThreadsData)
         {
@@ -141,14 +146,6 @@ public:
             td->pliesData[0] = PlyData();
             td->nodesByMove = { };
             td->bothAccsIdx = 0;
-
-            /*
-            if (td != mainThreadData())
-            {
-                td->accumulators[0] = bothAccs;
-                td->finnyTable = mainThreadData()->finnyTable;
-            }
-            */
 
             wakeThread(td, ThreadState::Searching);
         }
@@ -320,24 +317,6 @@ private:
             mStopSearch = true;
     }
 
-    constexpr i32 evaluate(const Position& pos)
-    {
-        constexpr EnumArray<i32, PieceType> PIECE_VALUES = {
-            100, 300, 300, 500, 900, 0
-        };
-
-        i32 eval = static_cast<i32>(pos.zobristHash() % 16);
-
-        for (const PieceType pt : EnumIter<PieceType>())
-        {
-            const i32 numOurs   = std::popcount(pos.getBb(pos.sideToMove(),    pt));
-            const i32 numTheirs = std::popcount(pos.getBb(pos.notSideToMove(), pt));
-            eval += (numOurs - numTheirs) * PIECE_VALUES[pt];
-        }
-
-        return eval;
-    }
-
     constexpr i32 search(ThreadData* td, i32 depth, const i32 ply, i32 alpha, const i32 beta)
     {
         assert(hasLegalMove(td->pos));
@@ -352,9 +331,20 @@ private:
         if (shouldStop(td)) return 0;
 
         // Max ply cutoff
-        if (ply >= MAX_DEPTH) return evaluate(td->pos);
+        if (ply >= MAX_DEPTH)
+            return td->pos.inCheck() ? 0 : *updateBothAccsAndEval(td, ply);
 
         depth = std::min<i32>(depth, MAX_DEPTH);
+
+        nnue::BothAccumulators& bothAccs = td->bothAccsStack[td->bothAccsIdx];
+
+        if (!bothAccs.mUpdated)
+        {
+            assert(td->bothAccsIdx > 0);
+            bothAccs.update(td->bothAccsStack[td->bothAccsIdx - 1], td->pos, td->finnyTable);
+        }
+
+        assert(bothAccs == nnue::BothAccumulators(td->pos));
 
         [[maybe_unused]] size_t legalMovesSeen = 0;
         i32 bestScore = -INF;
@@ -410,16 +400,20 @@ private:
 
         if (shouldStop(td)) return 0;
 
-        const i32 eval = evaluate(td->pos);
-
         // Max ply cutoff
-        if (ply >= MAX_DEPTH) return eval;
+        if (ply >= MAX_DEPTH)
+            return td->pos.inCheck() ? 0 : *updateBothAccsAndEval(td, ply);
 
-        if (eval >= beta) return eval;
+        const std::optional<i32> eval = updateBothAccsAndEval(td, ply);
 
-        alpha = std::max<i32>(alpha, eval);
+        if (!td->pos.inCheck())
+        {
+            if (*eval >= beta) return *eval;
 
-        i32 bestScore = eval;
+            alpha = std::max<i32>(alpha, *eval);
+        }
+
+        i32 bestScore = td->pos.inCheck() ? -INF : *eval;
         Move bestMove = MOVE_NONE;
 
         MovePicker movePicker = MovePicker();

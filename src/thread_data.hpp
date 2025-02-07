@@ -73,10 +73,7 @@ constexpr std::optional<i32> makeMove(ThreadData* td, const Move move, const i32
     // Update seldepth
     td->maxPlyReached = std::max<i32>(td->maxPlyReached, newPly);
 
-    PlyData& newPlyData = td->pliesData[static_cast<size_t>(newPly)];
-
-    newPlyData.pvLine.clear();
-    newPlyData.eval = std::nullopt;
+    td->pliesData[static_cast<size_t>(newPly)] = PlyData();
 
     if (move != MOVE_NONE)
     {
@@ -99,10 +96,10 @@ constexpr void undoMove(ThreadData* td)
     td->pos.undoMove();
 }
 
-constexpr std::optional<i32> updateBothAccsAndEval(ThreadData* td, const size_t ply)
+constexpr std::optional<i32> updateBothAccsAndEval(ThreadData* td, const i32 ply)
 {
     nnue::BothAccumulators& bothAccs = td->bothAccsStack[td->bothAccsIdx];
-    std::optional<i32>& eval = td->pliesData[ply].eval;
+    std::optional<i32>& eval = td->pliesData[static_cast<size_t>(ply)].eval;
 
     if (!bothAccs.mUpdated)
     {
@@ -110,12 +107,12 @@ constexpr std::optional<i32> updateBothAccsAndEval(ThreadData* td, const size_t 
         bothAccs.update(td->bothAccsStack[td->bothAccsIdx - 1], td->pos, td->finnyTable);
     }
 
+    assert(bothAccs == nnue::BothAccumulators(td->pos));
+
     if (td->pos.inCheck())
         eval = std::nullopt;
     else if (!eval)
     {
-        assert(bothAccs == nnue::BothAccumulators(td->pos));
-
         eval = nnue::evaluate(bothAccs, td->pos.sideToMove());
 
         // Clamp eval to avoid invalid values and checkmate values
