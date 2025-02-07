@@ -347,7 +347,7 @@ private:
         assert(alpha < beta);
 
         // Quiescence search at leaf nodes
-        if (depth <= 0) return evaluate(td->pos);
+        if (depth <= 0) return qSearch(td, ply, alpha, beta);
 
         if (shouldStop(td)) return 0;
 
@@ -425,7 +425,9 @@ private:
         MovePicker movePicker = MovePicker();
         Move move;
 
-        while ((move = movePicker.nextLegalNoisy(td->pos, false)) != MOVE_NONE)
+        while ((move = movePicker.nextLegalNoisy(td->pos, false)) != MOVE_NONE
+        || (td->pos.inCheck()
+        && (move = movePicker.nextLegalQuiet(td->pos)) != MOVE_NONE))
         {
             const std::optional<i32> optScore = makeMove(td, move, ply + 1);
 
@@ -435,17 +437,16 @@ private:
 
             if (shouldStop(td)) return 0;
 
-            if (score <= bestScore) continue;
+            bestScore = std::max<i32>(bestScore, score);
 
-            bestScore = score;
-
-            if (bestScore > alpha) {
-                alpha = bestScore;
+            if (score > alpha)
+            {
+                alpha = score;
                 bestMove = move;
             }
 
              // Fail high?
-            if (bestScore >= beta) break;
+            if (score >= beta) break;
         }
 
         return bestScore;
