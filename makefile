@@ -32,9 +32,6 @@ test:
 
 	$(CXX) $(CXXFLAGS) -march=native tests/testNNUE.cpp -o testNNUE$(SUFFIX)
 	./testNNUE$(SUFFIX)
-testMovegen:
-	$(CXX) $(CXXFLAGS) -march=native tests/testMoveGen.cpp -o testMoveGen$(SUFFIX)
-	./testMoveGen$(SUFFIX)
 tune:
 	$(CXX) $(CXXFLAGS) -march=native -DNDEBUG -DTUNE src/*.cpp -o $(EXE)$(SUFFIX)
 release:
