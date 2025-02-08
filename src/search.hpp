@@ -417,11 +417,15 @@ private:
 
             bound = Bound::Lower;
 
-            const i32 histBonus = std::clamp<i32>(
-                depth * historyBonusMul() - historyBonusOffset(), 0, historyBonusMax()
-            );
+            if (td->pos.isQuiet(move))
+            {
+                const i32 histBonus = std::clamp<i32>(
+                    depth * historyBonusMul() - historyBonusOffset(), 0, historyBonusMax()
+                );
 
-            td->historyTable[td->pos.sideToMove()][move.pieceType()][move.to()].update(histBonus);
+                td->historyTable[td->pos.sideToMove()][move.pieceType()][move.to()]
+                    .update(histBonus);
+            }
 
             break;
         }
