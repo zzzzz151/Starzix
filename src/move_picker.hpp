@@ -6,6 +6,7 @@
 #include "move.hpp"
 #include "position.hpp"
 #include "move_gen.hpp"
+#include "history_entry.hpp"
 
 struct MovesData
 {
@@ -16,10 +17,14 @@ public:
     std::optional<size_t> mIdx = std::nullopt;
 
     template <MoveGenType moveGenType>
-    constexpr void genAndScoreMoves(Position& pos, const Move ttMove)
+    constexpr void genAndScoreMoves(
+        Position& pos,
+        const Move ttMove,
+        const EnumArray<HistoryEntry, Color, PieceType, Square>* historyTable = nullptr)
     {
         static_assert(moveGenType != MoveGenType::AllMoves);
 
+        // Already generated and scored?
         if (mIdx) return;
 
         // Generate pseudolegal moves
@@ -60,7 +65,12 @@ public:
             }
             else if constexpr (moveGenType == MoveGenType::QuietOnly)
             {
-                mScores[i] = 0;
+                assert(historyTable != nullptr);
+
+                const HistoryEntry& histEntry
+                    = (*historyTable)[pos.sideToMove()][move.pieceType()][move.to()];
+
+                mScores[i] = histEntry.getHistory();
             }
 
             i++;
@@ -110,7 +120,9 @@ public:
         mTtMove = ttMove;
     }
 
-    constexpr Move nextLegal(Position& pos)
+    constexpr Move nextLegal(
+        Position& pos,
+        const EnumArray<HistoryEntry, Color, PieceType, Square>& historyTable)
     {
         // Maybe return TT move the first time this function is called
         if (!nextLegalCalled)
@@ -145,7 +157,7 @@ public:
         if (mNoisiesOnly) goto badNoisyMoves;
 
         // If not done already, gen and score quiet moves
-        mQuietsData.genAndScoreMoves<MoveGenType::QuietOnly>(pos, mTtMove);
+        mQuietsData.genAndScoreMoves<MoveGenType::QuietOnly>(pos, mTtMove, &historyTable);
 
         // Yield quiet moves
         while (true) {

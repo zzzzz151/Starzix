@@ -11,6 +11,7 @@
 //#include "simd.hpp"
 //#include "nnue.hpp"
 //#include "search_params.hpp"
+//#include "history_entry.hpp"
 //#include "thread_data.hpp"
 //#include "move_picker.hpp"
 //#include "tt.hpp"
