@@ -151,6 +151,9 @@ public:
 
         mStopSearch = false;
 
+        // Init main thread's position
+        mainThreadData()->pos = pos;
+
         // Init main thread's root accumulator
         nnue::BothAccumulators& bothAccs = mainThreadData()->bothAccsStack[0];
         bothAccs = nnue::BothAccumulators(pos);
@@ -181,16 +184,16 @@ public:
                 for (size_t inputBucket = 0; inputBucket < nnue::NUM_INPUT_BUCKETS; inputBucket++)
                     initFinnyEntry(color, mirrorVAxis, inputBucket);
 
-        // Init root accumulator and finny table of secondary threads
+        // Init position, root accumulator and finny table of secondary threads
         for (size_t i = 1; i < mThreadsData.size(); i++)
         {
+            mThreadsData[i]->pos = pos;
             mThreadsData[i]->bothAccsStack[0] = bothAccs;
             mThreadsData[i]->finnyTable = mainThreadData()->finnyTable;
         }
 
         for (ThreadData* td : mThreadsData)
         {
-            td->pos = pos;
             td->score = std::nullopt;
             td->pliesData[0] = PlyData();
             td->nodesByMove = { };
