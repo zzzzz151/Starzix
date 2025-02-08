@@ -271,10 +271,10 @@ constexpr bool isPseudolegal(Position& pos, const Move move)
             return false;
 
         const Square thruSquare = isLongCastle ? previous<Square>(from) : next<Square>(from);
-        const Bitboard occAndEnemyAttacks = pos.occupied() & pos.enemyAttacksNoStmKing();
+        const Bitboard occOrEnemyAttacks = pos.occupied() | pos.enemyAttacksNoStmKing();
 
-        return !hasSquare(occAndEnemyAttacks, to)
-            && !hasSquare(occAndEnemyAttacks, thruSquare);
+        return !hasSquare(occOrEnemyAttacks, to)
+            && !hasSquare(occOrEnemyAttacks, thruSquare);
     }
 
     const Bitboard moves
