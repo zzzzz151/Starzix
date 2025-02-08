@@ -66,37 +66,6 @@ constexpr Move bestMoveAtRoot(const ThreadData* td)
          : MOVE_NONE;
 }
 
-constexpr std::optional<i32> makeMove(ThreadData* td, const Move move, const i32 newPly)
-{
-    td->pos.makeMove(move);
-    td->nodes.fetch_add(1, std::memory_order_relaxed);
-
-    // Update seldepth
-    td->maxPlyReached = std::max<i32>(td->maxPlyReached, newPly);
-
-    td->pliesData[static_cast<size_t>(newPly)] = PlyData();
-
-    if (move != MOVE_NONE)
-    {
-        td->bothAccsIdx++;
-        td->bothAccsStack[td->bothAccsIdx].mUpdated = false;
-    }
-
-    const GameState gameState = td->pos.gameState(hasLegalMove, newPly);
-
-    return gameState == GameState::Draw ? std::optional<i32> { 0 }
-         : gameState == GameState::Loss ? std::optional<i32> { INF - newPly }
-         : std::nullopt;
-}
-
-constexpr void undoMove(ThreadData* td)
-{
-    if (td->pos.lastMove() != MOVE_NONE)
-        td->bothAccsIdx--;
-
-    td->pos.undoMove();
-}
-
 constexpr std::optional<i32> updateBothAccsAndEval(ThreadData* td, const i32 ply)
 {
     nnue::BothAccumulators& bothAccs = td->bothAccsStack[td->bothAccsIdx];
@@ -121,4 +90,46 @@ constexpr std::optional<i32> updateBothAccsAndEval(ThreadData* td, const i32 ply
     }
 
     return eval;
+}
+
+constexpr std::optional<i32> makeMove(ThreadData* td, const Move move, const i32 newPly)
+{
+    td->pos.makeMove(move);
+    td->nodes.fetch_add(1, std::memory_order_relaxed);
+
+    // Update seldepth
+    td->maxPlyReached = std::max<i32>(td->maxPlyReached, newPly);
+
+    td->pliesData[static_cast<size_t>(newPly)] = PlyData();
+
+    if (move != MOVE_NONE)
+    {
+        td->bothAccsIdx++;
+        td->bothAccsStack[td->bothAccsIdx].mUpdated = false;
+    }
+
+    const GameState gameState = td->pos.gameState(hasLegalMove, newPly);
+
+    if (gameState == GameState::Draw)
+        return 0;
+
+    if (gameState == GameState::Loss)
+        return -INF + newPly;
+
+    if (newPly >= MAX_DEPTH)
+    {
+        return td->pos.inCheck()
+             ? std::optional<i32> { 0 }
+             : updateBothAccsAndEval(td, newPly);
+    }
+
+    return std::nullopt;
+}
+
+constexpr void undoMove(ThreadData* td)
+{
+    if (td->pos.lastMove() != MOVE_NONE)
+        td->bothAccsIdx--;
+
+    td->pos.undoMove();
 }

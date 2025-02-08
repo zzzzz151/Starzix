@@ -339,7 +339,7 @@ private:
     constexpr i32 search(ThreadData* td, i32 depth, const i32 ply, i32 alpha, const i32 beta)
     {
         assert(hasLegalMove(td->pos));
-        assert(ply >= 0 && ply <= MAX_DEPTH);
+        assert(ply >= 0 && ply < MAX_DEPTH);
         assert(alpha >= -INF && alpha <= INF);
         assert(beta  >= -INF && beta  <= INF);
         assert(alpha < beta);
@@ -348,10 +348,6 @@ private:
         if (depth <= 0) return qSearch(td, ply, alpha, beta);
 
         if (shouldStop(td)) return 0;
-
-        // Max ply cutoff
-        if (ply >= MAX_DEPTH)
-            return td->pos.inCheck() ? 0 : *updateBothAccsAndEval(td, ply);
 
         depth = std::min<i32>(depth, MAX_DEPTH);
 
@@ -386,7 +382,7 @@ private:
             const std::optional<i32> optScore = makeMove(td, move, ply + 1);
 
             const i32 score = optScore
-                            ? *optScore
+                            ? -(*optScore)
                             : -search(td, depth - 1, ply + 1, -beta, -alpha);
 
             undoMove(td);
@@ -431,19 +427,16 @@ private:
         return bestScore;
     }
 
+    // Quiescence search
     constexpr i32 qSearch(ThreadData* td, const i32 ply, i32 alpha, const i32 beta)
     {
         assert(hasLegalMove(td->pos));
-        assert(ply > 0 && ply <= MAX_DEPTH);
+        assert(ply > 0 && ply < MAX_DEPTH);
         assert(alpha >= -INF && alpha <= INF);
         assert(beta  >= -INF && beta  <= INF);
         assert(alpha < beta);
 
         if (shouldStop(td)) return 0;
-
-        // Max ply cutoff
-        if (ply >= MAX_DEPTH)
-            return td->pos.inCheck() ? 0 : *updateBothAccsAndEval(td, ply);
 
         const std::optional<i32> eval = updateBothAccsAndEval(td, ply);
 
@@ -468,7 +461,7 @@ private:
             const std::optional<i32> optScore = makeMove(td, move, ply + 1);
 
             const i32 score = optScore
-                            ? *optScore
+                            ? -(*optScore)
                             : -qSearch(td, ply + 1, -beta, -alpha);
 
             undoMove(td);
