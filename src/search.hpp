@@ -357,14 +357,14 @@ private:
         const size_t ttEntryIdx = ttEntryIndex(td->pos.zobristHash(), mTT.size());
         const TTEntry ttEntry = mTT[ttEntryIdx];
         const bool ttHit = td->pos.zobristHash() == ttEntry.zobristHash;
-        [[maybe_unused]] const Move ttMove = ttHit ? Move(ttEntry.move) : MOVE_NONE;
+        const Move ttMove = ttHit ? Move(ttEntry.move) : MOVE_NONE;
 
         [[maybe_unused]] size_t legalMovesSeen = 0;
         i32 bestScore = -INF;
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::Upper;
 
-        MovePicker movePicker = MovePicker(false, MOVE_NONE);
+        MovePicker movePicker = MovePicker(false, ttMove);
         Move move;
 
         while ((move = movePicker.nextLegal(td->pos)) != MOVE_NONE)
