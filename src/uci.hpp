@@ -101,6 +101,10 @@ inline void runCommand(std::string& command, Position& pos, Searcher& searcher)
         pos.makeMove(tokens[1]);
     else if (command == "undomove" && pos.numStates() > 1)
         pos.undoMove();
+    #if defined(TUNE)
+    else if (command == "spsainput")
+        printSpsaInput();
+    #endif
 }
 
 inline void setoption(const std::vector<std::string>& tokens, Searcher& searcher)
@@ -120,6 +124,23 @@ inline void setoption(const std::vector<std::string>& tokens, Searcher& searcher
         searcher.setThreads(static_cast<size_t>(newNumThreads));
         std::cout << "info string Threads set to " << newNumThreads << std::endl;
     }
+    #if defined(TUNE)
+    else if (tunableParams.count(optionName) > 0)
+    {
+        const auto tunableParam = tunableParams[optionName];
+
+        std::visit([optionName, optionValue] (auto* myParam)
+        {
+            if (myParam == nullptr) return;
+
+            myParam->value = std::stoi(optionValue);
+
+            std::cout << "info string " << optionName
+                      << " set to "     << myParam->value
+                      << std::endl;
+        }, tunableParam);
+    }
+    #endif
 }
 
 constexpr void position(const std::vector<std::string>& tokens, Position& pos)

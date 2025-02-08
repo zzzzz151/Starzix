@@ -220,7 +220,7 @@ private:
         finnyEntry.piecesBbs = pos.piecesBbs();
     }
 
-    public:
+public:
 
     constexpr void update(
         const BothAccumulators& prevBothAccs, const Position& pos, FinnyTable& finnyTable)

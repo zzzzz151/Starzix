@@ -16,7 +16,7 @@
 
 // General utils
 
-#define stringify(myVar) (std::string)#myVar
+#define stringify(myVar) static_cast<std::string>(#myVar)
 
 #define ln(x) log(x)
 

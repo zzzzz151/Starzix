@@ -7,6 +7,7 @@
 #include "move_gen.hpp"
 #include "nnue.hpp"
 #include "search_params.hpp"
+#include "history_entry.hpp"
 #include "thread_data.hpp"
 #include "move_picker.hpp"
 #include "tt.hpp"
@@ -24,9 +25,13 @@ private:
 public:
 
     std::optional<u64> maxNodes = std::nullopt;
-    std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
+
+    std::chrono::time_point<std::chrono::steady_clock> startTime
+        = std::chrono::steady_clock::now();
+
     std::optional<u64> hardMs = std::nullopt;
     std::optional<u64> softMs = std::nullopt;
+
     bool printInfo = true;
 
     constexpr auto getMaxDepth() const {
@@ -122,7 +127,10 @@ public:
     constexpr void ucinewgame()
     {
         for (ThreadData* td : mThreadsData)
+        {
             td->nodes.store(0, std::memory_order_relaxed);
+            td->historyTable = { };
+        }
 
         resetTT(mTT);
     }
@@ -375,7 +383,7 @@ private:
         MovePicker movePicker = MovePicker(false, ttMove);
         Move move;
 
-        while ((move = movePicker.nextLegal(td->pos)) != MOVE_NONE)
+        while ((move = movePicker.nextLegal(td->pos, td->historyTable)) != MOVE_NONE)
         {
             legalMovesSeen++;
 
@@ -408,6 +416,16 @@ private:
             // Fail high
 
             bound = Bound::Lower;
+
+            if (td->pos.isQuiet(move))
+            {
+                const i32 histBonus = std::clamp<i32>(
+                    depth * historyBonusMul() - historyBonusOffset(), 0, historyBonusMax()
+                );
+
+                td->historyTable[td->pos.sideToMove()][move.pieceType()][move.to()]
+                    .update(histBonus);
+            }
 
             break;
         }
@@ -453,7 +471,7 @@ private:
         MovePicker movePicker = MovePicker(!td->pos.inCheck(), MOVE_NONE);
         Move move;
 
-        while ((move = movePicker.nextLegal(td->pos)) != MOVE_NONE)
+        while ((move = movePicker.nextLegal(td->pos, td->historyTable)) != MOVE_NONE)
         {
             if (bestScore > -MIN_MATE_SCORE && move.isUnderpromotion())
                 break;

@@ -7,6 +7,7 @@
 #include "move_gen.hpp"
 #include "nnue.hpp"
 #include "search_params.hpp"
+#include "history_entry.hpp"
 #include <algorithm>
 #include <atomic>
 #include <mutex>
@@ -38,6 +39,9 @@ public:
     std::array<PlyData, MAX_DEPTH + 1> pliesData; // [ply]
 
     std::array<u64, 1ULL << 17> nodesByMove; // [Move.asU16()]
+
+    // [stm][pieceType][targetSquare]
+    EnumArray<HistoryEntry, Color, PieceType, Square> historyTable = { };
 
     std::array<nnue::BothAccumulators, MAX_DEPTH + 1> bothAccsStack;
     size_t bothAccsIdx = 0;
