@@ -10,6 +10,10 @@
 #include "thread_data.hpp"
 #include "move_picker.hpp"
 #include "tt.hpp"
+#include <atomic>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
 
 struct SearchConfig
 {
@@ -65,7 +69,7 @@ public:
 
     inline Searcher() {
         setThreads(1);
-        resizeTT(mTT, 32); // default TT size is 32 MiB
+        resizeTT(mTT, 32); // Default TT size is 32 MiB
     }
 
     inline ~Searcher() {
@@ -118,7 +122,7 @@ public:
     constexpr void ucinewgame()
     {
         for (ThreadData* td : mThreadsData)
-            td->nodes = 0;
+            td->nodes.store(0, std::memory_order_relaxed);
 
         resetTT(mTT);
     }
@@ -128,7 +132,7 @@ public:
         u64 nodes = 0;
 
         for (const ThreadData* td : mThreadsData)
-            nodes += td->nodes;
+            nodes += td->nodes.load(std::memory_order_relaxed);
 
         return nodes;
     }
@@ -144,12 +148,12 @@ public:
 
         // Init node counter of every thread to 1 (root node)
         for (ThreadData* td : mThreadsData)
-            td->nodes = 1;
+            td->nodes.store(1, std::memory_order_relaxed);
 
         if (!hasLegalMove(pos))
             return { MOVE_NONE, pos.inCheck() ? -INF : 0 };
 
-        mStopSearch = false;
+        mStopSearch.store(false, std::memory_order_relaxed);
 
         // Init main thread's position
         mainThreadData()->pos = pos;
@@ -256,32 +260,34 @@ private:
             return false;
 
         if (mSearchConfig.maxNodes && totalNodes() >= *(mSearchConfig.maxNodes))
-            return mStopSearch = true;
+        {
+            mStopSearch.store(true, std::memory_order_relaxed);
+            return true;
+        }
 
         // Check time every N nodes
-        if (!mSearchConfig.hardMs || td->nodes % 1024 != 0)
+        if (!mSearchConfig.hardMs || td->nodes.load(std::memory_order_relaxed) % 1024 != 0)
             return false;
 
-        const auto msElapsed = millisecondsElapsed(mSearchConfig.startTime);
-        return mStopSearch = (msElapsed >= *(mSearchConfig.hardMs));
+        if (millisecondsElapsed(mSearchConfig.startTime) >= *(mSearchConfig.hardMs))
+        {
+            mStopSearch.store(true, std::memory_order_relaxed);
+            return true;
+        }
+
+        return false;
     }
 
     constexpr void iterativeDeepening(ThreadData* td)
     {
         for (i32 depth = 1; depth <= mSearchConfig.getMaxDepth(); depth++)
         {
-            const Move bestMoveAtRootBefore = bestMoveAtRoot(td);
-
             td->maxPlyReached = 0; // Reset seldepth
 
             const i32 score = search(td, depth, 0, -INF, INF);
 
             if (mStopSearch.load(std::memory_order_relaxed))
-            {
-                td->pliesData[0].pvLine.clear();
-                td->pliesData[0].pvLine.push_back(bestMoveAtRootBefore);
                 break;
-            }
 
             td->score = score;
 
@@ -292,8 +298,11 @@ private:
             const u64 msElapsed = millisecondsElapsed(mSearchConfig.startTime);
             const u64 nodes = totalNodes();
 
-            mStopSearch = (mSearchConfig.hardMs && msElapsed >= *(mSearchConfig.hardMs))
-                       || (mSearchConfig.maxNodes && nodes >= *(mSearchConfig.maxNodes));
+            const bool hardMsHit = mSearchConfig.hardMs && msElapsed >= *(mSearchConfig.hardMs);
+            const bool maxNodesHit = mSearchConfig.maxNodes && nodes >= *(mSearchConfig.maxNodes);
+
+            if (hardMsHit || maxNodesHit)
+                mStopSearch.store(true, std::memory_order_relaxed);
 
             if (!mSearchConfig.printInfo)
                 continue;
@@ -324,13 +333,13 @@ private:
 
         // If main thread, signal other threads to stop searching
         if (td == mainThreadData())
-            mStopSearch = true;
+            mStopSearch.store(true, std::memory_order_relaxed);
     }
 
     constexpr i32 search(ThreadData* td, i32 depth, const i32 ply, i32 alpha, const i32 beta)
     {
         assert(hasLegalMove(td->pos));
-        assert(ply >= 0 && ply <= MAX_DEPTH);
+        assert(ply >= 0 && ply < MAX_DEPTH);
         assert(alpha >= -INF && alpha <= INF);
         assert(beta  >= -INF && beta  <= INF);
         assert(alpha < beta);
@@ -339,10 +348,6 @@ private:
         if (depth <= 0) return qSearch(td, ply, alpha, beta);
 
         if (shouldStop(td)) return 0;
-
-        // Max ply cutoff
-        if (ply >= MAX_DEPTH)
-            return td->pos.inCheck() ? 0 : *updateBothAccsAndEval(td, ply);
 
         depth = std::min<i32>(depth, MAX_DEPTH);
 
@@ -377,7 +382,7 @@ private:
             const std::optional<i32> optScore = makeMove(td, move, ply + 1);
 
             const i32 score = optScore
-                            ? *optScore
+                            ? -(*optScore)
                             : -search(td, depth - 1, ply + 1, -beta, -alpha);
 
             undoMove(td);
@@ -422,19 +427,16 @@ private:
         return bestScore;
     }
 
+    // Quiescence search
     constexpr i32 qSearch(ThreadData* td, const i32 ply, i32 alpha, const i32 beta)
     {
         assert(hasLegalMove(td->pos));
-        assert(ply > 0 && ply <= MAX_DEPTH);
+        assert(ply > 0 && ply < MAX_DEPTH);
         assert(alpha >= -INF && alpha <= INF);
         assert(beta  >= -INF && beta  <= INF);
         assert(alpha < beta);
 
         if (shouldStop(td)) return 0;
-
-        // Max ply cutoff
-        if (ply >= MAX_DEPTH)
-            return td->pos.inCheck() ? 0 : *updateBothAccsAndEval(td, ply);
 
         const std::optional<i32> eval = updateBothAccsAndEval(td, ply);
 
@@ -459,7 +461,7 @@ private:
             const std::optional<i32> optScore = makeMove(td, move, ply + 1);
 
             const i32 score = optScore
-                            ? *optScore
+                            ? -(*optScore)
                             : -qSearch(td, ply + 1, -beta, -alpha);
 
             undoMove(td);
