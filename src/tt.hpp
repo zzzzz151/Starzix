@@ -54,7 +54,7 @@ inline void printTTSize(const std::vector<TTEntry>& tt)
 constexpr void resizeTT(std::vector<TTEntry>& tt, const size_t newMebibytes)
 {
     const size_t numEntries = newMebibytes * 1024 * 1024 / sizeof(TTEntry);
-    tt.clear(); // remove all elements
+    tt.clear(); // Remove all elements
     tt.resize(numEntries);
     tt.shrink_to_fit();
 }
@@ -62,7 +62,7 @@ constexpr void resizeTT(std::vector<TTEntry>& tt, const size_t newMebibytes)
 constexpr void resetTT(std::vector<TTEntry>& tt)
 {
     const auto numEntries = tt.size();
-    tt.clear(); // remove all elements
+    tt.clear(); // Remove all elements
     tt.resize(numEntries);
     tt.shrink_to_fit();
 }

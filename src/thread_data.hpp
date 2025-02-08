@@ -7,9 +7,10 @@
 #include "move_gen.hpp"
 #include "nnue.hpp"
 #include "search_params.hpp"
+#include <algorithm>
+#include <atomic>
 #include <mutex>
 #include <condition_variable>
-#include <algorithm>
 
 struct PlyData
 {
@@ -31,7 +32,7 @@ public:
 
     std::optional<i32> score = std::nullopt;
 
-    u64 nodes = 0;
+    std::atomic<u64> nodes = 0;
     i32 maxPlyReached = 0;
 
     std::array<PlyData, MAX_DEPTH + 1> pliesData; // [ply]
@@ -68,7 +69,7 @@ constexpr Move bestMoveAtRoot(const ThreadData* td)
 constexpr std::optional<i32> makeMove(ThreadData* td, const Move move, const i32 newPly)
 {
     td->pos.makeMove(move);
-    td->nodes++;
+    td->nodes.fetch_add(1, std::memory_order_relaxed);
 
     // Update seldepth
     td->maxPlyReached = std::max<i32>(td->maxPlyReached, newPly);
