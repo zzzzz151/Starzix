@@ -11,12 +11,12 @@ enum class GameState : i32 {
 };
 
 // [color][isLongCastle]
-constexpr EnumArray<std::array<Bitboard, 2>, Color> CASTLING_MASKS =
+constexpr EnumArray<std::array<Square, 2>, Color> CASTLING_ROOK_FROM =
 {
     // White short and long castle
-    std::array<Bitboard, 2> { squareBb(Square::H1), squareBb(Square::A1) },
+    std::array<Square, 2> { Square::H1, Square::A1 },
     // Black short and long castle
-    std::array<Bitboard, 2> { squareBb(Square::H8), squareBb(Square::A8) }
+    std::array<Square, 2> { Square::H8, Square::A8 }
 };
 
 // [kingTargetSquare]
@@ -136,7 +136,7 @@ public:
                 const Color color = isupper(thisChar) ? Color::White : Color::Black;
                 const bool isLongCastle = thisChar == 'Q' || thisChar == 'q';
 
-                state().castlingRights |= CASTLING_MASKS[color][isLongCastle];
+                state().castlingRights |= squareBb(CASTLING_ROOK_FROM[color][isLongCastle]);
             }
 
             state().zobristHash ^= state().castlingRights;
@@ -380,16 +380,16 @@ public:
 
         myFen += " ";
 
-        if (state().castlingRights & CASTLING_MASKS[Color::White][false])
+        if (hasSquare(state().castlingRights, CASTLING_ROOK_FROM[Color::White][false]))
             myFen += "K";
 
-        if (state().castlingRights & CASTLING_MASKS[Color::White][true])
+        if (hasSquare(state().castlingRights, CASTLING_ROOK_FROM[Color::White][true]))
             myFen += "Q";
 
-        if (state().castlingRights & CASTLING_MASKS[Color::Black][false])
+        if (hasSquare(state().castlingRights, CASTLING_ROOK_FROM[Color::Black][false]))
             myFen += "k";
 
-        if (state().castlingRights & CASTLING_MASKS[Color::Black][true])
+        if (hasSquare(state().castlingRights, CASTLING_ROOK_FROM[Color::Black][true]))
             myFen += "q";
 
         // No castling rights
@@ -722,12 +722,12 @@ public:
         // Update castling rights
         if (pieceType == PieceType::King)
         {
-            state().castlingRights &= ~CASTLING_MASKS[sideToMove()][false];
-            state().castlingRights &= ~CASTLING_MASKS[sideToMove()][true];
+            state().castlingRights &= ~squareBb(CASTLING_ROOK_FROM[sideToMove()][false]);
+            state().castlingRights &= ~squareBb(CASTLING_ROOK_FROM[sideToMove()][true]);
         }
-        else if (squareBb(from) & state().castlingRights)
+        else if (hasSquare(state().castlingRights, from))
             state().castlingRights &= ~squareBb(from);
-        if (squareBb(to) & state().castlingRights)
+        else if (hasSquare(state().castlingRights, to))
             state().castlingRights &= ~squareBb(to);
 
         state().zobristHash ^= state().castlingRights; // XOR new castling rights in

@@ -13,6 +13,7 @@
 //#include "search_params.hpp"
 //#include "thread_data.hpp"
 //#include "move_picker.hpp"
+//#include "tt.hpp"
 //#include "search.hpp"
 //#include "bench.hpp"
 #include "uci.hpp"
@@ -32,6 +33,7 @@ int main(int argc, char* argv[])
 
     Position pos = START_POS;
     Searcher searcher = Searcher();
+    printTTSize(searcher.mTT);
 
     // If a command is passed in program args, run it and exit
 
@@ -58,13 +60,7 @@ int main(int argc, char* argv[])
     while (true)
     {
         std::getline(std::cin, command);
-
-        try {
-            uci::runCommand(command, pos, searcher);
-        }
-        catch (...) {
-
-        }
+        uci::runCommand(command, pos, searcher);
     }
 
     return EXIT_SUCCESS;

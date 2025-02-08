@@ -9,6 +9,7 @@
 #include "search_params.hpp"
 #include "thread_data.hpp"
 #include "move_picker.hpp"
+#include "tt.hpp"
 
 struct SearchConfig
 {
@@ -60,18 +61,66 @@ private:
 
 public:
 
+    std::vector<TTEntry> mTT = { }; // Transposition table
+
     inline Searcher() {
         setThreads(1);
+        resizeTT(mTT, 32); // default TT size is 32 MiB
     }
 
     inline ~Searcher() {
         setThreads(0);
     }
 
+    inline void setThreads(const size_t numThreads)
+    {
+        blockUntilSleep();
+
+        // Remove threads
+        while (!mThreadsData.empty())
+        {
+            ThreadData* td = mThreadsData.back();
+
+            wakeThread(td, ThreadState::ExitAsap);
+
+            {
+                std::unique_lock<std::mutex> lock(td->mutex);
+
+                td->cv.wait(lock, [td] {
+                    return td->threadState == ThreadState::Exited;
+                });
+            }
+
+            if (mNativeThreads.back().joinable())
+                mNativeThreads.back().join();
+
+            mNativeThreads.pop_back();
+            delete td, mThreadsData.pop_back();
+        }
+
+        mThreadsData.reserve(numThreads);
+        mNativeThreads.reserve(numThreads);
+
+        // Add threads
+        while (mThreadsData.size() < numThreads)
+        {
+            ThreadData* td = new ThreadData();
+            std::thread nativeThread([=, this]() mutable { loopThread(td); });
+
+            mThreadsData.push_back(td);
+            mNativeThreads.push_back(std::move(nativeThread));
+        }
+
+        mThreadsData.shrink_to_fit();
+        mNativeThreads.shrink_to_fit();
+    }
+
     constexpr void ucinewgame()
     {
         for (ThreadData* td : mThreadsData)
             td->nodes = 0;
+
+        resetTT(mTT);
     }
 
     constexpr u64 totalNodes() const
@@ -101,6 +150,9 @@ public:
             return { MOVE_NONE, pos.inCheck() ? -INF : 0 };
 
         mStopSearch = false;
+
+        // Init main thread's position
+        mainThreadData()->pos = pos;
 
         // Init main thread's root accumulator
         nnue::BothAccumulators& bothAccs = mainThreadData()->bothAccsStack[0];
@@ -132,16 +184,16 @@ public:
                 for (size_t inputBucket = 0; inputBucket < nnue::NUM_INPUT_BUCKETS; inputBucket++)
                     initFinnyEntry(color, mirrorVAxis, inputBucket);
 
-        // Init root accumulator and finny table of secondary threads
+        // Init position, root accumulator and finny table of secondary threads
         for (size_t i = 1; i < mThreadsData.size(); i++)
         {
+            mThreadsData[i]->pos = pos;
             mThreadsData[i]->bothAccsStack[0] = bothAccs;
             mThreadsData[i]->finnyTable = mainThreadData()->finnyTable;
         }
 
         for (ThreadData* td : mThreadsData)
         {
-            td->pos = pos;
             td->score = std::nullopt;
             td->pliesData[0] = PlyData();
             td->nodesByMove = { };
@@ -193,49 +245,6 @@ private:
         }
     }
 
-    inline void setThreads(const size_t numThreads)
-    {
-        blockUntilSleep();
-
-        // Remove threads
-        while (!mThreadsData.empty())
-        {
-            ThreadData* td = mThreadsData.back();
-
-            wakeThread(td, ThreadState::ExitAsap);
-
-            {
-                std::unique_lock<std::mutex> lock(td->mutex);
-
-                td->cv.wait(lock, [td] {
-                    return td->threadState == ThreadState::Exited;
-                });
-            }
-
-            if (mNativeThreads.back().joinable())
-                mNativeThreads.back().join();
-
-            mNativeThreads.pop_back();
-            delete td, mThreadsData.pop_back();
-        }
-
-        mThreadsData.reserve(numThreads);
-        mNativeThreads.reserve(numThreads);
-
-        // Add threads
-        while (mThreadsData.size() < numThreads)
-        {
-            ThreadData* td = new ThreadData();
-            std::thread nativeThread([=, this]() mutable { loopThread(td); });
-
-            mThreadsData.push_back(td);
-            mNativeThreads.push_back(std::move(nativeThread));
-        }
-
-        mThreadsData.shrink_to_fit();
-        mNativeThreads.shrink_to_fit();
-    }
-
     constexpr bool shouldStop(const ThreadData* td)
     {
         if (mStopSearch.load(std::memory_order_relaxed))
@@ -253,7 +262,8 @@ private:
         if (!mSearchConfig.hardMs || td->nodes % 1024 != 0)
             return false;
 
-        return mStopSearch = (millisecondsElapsed(mSearchConfig.startTime) >= *(mSearchConfig.hardMs));
+        const auto msElapsed = millisecondsElapsed(mSearchConfig.startTime);
+        return mStopSearch = (msElapsed >= *(mSearchConfig.hardMs));
     }
 
     constexpr void iterativeDeepening(ThreadData* td)
@@ -346,11 +356,18 @@ private:
 
         assert(bothAccs == nnue::BothAccumulators(td->pos));
 
+        // Probe TT for TT entry
+        const size_t ttEntryIdx = ttEntryIndex(td->pos.zobristHash(), mTT.size());
+        const TTEntry ttEntry = mTT[ttEntryIdx];
+        const bool ttHit = td->pos.zobristHash() == ttEntry.zobristHash;
+        const Move ttMove = ttHit ? Move(ttEntry.move) : MOVE_NONE;
+
         [[maybe_unused]] size_t legalMovesSeen = 0;
         i32 bestScore = -INF;
         Move bestMove = MOVE_NONE;
+        Bound bound = Bound::Upper;
 
-        MovePicker movePicker = MovePicker();
+        MovePicker movePicker = MovePicker(false, ttMove);
         Move move;
 
         while ((move = movePicker.nextLegal(td->pos)) != MOVE_NONE)
@@ -359,7 +376,9 @@ private:
 
             const std::optional<i32> optScore = makeMove(td, move, ply + 1);
 
-            const i32 score = optScore ? *optScore : -search(td, depth - 1, ply + 1, -beta, -alpha);
+            const i32 score = optScore
+                            ? *optScore
+                            : -search(td, depth - 1, ply + 1, -beta, -alpha);
 
             undoMove(td);
 
@@ -372,6 +391,7 @@ private:
 
             alpha = score;
             bestMove = move;
+            bound = Bound::Exact;
 
             if (ply == 0) {
                 td->pliesData[0].pvLine.clear();
@@ -382,11 +402,23 @@ private:
 
             // Fail high
 
+            bound = Bound::Lower;
+
             break;
         }
 
         assert(legalMovesSeen > 0);
 
+        // Update TT entry
+        mTT[ttEntryIdx].update(
+            td->pos.zobristHash(),
+            static_cast<u8>(depth),
+            static_cast<i16>(bestScore),
+            bound,
+            bestMove
+        );
+
+        assert(std::abs(bestScore) < INF);
         return bestScore;
     }
 
@@ -416,16 +448,19 @@ private:
         i32 bestScore = td->pos.inCheck() ? -INF : *eval;
         Move bestMove = MOVE_NONE;
 
-        MovePicker movePicker = MovePicker();
+        MovePicker movePicker = MovePicker(!td->pos.inCheck(), MOVE_NONE);
         Move move;
 
-        while ((move = movePicker.nextLegalNoisy(td->pos, false)) != MOVE_NONE
-        || (td->pos.inCheck()
-        && (move = movePicker.nextLegalQuiet(td->pos)) != MOVE_NONE))
+        while ((move = movePicker.nextLegal(td->pos)) != MOVE_NONE)
         {
+            if (bestScore > -MIN_MATE_SCORE && move.isUnderpromotion())
+                break;
+
             const std::optional<i32> optScore = makeMove(td, move, ply + 1);
 
-            const i32 score = optScore ? *optScore : -qSearch(td, ply + 1, -beta, -alpha);
+            const i32 score = optScore
+                            ? *optScore
+                            : -qSearch(td, ply + 1, -beta, -alpha);
 
             undoMove(td);
 
@@ -443,6 +478,7 @@ private:
             if (score >= beta) break;
         }
 
+        assert(std::abs(bestScore) < INF);
         return bestScore;
     }
 

@@ -421,12 +421,12 @@ constexpr EnumArray<Bitboard, Square, Square> BETWEEN_EXCLUSIVE_BB = [] () const
         {
             if (sq1 == sq2) continue;
 
-            if (getBishopAttacks(sq1, 0) & squareBb(sq2))
+            if (hasSquare(getBishopAttacks(sq1, 0), sq2))
             {
                 betweenExclusiveBb[sq1][sq2] = getBishopAttacks(sq1, squareBb(sq2))
                                              & getBishopAttacks(sq2, squareBb(sq1));
             }
-            else if (getRookAttacks(sq1, 0) & squareBb(sq2))
+            else if (hasSquare(getRookAttacks(sq1, 0), sq2))
             {
                 betweenExclusiveBb[sq1][sq2] = getRookAttacks(sq1, squareBb(sq2))
                                              & getRookAttacks(sq2, squareBb(sq1));
@@ -447,9 +447,9 @@ constexpr EnumArray<Bitboard, Square, Square> LINE_THRU_BB = [] () consteval
         {
             if (sq1 == sq2) continue;
 
-            if (getBishopAttacks(sq1, 0) & squareBb(sq2))
+            if (hasSquare(getBishopAttacks(sq1, 0), sq2))
                 lineThruBb[sq1][sq2] |= getBishopAttacks(sq1, 0) & getBishopAttacks(sq2, 0);
-            else if (getRookAttacks(sq1, 0) & squareBb(sq2))
+            else if (hasSquare(getRookAttacks(sq1, 0), sq2))
                 lineThruBb[sq1][sq2] |= getRookAttacks(sq1, 0) & getRookAttacks(sq2, 0);
 
             if (lineThruBb[sq1][sq2] > 0)

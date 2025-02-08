@@ -59,7 +59,7 @@ constexpr std::array BENCH_FENS {
     "2r2b2/5p2/5k2/p1r1pP2/P2pB3/1P3P2/K1P3R1/7R w - - 23 93"
 };
 
-inline void bench(const i32 depth = 5)
+inline void bench(const i32 depth = 6)
 {
     Searcher searcher = Searcher();
 
@@ -72,7 +72,9 @@ inline void bench(const i32 depth = 5)
     for (const std::string fen : BENCH_FENS)
     {
         Position pos = Position(fen);
-        std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
+
+        std::chrono::time_point<std::chrono::steady_clock> startTime
+            = std::chrono::steady_clock::now();
 
         searcher.search(pos, searchConfig);
 
