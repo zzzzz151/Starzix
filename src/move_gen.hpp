@@ -264,7 +264,7 @@ constexpr bool isPseudolegal(Position& pos, const Move move)
         // Do we have this castling right?
         if (!hasSquare(pos.castlingRights(), rookFrom)
         // Do we have rook in corner?
-        || !hasSquare(pos.getBb(stm, PieceType::Rook), rookFrom))
+        ||  !hasSquare(pos.getBb(stm, PieceType::Rook), rookFrom))
             return false;
 
         if (isLongCastle && pos.isOccupied(next<Square>(rookFrom)))
@@ -552,6 +552,8 @@ constexpr bool hasLegalMove(Position& pos)
 
         if (enemyRooksQueens & getRookAttacks(kingSquare, occAfter))
             return false;
+
+        return true;
     });
 
     return false;

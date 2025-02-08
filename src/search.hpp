@@ -387,8 +387,8 @@ private:
             if (score <= alpha) continue;
 
             alpha = score;
-            bound = Bound::Exact;
             bestMove = move;
+            bound = Bound::Exact;
 
             if (ply == 0) {
                 td->pliesData[0].pvLine.clear();
