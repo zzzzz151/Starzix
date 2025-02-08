@@ -55,7 +55,7 @@ constexpr u32 OVERHEAD_MS = 20;
 // Hard time limit is divided by this, so this must not be 0
 constexpr u32 DEFAULT_MOVES_TO_GO = 25;
 
-// History bonus
+// History heuristic
 constexpr i32 HISTORY_MAX = 16384;
 MAYBE_CONSTEXPR TunableParam<i32> historyBonusMul    = TunableParam<i32>(300, 50, 600, 25);
 MAYBE_CONSTEXPR TunableParam<i32> historyBonusOffset = TunableParam<i32>(0, 0, 500, 100);
