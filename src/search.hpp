@@ -364,7 +364,7 @@ private:
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::Upper;
 
-        MovePicker movePicker = MovePicker();
+        MovePicker movePicker = MovePicker(false, MOVE_NONE);
         Move move;
 
         while ((move = movePicker.nextLegal(td->pos)) != MOVE_NONE)
@@ -415,6 +415,7 @@ private:
             bestMove
         );
 
+        assert(std::abs(bestScore) < INF);
         return bestScore;
     }
 
@@ -444,13 +445,14 @@ private:
         i32 bestScore = td->pos.inCheck() ? -INF : *eval;
         Move bestMove = MOVE_NONE;
 
-        MovePicker movePicker = MovePicker();
+        MovePicker movePicker = MovePicker(!td->pos.inCheck(), MOVE_NONE);
         Move move;
 
-        while ((move = movePicker.nextLegalNoisy(td->pos, false)) != MOVE_NONE
-        || (td->pos.inCheck()
-        && (move = movePicker.nextLegalQuiet(td->pos)) != MOVE_NONE))
+        while ((move = movePicker.nextLegal(td->pos)) != MOVE_NONE)
         {
+            if (bestScore > -MIN_MATE_SCORE && move.isUnderpromotion())
+                break;
+
             const std::optional<i32> optScore = makeMove(td, move, ply + 1);
 
             const i32 score = optScore
@@ -473,6 +475,7 @@ private:
             if (score >= beta) break;
         }
 
+        assert(std::abs(bestScore) < INF);
         return bestScore;
     }
 
