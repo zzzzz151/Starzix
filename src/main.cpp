@@ -60,13 +60,7 @@ int main(int argc, char* argv[])
     while (true)
     {
         std::getline(std::cin, command);
-
-        try {
-            uci::runCommand(command, pos, searcher);
-        }
-        catch (...) {
-
-        }
+        uci::runCommand(command, pos, searcher);
     }
 
     return EXIT_SUCCESS;

@@ -146,18 +146,34 @@ static_assert(Move(Square::A2, Square::A1, MoveFlag::QueenPromo)    .to() == Squ
 static_assert(Move(Square::B1, Square::C3, MoveFlag::Knight)        .to() == Square::C3);
 
 // Test Move.pieceType()
-static_assert(Move(Square::D2, Square::D4, MoveFlag::PawnDoublePush).pieceType() == PieceType::Pawn);
-static_assert(Move(Square::D5, Square::E6, MoveFlag::EnPassant)     .pieceType() == PieceType::Pawn);
-static_assert(Move(Square::A2, Square::A1, MoveFlag::QueenPromo)    .pieceType() == PieceType::Pawn);
-static_assert(Move(Square::B1, Square::C3, MoveFlag::Knight)        .pieceType() == PieceType::Knight);
-static_assert(Move(Square::E1, Square::G1, MoveFlag::Castling)      .pieceType() == PieceType::King);
+
+static_assert(Move(Square::D2, Square::D4, MoveFlag::PawnDoublePush)
+    .pieceType() == PieceType::Pawn);
+
+static_assert(Move(Square::D5, Square::E6, MoveFlag::EnPassant)
+    .pieceType() == PieceType::Pawn);
+
+static_assert(Move(Square::A2, Square::A1, MoveFlag::QueenPromo)
+    .pieceType() == PieceType::Pawn);
+
+static_assert(Move(Square::B1, Square::C3, MoveFlag::Knight)
+    .pieceType() == PieceType::Knight);
+
+static_assert(Move(Square::E1, Square::G1, MoveFlag::Castling)
+    .pieceType() == PieceType::King);
 
 // Test Move.promotion()
+
 static_assert(!Move(Square::D4, Square::D5, MoveFlag::Pawn)          .promotion());
 static_assert(!Move(Square::D2, Square::D4, MoveFlag::PawnDoublePush).promotion());
 static_assert(!Move(Square::D5, Square::E6, MoveFlag::EnPassant)     .promotion());
-static_assert(Move(Square::A2, Square::A1, MoveFlag::KnightPromo)    .promotion() == PieceType::Knight);
-static_assert(Move(Square::A2, Square::A1, MoveFlag::QueenPromo)     .promotion() == PieceType::Queen);
+
+static_assert(Move(Square::A2, Square::A1, MoveFlag::KnightPromo)
+    .promotion() == PieceType::Knight);
+
+static_assert(Move(Square::A2, Square::A1, MoveFlag::QueenPromo)
+    .promotion() == PieceType::Queen);
+
 static_assert(!Move(Square::B1, Square::C3, MoveFlag::Knight)        .promotion());
 static_assert(!Move(Square::E1, Square::G1, MoveFlag::Castling)      .promotion());
 

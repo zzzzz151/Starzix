@@ -173,22 +173,28 @@ constexpr ArrayVec<Move, 256> pseudolegalMoves(
         goto end;
 
     // Short castling
-    if (hasSquare(pos.castlingRights(), CASTLING_ROOK_FROM[stm][false])
-    && !hasSquare(occ | enemyAttacks, add<Square>(kingSquare, 1))
-    && !hasSquare(occ | enemyAttacks, add<Square>(kingSquare, 2)))
+    if (hasSquare(pos.castlingRights(), CASTLING_ROOK_FROM[stm][false]))
     {
-        const Square toSquare = add<Square>(kingSquare, 2);
-        pseudolegals.push_back(Move(kingSquare, toSquare, MoveFlag::Castling));
+        const Square kingTo = add<Square>(kingSquare, 2);
+
+        if (!hasSquare(occ | enemyAttacks, next<Square>(kingSquare))
+        &&  !hasSquare(occ | enemyAttacks, kingTo))
+        {
+            pseudolegals.push_back(Move(kingSquare, kingTo, MoveFlag::Castling));
+        }
     }
 
     // Long castling
-    if (hasSquare(pos.castlingRights(), CASTLING_ROOK_FROM[stm][true])
-    && !hasSquare(occ | enemyAttacks, add<Square>(kingSquare, -1))
-    && !hasSquare(occ | enemyAttacks, add<Square>(kingSquare, -2))
-    && !pos.isOccupied(add<Square>(kingSquare, -3)))
+    if (hasSquare(pos.castlingRights(), CASTLING_ROOK_FROM[stm][true]))
     {
-        const Square toSquare = add<Square>(kingSquare, -2);
-        pseudolegals.push_back(Move(kingSquare, toSquare, MoveFlag::Castling));
+        const Square kingTo = add<Square>(kingSquare, -2);
+
+        if (!hasSquare(occ | enemyAttacks, previous<Square>(kingSquare))
+        &&  !hasSquare(occ | enemyAttacks, kingTo)
+        &&  !pos.isOccupied(previous<Square>(kingTo)))
+        {
+            pseudolegals.push_back(Move(kingSquare, kingTo, MoveFlag::Castling));
+        }
     }
 
     end:
@@ -206,7 +212,7 @@ constexpr ArrayVec<Move, 256> pseudolegalMoves(
     return pseudolegals;
 }
 
-constexpr bool isPseudolegal(const Position& pos, const Move move)
+constexpr bool isPseudolegal(Position& pos, const Move move)
 {
     if (move == MOVE_NONE) return false;
 
@@ -225,9 +231,8 @@ constexpr bool isPseudolegal(const Position& pos, const Move move)
         const Bitboard wrongAttacks = getPawnAttacks(from, pos.notSideToMove());
 
         // Pawn moving in wrong direction?
-        if (to == add<Square>(from, stm == Color::White ? -8  : 8)
-        ||  to == add<Square>(from, stm == Color::White ? -16 : 16)
-        ||  hasSquare(wrongAttacks, to))
+        if (to == add<Square>(from, stm == Color::White ? -8 : 8)
+        || hasSquare(wrongAttacks, to))
             return false;
 
         // If en passant, is en passant square the move's target square?
@@ -253,28 +258,23 @@ constexpr bool isPseudolegal(const Position& pos, const Move move)
     {
         if (pos.inCheck()) return false;
 
-        const auto [rookFrom, rookTo] = CASTLING_ROOK_FROM_TO[to];
-
-        if (!hasSquare(pos.castlingRights(), rookFrom))
-            return false;
-
-        // Do we have rook in the corner?
-        if(!hasSquare(pos.getBb(stm, PieceType::Rook), rookFrom))
-            return false;
-
-        const bool isLongCastle = static_cast<i32>(from) < static_cast<i32>(to);
+        const bool isLongCastle = static_cast<i32>(from) > static_cast<i32>(to);
+        const Square rookFrom = CASTLING_ROOK_FROM[stm][isLongCastle];
 
         // Do we have this castling right?
-        if (!hasSquare(pos.castlingRights(), CASTLING_ROOK_FROM[stm][isLongCastle]))
+        if (!hasSquare(pos.castlingRights(), rookFrom)
+        // Do we have rook in corner?
+        || !hasSquare(pos.getBb(stm, PieceType::Rook), rookFrom))
             return false;
 
-        if (isLongCastle && pos.isOccupied(add<Square>(from, -3))
+        if (isLongCastle && pos.isOccupied(next<Square>(rookFrom)))
             return false;
 
+        const Square thruSquare = isLongCastle ? previous<Square>(from) : next<Square>(from);
         const Bitboard occAndEnemyAttacks = pos.occupied() & pos.enemyAttacksNoStmKing();
 
-        return !hasSquare(occAndEnemyAttacks, add<Square>(from, isLongCastle ? 1 : -1))
-            && !hasSquare(occAndEnemyAttacks, add<Square>(from, isLongCastle ? 2 : -2));
+        return !hasSquare(occAndEnemyAttacks, to)
+            && !hasSquare(occAndEnemyAttacks, thruSquare);
     }
 
     const Bitboard moves

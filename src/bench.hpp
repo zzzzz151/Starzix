@@ -72,7 +72,9 @@ inline void bench(const i32 depth = 5)
     for (const std::string fen : BENCH_FENS)
     {
         Position pos = Position(fen);
-        std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
+
+        std::chrono::time_point<std::chrono::steady_clock> startTime
+            = std::chrono::steady_clock::now();
 
         searcher.search(pos, searchConfig);
 
