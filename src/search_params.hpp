@@ -50,7 +50,7 @@ constexpr i32 INF = 30'000;
 constexpr i32 MIN_MATE_SCORE = INF - MAX_DEPTH;
 
 // Time management
-MAYBE_CONSTEXPR TunableParam<double> hardTimePercentage = TunableParam<double>(0.75, 0.5, 0.8, 0.05);
+MAYBE_CONSTEXPR TunableParam<double> hardTimePercentage = TunableParam<double>(0.5, 0.25, 0.75, 0.05);
 MAYBE_CONSTEXPR TunableParam<double> softTimePercentage = TunableParam<double>(0.05, 0.02, 0.20, 0.02);
 
 // History heuristic
