@@ -292,7 +292,7 @@ private:
         {
             td->maxPlyReached = 0; // Reset seldepth
 
-            const i32 score = search(td, depth, 0, -INF, INF);
+            const i32 score = search<true>(td, depth, 0, -INF, INF);
 
             if (mStopSearch.load(std::memory_order_relaxed))
                 break;
@@ -344,12 +344,14 @@ private:
             mStopSearch.store(true, std::memory_order_relaxed);
     }
 
+    template<bool isRoot>
     constexpr i32 search(ThreadData* td, i32 depth, const i32 ply, i32 alpha, const i32 beta)
     {
         assert(hasLegalMove(td->pos));
+        assert(isRoot == (ply == 0));
         assert(ply >= 0 && ply < MAX_DEPTH);
-        assert(alpha >= -INF && alpha <= INF);
-        assert(beta  >= -INF && beta  <= INF);
+        assert(std::abs(alpha) <= INF);
+        assert(std::abs(beta) <= INF);
         assert(alpha < beta);
 
         // Quiescence search at leaf nodes
@@ -370,10 +372,27 @@ private:
         assert(bothAccs == nnue::BothAccumulators(td->pos));
 
         // Probe TT for TT entry
-        const size_t ttEntryIdx = ttEntryIndex(td->pos.zobristHash(), mTT.size());
-        const TTEntry ttEntry = mTT[ttEntryIdx];
-        const bool ttHit = td->pos.zobristHash() == ttEntry.zobristHash;
-        const Move ttMove = ttHit ? Move(ttEntry.move) : MOVE_NONE;
+
+        TTEntry& ttEntryRef = getEntry(mTT, td->pos.zobristHash());
+
+        std::optional<TTEntry> ttEntry = ttEntryRef.zobristHash == td->pos.zobristHash()
+                                       ? std::optional<TTEntry> { ttEntryRef }
+                                       : std::nullopt;
+
+        Move ttMove = MOVE_NONE;
+
+        if (ttEntry) {
+            ttEntry->adjustScore(static_cast<i16>(ply));
+            ttMove = Move(ttEntry->move);
+
+            // TT cutoff
+            if (!isRoot
+            && ttEntry->depth >= depth
+            && (ttEntry->bound == Bound::Exact
+            || (ttEntry->bound == Bound::Upper && ttEntry->score <= alpha)
+            || (ttEntry->bound == Bound::Lower && ttEntry->score >= beta)))
+                return ttEntry->score;
+        }
 
         [[maybe_unused]] size_t legalMovesSeen = 0;
         i32 bestScore = -INF;
@@ -391,7 +410,7 @@ private:
 
             const i32 score = optScore
                             ? -(*optScore)
-                            : -search(td, depth - 1, ply + 1, -beta, -alpha);
+                            : -search<false>(td, depth - 1, ply + 1, -beta, -alpha);
 
             undoMove(td);
 
@@ -406,7 +425,7 @@ private:
             bestMove = move;
             bound = Bound::Exact;
 
-            if (ply == 0) {
+            if (isRoot) {
                 td->pliesData[0].pvLine.clear();
                 td->pliesData[0].pvLine.push_back(bestMove);
             }
@@ -433,10 +452,11 @@ private:
         assert(legalMovesSeen > 0);
 
         // Update TT entry
-        mTT[ttEntryIdx].update(
+        ttEntryRef.update(
             td->pos.zobristHash(),
             static_cast<u8>(depth),
             static_cast<i16>(bestScore),
+            static_cast<i16>(ply),
             bound,
             bestMove
         );
@@ -450,8 +470,8 @@ private:
     {
         assert(hasLegalMove(td->pos));
         assert(ply > 0 && ply < MAX_DEPTH);
-        assert(alpha >= -INF && alpha <= INF);
-        assert(beta  >= -INF && beta  <= INF);
+        assert(std::abs(alpha) <= INF);
+        assert(std::abs(beta) <= INF);
         assert(alpha < beta);
 
         if (shouldStop(td)) return 0;
