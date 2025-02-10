@@ -340,7 +340,7 @@ private:
 
             checkSoftTime:
 
-            if (depth >= 6 && mSearchConfig.softMs && msElapsed >= *(mSearchConfig.softMs))
+            if (mSearchConfig.softMs && msElapsed >= *(mSearchConfig.softMs))
                 break;
         }
 
