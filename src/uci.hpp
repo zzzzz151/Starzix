@@ -133,7 +133,11 @@ inline void setoption(const std::vector<std::string>& tokens, Searcher& searcher
         {
             if (myParam == nullptr) return;
 
-            myParam->value = std::stoi(optionValue);
+            myParam->value = std::is_same<decltype(myParam->value), double>::value
+                           ? std::stod(optionValue)
+                           : std::is_same<decltype(myParam->value), float>::value
+                           ? std::stof(optionValue)
+                           : std::stoi(optionValue);
 
             std::cout << "info string " << optionName
                       << " set to "     << myParam->value
@@ -175,7 +179,6 @@ constexpr void go(
     SearchConfig searchConfig = SearchConfig();
 
     [[maybe_unused]] u64 incrementMs = 0;
-    u64 movesToGo = 25;
     bool isMoveTime = false;
 
     for (size_t i = 1; i < tokens.size() - 1; i += 2)
@@ -191,7 +194,9 @@ constexpr void go(
             incrementMs = value;
 
         else if (tokens[i] == "movestogo")
-            movesToGo = std::max<u64>(value, 1ULL);
+        {
+
+        }
         else if (tokens[i] == "movetime")
         {
             isMoveTime = true;
@@ -205,11 +210,22 @@ constexpr void go(
 
     if (searchConfig.hardMs)
     {
-        const i64 minusOverhead = static_cast<i64>(*(searchConfig.hardMs)) - 20;
-        searchConfig.hardMs = static_cast<u64>(std::max<i64>(minusOverhead, 0));
+        // Remove move overheard milliseconds from hard time limit
+        searchConfig.hardMs = static_cast<u64>(std::max<i64>(
+            static_cast<i64>(*(searchConfig.hardMs)) - 20,
+            0
+        ));
 
         if (!isMoveTime)
-            *(searchConfig.hardMs) /= movesToGo;
+        {
+            searchConfig.hardMs = static_cast<u64>(round(
+                static_cast<double>(*(searchConfig.hardMs)) * hardTimePercentage()
+            ));
+
+            searchConfig.softMs = static_cast<u64>(round(
+                static_cast<double>(*(searchConfig.hardMs)) * softTimePercentage()
+            ));
+        }
     }
 
     const auto [bestMove, score] = searcher.search(pos, searchConfig);
