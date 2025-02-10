@@ -49,6 +49,10 @@ constexpr i32 MAX_DEPTH = 100;
 constexpr i32 INF = 30'000;
 constexpr i32 MIN_MATE_SCORE = INF - MAX_DEPTH;
 
+// Time management
+MAYBE_CONSTEXPR TunableParam<double> hardTimePercentage = TunableParam<double>(0.75, 0.5, 0.8, 0.05);
+MAYBE_CONSTEXPR TunableParam<double> softTimePercentage = TunableParam<double>(0.05, 0.05, 0.25, 0.02);
+
 // History heuristic
 constexpr i32 HISTORY_MAX = 16384;
 MAYBE_CONSTEXPR TunableParam<i32> historyBonusMul    = TunableParam<i32>(300, 50, 600, 25);
@@ -57,10 +61,13 @@ MAYBE_CONSTEXPR TunableParam<i32> historyBonusMax    = TunableParam<i32>(1500, 5
 
 #if defined(TUNE)
     using TunableParamVariant = std::variant<
+        TunableParam<double>*,
         TunableParam<i32>*
     >;
 
     tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
+        { stringify(hardTimePercentage), &hardTimePercentage },
+        { stringify(softTimePercentage), &softTimePercentage },
         { stringify(historyBonusMul),    &historyBonusMul },
         { stringify(historyBonusOffset), &historyBonusOffset },
         { stringify(historyBonusMax),    &historyBonusMax },
@@ -84,8 +91,10 @@ MAYBE_CONSTEXPR TunableParam<i32> historyBonusMax    = TunableParam<i32>(1500, 5
                           << ", " << myParam->max
                           << ", " << myParam->step
                           << ", 0.002"
-                          << std::endl;
+                          << "\n";
             }, tunableParam);
+
+            std::flush(std::cout);
         }
     }
 #endif

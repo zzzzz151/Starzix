@@ -313,7 +313,7 @@ private:
                 mStopSearch.store(true, std::memory_order_relaxed);
 
             if (!mSearchConfig.printInfo)
-                continue;
+                goto checkSoftTime;
 
             std::cout << "info"
                       << " depth "    << depth
@@ -337,6 +337,11 @@ private:
                 std::cout << " " << move.toUci();
 
             std::cout << std::endl;
+
+            checkSoftTime:
+
+            if (depth >= 6 && mSearchConfig.softMs && msElapsed >= *(mSearchConfig.softMs))
+                break;
         }
 
         // If main thread, signal other threads to stop searching
