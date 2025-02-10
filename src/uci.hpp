@@ -10,6 +10,8 @@
 
 namespace uci {
 
+inline void uci();
+
 inline void setoption(const std::vector<std::string>& tokens, Searcher& searcher);
 
 constexpr void position(const std::vector<std::string>& tokens, Position& pos);
@@ -27,14 +29,7 @@ inline void runCommand(std::string& command, Position& pos, Searcher& searcher)
 
     // UCI commands
     if (command == "uci")
-    {
-        std::cout << "id name Starzix";
-        std::cout << "\nid author zzzzz";
-        std::cout << "\noption name Hash type spin default 32 min 1 max 131072";
-        std::cout << "\noption name Threads type spin default 1 min 1 max 256";
-        std::cout << "\nuciok";
-        std::cout << std::endl; // Flush
-    }
+        uci();
     else if (tokens[0] == "setoption") // e.g. "setoption name Hash value 32"
         setoption(tokens, searcher);
     else if (command == "ucinewgame")
@@ -105,6 +100,36 @@ inline void runCommand(std::string& command, Position& pos, Searcher& searcher)
     else if (command == "spsainput")
         printSpsaInput();
     #endif
+}
+
+inline void uci()
+{
+    std::cout << "id name Starzix";
+    std::cout << "\nid author zzzzz";
+    std::cout << "\noption name Hash type spin default 32 min 1 max 131072";
+    std::cout << "\noption name Threads type spin default 1 min 1 max 256";
+
+    #if defined(TUNE)
+        for (const auto& pair : tunableParams)
+        {
+            const std::string paramName = pair.first;
+            const auto& tunableParam = pair.second;
+
+            std::visit([&paramName] (const auto* myParam)
+            {
+                if (myParam == nullptr) return;
+
+                std::cout << "\noption name " << paramName
+                          << " type string"
+                          << " default " << myParam->value
+                          << " min "     << myParam->min
+                          << " max "     << myParam->max;
+
+            }, tunableParam);
+        }
+    #endif
+
+    std::cout << "\nuciok" << std::endl;
 }
 
 inline void setoption(const std::vector<std::string>& tokens, Searcher& searcher)

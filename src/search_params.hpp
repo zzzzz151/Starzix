@@ -91,8 +91,10 @@ MAYBE_CONSTEXPR TunableParam<i32> historyBonusMax    = TunableParam<i32>(1500, 5
                           << ", " << myParam->max
                           << ", " << myParam->step
                           << ", 0.002"
-                          << std::endl;
+                          << "\n";
             }, tunableParam);
+
+            std::flush(std::cout);
         }
     }
 #endif
