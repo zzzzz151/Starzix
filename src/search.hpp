@@ -372,9 +372,9 @@ private:
         assert(bothAccs == nnue::BothAccumulators(td->pos));
 
         // Probe TT for TT entry
-
         TTEntry& ttEntryRef = getEntry(mTT, td->pos.zobristHash());
 
+        // No TT entry if collision
         std::optional<TTEntry> ttEntry = ttEntryRef.zobristHash == td->pos.zobristHash()
                                        ? std::optional<TTEntry> { ttEntryRef }
                                        : std::nullopt;
