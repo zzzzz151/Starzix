@@ -175,7 +175,7 @@ constexpr void go(
     SearchConfig searchConfig = SearchConfig();
 
     [[maybe_unused]] u64 incrementMs = 0;
-    u64 movesToGo = DEFAULT_MOVES_TO_GO;
+    u64 movesToGo = 25;
     bool isMoveTime = false;
 
     for (size_t i = 1; i < tokens.size() - 1; i += 2)
@@ -205,9 +205,7 @@ constexpr void go(
 
     if (searchConfig.hardMs)
     {
-        const i64 minusOverhead = static_cast<i64>(*(searchConfig.hardMs))
-                                - static_cast<i64>(OVERHEAD_MS);
-
+        const i64 minusOverhead = static_cast<i64>(*(searchConfig.hardMs)) - 20;
         searchConfig.hardMs = static_cast<u64>(std::max<i64>(minusOverhead, 0));
 
         if (!isMoveTime)

@@ -24,16 +24,29 @@ public:
         const u64 newHash,
         const u8 newDepth,
         const i16 newScore,
+        const i16 ply,
         const Bound newBound,
         const Move newMove)
     {
         this->zobristHash = newHash;
         this->depth = newDepth;
-        this->score = newScore;
+
+        this->score = newScore >= MIN_MATE_SCORE  ? newScore + ply
+                    : newScore <= -MIN_MATE_SCORE ? newScore - ply
+                    : newScore;
+
         this->bound = newBound;
 
         if (this->zobristHash != newHash || newMove != MOVE_NONE)
             this->move = newMove.asU16();
+    }
+
+    constexpr void adjustScore(const i16 ply)
+    {
+        if (this->score >= MIN_MATE_SCORE)
+            this->score -= ply;
+        else if (this->score <= -MIN_MATE_SCORE)
+            this->score += ply;
     }
 
 } __attribute__((packed)); // struct TTEntry
@@ -67,7 +80,13 @@ constexpr void resetTT(std::vector<TTEntry>& tt)
     tt.shrink_to_fit();
 }
 
-constexpr size_t ttEntryIndex(const u64 zobristHash, const size_t numEntries)
+constexpr TTEntry& getEntry(std::vector<TTEntry>& tt, const u64 zobristHash)
 {
-    return (static_cast<u128>(zobristHash) * static_cast<u128>(numEntries)) >> 64;
+    assert(tt.size() > 0);
+
+    const size_t idx = static_cast<size_t>(
+        (static_cast<u128>(zobristHash) * static_cast<u128>(tt.size())) >> 64
+    );
+
+    return tt[idx];
 }
