@@ -35,7 +35,7 @@ public:
     std::optional<i32> score = std::nullopt;
 
     std::atomic<u64> nodes = 0;
-    i32 maxPlyReached = 0;
+    size_t maxPlyReached = 0;
 
     std::array<PlyData, MAX_DEPTH + 1> pliesData; // [ply]
 
@@ -71,10 +71,10 @@ constexpr Move bestMoveAtRoot(const ThreadData* td)
          : MOVE_NONE;
 }
 
-constexpr std::optional<i32> updateBothAccsAndEval(ThreadData* td, const i32 ply)
+constexpr std::optional<i32> updateBothAccsAndEval(ThreadData* td, const size_t ply)
 {
     nnue::BothAccumulators& bothAccs = td->bothAccsStack[td->bothAccsIdx];
-    std::optional<i32>& eval = td->pliesData[static_cast<size_t>(ply)].eval;
+    std::optional<i32>& eval = td->pliesData[ply].eval;
 
     if (!bothAccs.mUpdated)
     {
@@ -97,17 +97,16 @@ constexpr std::optional<i32> updateBothAccsAndEval(ThreadData* td, const i32 ply
     return eval;
 }
 
-constexpr std::optional<i32> makeMove(ThreadData* td, const Move move, const i32 newPly)
+constexpr std::optional<i32> makeMove(ThreadData* td, const Move move, const size_t newPly)
 {
     td->pos.makeMove(move);
     td->nodes.fetch_add(1, std::memory_order_relaxed);
 
     // Update seldepth
-    td->maxPlyReached = std::max<i32>(td->maxPlyReached, newPly);
+    td->maxPlyReached = std::max<size_t>(td->maxPlyReached, newPly);
 
-    PlyData& newPlyData = td->pliesData[static_cast<size_t>(newPly)];
-    newPlyData.pvLine.clear();
-    newPlyData.eval = std::nullopt;
+    td->pliesData[newPly].pvLine.clear();
+    td->pliesData[newPly].eval = std::nullopt;
 
     if (move != MOVE_NONE)
     {
@@ -121,7 +120,7 @@ constexpr std::optional<i32> makeMove(ThreadData* td, const Move move, const i32
         return 0;
 
     if (gameState == GameState::Loss)
-        return -INF + newPly;
+        return -INF + static_cast<i32>(newPly);
 
     if (newPly >= MAX_DEPTH)
     {

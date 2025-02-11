@@ -20,7 +20,7 @@ struct SearchConfig
 {
 private:
 
-    i32 maxDepth = MAX_DEPTH;
+    size_t maxDepth = MAX_DEPTH;
 
 public:
 
@@ -34,13 +34,16 @@ public:
 
     bool printInfo = true;
 
-    constexpr auto getMaxDepth() const {
+    constexpr auto getMaxDepth() const
+    {
         return this->maxDepth;
     }
 
     constexpr void setMaxDepth(const i32 newMaxDepth)
     {
-        this->maxDepth = std::clamp<i32>(newMaxDepth, 1, MAX_DEPTH);
+        this->maxDepth = static_cast<size_t>(std::clamp<i32>(
+            newMaxDepth, 1, static_cast<i32>(MAX_DEPTH)
+        ));
     }
 
 }; // struct SearchConfig
@@ -290,7 +293,7 @@ private:
 
     constexpr void iterativeDeepening(ThreadData* td)
     {
-        for (i32 depth = 1; depth <= mSearchConfig.getMaxDepth(); depth++)
+        for (i32 depth = 1; depth <= static_cast<i32>(mSearchConfig.getMaxDepth()); depth++)
         {
             td->maxPlyReached = 0; // Reset seldepth
 
@@ -356,7 +359,7 @@ private:
     }
 
     template<bool isRoot>
-    constexpr i32 search(ThreadData* td, i32 depth, const i32 ply, i32 alpha, const i32 beta)
+    constexpr i32 search(ThreadData* td, i32 depth, const size_t ply, i32 alpha, const i32 beta)
     {
         assert(hasLegalMove(td->pos));
         assert(isRoot == (ply == 0));
@@ -370,7 +373,7 @@ private:
 
         if (shouldStop(td)) return 0;
 
-        depth = std::min<i32>(depth, MAX_DEPTH);
+        depth = std::min<i32>(depth, static_cast<i32>(MAX_DEPTH));
 
         nnue::BothAccumulators& bothAccs = td->bothAccsStack[td->bothAccsIdx];
 
@@ -398,10 +401,10 @@ private:
         || (ttEntry->bound == Bound::Lower && ttEntry->score >= beta)))
             return ttEntry->score;
 
-        PlyData& plyData = td->pliesData[static_cast<size_t>(ply)];
+        PlyData& plyData = td->pliesData[ply];
 
         // Reset killer move of next tree level
-        td->pliesData[static_cast<size_t>(ply) + 1].killer = MOVE_NONE;
+        td->pliesData[ply + 1].killer = MOVE_NONE;
 
         // IIR (Internal iterative reduction)
         if (depth >= 4 && (!ttEntry || ttEntry->move == MOVE_NONE))
@@ -485,7 +488,7 @@ private:
     }
 
     // Quiescence search
-    constexpr i32 qSearch(ThreadData* td, const i32 ply, i32 alpha, const i32 beta)
+    constexpr i32 qSearch(ThreadData* td, const size_t ply, i32 alpha, const i32 beta)
     {
         assert(hasLegalMove(td->pos));
         assert(ply > 0 && ply < MAX_DEPTH);
@@ -506,10 +509,13 @@ private:
             alpha = std::max<i32>(alpha, *eval);
         }
 
+        // Reset killer move of next tree level
+        td->pliesData[ply + 1].killer = MOVE_NONE;
+
         i32 bestScore = td->pos.inCheck() ? -INF : *eval;
         Move bestMove = MOVE_NONE;
 
-        const Move killer = td->pliesData[static_cast<size_t>(ply)].killer;
+        const Move killer = td->pliesData[ply].killer;
         MovePicker movePicker = MovePicker(!td->pos.inCheck(), MOVE_NONE, killer);
         Move move;
 

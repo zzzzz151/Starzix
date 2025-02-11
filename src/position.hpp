@@ -464,7 +464,7 @@ public:
 
     constexpr GameState gameState(
         bool (*fnHasLegalMove) (Position&),
-        const std::optional<i32> searchPly = std::nullopt)
+        const std::optional<size_t> searchPly = std::nullopt)
     {
         if (!fnHasLegalMove(*this))
             return inCheck() ? GameState::Loss : GameState::Draw;
@@ -516,7 +516,8 @@ public:
         const i32 stateIdxAfterPawnOrCapture
             = std::max<i32>(0, numStates - pliesSincePawnOrCapt - 1);
 
-        const i32 rootStateIdx = searchPly ? numStates - *searchPly - 1 : -1;
+        const i32 rootStateIdx
+            = searchPly ? numStates - static_cast<i32>(*searchPly) - 1 : -1;
 
         size_t count = 0;
 
