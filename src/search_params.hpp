@@ -58,6 +58,9 @@ constexpr i32 HISTORY_MAX = 16384;
 MAYBE_CONSTEXPR TunableParam<i32> historyBonusMul    = TunableParam<i32>(300, 50, 600, 25);
 MAYBE_CONSTEXPR TunableParam<i32> historyBonusOffset = TunableParam<i32>(0, 0, 500, 100);
 MAYBE_CONSTEXPR TunableParam<i32> historyBonusMax    = TunableParam<i32>(1500, 500, 2500, 200);
+MAYBE_CONSTEXPR TunableParam<i32> historyMalusMul    = TunableParam<i32>(300, 50, 600, 25);
+MAYBE_CONSTEXPR TunableParam<i32> historyMalusOffset = TunableParam<i32>(0, 0, 500, 100);
+MAYBE_CONSTEXPR TunableParam<i32> historyMalusMax    = TunableParam<i32>(1500, 500, 2500, 200);
 
 #if defined(TUNE)
     using TunableParamVariant = std::variant<
@@ -71,6 +74,9 @@ MAYBE_CONSTEXPR TunableParam<i32> historyBonusMax    = TunableParam<i32>(1500, 5
         { stringify(historyBonusMul),    &historyBonusMul },
         { stringify(historyBonusOffset), &historyBonusOffset },
         { stringify(historyBonusMax),    &historyBonusMax },
+        { stringify(historyMalusMul),    &historyMalusMul },
+        { stringify(historyMalusOffset), &historyMalusOffset },
+        { stringify(historyMalusMax),    &historyMalusMax },
     };
 
     inline void printSpsaInput()
