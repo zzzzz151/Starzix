@@ -8,6 +8,10 @@
 #include "move_gen.hpp"
 #include "history_entry.hpp"
 
+enum class MoveRanking : i32 {
+    TtMove = 10, GoodNoisy = 9, Killer = 8, Quiet = 7, BadNoisy = 6
+};
+
 struct MovesData
 {
 public:
@@ -108,14 +112,19 @@ struct MovePicker
 {
 private:
 
-    bool mNoisiesOnly = false;
     Move mTtMove = MOVE_NONE;
     Move mKiller = MOVE_NONE;
+
     bool mTtMoveDone = false;
     bool mKillerDone = false;
+
     MovesData mNoisiesData, mQuietsData;
 
+    bool mBadNoisyReady = false;
+
 public:
+
+    bool mNoisiesOnly = false;
 
     constexpr MovePicker(const bool noisiesOnly, const Move ttMove, const Move killer)
     {
@@ -124,7 +133,7 @@ public:
         mKiller = killer;
     }
 
-    constexpr Move nextLegal(
+    constexpr std::pair<Move, std::optional<MoveRanking>> nextLegal(
         Position& pos,
         const EnumArray<HistoryEntry, Color, PieceType, Square>& historyTable)
     {
@@ -137,29 +146,32 @@ public:
             && (!mNoisiesOnly || !pos.isQuiet(mTtMove))
             && isPseudolegal(pos, mTtMove)
             && isPseudolegalLegal(pos, mTtMove))
-                return mTtMove;
+                return { mTtMove, MoveRanking::TtMove };
         }
 
         // If not done already, gen and score noisy moves
         mNoisiesData.genAndScoreMoves<MoveGenType::NoisyOnly>(pos, mTtMove);
 
-        // Yield good noisy moves
-        while (true) {
+        // Find next noisy move
+        while (!mBadNoisyReady)
+        {
             const auto [move, score] = mNoisiesData.next();
 
             if (move == MOVE_NONE) break;
 
             if (score < 0) {
-                *(mNoisiesData.mIdx) -= 1;
+                mBadNoisyReady = true;
                 break;
             }
 
+            // Yield good noisy move
             if (isPseudolegalLegal(pos, move))
-                return move;
+                return { move, MoveRanking::GoodNoisy };
         }
 
-        if (mNoisiesOnly) goto badNoisyMoves;
+        if (mNoisiesOnly) goto badNoisyMove;
 
+        // Maybe return killer move
         if (!mKillerDone)
         {
             mKillerDone = true;
@@ -168,35 +180,42 @@ public:
             && pos.isQuiet(mKiller)
             && isPseudolegal(pos, mKiller)
             && isPseudolegalLegal(pos, mKiller))
-                return mKiller;
+                return { mKiller, MoveRanking::Killer };
         }
 
         // If not done already, gen and score quiet moves
-        mQuietsData.genAndScoreMoves<MoveGenType::QuietOnly>(pos, mTtMove, mKiller, &historyTable);
+        mQuietsData.genAndScoreMoves<MoveGenType::QuietOnly>(
+            pos, mTtMove, mKiller, &historyTable
+        );
 
         // Yield quiet moves
-        while (true) {
+        while (true)
+        {
             const auto [move, score] = mQuietsData.next();
 
             if (move == MOVE_NONE) break;
 
             if (isPseudolegalLegal(pos, move))
-                return move;
+                return { move, MoveRanking::Quiet };
         }
 
-        badNoisyMoves:
+        badNoisyMove:
 
-        // Yield bad noisy moves
-        while (true) {
-            const auto [move, score] = mNoisiesData.next();
+        // Yield bad noisy move
+        if (mBadNoisyReady)
+        {
+            mBadNoisyReady = false;
 
-            if (move == MOVE_NONE) break;
+            const Move move = mNoisiesData.mMoves[*(mNoisiesData.mIdx) - 1];
 
             if (isPseudolegalLegal(pos, move))
-                return move;
+                return { move, MoveRanking::BadNoisy };
+
+            return nextLegal(pos, historyTable);
         }
 
-        return MOVE_NONE;
+        // No more legal moves
+        return { MOVE_NONE, std::nullopt };
     }
 
 }; // struct MovePicker
