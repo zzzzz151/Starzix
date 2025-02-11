@@ -20,6 +20,7 @@ public:
     constexpr void genAndScoreMoves(
         Position& pos,
         const Move ttMove,
+        const Move killer = MOVE_NONE,
         const EnumArray<HistoryEntry, Color, PieceType, Square>* historyTable = nullptr)
     {
         static_assert(moveGenType != MoveGenType::AllMoves);
@@ -35,7 +36,7 @@ public:
         {
             const Move move = mMoves[i];
 
-            if (move == ttMove)
+            if (move == ttMove || move == killer)
             {
                 mMoves.swap(i, mMoves.size() - 1);
                 mMoves.pop_back();
@@ -109,15 +110,18 @@ private:
 
     bool mNoisiesOnly = false;
     Move mTtMove = MOVE_NONE;
-    bool nextLegalCalled = false;
+    Move mKiller = MOVE_NONE;
+    bool mTtMoveDone = false;
+    bool mKillerDone = false;
     MovesData mNoisiesData, mQuietsData;
 
 public:
 
-    constexpr MovePicker(const bool noisiesOnly, const Move ttMove)
+    constexpr MovePicker(const bool noisiesOnly, const Move ttMove, const Move killer)
     {
         mNoisiesOnly = noisiesOnly;
         mTtMove = ttMove;
+        mKiller = killer;
     }
 
     constexpr Move nextLegal(
@@ -125,9 +129,9 @@ public:
         const EnumArray<HistoryEntry, Color, PieceType, Square>& historyTable)
     {
         // Maybe return TT move the first time this function is called
-        if (!nextLegalCalled)
+        if (!mTtMoveDone)
         {
-            nextLegalCalled = true;
+            mTtMoveDone = true;
 
             if (mTtMove != MOVE_NONE
             && (!mNoisiesOnly || !pos.isQuiet(mTtMove))
@@ -156,8 +160,19 @@ public:
 
         if (mNoisiesOnly) goto badNoisyMoves;
 
+        if (!mKillerDone)
+        {
+            mKillerDone = true;
+
+            if (mKiller != MOVE_NONE
+            && pos.isQuiet(mKiller)
+            && isPseudolegal(pos, mKiller)
+            && isPseudolegalLegal(pos, mKiller))
+                return mKiller;
+        }
+
         // If not done already, gen and score quiet moves
-        mQuietsData.genAndScoreMoves<MoveGenType::QuietOnly>(pos, mTtMove, &historyTable);
+        mQuietsData.genAndScoreMoves<MoveGenType::QuietOnly>(pos, mTtMove, mKiller, &historyTable);
 
         // Yield quiet moves
         while (true) {
