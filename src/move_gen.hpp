@@ -327,7 +327,7 @@ constexpr bool isPseudolegalLegal(Position& pos, const Move move)
         Bitboard slidingAttackersTo = bishopsQueens & getBishopAttacks(kingSquare, occAfter);
         slidingAttackersTo         |= rooksQueens   & getRookAttacks(kingSquare, occAfter);
 
-        return (slidingAttackersTo & pos.them()) == 0;
+        return (pos.them() & slidingAttackersTo) == 0;
     }
 
     if (!hasSquare(LINE_THRU_BB[from][to], kingSquare) && hasSquare(pos.pinned(), from))
@@ -524,49 +524,30 @@ constexpr bool hasLegalMove(Position& pos)
     const Bitboard enPassantSqBb = squareBb(enPassantSquare);
 
     const Bitboard ourNearbyPawns = pos.getBb(stm, PieceType::Pawn)
-                                    & getPawnAttacks(enPassantSquare, pos.notSideToMove());
+                                  & getPawnAttacks(enPassantSquare, pos.notSideToMove());
 
     ITERATE_BITBOARD(ourNearbyPawns, ourPawnSquare,
     {
-        auto colorBbs  = pos.colorBbs();
-        auto piecesBbs = pos.piecesBbs();
+        // If, after en passant, an enemy slider is attacking our king,
+        // the en passant was illegal
 
-        const Bitboard ourPawnBb = squareBb(ourPawnSquare);
-        const Bitboard capturedPawnBb = squareBb(enPassantRelative(enPassantSquare));
+        const Bitboard occAfter
+            = occ
+            ^ squareBb(ourPawnSquare)
+            ^ squareBb(enPassantRelative(enPassantSquare))
+            ^ enPassantSqBb;
 
-        // Make en passant move
+        const Bitboard bishopsQueens
+            = pos.getBb(PieceType::Bishop) | pos.getBb(PieceType::Queen);
 
-        colorBbs[stm] ^= ourPawnBb;
-        colorBbs[stm] ^= enPassantSqBb;
-        colorBbs[pos.notSideToMove()] ^= capturedPawnBb;
+        const Bitboard rooksQueens
+            = pos.getBb(PieceType::Rook)   | pos.getBb(PieceType::Queen);
 
-        piecesBbs[PieceType::Pawn] ^= ourPawnBb;
-        piecesBbs[PieceType::Pawn] ^= enPassantSqBb;
-        piecesBbs[PieceType::Pawn] ^= capturedPawnBb;
+        Bitboard slidingAttackersTo = bishopsQueens & getBishopAttacks(kingSquare, occAfter);
+        slidingAttackersTo         |= rooksQueens   & getRookAttacks(kingSquare, occAfter);
 
-        // If after the en passant our king is under attack, then en passant was illegal
-
-        if (pos.getBb(pos.notSideToMove(), PieceType::Pawn) & getPawnAttacks(kingSquare, stm))
-            return false;
-
-        if (pos.getBb(pos.notSideToMove(), PieceType::Knight) & getKnightAttacks(kingSquare))
-            return false;
-
-        const Bitboard occAfter = colorBbs[Color::White] | colorBbs[Color::Black];
-
-        const Bitboard enemyBishopsQueens
-            = pos.them() & (pos.getBb(PieceType::Bishop) | pos.getBb(PieceType::Queen));
-
-        if (enemyBishopsQueens & getBishopAttacks(kingSquare, occAfter))
-            return false;
-
-        const Bitboard enemyRooksQueens
-            = pos.them() & (pos.getBb(PieceType::Rook) | pos.getBb(PieceType::Queen));
-
-        if (enemyRooksQueens & getRookAttacks(kingSquare, occAfter))
-            return false;
-
-        return true;
+        if ((pos.them() & slidingAttackersTo) == 0)
+            return true;
     });
 
     return false;
