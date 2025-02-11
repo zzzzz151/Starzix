@@ -433,19 +433,6 @@ private:
             legalMovesSeen++;
             const bool isQuiet = td->pos.isQuiet(move);
 
-            /*
-            if (!isRoot
-            && bestScore > -MIN_MATE_SCORE
-            && static_cast<i32>(*moveRanking) < static_cast<i32>(MoveRanking::Killer)
-            && td->pos.stmHasNonPawns())
-            {
-                // SEE pruning
-                const i32 threshold = depth * (isQuiet ? seeQuietThreshold() : seeNoisyThreshold());
-                if (!td->pos.SEE(move, threshold))
-                    continue;
-            }
-            */
-
             const std::optional<i32> optScore = makeMove(td, move, ply + 1);
 
             const i32 score = optScore
