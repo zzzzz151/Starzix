@@ -11,17 +11,8 @@ enum class MoveGenType : i32 {
     AllMoves = 0, NoisyOnly = 1, QuietOnly = 2
 };
 
-constexpr void addPromotions(
-    ArrayVec<Move, 256>& moves, const Square from, const Square to)
-{
-    moves.push_back(Move(from, to, MoveFlag::QueenPromo));
-    moves.push_back(Move(from, to, MoveFlag::KnightPromo));
-    moves.push_back(Move(from, to, MoveFlag::RookPromo));
-    moves.push_back(Move(from, to, MoveFlag::BishopPromo));
-}
-
-constexpr ArrayVec<Move, 256> pseudolegalMoves(
-    Position& pos, const MoveGenType moveGenType)
+template<MoveGenType moveGenType>
+constexpr ArrayVec<Move, 256> pseudolegalMoves(Position& pos)
 {
     ArrayVec<Move, 256> pseudolegals;
 
@@ -48,6 +39,14 @@ constexpr ArrayVec<Move, 256> pseudolegalMoves(
             );
         });
     }
+
+    const auto addPromos = [&] (const Square from, const Square to) constexpr -> void
+    {
+        pseudolegals.push_back(Move(from, to, MoveFlag::QueenPromo));
+        pseudolegals.push_back(Move(from, to, MoveFlag::KnightPromo));
+        pseudolegals.push_back(Move(from, to, MoveFlag::RookPromo));
+        pseudolegals.push_back(Move(from, to, MoveFlag::BishopPromo));
+    };
 
     #pragma clang diagnostic push
     #pragma clang diagnostic ignored "-Wshadow"
@@ -78,7 +77,7 @@ constexpr ArrayVec<Move, 256> pseudolegalMoves(
         ITERATE_BITBOARD(getPawnAttacks(fromSquare, stm) & pos.them(), toSquare,
         {
             if (willPromote)
-                addPromotions(pseudolegals, fromSquare, toSquare);
+                addPromos(fromSquare, toSquare);
             else
                 pseudolegals.push_back(Move(fromSquare, toSquare, MoveFlag::Pawn));
         });
@@ -93,7 +92,7 @@ constexpr ArrayVec<Move, 256> pseudolegalMoves(
             continue;
 
         if (willPromote && moveGenType != MoveGenType::QuietOnly)
-            addPromotions(pseudolegals, fromSquare, squareOneUp);
+            addPromos(fromSquare, squareOneUp);
 
         if (willPromote || moveGenType == MoveGenType::NoisyOnly)
             continue;
@@ -214,77 +213,88 @@ constexpr ArrayVec<Move, 256> pseudolegalMoves(
 
 constexpr bool isPseudolegal(Position& pos, const Move move)
 {
-    if (move == MOVE_NONE) return false;
-
-    const Color stm = pos.sideToMove();
-
-    const Square from  = move.from();
-    const Square to    = move.to();
-    const PieceType pt = move.pieceType();
-
-    // Do we have the move's piece on origin square?
-    if (!hasSquare(pos.getBb(stm, pt), from))
-        return false;
-
-    if (pt == PieceType::Pawn)
+    const auto result = [&] () constexpr -> bool
     {
-        const Bitboard wrongAttacks = getPawnAttacks(from, pos.notSideToMove());
+        if (move == MOVE_NONE) return false;
 
-        // Pawn moving in wrong direction?
-        if (to == add<Square>(from, stm == Color::White ? -8 : 8)
-        || hasSquare(wrongAttacks, to))
+        const Color stm = pos.sideToMove();
+
+        const Square from  = move.from();
+        const Square to    = move.to();
+        const PieceType pt = move.pieceType();
+
+        // Do we have the move's piece on origin square?
+        if (!hasSquare(pos.getBb(stm, pt), from))
             return false;
 
-        // If en passant, is en passant square the move's target square?
-        if (move.flag() == MoveFlag::EnPassant)
-            return pos.enPassantSquare() && *(pos.enPassantSquare()) == to;
+        if (pt == PieceType::Pawn)
+        {
+            // If en passant, is en passant square the move's target square?
+            if (move.flag() == MoveFlag::EnPassant)
+                return pos.enPassantSquare() && *(pos.enPassantSquare()) == to;
 
-        // If pawn is capturing, is there an enemy piece in target square?
-        if (hasSquare(getPawnAttacks(from, stm), to))
-            return hasSquare(pos.them(), to);
+            const Bitboard wrongAttacks = getPawnAttacks(from, pos.notSideToMove());
 
-        // Pawn push
+            // Pawn attacking in wrong direction?
+            if (hasSquare(wrongAttacks, to))
+                return false;
 
-        if (pos.isOccupied(to))
-            return false;
+            // If pawn is capturing, is there an enemy piece in target square?
+            if (hasSquare(getPawnAttacks(from, stm), to))
+                return hasSquare(pos.them(), to);
 
-        if (move.flag() == MoveFlag::PawnDoublePush)
-            return !pos.isOccupied(add<Square>(from, stm == Color::White ? 8 : -8));
+            // Pawn push
 
-        return true;
-    }
+            if (to == add<Square>(from, stm == Color::White ? -8 : 8)
+            || pos.isOccupied(to))
+                return false;
 
-    if (move.flag() == MoveFlag::Castling)
-    {
-        if (pos.inCheck()) return false;
+            if (move.flag() == MoveFlag::PawnDoublePush)
+            {
+                const Rank ourSecondRank = stm == Color::White ? Rank::Rank2 : Rank::Rank7;
 
-        const bool isLongCastle = static_cast<i32>(from) > static_cast<i32>(to);
-        const Square rookFrom = CASTLING_ROOK_FROM[stm][isLongCastle];
+                return squareRank(move.from()) == ourSecondRank
+                    && !pos.isOccupied(add<Square>(from, stm == Color::White ? 8 : -8));
+            }
 
-        // Do we have this castling right?
-        if (!hasSquare(pos.castlingRights(), rookFrom)
-        // Do we have rook in corner?
-        ||  !hasSquare(pos.getBb(stm, PieceType::Rook), rookFrom))
-            return false;
+            return true;
+        }
 
-        if (isLongCastle && pos.isOccupied(next<Square>(rookFrom)))
-            return false;
+        if (move.flag() == MoveFlag::Castling)
+        {
+            if (pos.inCheck()) return false;
 
-        const Square thruSquare = isLongCastle ? previous<Square>(from) : next<Square>(from);
-        const Bitboard occOrEnemyAttacks = pos.occupied() | pos.enemyAttacksNoStmKing();
+            const bool isLongCastle = static_cast<i32>(from) > static_cast<i32>(to);
+            const Square rookFrom = CASTLING_ROOK_FROM[stm][isLongCastle];
 
-        return !hasSquare(occOrEnemyAttacks, to)
-            && !hasSquare(occOrEnemyAttacks, thruSquare);
-    }
+            // Do we have this castling right?
+            if (!hasSquare(pos.castlingRights(), rookFrom)
+            // Do we have rook in corner?
+            ||  !hasSquare(pos.getBb(stm, PieceType::Rook), rookFrom))
+                return false;
 
-    const Bitboard moves
-        = pt == PieceType::Knight ? getKnightAttacks(from)
-        : pt == PieceType::Bishop ? getBishopAttacks(from, pos.occupied())
-        : pt == PieceType::Rook   ? getRookAttacks  (from, pos.occupied())
-        : pt == PieceType::Queen  ? getQueenAttacks (from, pos.occupied())
-        : getKingAttacks(from) & ~pos.enemyAttacksNoStmKing();
+            if (isLongCastle && pos.isOccupied(next<Square>(rookFrom)))
+                return false;
 
-    return hasSquare(moves & ~pos.us(), to);
+            const Square thruSquare = isLongCastle ? previous<Square>(from) : next<Square>(from);
+            const Bitboard occOrEnemyAttacks = pos.occupied() | pos.enemyAttacksNoStmKing();
+
+            return !hasSquare(occOrEnemyAttacks, to)
+                && !hasSquare(occOrEnemyAttacks, thruSquare);
+        }
+
+        const Bitboard moves
+            = pt == PieceType::Knight ? getKnightAttacks(from)
+            : pt == PieceType::Bishop ? getBishopAttacks(from, pos.occupied())
+            : pt == PieceType::Rook   ? getRookAttacks  (from, pos.occupied())
+            : pt == PieceType::Queen  ? getQueenAttacks (from, pos.occupied())
+            : getKingAttacks(from) & ~pos.enemyAttacksNoStmKing();
+
+        return hasSquare(moves & ~pos.us(), to);
+    }();
+
+    assert(pseudolegalMoves<MoveGenType::AllMoves>(pos).contains(move) == result);
+    return result;
 }
 
 constexpr bool isPseudolegalLegal(Position& pos, const Move move)
@@ -308,8 +318,11 @@ constexpr bool isPseudolegalLegal(Position& pos, const Move move)
         const Bitboard occAfter
             = pos.occupied() ^ squareBb(from) ^ squareBb(enPassantRelative(to)) ^ squareBb(to);
 
-        const Bitboard bishopsQueens = pos.getBb(PieceType::Bishop) | pos.getBb(PieceType::Queen);
-        const Bitboard rooksQueens   = pos.getBb(PieceType::Rook)   | pos.getBb(PieceType::Queen);
+        const Bitboard bishopsQueens
+            = pos.getBb(PieceType::Bishop) | pos.getBb(PieceType::Queen);
+
+        const Bitboard rooksQueens
+            = pos.getBb(PieceType::Rook)   | pos.getBb(PieceType::Queen);
 
         Bitboard slidingAttackersTo = bishopsQueens & getBishopAttacks(kingSquare, occAfter);
         slidingAttackersTo         |= rooksQueens   & getRookAttacks(kingSquare, occAfter);
@@ -563,7 +576,7 @@ constexpr u64 perft(Position& pos, const i32 depth)
 {
     if (depth <= 0) return 1;
 
-    const auto moves = pseudolegalMoves(pos, MoveGenType::AllMoves);
+    const auto moves = pseudolegalMoves<MoveGenType::AllMoves>(pos);
     u64 nodes = 0;
 
     for (const Move move : moves)
@@ -579,7 +592,6 @@ constexpr u64 perft(Position& pos, const i32 depth)
         }
 
     assert(hasLegalMove(pos) == (nodes != 0));
-
     return nodes;
 }
 
@@ -590,7 +602,7 @@ constexpr u64 perftSplit(Position& pos, const i32 depth)
         return 1;
     }
 
-    const auto moves = pseudolegalMoves(pos, MoveGenType::AllMoves);
+    const auto moves = pseudolegalMoves<MoveGenType::AllMoves>(pos);
     u64 totalNodes = 0;
 
     for (const Move move : moves)
