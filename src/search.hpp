@@ -267,16 +267,18 @@ private:
         if (td != mainThreadData() || !(mainThreadData()->score))
             return false;
 
+        // Hit nodes limit?
         if (mSearchConfig.maxNodes && totalNodes() >= *(mSearchConfig.maxNodes))
         {
             mStopSearch.store(true, std::memory_order_relaxed);
             return true;
         }
 
-        // Check time every N nodes
+        // Check hard time limit every N nodes
         if (!mSearchConfig.hardMs || td->nodes.load(std::memory_order_relaxed) % 1024 != 0)
             return false;
 
+        // Hit hard time limit?
         if (millisecondsElapsed(mSearchConfig.startTime) >= *(mSearchConfig.hardMs))
         {
             mStopSearch.store(true, std::memory_order_relaxed);
@@ -299,9 +301,11 @@ private:
 
             td->score = score;
 
-            // If not main thread, continue
+            // Only print uci info and check soft time limit in main thread
             if (td != mainThreadData())
                 continue;
+
+            // Print uci info
 
             const u64 msElapsed = millisecondsElapsed(mSearchConfig.startTime);
             const u64 nodes = totalNodes();
@@ -339,6 +343,8 @@ private:
             std::cout << std::endl;
 
             checkSoftTime:
+
+            // Stop searching if soft time limit has been hit
 
             if (mSearchConfig.softMs && msElapsed >= *(mSearchConfig.softMs))
                 break;
@@ -441,6 +447,7 @@ private:
 
             bound = Bound::Lower;
 
+            // If quiet move, update its quiet history
             if (td->pos.isQuiet(move))
             {
                 const i32 histBonus = std::clamp<i32>(
@@ -485,6 +492,8 @@ private:
 
         if (!td->pos.inCheck())
         {
+            // Stand pat
+            // Return immediately if static eval fails high
             if (*eval >= beta) return *eval;
 
             alpha = std::max<i32>(alpha, *eval);
@@ -498,6 +507,7 @@ private:
 
         while ((move = movePicker.nextLegal(td->pos, td->historyTable)) != MOVE_NONE)
         {
+            // Underpromotions pruning
             if (bestScore > -MIN_MATE_SCORE && move.isUnderpromotion())
                 break;
 

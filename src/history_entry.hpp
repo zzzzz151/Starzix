@@ -12,7 +12,7 @@ constexpr void updateHistory(i16& history, i32 bonus)
     bonus = std::clamp<i32>(bonus, -HISTORY_MAX, HISTORY_MAX);
 
     history += static_cast<i16>(
-        bonus - abs(bonus) * static_cast<i32>(history) / HISTORY_MAX
+        bonus - std::abs(bonus) * static_cast<i32>(history) / HISTORY_MAX
     );
 
     assert(std::abs(history) <= HISTORY_MAX);

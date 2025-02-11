@@ -228,16 +228,15 @@ constexpr bool isPseudolegal(Position& pos, const Move move)
 
     if (pt == PieceType::Pawn)
     {
-        const Bitboard wrongAttacks = getPawnAttacks(from, pos.notSideToMove());
-
-        // Pawn moving in wrong direction?
-        if (to == add<Square>(from, stm == Color::White ? -8 : 8)
-        || hasSquare(wrongAttacks, to))
-            return false;
-
         // If en passant, is en passant square the move's target square?
         if (move.flag() == MoveFlag::EnPassant)
             return pos.enPassantSquare() && *(pos.enPassantSquare()) == to;
+
+        const Bitboard wrongAttacks = getPawnAttacks(from, pos.notSideToMove());
+
+        // Pawn attacking in wrong direction?
+        if (hasSquare(wrongAttacks, to))
+            return false;
 
         // If pawn is capturing, is there an enemy piece in target square?
         if (hasSquare(getPawnAttacks(from, stm), to))
@@ -245,11 +244,17 @@ constexpr bool isPseudolegal(Position& pos, const Move move)
 
         // Pawn push
 
-        if (pos.isOccupied(to))
+        if (to == add<Square>(from, stm == Color::White ? -8 : 8)
+        || pos.isOccupied(to))
             return false;
 
         if (move.flag() == MoveFlag::PawnDoublePush)
-            return !pos.isOccupied(add<Square>(from, stm == Color::White ? 8 : -8));
+        {
+            const Rank ourSecondRank = stm == Color::White ? Rank::Rank2 : Rank::Rank7;
+
+            return squareRank(move.from()) == ourSecondRank
+                && !pos.isOccupied(add<Square>(from, stm == Color::White ? 8 : -8));
+        }
 
         return true;
     }
