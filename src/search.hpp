@@ -398,6 +398,11 @@ private:
         || (ttEntry->bound == Bound::Lower && ttEntry->score >= beta)))
             return ttEntry->score;
 
+        PlyData& plyData = td->pliesData[static_cast<size_t>(ply)];
+
+        // Reset killer move of next tree level
+        td->pliesData[static_cast<size_t>(ply) + 1].killer = MOVE_NONE;
+
         // IIR (Internal iterative reduction)
         if (depth >= 4 && (!ttEntry || ttEntry->move == MOVE_NONE))
             depth--;
@@ -407,7 +412,10 @@ private:
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::Upper;
 
-        MovePicker movePicker = MovePicker(false, ttEntry ? ttEntry->move : MOVE_NONE);
+        MovePicker movePicker = MovePicker(
+            false, ttEntry ? ttEntry->move : MOVE_NONE, plyData.killer
+        );
+
         Move move;
 
         while ((move = movePicker.nextLegal(td->pos, td->historyTable)) != MOVE_NONE)
@@ -434,8 +442,8 @@ private:
             bound = Bound::Exact;
 
             if (isRoot) {
-                td->pliesData[0].pvLine.clear();
-                td->pliesData[0].pvLine.push_back(bestMove);
+                plyData.pvLine.clear();
+                plyData.pvLine.push_back(bestMove);
             }
 
             if (score < beta) continue;
@@ -447,6 +455,8 @@ private:
             // If quiet move, update its quiet history
             if (td->pos.isQuiet(move))
             {
+                plyData.killer = move;
+
                 const i32 histBonus = std::clamp<i32>(
                     depth * historyBonusMul() - historyBonusOffset(), 0, historyBonusMax()
                 );
@@ -499,7 +509,8 @@ private:
         i32 bestScore = td->pos.inCheck() ? -INF : *eval;
         Move bestMove = MOVE_NONE;
 
-        MovePicker movePicker = MovePicker(!td->pos.inCheck(), MOVE_NONE);
+        const Move killer = td->pliesData[static_cast<size_t>(ply)].killer;
+        MovePicker movePicker = MovePicker(!td->pos.inCheck(), MOVE_NONE, killer);
         Move move;
 
         while ((move = movePicker.nextLegal(td->pos, td->historyTable)) != MOVE_NONE)

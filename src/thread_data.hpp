@@ -19,6 +19,7 @@ public:
 
     ArrayVec<Move, MAX_DEPTH + 1> pvLine;
     std::optional<i32> eval = std::nullopt;
+    Move killer = MOVE_NONE;
 };
 
 enum class ThreadState : i32 {
@@ -104,7 +105,9 @@ constexpr std::optional<i32> makeMove(ThreadData* td, const Move move, const i32
     // Update seldepth
     td->maxPlyReached = std::max<i32>(td->maxPlyReached, newPly);
 
-    td->pliesData[static_cast<size_t>(newPly)] = PlyData();
+    PlyData& newPlyData = td->pliesData[static_cast<size_t>(newPly)];
+    newPlyData.pvLine.clear();
+    newPlyData.eval = std::nullopt;
 
     if (move != MOVE_NONE)
     {
