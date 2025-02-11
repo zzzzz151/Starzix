@@ -28,7 +28,7 @@ public:
         if (mIdx) return;
 
         // Generate pseudolegal moves
-        mMoves = pseudolegalMoves(pos, moveGenType);
+        mMoves = pseudolegalMoves<moveGenType>(pos);
 
         // Score moves
         for (size_t i = 0; i < mMoves.size();)
