@@ -29,6 +29,7 @@ public:
         const Move newMove)
     {
         this->zobristHash = newHash;
+
         this->depth = newDepth;
 
         this->score = newScore >= MIN_MATE_SCORE  ? newScore + ply
@@ -41,17 +42,41 @@ public:
             this->move = newMove.asU16();
     }
 
-    constexpr void adjustScore(const i16 ply)
-    {
-        if (this->score >= MIN_MATE_SCORE)
-            this->score -= ply;
-        else if (this->score <= -MIN_MATE_SCORE)
-            this->score += ply;
-    }
-
 } __attribute__((packed)); // struct TTEntry
 
 static_assert(sizeof(TTEntry) == 8 + 2 + 2 + 1 + 1);
+
+struct ParsedTTEntry
+{
+public:
+
+    i32 depth = 0;
+    i32 score = 0;
+    Bound bound = Bound::None;
+    Move move = MOVE_NONE;
+
+    constexpr static std::optional<ParsedTTEntry> parse(
+        const TTEntry& ttEntry, const u64 zobristHash, const i16 ply)
+    {
+        if (ttEntry.zobristHash != zobristHash)
+            return std::nullopt;
+
+        ParsedTTEntry parsedEntry;
+
+        parsedEntry.depth = ttEntry.depth;
+
+        parsedEntry.score = ttEntry.score >= MIN_MATE_SCORE  ? ttEntry.score - ply
+                          : ttEntry.score <= -MIN_MATE_SCORE ? ttEntry.score + ply
+                          : ttEntry.score;
+
+        parsedEntry.bound = ttEntry.bound;
+
+        parsedEntry.move = Move(ttEntry.move);
+
+        return parsedEntry;
+    }
+
+}; // struct ParsedTTEntry
 
 inline void printTTSize(const std::vector<TTEntry>& tt)
 {
