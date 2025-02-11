@@ -405,6 +405,9 @@ private:
                 return ttEntry->score;
         }
 
+        if (depth >= 4 && ttMove == MOVE_NONE)
+            depth--;
+
         [[maybe_unused]] size_t legalMovesSeen = 0;
         i32 bestScore = -INF;
         Move bestMove = MOVE_NONE;
