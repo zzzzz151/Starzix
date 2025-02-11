@@ -415,6 +415,8 @@ private:
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::Upper;
 
+        ArrayVec<Move, 256> failLowQuiets;
+
         MovePicker movePicker = MovePicker(
             false, ttEntry ? ttEntry->move : MOVE_NONE, plyData.killer
         );
@@ -438,13 +440,19 @@ private:
             bestScore = std::max<i32>(bestScore, score);
 
             // Fail low?
-            if (score <= alpha) continue;
+            if (score <= alpha)
+            {
+                if (td->pos.isQuiet(move))
+                    failLowQuiets.push_back(move);
+
+                continue;
+            }
 
             alpha = score;
             bestMove = move;
             bound = Bound::Exact;
 
-            if (isRoot) {
+            if constexpr (isRoot) {
                 plyData.pvLine.clear();
                 plyData.pvLine.push_back(bestMove);
             }
@@ -455,17 +463,32 @@ private:
 
             bound = Bound::Lower;
 
-            // If quiet move, update its quiet history
-            if (td->pos.isQuiet(move))
+            if (!td->pos.isQuiet(move))
+                break;
+
+            // We have a quiet move
+
+            plyData.killer = move;
+
+            // Increase move's history
+
+            const i32 histBonus = std::clamp<i32>(
+                depth * historyBonusMul() - historyBonusOffset(), 0, historyBonusMax()
+            );
+
+            td->historyTable[td->pos.sideToMove()][move.pieceType()][move.to()]
+                .update(histBonus);
+
+            // Decrease history of fail low quiets
+
+            const i32 histMalus = -std::clamp<i32>(
+                depth * historyMalusMul() - historyMalusOffset(), 0, historyMalusMax()
+            );
+
+            for (const Move failLowQuiet : failLowQuiets)
             {
-                plyData.killer = move;
-
-                const i32 histBonus = std::clamp<i32>(
-                    depth * historyBonusMul() - historyBonusOffset(), 0, historyBonusMax()
-                );
-
-                td->historyTable[td->pos.sideToMove()][move.pieceType()][move.to()]
-                    .update(histBonus);
+                td->historyTable[td->pos.sideToMove()][failLowQuiet.pieceType()][failLowQuiet.to()]
+                    .update(histMalus);
             }
 
             break;
