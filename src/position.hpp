@@ -529,12 +529,12 @@ public:
         return GameState::Ongoing;
     }
 
-    constexpr bool hasNonPawnMaterial(const Color color) const
+    constexpr bool stmHasNonPawns() const
     {
-        return getBb(color, PieceType::Knight) > 0
-            || getBb(color, PieceType::Bishop) > 0
-            || getBb(color, PieceType::Rook)   > 0
-            || getBb(color, PieceType::Queen)  > 0;
+        return getBb(sideToMove(), PieceType::Knight) > 0
+            || getBb(sideToMove(), PieceType::Bishop) > 0
+            || getBb(sideToMove(), PieceType::Rook)   > 0
+            || getBb(sideToMove(), PieceType::Queen)  > 0;
     }
 
     constexpr Bitboard pinned()

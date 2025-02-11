@@ -417,15 +417,34 @@ private:
 
         ArrayVec<Move, 256> failLowQuiets;
 
+        // Moves loop
+
         MovePicker movePicker = MovePicker(
             false, ttEntry ? ttEntry->move : MOVE_NONE, plyData.killer
         );
 
-        Move move;
-
-        while ((move = movePicker.nextLegal(td->pos, td->historyTable)) != MOVE_NONE)
+        while (true)
         {
+            // moveRanking is a std::optional<MoveRanking>
+            const auto [move, moveRanking] = movePicker.nextLegal(td->pos, td->historyTable);
+
+            if (move == MOVE_NONE) break;
+
             legalMovesSeen++;
+            const bool isQuiet = td->pos.isQuiet(move);
+
+            /*
+            if (!isRoot
+            && bestScore > -MIN_MATE_SCORE
+            && static_cast<i32>(*moveRanking) < static_cast<i32>(MoveRanking::Killer)
+            && td->pos.stmHasNonPawns())
+            {
+                // SEE pruning
+                const i32 threshold = depth * (isQuiet ? seeQuietThreshold() : seeNoisyThreshold());
+                if (!td->pos.SEE(move, threshold))
+                    continue;
+            }
+            */
 
             const std::optional<i32> optScore = makeMove(td, move, ply + 1);
 
@@ -463,8 +482,7 @@ private:
 
             bound = Bound::Lower;
 
-            if (!td->pos.isQuiet(move))
-                break;
+            if (!isQuiet) break;
 
             // We have a quiet move
 
@@ -538,14 +556,25 @@ private:
         i32 bestScore = td->pos.inCheck() ? -INF : *eval;
         Move bestMove = MOVE_NONE;
 
+        // Moves loop
+
         const Move killer = td->pliesData[ply].killer;
         MovePicker movePicker = MovePicker(!td->pos.inCheck(), MOVE_NONE, killer);
-        Move move;
 
-        while ((move = movePicker.nextLegal(td->pos, td->historyTable)) != MOVE_NONE)
+        while (true)
         {
-            // Underpromotions pruning
-            if (bestScore > -MIN_MATE_SCORE && move.isUnderpromotion())
+            // moveRanking is a std::optional<MoveRanking>
+            const auto [move, moveRanking] = movePicker.nextLegal(td->pos, td->historyTable);
+
+            if (move == MOVE_NONE) break;
+
+            // In check, assert that no quiet moves are searched if we found
+            // a move that doesn't get us checkmated
+            assert(bestScore <= -MIN_MATE_SCORE || !td->pos.isQuiet(move));
+
+            // Prune bad noisy moves
+            if (bestScore > -MIN_MATE_SCORE
+            && static_cast<i32>(*moveRanking) < static_cast<i32>(MoveRanking::GoodNoisy))
                 break;
 
             const std::optional<i32> optScore = makeMove(td, move, ply + 1);
@@ -559,6 +588,11 @@ private:
             if (shouldStop(td)) return 0;
 
             bestScore = std::max<i32>(bestScore, score);
+
+            // In check, all moves are queued, but once we find a
+            // move that doeesn't get us checkmated, we skip quiets
+            if (score > -MIN_MATE_SCORE)
+                movePicker.mNoisiesOnly = true;
 
             if (score > alpha)
             {
