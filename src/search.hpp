@@ -385,32 +385,29 @@ private:
         // Probe TT for TT entry
         TTEntry& ttEntryRef = getEntry(mTT, td->pos.zobristHash());
 
-        // No TT entry if collision
-        std::optional<TTEntry> ttEntry = ttEntryRef.zobristHash == td->pos.zobristHash()
-                                       ? std::optional<TTEntry> { ttEntryRef }
-                                       : std::nullopt;
+        // Parse TT entry
+        const std::optional<ParsedTTEntry> ttEntry
+            = ParsedTTEntry::parse(ttEntryRef, td->pos.zobristHash(), static_cast<i16>(ply));
 
-        Move ttMove = MOVE_NONE;
+        // TT cutoff
+        if (ttEntry
+        && !isRoot
+        && ttEntry->depth >= depth
+        && (ttEntry->bound == Bound::Exact
+        || (ttEntry->bound == Bound::Upper && ttEntry->score <= alpha)
+        || (ttEntry->bound == Bound::Lower && ttEntry->score >= beta)))
+            return ttEntry->score;
 
-        if (ttEntry) {
-            ttEntry->adjustScore(static_cast<i16>(ply));
-            ttMove = Move(ttEntry->move);
-
-            // TT cutoff
-            if (!isRoot
-            && ttEntry->depth >= depth
-            && (ttEntry->bound == Bound::Exact
-            || (ttEntry->bound == Bound::Upper && ttEntry->score <= alpha)
-            || (ttEntry->bound == Bound::Lower && ttEntry->score >= beta)))
-                return ttEntry->score;
-        }
+        // IIR (Internal iterative reduction)
+        if (depth >= 4 && (!ttEntry || ttEntry->move == MOVE_NONE))
+            depth--;
 
         [[maybe_unused]] size_t legalMovesSeen = 0;
         i32 bestScore = -INF;
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::Upper;
 
-        MovePicker movePicker = MovePicker(false, ttMove);
+        MovePicker movePicker = MovePicker(false, ttEntry ? ttEntry->move : MOVE_NONE);
         Move move;
 
         while ((move = movePicker.nextLegal(td->pos, td->historyTable)) != MOVE_NONE)
