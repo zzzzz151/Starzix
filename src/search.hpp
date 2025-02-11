@@ -568,13 +568,9 @@ private:
 
             if (move == MOVE_NONE) break;
 
-            // In check, assert that no quiet moves are searched if we found
-            // a move that doesn't get us checkmated
-            assert(bestScore <= -MIN_MATE_SCORE || !td->pos.isQuiet(move));
-
             // Prune bad noisy moves
             if (bestScore > -MIN_MATE_SCORE
-            && static_cast<i32>(*moveRanking) < static_cast<i32>(MoveRanking::GoodNoisy))
+            && static_cast<i32>(*moveRanking) <= static_cast<i32>(MoveRanking::BadNoisy))
                 break;
 
             const std::optional<i32> optScore = makeMove(td, move, ply + 1);
@@ -588,11 +584,6 @@ private:
             if (shouldStop(td)) return 0;
 
             bestScore = std::max<i32>(bestScore, score);
-
-            // In check, all moves are queued, but once we find a
-            // move that doeesn't get us checkmated, we skip quiets
-            if (score > -MIN_MATE_SCORE)
-                movePicker.mNoisiesOnly = true;
 
             if (score > alpha)
             {

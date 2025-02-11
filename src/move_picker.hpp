@@ -204,7 +204,13 @@ public:
         if (mBadNoisyReady)
         {
             mBadNoisyReady = false;
-            return { mNoisiesData.mMoves[*(mNoisiesData.mIdx) - 1], MoveRanking::BadNoisy };
+
+            const Move move = mNoisiesData.mMoves[*(mNoisiesData.mIdx) - 1];
+
+            if (!isPseudolegalLegal(pos, move))
+                return nextLegal(pos, historyTable);
+
+            return { move, MoveRanking::BadNoisy };
         }
 
         // No more legal moves
