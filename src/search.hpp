@@ -591,6 +591,10 @@ private:
             if (bestScore > -MIN_MATE_SCORE && move.isUnderpromotion())
                 break;
 
+            // SEE pruning
+            if (!td->pos.inCheck() && !td->pos.SEE(move))
+                continue;
+
             const std::optional<i32> optScore = makeMove(td, move, ply + 1);
 
             const i32 score = optScore
