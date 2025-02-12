@@ -24,8 +24,9 @@ public:
     constexpr void genAndScoreMoves(
         Position& pos,
         const Move ttMove,
-        const Move killer = MOVE_NONE,
-        const EnumArray<HistoryEntry, Color, PieceType, Square>* historyTable = nullptr)
+        const Move killer,
+        const bool doSEE,
+        const EnumArray<HistoryEntry, Color, PieceType, Square>& historyTable)
     {
         static_assert(moveGenType != MoveGenType::AllMoves);
 
@@ -49,18 +50,28 @@ public:
 
             if constexpr (moveGenType == MoveGenType::NoisyOnly)
             {
-                constexpr EnumArray<std::optional<i32>, PieceType> UNDERPROMO_SCORE = {
-                //       P           N        B        R          Q             K
-                    std::nullopt, -30'000, -50'000, -40'000, std::nullopt, std::nullopt
-                };
-
                 const std::optional<PieceType> promo = move.promotion();
 
-                mScores[i] = promo && *promo != PieceType::Queen
-                           ? *(UNDERPROMO_SCORE[*promo])
-                           : promo
-                           ? (pos.SEE(move) ? 30'000 : -10'000) // Queen promo
-                           : 20'000 * (pos.SEE(move) ? 1 : -1);
+                if (doSEE) {
+                    constexpr EnumArray<std::optional<i32>, PieceType> UNDERPROMO_SCORE = {
+                    //       P           N        B        R          Q             K
+                        std::nullopt, -30'000, -50'000, -40'000, std::nullopt, std::nullopt
+                    };
+
+                    mScores[i] = promo && *promo != PieceType::Queen
+                               ? *(UNDERPROMO_SCORE[*promo])
+                               : promo
+                               ? (pos.SEE(move) ? 30'000 : -10'000) // Queen promo
+                               : 20'000 * (pos.SEE(move) ? 1 : -1);
+                }
+                else {
+                    constexpr EnumArray<std::optional<i32>, PieceType> PROMO_SCORE = {
+                        //   P           N        B        R       Q          K
+                        std::nullopt, -30'000, -50'000, -40'000, 20'000, std::nullopt
+                    };
+
+                    mScores[i] = promo ? *(PROMO_SCORE[*promo]) : 10'000;
+                }
 
                 // MVVLVA (most valuable victim, least valuable attacker)
 
@@ -74,12 +85,8 @@ public:
             }
             else if constexpr (moveGenType == MoveGenType::QuietOnly)
             {
-                assert(historyTable != nullptr);
-
-                const HistoryEntry& histEntry
-                    = (*historyTable)[pos.sideToMove()][move.pieceType()][move.to()];
-
-                mScores[i] = histEntry.getHistory();
+                mScores[i] = historyTable[pos.sideToMove()][move.pieceType()][move.to()]
+                    .getHistory();
             }
 
             i++;
@@ -154,7 +161,9 @@ public:
         }
 
         // If not done already, gen and score noisy moves
-        mNoisiesData.genAndScoreMoves<MoveGenType::NoisyOnly>(pos, mTtMove);
+        mNoisiesData.genAndScoreMoves<MoveGenType::NoisyOnly>(
+            pos, mTtMove, MOVE_NONE, !mNoisiesOnly, historyTable
+        );
 
         // Find next noisy move
         while (!mBadNoisyReady)
@@ -189,7 +198,7 @@ public:
 
         // If not done already, gen and score quiet moves
         mQuietsData.genAndScoreMoves<MoveGenType::QuietOnly>(
-            pos, mTtMove, mKiller, &historyTable
+            pos, mTtMove, mKiller, true, historyTable
         );
 
         // Yield quiet moves
