@@ -49,14 +49,18 @@ public:
 
             if constexpr (moveGenType == MoveGenType::NoisyOnly)
             {
-                const std::optional<PieceType> promo = move.promotion();
-
-                constexpr EnumArray<i32, PieceType> PROMO_SCORE = {
-                //  P     N        B        R        Q    K
-                    0, -10'000, -30'000, -20'000, 10'000, 0
+                constexpr EnumArray<std::optional<i32>, PieceType> UNDERPROMO_SCORE = {
+                //       P           N        B        R          Q             K
+                    std::nullopt, -30'000, -50'000, -40'000, std::nullopt, std::nullopt
                 };
 
-                mScores[i] = promo ? PROMO_SCORE[*promo] : 5'000;
+                const std::optional<PieceType> promo = move.promotion();
+
+                mScores[i] = promo && *promo != PieceType::Queen
+                           ? *(UNDERPROMO_SCORE[*promo])
+                           : promo
+                           ? (pos.SEE(move) ? 30'000 : -10'000) // Queen promo
+                           : 20'000 * (pos.SEE(move) ? 1 : -1);
 
                 // MVVLVA (most valuable victim, least valuable attacker)
 

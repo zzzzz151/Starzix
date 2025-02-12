@@ -53,10 +53,6 @@ constexpr i32 MIN_MATE_SCORE = INF - static_cast<i32>(MAX_DEPTH);
 MAYBE_CONSTEXPR TunableParam<double> hardTimePercentage = TunableParam<double>(0.5, 0.25, 0.75, 0.05);
 MAYBE_CONSTEXPR TunableParam<double> softTimePercentage = TunableParam<double>(0.05, 0.02, 0.20, 0.02);
 
-// SEE pruning
-MAYBE_CONSTEXPR TunableParam<i32> seeQuietThreshold = TunableParam<i32>(-50, -201, -1, 20);
-MAYBE_CONSTEXPR TunableParam<i32> seeNoisyThreshold = TunableParam<i32>(-100, -201, -1, 20);
-
 // History heuristic
 constexpr i32 HISTORY_MAX = 16384;
 MAYBE_CONSTEXPR TunableParam<i32> historyBonusMul    = TunableParam<i32>(300, 50, 600, 25);
@@ -75,8 +71,6 @@ MAYBE_CONSTEXPR TunableParam<i32> historyMalusMax    = TunableParam<i32>(1500, 5
     tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
         { stringify(hardTimePercentage), &hardTimePercentage },
         { stringify(softTimePercentage), &softTimePercentage },
-        { stringify(seeQuietThreshold),  &seeQuietThreshold },
-        { stringify(seeNoisyThreshold),  &seeNoisyThreshold },
         { stringify(historyBonusMul),    &historyBonusMul },
         { stringify(historyBonusOffset), &historyBonusOffset },
         { stringify(historyBonusMax),    &historyBonusMax },
