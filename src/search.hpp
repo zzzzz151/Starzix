@@ -431,7 +431,7 @@ private:
         if (depth >= 4 && (!ttEntry || ttEntry->move == MOVE_NONE))
             depth--;
 
-        [[maybe_unused]] size_t legalMovesSeen = 0;
+        size_t legalMovesSeen = 0;
         i32 bestScore = -INF;
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::Upper;
@@ -474,7 +474,25 @@ private:
                 goto moveSearched;
             }
 
-            if (!isPvNode || legalMovesSeen > 1)
+            // PVS (Principal variation search)
+
+            // LMR (Late move reductions)
+            if (depth >= 2
+            && legalMovesSeen > 1 + isRoot
+            && static_cast<i32>(*moveRanking) < static_cast<i32>(MoveRanking::GoodNoisy))
+            {
+                i32 lmr = LMR_TABLE[static_cast<size_t>(depth)][isQuiet][legalMovesSeen]
+                        - isPvNode
+                        - td->pos.inCheck();
+
+                lmr = std::max<i32>(lmr, 0); // Don't extend depth
+
+                score = -search<false, false>(td, depth - 1 - lmr, ply + 1, -alpha - 1, -alpha);
+
+                if (score > alpha && lmr > 0)
+                    score = -search<false, false>(td, depth - 1, ply + 1, -alpha - 1, -alpha);
+            }
+            else if (!isPvNode || legalMovesSeen > 1)
                 score = -search<false, false>(td, depth - 1, ply + 1, -alpha - 1, -alpha);
 
             if (isPvNode && (legalMovesSeen == 1 || score > alpha))
