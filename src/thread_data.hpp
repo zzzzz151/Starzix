@@ -71,30 +71,34 @@ constexpr Move bestMoveAtRoot(const ThreadData* td)
          : MOVE_NONE;
 }
 
-constexpr std::optional<i32> updateBothAccsAndEval(ThreadData* td, const size_t ply)
+constexpr void updateBothAccs(ThreadData* td)
 {
-    nnue::BothAccumulators& bothAccs = td->bothAccsStack[td->bothAccsIdx];
+    assert(td->bothAccsIdx > 0 || td->bothAccsStack[td->bothAccsIdx].mUpdated);
+
+    if (td->bothAccsIdx > 0)
+    {
+        td->bothAccsStack[td->bothAccsIdx]
+            .updateMove(td->bothAccsStack[td->bothAccsIdx - 1], td->pos, td->finnyTable);
+    }
+}
+
+constexpr i32 getEval(ThreadData* td, const size_t ply)
+{
     std::optional<i32>& eval = td->pliesData[ply].eval;
 
-    if (!bothAccs.mUpdated)
-    {
-        assert(td->bothAccsIdx > 0);
-        bothAccs.update(td->bothAccsStack[td->bothAccsIdx - 1], td->pos, td->finnyTable);
-    }
-
-    assert(bothAccs == nnue::BothAccumulators(td->pos));
-
     if (td->pos.inCheck())
-        eval = std::nullopt;
+        eval = 0;
     else if (!eval)
     {
-        eval = nnue::evaluate(bothAccs, td->pos.sideToMove());
+        updateBothAccs(td);
+
+        eval = nnue::evaluate(td->bothAccsStack[td->bothAccsIdx], td->pos.sideToMove());
 
         // Clamp eval to avoid invalid values and checkmate values
         eval = std::clamp<i32>(*eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
     }
 
-    return eval;
+    return *eval;
 }
 
 constexpr std::optional<i32> makeMove(ThreadData* td, const Move move, const size_t newPly)
@@ -123,11 +127,7 @@ constexpr std::optional<i32> makeMove(ThreadData* td, const Move move, const siz
         return -INF + static_cast<i32>(newPly);
 
     if (newPly >= MAX_DEPTH)
-    {
-        return td->pos.inCheck()
-             ? std::optional<i32> { 0 }
-             : updateBothAccsAndEval(td, newPly);
-    }
+        return getEval(td, newPly);
 
     return std::nullopt;
 }

@@ -375,16 +375,6 @@ private:
 
         depth = std::min<i32>(depth, static_cast<i32>(MAX_DEPTH));
 
-        nnue::BothAccumulators& bothAccs = td->bothAccsStack[td->bothAccsIdx];
-
-        if (!bothAccs.mUpdated)
-        {
-            assert(td->bothAccsIdx > 0);
-            bothAccs.update(td->bothAccsStack[td->bothAccsIdx - 1], td->pos, td->finnyTable);
-        }
-
-        assert(bothAccs == nnue::BothAccumulators(td->pos));
-
         // Probe TT for TT entry
         TTEntry& ttEntryRef = getEntry(mTT, td->pos.zobristHash());
 
@@ -400,6 +390,8 @@ private:
         || (ttEntry->bound == Bound::Upper && ttEntry->score <= alpha)
         || (ttEntry->bound == Bound::Lower && ttEntry->score >= beta)))
             return ttEntry->score;
+
+        updateBothAccs(td);
 
         PlyData& plyData = td->pliesData[ply];
 
@@ -537,21 +529,23 @@ private:
 
         if (shouldStop(td)) return 0;
 
-        const std::optional<i32> eval = updateBothAccsAndEval(td, ply);
+        updateBothAccs(td);
+
+        const i32 eval = getEval(td, ply);
 
         if (!td->pos.inCheck())
         {
             // Stand pat
             // Return immediately if static eval fails high
-            if (*eval >= beta) return *eval;
+            if (eval >= beta) return eval;
 
-            alpha = std::max<i32>(alpha, *eval);
+            alpha = std::max<i32>(alpha, eval);
         }
 
         // Reset killer move of next tree level
         td->pliesData[ply + 1].killer = MOVE_NONE;
 
-        i32 bestScore = td->pos.inCheck() ? -INF : *eval;
+        i32 bestScore = td->pos.inCheck() ? -INF : eval;
         Move bestMove = MOVE_NONE;
 
         // Moves loop

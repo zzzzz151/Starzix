@@ -222,10 +222,15 @@ private:
 
 public:
 
-    constexpr void update(
+    constexpr void updateMove(
         const BothAccumulators& prevBothAccs, const Position& pos, FinnyTable& finnyTable)
     {
-        assert(prevBothAccs.mUpdated && !mUpdated);
+        assert(prevBothAccs.mUpdated);
+
+        if (mUpdated) {
+            assert(*this == nnue::BothAccumulators(pos));
+            return;
+        }
 
         mMirrorVAxis = prevBothAccs.mMirrorVAxis;
         mInputBucket = prevBothAccs.mInputBucket;
@@ -335,12 +340,12 @@ public:
             }
         }
 
-        // Everything updated
-        mUpdated = true;
+        mUpdated = true; // Everything updated
+
+        assert(*this == nnue::BothAccumulators(pos));
     }
 
 }; // struct BothAccumulators
-
 
 constexpr i32 evaluate(const BothAccumulators& bothAccs, const Color stm)
 {
