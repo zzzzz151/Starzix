@@ -393,6 +393,33 @@ private:
 
         updateBothAccs(td);
 
+        const auto eval = [&] () constexpr -> i32 {
+            return getEval(td, ply);
+        };
+
+        if (!isRoot && !td->pos.inCheck())
+        {
+            // NMP (Null move pruning)
+            if (depth >= 3
+            && td->pos.lastMove() != MOVE_NONE
+            && td->pos.stmHasNonPawns()
+            && !(ttEntry && ttEntry->bound == Bound::Upper && ttEntry->score < beta)
+            && eval() >= beta)
+            {
+                const std::optional<i32> optScore = makeMove(td, MOVE_NONE, ply + 1);
+
+                const i32 score = optScore
+                                ? -(*optScore)
+                                : -search<false>(td, depth - 3 - depth / 3, ply + 1, -beta, -alpha);
+
+                undoMove(td);
+
+                if (shouldStop(td)) return 0;
+
+                if (score >= beta) return score >= MIN_MATE_SCORE ? beta : score;
+            }
+        }
+
         PlyData& plyData = td->pliesData[ply];
 
         // Reset killer move of next tree level
