@@ -54,8 +54,8 @@ MAYBE_CONSTEXPR TunableParam<double> hardTimePercentage = TunableParam<double>(0
 MAYBE_CONSTEXPR TunableParam<double> softTimePercentage = TunableParam<double>(0.05, 0.02, 0.20, 0.02);
 
 // SEE pruning
-MAYBE_CONSTEXPR TunableParam<i32> seeNoisyThreshold = TunableParam<i32>(-100, -210, -10, 20);
-MAYBE_CONSTEXPR TunableParam<i32> seeQuietThreshold = TunableParam<i32>(-50, -210, -10, 20);
+MAYBE_CONSTEXPR TunableParam<i32> seeNoisyThreshold = TunableParam<i32>(-150, -210, -10, 20);
+MAYBE_CONSTEXPR TunableParam<i32> seeQuietThreshold = TunableParam<i32>(-90, -210, -10, 20);
 
 // History heuristic
 constexpr i32 HISTORY_MAX = 16384;
