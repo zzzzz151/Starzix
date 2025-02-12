@@ -555,8 +555,8 @@ private:
 
             if (move == MOVE_NONE) break;
 
-            // Prune bad noisy moves
-            if (bestScore > -MIN_MATE_SCORE && *moveRanking == MoveRanking::BadNoisy)
+            // Prune underpromotions
+            if (bestScore > -MIN_MATE_SCORE && move.isUnderpromotion())
                 break;
 
             const std::optional<i32> optScore = makeMove(td, move, ply + 1);
