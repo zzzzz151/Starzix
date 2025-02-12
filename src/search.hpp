@@ -297,7 +297,7 @@ private:
         {
             td->maxPlyReached = 0; // Reset seldepth
 
-            const i32 score = search<true>(td, depth, 0, -INF, INF);
+            const i32 score = search<true, true>(td, depth, 0, -INF, INF);
 
             if (mStopSearch.load(std::memory_order_relaxed))
                 break;
@@ -358,7 +358,7 @@ private:
             mStopSearch.store(true, std::memory_order_relaxed);
     }
 
-    template<bool isRoot>
+    template<bool isRoot, bool isPvNode>
     constexpr i32 search(ThreadData* td, i32 depth, const size_t ply, i32 alpha, const i32 beta)
     {
         assert(hasLegalMove(td->pos));
@@ -367,6 +367,8 @@ private:
         assert(std::abs(alpha) <= INF);
         assert(std::abs(beta) <= INF);
         assert(alpha < beta);
+        assert(!(isRoot && !isPvNode));
+        assert(isPvNode || alpha + 1 == beta);
 
         // Quiescence search at leaf nodes
         if (depth <= 0) return qSearch(td, ply, alpha, beta);
@@ -384,7 +386,7 @@ private:
 
         // TT cutoff
         if (ttEntry
-        && !isRoot
+        && !isPvNode
         && ttEntry->depth >= depth
         && (ttEntry->bound == Bound::Exact
         || (ttEntry->bound == Bound::Upper && ttEntry->score <= alpha)
@@ -397,7 +399,7 @@ private:
             return getEval(td, ply);
         };
 
-        if (!isRoot && !td->pos.inCheck())
+        if (!isPvNode && !td->pos.inCheck())
         {
             // NMP (Null move pruning)
             if (depth >= 3
@@ -410,7 +412,7 @@ private:
 
                 const i32 score = optScore
                                 ? -(*optScore)
-                                : -search<false>(td, depth - 3 - depth / 3, ply + 1, -beta, -alpha);
+                                : -search<false, false>(td, depth - 3 - depth / 3, ply + 1, -beta, -alpha);
 
                 undoMove(td);
 
@@ -465,9 +467,20 @@ private:
 
             const std::optional<i32> optScore = makeMove(td, move, ply + 1);
 
-            const i32 score = optScore
-                            ? -(*optScore)
-                            : -search<false>(td, depth - 1, ply + 1, -beta, -alpha);
+            i32 score = 0;
+
+            if (optScore) {
+                score = -(*optScore);
+                goto moveSearched;
+            }
+
+            if (!isPvNode || legalMovesSeen > 1)
+                score = -search<false, false>(td, depth - 1, ply + 1, -alpha - 1, -alpha);
+
+            if (isPvNode && (legalMovesSeen == 1 || score > alpha))
+                score = -search<false, true>(td, depth - 1, ply + 1, -beta, -alpha);
+
+            moveSearched:
 
             undoMove(td);
 
@@ -488,9 +501,15 @@ private:
             bestMove = move;
             bound = Bound::Exact;
 
-            if constexpr (isRoot) {
+            // In PV nodes, update PV line
+            if constexpr (isPvNode)
+            {
                 plyData.pvLine.clear();
-                plyData.pvLine.push_back(bestMove);
+                plyData.pvLine.push_back(move);
+
+                // Copy child's PV line
+                for (const Move m : td->pliesData[ply + 1].pvLine)
+                    plyData.pvLine.push_back(m);
             }
 
             if (score < beta) continue;
