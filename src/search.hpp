@@ -363,7 +363,7 @@ private:
 
                 const double scaled
                     = static_cast<double>(*(mSearchConfig.softMs))
-                    * (1.25 - bestMoveNodesFraction / 2.0);
+                    * (1.5 - bestMoveNodesFraction * 0.75);
 
                 return static_cast<u64>(round(scaled));
             };
