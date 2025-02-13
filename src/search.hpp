@@ -575,7 +575,7 @@ private:
             );
 
             td->historyTable[td->pos.sideToMove()][move.pieceType()][move.to()]
-                .update(histBonus);
+                .update(histBonus, td->pos.lastMove());
 
             // Decrease history of fail low quiets
 
@@ -586,7 +586,7 @@ private:
             for (const Move failLowQuiet : failLowQuiets)
             {
                 td->historyTable[td->pos.sideToMove()][failLowQuiet.pieceType()][failLowQuiet.to()]
-                    .update(histMalus);
+                    .update(histMalus, td->pos.lastMove());
             }
 
             break;
