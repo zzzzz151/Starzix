@@ -86,7 +86,7 @@ public:
             else if constexpr (moveGenType == MoveGenType::QuietOnly)
             {
                 mScores[i] = historyTable[pos.sideToMove()][move.pieceType()][move.to()]
-                    .getHistory();
+                    .getHistory(pos.lastMove());
             }
 
             i++;

@@ -23,16 +23,26 @@ struct HistoryEntry
 private:
 
     i16 mMainHist = 0;
+    EnumArray<i16, PieceType, Square> mContHist = { };
 
 public:
 
-    constexpr i32 getHistory() const {
-        return static_cast<i32>(mMainHist);
+    constexpr i32 getHistory(const Move lastMove) const
+    {
+        i32 total = static_cast<i32>(mMainHist);
+
+        if (lastMove != MOVE_NONE)
+            total += static_cast<i32>(mContHist[lastMove.pieceType()][lastMove.to()]);
+
+        return total;
     }
 
-    constexpr void update(const i32 bonus)
+    constexpr void update(const i32 bonus, const Move lastMove)
     {
         updateHistory(mMainHist, bonus);
+
+        if (lastMove != MOVE_NONE)
+            updateHistory(mContHist[lastMove.pieceType()][lastMove.to()], bonus);
     }
 
 }; // struct HistoryEntry
