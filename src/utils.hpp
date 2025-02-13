@@ -7,6 +7,7 @@
 #include "enum_utils.hpp"
 #include <iostream>
 #include <string>
+#include <cmath>
 #include <vector>
 #include <sstream>
 #include <chrono>
@@ -18,7 +19,7 @@
 
 #define stringify(myVar) static_cast<std::string>(#myVar)
 
-#define ln(x) log(x)
+#define ln(x) std::log(x)
 
 template <typename T>
 inline std::string colored(const T& x, const ColorCode colorCode)

@@ -73,7 +73,7 @@ MAYBE_CONSTEXPR TunableParam<i32> historyMalusOffset = TunableParam<i32>(0, 0, 5
 MAYBE_CONSTEXPR TunableParam<i32> historyMalusMax    = TunableParam<i32>(1500, 500, 2500, 200);
 
 // [depth][isQuietMove][legalMovesSeen]
-constexpr MultiArray<i32, MAX_DEPTH + 1, 2, 256> getLmrTable()
+inline MultiArray<i32, MAX_DEPTH + 1, 2, 256> getLmrTable()
 {
     MultiArray<i32, MAX_DEPTH + 1, 2, 256> lmrTable = { };
 
