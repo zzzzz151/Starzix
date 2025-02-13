@@ -349,7 +349,27 @@ private:
 
             // Stop searching if soft time limit has been hit
 
-            if (mSearchConfig.softMs && msElapsed >= *(mSearchConfig.softMs))
+            // Nodes time management
+            // Scale soft time limit based on nodes spent on best move at root
+            const auto softMsScaled = [&] () constexpr -> u64
+            {
+                const u64 bestMoveNodes = td->nodesByMove[bestMoveAtRoot(td).asU16()];
+
+                const double bestMoveNodesFraction
+                    = static_cast<double>(bestMoveNodes)
+                    / static_cast<double>(std::max<u64>(td->nodes, 1));
+
+                assert(bestMoveNodesFraction >= 0.0 && bestMoveNodesFraction <= 1.0);
+
+                const double scaled
+                    = static_cast<double>(*(mSearchConfig.softMs))
+                    * (1.5 - bestMoveNodesFraction * 0.75);
+
+                return static_cast<u64>(round(scaled));
+            };
+
+            if (mSearchConfig.softMs
+            && msElapsed >= (depth >= 6 ? softMsScaled() : *(mSearchConfig.softMs)))
                 break;
         }
 
@@ -465,6 +485,8 @@ private:
                     continue;
             }
 
+            const u64 nodesBefore = td->nodes;
+
             const std::optional<i32> optScore = makeMove(td, move, ply + 1);
 
             i32 score = 0;
@@ -503,6 +525,10 @@ private:
             undoMove(td);
 
             if (shouldStop(td)) return 0;
+
+            assert(td->nodes > nodesBefore);
+
+            if (isRoot) td->nodesByMove[move.asU16()] += td->nodes - nodesBefore;
 
             bestScore = std::max<i32>(bestScore, score);
 
