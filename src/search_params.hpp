@@ -57,6 +57,12 @@ MAYBE_CONSTEXPR TunableParam<double> softTimePercentage = TunableParam<double>(0
 MAYBE_CONSTEXPR TunableParam<i32> seeNoisyThreshold = TunableParam<i32>(-150, -210, -10, 20);
 MAYBE_CONSTEXPR TunableParam<i32> seeQuietThreshold = TunableParam<i32>(-90, -210, -10, 20);
 
+// LMR (Late move reductions)
+MAYBE_CONSTEXPR TunableParam<double> lmrBaseQuiet = TunableParam<double>(0.8, 0.3, 1.2, 0.1);
+MAYBE_CONSTEXPR TunableParam<double> lmrBaseNoisy = TunableParam<double>(0.8, 0.3, 1.2, 0.1);
+MAYBE_CONSTEXPR TunableParam<double> lmrMulQuiet  = TunableParam<double>(0.4, 0.2, 0.8, 0.1);
+MAYBE_CONSTEXPR TunableParam<double> lmrMulNoisy  = TunableParam<double>(0.4, 0.2, 0.8, 0.1);
+
 // History heuristic
 constexpr i32 HISTORY_MAX = 16384;
 MAYBE_CONSTEXPR TunableParam<i32> historyBonusMul    = TunableParam<i32>(300, 50, 600, 25);
@@ -65,6 +71,32 @@ MAYBE_CONSTEXPR TunableParam<i32> historyBonusMax    = TunableParam<i32>(1500, 5
 MAYBE_CONSTEXPR TunableParam<i32> historyMalusMul    = TunableParam<i32>(300, 50, 600, 25);
 MAYBE_CONSTEXPR TunableParam<i32> historyMalusOffset = TunableParam<i32>(0, 0, 500, 100);
 MAYBE_CONSTEXPR TunableParam<i32> historyMalusMax    = TunableParam<i32>(1500, 500, 2500, 200);
+
+// [depth][isQuietMove][legalMovesSeen]
+constexpr MultiArray<i32, MAX_DEPTH + 1, 2, 256> getLmrTable()
+{
+    MultiArray<i32, MAX_DEPTH + 1, 2, 256> lmrTable = { };
+
+    for (size_t depth = 1; depth < MAX_DEPTH + 1; depth++)
+        for (size_t legalMovesSeen = 1; legalMovesSeen < 256; legalMovesSeen++)
+        {
+            const double a = ln(static_cast<double>(depth));
+            const double b = ln(static_cast<double>(legalMovesSeen));
+
+            lmrTable[depth][false][legalMovesSeen] = static_cast<i32>(round(
+                lmrBaseNoisy() + a * b * lmrMulNoisy()
+            ));
+
+            lmrTable[depth][true][legalMovesSeen] = static_cast<i32>(round(
+                lmrBaseQuiet() + a * b * lmrMulQuiet()
+            ));
+        }
+
+    return lmrTable;
+}
+
+// [depth][isQuietMove][legalMovesSeen]
+MAYBE_CONST MultiArray<i32, MAX_DEPTH + 1, 2, 256> LMR_TABLE = getLmrTable();
 
 #if defined(TUNE)
     using TunableParamVariant = std::variant<
@@ -77,6 +109,10 @@ MAYBE_CONSTEXPR TunableParam<i32> historyMalusMax    = TunableParam<i32>(1500, 5
         { stringify(softTimePercentage), &softTimePercentage },
         { stringify(seeNoisyThreshold),  &seeNoisyThreshold },
         { stringify(seeQuietThreshold),  &seeQuietThreshold },
+        { stringify(lmrBaseQuiet),       &lmrBaseQuiet },
+        { stringify(lmrBaseNoisy),       &lmrBaseNoisy },
+        { stringify(lmrMulQuiet),        &lmrMulQuiet },
+        { stringify(lmrMulNoisy),        &lmrMulNoisy },
         { stringify(historyBonusMul),    &historyBonusMul },
         { stringify(historyBonusOffset), &historyBonusOffset },
         { stringify(historyBonusMax),    &historyBonusMax },

@@ -164,6 +164,12 @@ inline void setoption(const std::vector<std::string>& tokens, Searcher& searcher
                            ? std::stof(optionValue)
                            : std::stoi(optionValue);
 
+            if (optionName == stringify(lmrBaseQuiet)
+            ||  optionName == stringify(lmrBaseNoisy)
+            ||  optionName == stringify(lmrMulQuiet)
+            ||  optionName == stringify(lmrMulNoisy))
+                LMR_TABLE = getLmrTable();
+
             std::cout << "info string " << optionName
                       << " set to "     << myParam->value
                       << std::endl;
