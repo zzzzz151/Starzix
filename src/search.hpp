@@ -474,14 +474,20 @@ private:
             legalMovesSeen++;
             const bool isQuiet = td->pos.isQuiet(move);
 
-            if (!isRoot
-            && bestScore > -MIN_MATE_SCORE
-            && static_cast<i32>(*moveRanking) < static_cast<i32>(MoveRanking::GoodNoisy)
-            && td->pos.stmHasNonPawns())
+            if (bestScore > -MIN_MATE_SCORE
+            && static_cast<i32>(*moveRanking) < static_cast<i32>(MoveRanking::GoodNoisy))
             {
+                // LMP (Late move pruning)
+                if (!isPvNode
+                && !td->pos.inCheck()
+                && legalMovesSeen > static_cast<size_t>(3 + depth * depth * 3 / 4))
+                    break;
+
                 // SEE pruning
+
                 const i32 threshold = depth * (isQuiet ? seeQuietThreshold() : seeNoisyThreshold());
-                if (!td->pos.SEE(move, threshold))
+
+                if (!isRoot && td->pos.stmHasNonPawns() && !td->pos.SEE(move, threshold))
                     continue;
             }
 
