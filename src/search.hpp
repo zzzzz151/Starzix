@@ -627,21 +627,6 @@ private:
 
         if (shouldStop(td)) return 0;
 
-        // Probe TT for TT entry
-        TTEntry& ttEntryRef = getEntry(mTT, td->pos.zobristHash());
-
-        // Parse TT entry
-        const std::optional<ParsedTTEntry> ttEntry
-            = ParsedTTEntry::parse(ttEntryRef, td->pos.zobristHash(), static_cast<i16>(ply));
-
-        // TT cutoff
-        if (!isPvNode
-        && ttEntry
-        && (ttEntry->bound == Bound::Exact
-        || (ttEntry->bound == Bound::Upper && ttEntry->score <= alpha)
-        || (ttEntry->bound == Bound::Lower && ttEntry->score >= beta)))
-                return ttEntry->score;
-
         updateBothAccs(td);
 
         const i32 eval = getEval(td, ply);
