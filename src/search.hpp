@@ -391,7 +391,7 @@ private:
         assert(isPvNode || alpha + 1 == beta);
 
         // Quiescence search at leaf nodes
-        if (depth <= 0) return qSearch(td, ply, alpha, beta);
+        if (depth <= 0) return qSearch<isPvNode>(td, ply, alpha, beta);
 
         if (shouldStop(td)) return 0;
 
@@ -405,8 +405,8 @@ private:
             = ParsedTTEntry::parse(ttEntryRef, td->pos.zobristHash(), static_cast<i16>(ply));
 
         // TT cutoff
-        if (ttEntry
-        && !isPvNode
+        if (!isPvNode
+        && ttEntry
         && ttEntry->depth >= depth
         && (ttEntry->bound == Bound::Exact
         || (ttEntry->bound == Bound::Upper && ttEntry->score <= alpha)
@@ -615,6 +615,7 @@ private:
     }
 
     // Quiescence search
+    template<bool isPvNode>
     constexpr i32 qSearch(ThreadData* td, const size_t ply, i32 alpha, const i32 beta)
     {
         assert(hasLegalMove(td->pos));
@@ -622,8 +623,24 @@ private:
         assert(std::abs(alpha) <= INF);
         assert(std::abs(beta) <= INF);
         assert(alpha < beta);
+        assert(isPvNode || alpha + 1 == beta);
 
         if (shouldStop(td)) return 0;
+
+        // Probe TT for TT entry
+        TTEntry& ttEntryRef = getEntry(mTT, td->pos.zobristHash());
+
+        // Parse TT entry
+        const std::optional<ParsedTTEntry> ttEntry
+            = ParsedTTEntry::parse(ttEntryRef, td->pos.zobristHash(), static_cast<i16>(ply));
+
+        // TT cutoff
+        if (!isPvNode
+        && ttEntry
+        && (ttEntry->bound == Bound::Exact
+        || (ttEntry->bound == Bound::Upper && ttEntry->score <= alpha)
+        || (ttEntry->bound == Bound::Lower && ttEntry->score >= beta)))
+                return ttEntry->score;
 
         updateBothAccs(td);
 
@@ -668,7 +685,7 @@ private:
 
             const i32 score = optScore
                             ? -(*optScore)
-                            : -qSearch(td, ply + 1, -beta, -alpha);
+                            : -qSearch<isPvNode>(td, ply + 1, -beta, -alpha);
 
             undoMove(td);
 
