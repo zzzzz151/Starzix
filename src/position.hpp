@@ -721,6 +721,7 @@ public:
         state().zobristHash ^= state().castlingRights; // XOR old castling rights out
 
         // Update castling rights
+
         if (pieceType == PieceType::King)
         {
             state().castlingRights &= ~squareBb(CASTLING_ROOK_FROM[sideToMove()][false]);
@@ -728,7 +729,8 @@ public:
         }
         else if (hasSquare(state().castlingRights, from))
             state().castlingRights &= ~squareBb(from);
-        else if (hasSquare(state().castlingRights, to))
+
+        if (hasSquare(state().castlingRights, to))
             state().castlingRights &= ~squareBb(to);
 
         state().zobristHash ^= state().castlingRights; // XOR new castling rights in
