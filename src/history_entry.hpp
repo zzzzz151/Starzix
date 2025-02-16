@@ -22,14 +22,16 @@ struct HistoryEntry
 {
 private:
 
-    i16 mMainHist = 0;
+    MultiArray<i16, 2, 2> mMainHist = { }; // [enemyAttacksSrc][enemyAttacksDst]
+
     EnumArray<i16, PieceType, Square> mContHist = { };
 
 public:
 
-    constexpr i32 getHistory(const Move lastMove) const
+    constexpr i32 getHistory(
+        const bool enemyAttacksSrc, const bool enemyAttacksDst, const Move lastMove) const
     {
-        i32 total = static_cast<i32>(mMainHist);
+        i32 total = static_cast<i32>(mMainHist[enemyAttacksSrc][enemyAttacksDst]);
 
         if (lastMove != MOVE_NONE)
             total += static_cast<i32>(mContHist[lastMove.pieceType()][lastMove.to()]);
@@ -37,9 +39,13 @@ public:
         return total;
     }
 
-    constexpr void update(const i32 bonus, const Move lastMove)
+    constexpr void update(
+        const i32 bonus,
+        const bool enemyAttacksSrc,
+        const bool enemyAttacksDst,
+        const Move lastMove)
     {
-        updateHistory(mMainHist, bonus);
+        updateHistory(mMainHist[enemyAttacksSrc][enemyAttacksDst], bonus);
 
         if (lastMove != MOVE_NONE)
             updateHistory(mContHist[lastMove.pieceType()][lastMove.to()], bonus);

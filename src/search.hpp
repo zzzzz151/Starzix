@@ -576,12 +576,18 @@ private:
 
             // Increase move's history
 
+            const Bitboard enemyAttacks = td->pos.enemyAttacksNoStmKing();
+
             const i32 histBonus = std::clamp<i32>(
                 depth * historyBonusMul() - historyBonusOffset(), 0, historyBonusMax()
             );
 
-            td->historyTable[td->pos.sideToMove()][move.pieceType()][move.to()]
-                .update(histBonus, td->pos.lastMove());
+            td->historyTable[td->pos.sideToMove()][move.pieceType()][move.to()].update(
+                histBonus,
+                hasSquare(enemyAttacks, move.from()),
+                hasSquare(enemyAttacks, move.to()),
+                td->pos.lastMove()
+            );
 
             // Decrease history of fail low quiets
 
@@ -589,10 +595,14 @@ private:
                 depth * historyMalusMul() - historyMalusOffset(), 0, historyMalusMax()
             );
 
-            for (const Move failLowQuiet : failLowQuiets)
+            for (const Move m : failLowQuiets)
             {
-                td->historyTable[td->pos.sideToMove()][failLowQuiet.pieceType()][failLowQuiet.to()]
-                    .update(histMalus, td->pos.lastMove());
+                td->historyTable[td->pos.sideToMove()][m.pieceType()][m.to()].update(
+                    histMalus,
+                    hasSquare(enemyAttacks, m.from()),
+                    hasSquare(enemyAttacks, m.to()),
+                    td->pos.lastMove()
+                );
             }
 
             break;
