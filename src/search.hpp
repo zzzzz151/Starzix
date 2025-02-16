@@ -297,7 +297,7 @@ private:
         {
             td->maxPlyReached = 0; // Reset seldepth
 
-            const i32 score = search<true, true>(td, depth, 0, -INF, INF);
+            const i32 score = search<true, true, false>(td, depth, 0, -INF, INF);
 
             if (mStopSearch.load(std::memory_order_relaxed))
                 break;
@@ -378,7 +378,7 @@ private:
             mStopSearch.store(true, std::memory_order_relaxed);
     }
 
-    template<bool isRoot, bool isPvNode>
+    template<bool isRoot, bool isPvNode, bool isCutNode>
     constexpr i32 search(ThreadData* td, i32 depth, const size_t ply, i32 alpha, const i32 beta)
     {
         assert(hasLegalMove(td->pos));
@@ -389,6 +389,7 @@ private:
         assert(alpha < beta);
         assert(!(isRoot && !isPvNode));
         assert(isPvNode || alpha + 1 == beta);
+        assert(!(isPvNode && isCutNode));
 
         // Quiescence search at leaf nodes
         if (depth <= 0) return qSearch<isPvNode>(td, ply, alpha, beta);
@@ -431,8 +432,8 @@ private:
                 const std::optional<i32> optScore = makeMove(td, MOVE_NONE, ply + 1);
 
                 const i32 score = optScore
-                                ? -(*optScore)
-                                : -search<false, false>(td, depth - 3 - depth / 3, ply + 1, -beta, -alpha);
+                    ? -(*optScore)
+                    : -search<false, false, false>(td, depth - 3 - depth / 3, ply + 1, -beta, -alpha);
 
                 undoMove(td);
 
@@ -511,20 +512,21 @@ private:
             {
                 i32 lmr = LMR_TABLE[static_cast<size_t>(depth)][isQuiet][legalMovesSeen]
                         - isPvNode
-                        - td->pos.inCheck();
+                        - td->pos.inCheck()
+                        + isCutNode * 2;
 
                 lmr = std::max<i32>(lmr, 0); // Don't extend depth
 
-                score = -search<false, false>(td, depth - 1 - lmr, ply + 1, -alpha - 1, -alpha);
+                score = -search<false, false, true>(td, depth - 1 - lmr, ply + 1, -alpha - 1, -alpha);
 
                 if (score > alpha && lmr > 0)
-                    score = -search<false, false>(td, depth - 1, ply + 1, -alpha - 1, -alpha);
+                    score = -search<false, false, !isCutNode>(td, depth - 1, ply + 1, -alpha - 1, -alpha);
             }
             else if (!isPvNode || legalMovesSeen > 1)
-                score = -search<false, false>(td, depth - 1, ply + 1, -alpha - 1, -alpha);
+                score = -search<false, false, !isCutNode>(td, depth - 1, ply + 1, -alpha - 1, -alpha);
 
             if (isPvNode && (legalMovesSeen == 1 || score > alpha))
-                score = -search<false, true>(td, depth - 1, ply + 1, -beta, -alpha);
+                score = -search<false, true, false>(td, depth - 1, ply + 1, -beta, -alpha);
 
             moveSearched:
 
