@@ -5,6 +5,7 @@
 #include "utils.hpp"
 #include "move.hpp"
 #include "attacks.hpp"
+#include "cuckoo.hpp"
 
 enum class GameState : i32 {
     Draw, Loss, Ongoing
@@ -511,10 +512,10 @@ public:
             return GameState::Ongoing;
 
         const i32 numStates = static_cast<i32>(mStates.size());
-        const i32 pliesSincePawnOrCapt = static_cast<i32>(state().pliesSincePawnOrCapture);
+        const i32 pliesSincePawnOrCapture = static_cast<i32>(state().pliesSincePawnOrCapture);
 
         const i32 stateIdxAfterPawnOrCapture
-            = std::max<i32>(0, numStates - pliesSincePawnOrCapt - 1);
+            = std::max<i32>(0, numStates - pliesSincePawnOrCapture - 1);
 
         const i32 rootStateIdx
             = searchPly ? numStates - static_cast<i32>(*searchPly) - 1 : -1;
@@ -929,6 +930,61 @@ public:
         hashAfter ^= ZOBRIST_PIECES[sideToMove()][pt][to];
 
         return hashAfter;
+    }
+
+    // Do we have a legal move that results in position repetition?
+    constexpr bool hasUpcomingRepetition(const std::optional<size_t> searchPly = std::nullopt) const
+    {
+        if (mStates.size() <= 3 || state().pliesSincePawnOrCapture < 3)
+            return false;
+
+        const i32 numStates = static_cast<i32>(mStates.size());
+        const i32 pliesSincePawnOrCapture = static_cast<i32>(state().pliesSincePawnOrCapture);
+
+        const i32 stateIdxAfterPawnOrCapture
+            = std::max<i32>(0, numStates - pliesSincePawnOrCapture - 1);
+
+        const i32 rootStateIdx
+            = searchPly ? numStates - static_cast<i32>(*searchPly) - 1 : -1;
+
+        u64 otherHash = state().zobristHash ^ mStates[mStates.size() - 2].zobristHash ^ ZOBRIST_COLOR;
+
+        #pragma clang diagnostic push
+        #pragma clang diagnostic ignored "-Wsign-conversion"
+
+        for (i32 stateIdx = numStates - 4; stateIdx >= stateIdxAfterPawnOrCapture; stateIdx -= 2)
+        {
+            otherHash ^= mStates[stateIdx + 1].zobristHash;
+            otherHash ^= mStates[stateIdx].zobristHash;
+            otherHash ^= ZOBRIST_COLOR;
+
+            if (otherHash != 0) continue;
+
+            const u64 moveHash = state().zobristHash ^ mStates[stateIdx].zobristHash;
+            size_t cuckooIdx;
+
+            if ((cuckooIdx = h1(moveHash), CUCKOO_DATA.hashes[cuckooIdx] != moveHash)
+            &&  (cuckooIdx = h2(moveHash), CUCKOO_DATA.hashes[cuckooIdx] != moveHash))
+                continue;
+
+            const Move move = CUCKOO_DATA.moves[cuckooIdx];
+
+            if (occupied() & BETWEEN_EXCLUSIVE_BB[move.from()][move.to()])
+                continue;
+
+            // After root, do 2-fold repetition
+            if (stateIdx > rootStateIdx)
+                return true;
+
+            // At and before root, do 3-fold repetition
+            for (i32 j = stateIdx - 2; j >= stateIdxAfterPawnOrCapture; j -= 2)
+                if (mStates[stateIdx].zobristHash == mStates[j].zobristHash)
+                    return true;
+        }
+
+        #pragma clang diagnostic pop // #pragma clang diagnostic ignored "-Wsign-conversion"
+
+        return false;
     }
 
 }; // class Position

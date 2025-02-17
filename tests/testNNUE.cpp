@@ -3,7 +3,7 @@
 #include "../src/position.hpp"
 #include "../src/nnue.hpp"
 #include "positions.hpp"
-#include "../src/3rdparty/ordered_map.h"
+#include "../3rd-party/ordered_map.h"
 #include <cassert>
 
 tsl::ordered_map<std::string, i32> FENS_EVAL = {
