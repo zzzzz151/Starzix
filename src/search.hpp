@@ -542,7 +542,8 @@ private:
 
             assert(td->nodes > nodesBefore);
 
-            if (isRoot) td->nodesByMove[move.asU16()] += td->nodes - nodesBefore;
+            if constexpr (isRoot)
+                td->nodesByMove[move.asU16()] += td->nodes - nodesBefore;
 
             bestScore = std::max<i32>(bestScore, score);
 
