@@ -399,20 +399,20 @@ private:
         depth = std::min<i32>(depth, static_cast<i32>(MAX_DEPTH));
 
         // Probe TT for TT entry
-        TTEntry& ttEntryRef = getEntry(mTT, td->pos.zobristHash());
+        TTEntry& ttEntry = getEntry(mTT, td->pos.zobristHash());
 
-        // Parse TT entry
-        const std::optional<ParsedTTEntry> ttEntry
-            = ParsedTTEntry::parse(ttEntryRef, td->pos.zobristHash(), static_cast<i16>(ply));
+        // Get TT entry data
+        const auto [ttHit, ttDepth, ttScore, ttBound, ttMove]
+            = ttEntry.get(td->pos.zobristHash(), static_cast<i16>(ply));
 
         // TT cutoff
         if (!isPvNode
-        && ttEntry
-        && ttEntry->depth >= depth
-        && (ttEntry->bound == Bound::Exact
-        || (ttEntry->bound == Bound::Upper && ttEntry->score <= alpha)
-        || (ttEntry->bound == Bound::Lower && ttEntry->score >= beta)))
-            return ttEntry->score;
+        && ttHit
+        && ttDepth >= depth
+        && (ttBound == Bound::Exact
+        || (ttBound == Bound::Upper && ttScore <= alpha)
+        || (ttBound == Bound::Lower && ttScore >= beta)))
+            return ttScore;
 
         updateBothAccs(td);
 
@@ -426,7 +426,7 @@ private:
             if (depth >= 3
             && td->pos.lastMove() != MOVE_NONE
             && td->pos.stmHasNonPawns()
-            && !(ttEntry && ttEntry->bound == Bound::Upper && ttEntry->score < beta)
+            && !(ttHit && ttBound == Bound::Upper && ttScore < beta)
             && eval() >= beta)
             {
                 const std::optional<i32> optScore = makeMove(td, MOVE_NONE, ply + 1);
@@ -449,7 +449,7 @@ private:
         td->pliesData[ply + 1].killer = MOVE_NONE;
 
         // IIR (Internal iterative reduction)
-        if (depth >= 4 && (!ttEntry || ttEntry->move == MOVE_NONE))
+        if (depth >= 4 && ttMove == MOVE_NONE)
             depth--;
 
         size_t legalMovesSeen = 0;
@@ -461,9 +461,7 @@ private:
 
         // Moves loop
 
-        MovePicker movePicker = MovePicker(
-            false, ttEntry ? ttEntry->move : MOVE_NONE, plyData.killer
-        );
+        MovePicker movePicker = MovePicker(false, ttMove, plyData.killer);
 
         while (true)
         {
@@ -613,7 +611,7 @@ private:
         assert(legalMovesSeen > 0);
 
         // Update TT entry
-        ttEntryRef.update(
+        ttEntry.update(
             td->pos.zobristHash(),
             static_cast<u8>(depth),
             static_cast<i16>(bestScore),

@@ -5,6 +5,7 @@
 #include "utils.hpp"
 #include "move.hpp"
 #include <cmath>
+#include <tuple>
 
 enum class Bound : u8 {
     None = 0, Exact = 1, Lower = 2, Upper = 3
@@ -12,13 +13,35 @@ enum class Bound : u8 {
 
 struct TTEntry
 {
+private:
+
+    u64 mZobristHash = 0;
+    u8 mDepth = 0;
+    i16 mScore = 0;
+    Bound mBound = Bound::None;
+    u16 mMove = MOVE_NONE.asU16();
+
 public:
 
-    u64 zobristHash = 0;
-    u8 depth = 0;
-    i16 score = 0;
-    Bound bound = Bound::None;
-    u16 move = MOVE_NONE.asU16();
+    // ttHit, depth, score, bound, move
+    constexpr std::tuple<bool, i32, i32, Bound, Move> get(
+        const u64 zobristHash, const i16 ply) const
+    {
+        if (mZobristHash != zobristHash)
+            return { false, 0, 0, Bound::None, MOVE_NONE };
+
+        const i16 score = mScore >= MIN_MATE_SCORE  ? mScore - ply
+                        : mScore <= -MIN_MATE_SCORE ? mScore + ply
+                        : mScore;
+
+        return {
+            true,
+            static_cast<i32>(mDepth),
+            static_cast<i32>(score),
+            mBound,
+            Move(mMove)
+        };
+    }
 
     constexpr void update(
         const u64 newHash,
@@ -28,55 +51,23 @@ public:
         const Bound newBound,
         const Move newMove)
     {
-        this->zobristHash = newHash;
+        mZobristHash = newHash;
 
-        this->depth = newDepth;
+        mDepth = newDepth;
 
-        this->score = newScore >= MIN_MATE_SCORE  ? newScore + ply
-                    : newScore <= -MIN_MATE_SCORE ? newScore - ply
-                    : newScore;
+        mScore = newScore >= MIN_MATE_SCORE  ? newScore + ply
+               : newScore <= -MIN_MATE_SCORE ? newScore - ply
+               : newScore;
 
-        this->bound = newBound;
+        mBound = newBound;
 
-        if (this->zobristHash != newHash || newMove != MOVE_NONE)
-            this->move = newMove.asU16();
+        if (mZobristHash != newHash || newMove != MOVE_NONE)
+            mMove = newMove.asU16();
     }
 
 } __attribute__((packed)); // struct TTEntry
 
 static_assert(sizeof(TTEntry) == 8 + 2 + 2 + 1 + 1);
-
-struct ParsedTTEntry
-{
-public:
-
-    i32 depth = 0;
-    i32 score = 0;
-    Bound bound = Bound::None;
-    Move move = MOVE_NONE;
-
-    constexpr static std::optional<ParsedTTEntry> parse(
-        const TTEntry& ttEntry, const u64 zobristHash, const i16 ply)
-    {
-        if (ttEntry.zobristHash != zobristHash)
-            return std::nullopt;
-
-        ParsedTTEntry parsedEntry;
-
-        parsedEntry.depth = ttEntry.depth;
-
-        parsedEntry.score = ttEntry.score >= MIN_MATE_SCORE  ? ttEntry.score - ply
-                          : ttEntry.score <= -MIN_MATE_SCORE ? ttEntry.score + ply
-                          : ttEntry.score;
-
-        parsedEntry.bound = ttEntry.bound;
-
-        parsedEntry.move = Move(ttEntry.move);
-
-        return parsedEntry;
-    }
-
-}; // struct ParsedTTEntry
 
 inline void printTTSize(const std::vector<TTEntry>& tt)
 {
