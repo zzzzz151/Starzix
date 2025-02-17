@@ -1,5 +1,7 @@
 // clang-format off
 
+#include "utils.hpp"
+#include "position.hpp"
 #include "uci.hpp"
 #include <iostream>
 

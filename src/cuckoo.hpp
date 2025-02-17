@@ -1,12 +1,12 @@
 // clang-format off
 
+#pragma once
+
 #include "utils.hpp"
 #include "move.hpp"
 #include "attacks.hpp"
 #include <algorithm>
 #include <stdexcept>
-
-#pragma once
 
 constexpr u64 h1(const u64 hash)
 {
