@@ -1,22 +1,5 @@
 // clang-format off
 
-//#include "types.hpp"
-//#include "array_utils.hpp"
-//#include "enum_utils.hpp"
-//#include "utils.hpp"
-//#include "move.hpp"
-//#include "attacks.hpp"
-//#include "position.hpp"
-//#include "move_gen.hpp"
-//#include "simd.hpp"
-//#include "nnue.hpp"
-//#include "search_params.hpp"
-//#include "history_entry.hpp"
-//#include "thread_data.hpp"
-//#include "move_picker.hpp"
-//#include "tt.hpp"
-//#include "search.hpp"
-//#include "bench.hpp"
 #include "uci.hpp"
 #include <iostream>
 

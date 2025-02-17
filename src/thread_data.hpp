@@ -5,8 +5,8 @@
 #include "utils.hpp"
 #include "position.hpp"
 #include "move_gen.hpp"
-#include "nnue.hpp"
 #include "search_params.hpp"
+#include "nnue.hpp"
 #include "history_entry.hpp"
 #include <algorithm>
 #include <atomic>

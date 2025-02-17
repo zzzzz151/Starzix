@@ -5,12 +5,13 @@
 #include "utils.hpp"
 #include "position.hpp"
 #include "move_gen.hpp"
-#include "nnue.hpp"
 #include "search_params.hpp"
+#include "nnue.hpp"
 #include "history_entry.hpp"
 #include "thread_data.hpp"
 #include "move_picker.hpp"
 #include "tt.hpp"
+#include "cuckoo.hpp"
 #include <atomic>
 #include <thread>
 #include <mutex>
@@ -396,6 +397,13 @@ private:
 
         if (shouldStop(td)) return 0;
 
+        if (!isRoot && alpha < 0 && td->pos.hasUpcomingRepetition(ply))
+        {
+            alpha = 0;
+
+            if (alpha >= beta) return alpha;
+        }
+
         depth = std::min<i32>(depth, static_cast<i32>(MAX_DEPTH));
 
         // Probe TT for TT entry
@@ -636,6 +644,13 @@ private:
         assert(isPvNode || alpha + 1 == beta);
 
         if (shouldStop(td)) return 0;
+
+        if (alpha < 0 && td->pos.hasUpcomingRepetition(ply))
+        {
+            alpha = 0;
+
+            if (alpha >= beta) return alpha;
+        }
 
         updateBothAccs(td);
 

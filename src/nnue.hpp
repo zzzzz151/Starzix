@@ -13,7 +13,7 @@
     #undef _MSC_VER
 #endif
 
-#include "3rdparty/incbin.h"
+#include "../3rd-party/incbin.h"
 
 namespace nnue {
 
