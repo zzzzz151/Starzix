@@ -12,6 +12,7 @@ constexpr u64 h1(const u64 hash)
 {
     return hash & 0x1fff;
 }
+
 constexpr u64 h2(const u64 hash)
 {
     return (hash >> 16) & 0x1fff;
