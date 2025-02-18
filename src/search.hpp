@@ -468,7 +468,7 @@ private:
         Bound bound = Bound::Upper;
 
         ArrayVec<Move, 256> failLowQuiets;
-        ArrayVec<std::pair<Move, std::optional<PieceType>>, 256> failLowNoisies;
+        ArrayVec<std::pair<Move, std::optional<PieceType>>, 256> failLowNoisies; // move, captured
 
         // Moves loop
 
