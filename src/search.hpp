@@ -709,8 +709,9 @@ private:
 
         // Moves loop
 
-        const Move killer = td->pliesData[ply].killer;
-        MovePicker movePicker = MovePicker(!td->pos.inCheck(), MOVE_NONE, killer);
+        MovePicker movePicker = MovePicker(
+            !td->pos.inCheck(), MOVE_NONE, td->pliesData[ply].killer
+        );
 
         while (true)
         {
