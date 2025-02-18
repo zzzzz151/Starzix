@@ -422,6 +422,9 @@ private:
         || (ttBound == Bound::Lower && ttScore >= beta)))
             return ttScore;
 
+        // Reset killer move of next tree level
+        td->pliesData[ply + 1].killer = MOVE_NONE;
+
         updateBothAccs(td);
 
         const auto eval = [&] () constexpr -> i32 {
@@ -453,14 +456,11 @@ private:
             }
         }
 
-        PlyData& plyData = td->pliesData[ply];
-
-        // Reset killer move of next tree level
-        td->pliesData[ply + 1].killer = MOVE_NONE;
-
         // IIR (Internal iterative reduction)
         if (depth >= 4 && ttMove == MOVE_NONE)
             depth--;
+
+        PlyData& plyData = td->pliesData[ply];
 
         size_t legalMovesSeen = 0;
         i32 bestScore = -INF;
@@ -706,8 +706,9 @@ private:
 
         // Moves loop
 
-        const Move killer = td->pliesData[ply].killer;
-        MovePicker movePicker = MovePicker(!td->pos.inCheck(), MOVE_NONE, killer);
+        MovePicker movePicker = MovePicker(
+            !td->pos.inCheck(), MOVE_NONE, td->pliesData[ply].killer
+        );
 
         while (true)
         {
