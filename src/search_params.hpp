@@ -50,8 +50,10 @@ public:
 }; // struct TunableParam
 
 // Time management
-MAYBE_CONSTEXPR auto hardTimePercentage = TunableParam<double>(0.5, 0.25, 0.75, 0.05);
-MAYBE_CONSTEXPR auto softTimePercentage = TunableParam<double>(0.05, 0.02, 0.20, 0.02);
+MAYBE_CONSTEXPR auto timeHardPercentage = TunableParam<double>(0.5, 0.25, 0.75, 0.1);
+MAYBE_CONSTEXPR auto timeSoftPercentage = TunableParam<double>(0.05, 0.02, 0.20, 0.02);
+MAYBE_CONSTEXPR auto nodesTmBase = TunableParam<double>(1.5, 1.0, 2.0, 0.1);
+MAYBE_CONSTEXPR auto nodesTmMul  = TunableParam<double>(0.75, 0.5, 1.0, 0.1);
 
 // SEE thresholds
 MAYBE_CONSTEXPR auto seeNoisyHistMul   = TunableParam<float>(0.05f, 0.0f, 0.2f, 0.02f);
@@ -59,10 +61,10 @@ MAYBE_CONSTEXPR auto seeNoisyThreshold = TunableParam<i32>(-150, -210, -10, 20);
 MAYBE_CONSTEXPR auto seeQuietThreshold = TunableParam<i32>(-90, -210, -10, 20);
 
 // LMR (Late move reductions)
-MAYBE_CONSTEXPR auto lmrBaseQuiet = TunableParam<double>(0.8, 0.3, 1.2, 0.1);
 MAYBE_CONSTEXPR auto lmrBaseNoisy = TunableParam<double>(0.8, 0.3, 1.2, 0.1);
-MAYBE_CONSTEXPR auto lmrMulQuiet  = TunableParam<double>(0.4, 0.2, 0.8, 0.1);
+MAYBE_CONSTEXPR auto lmrBaseQuiet = TunableParam<double>(0.8, 0.3, 1.2, 0.1);
 MAYBE_CONSTEXPR auto lmrMulNoisy  = TunableParam<double>(0.4, 0.2, 0.8, 0.1);
+MAYBE_CONSTEXPR auto lmrMulQuiet  = TunableParam<double>(0.4, 0.2, 0.8, 0.1);
 
 // History heuristic
 constexpr i32 HISTORY_MAX = 16384;
@@ -107,15 +109,17 @@ MAYBE_CONST MultiArray<i32, MAX_DEPTH + 1, 2, 256> LMR_TABLE = getLmrTable();
     >;
 
     tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
-        { stringify(hardTimePercentage), &hardTimePercentage },
-        { stringify(softTimePercentage), &softTimePercentage },
+        { stringify(timeHardPercentage), &timeHardPercentage },
+        { stringify(timeSoftPercentage), &timeSoftPercentage },
+        { stringify(nodesTmBase),        &nodesTmBase },
+        { stringify(nodesTmMul),         &nodesTmMul },
         { stringify(seeNoisyHistMul),    &seeNoisyHistMul },
         { stringify(seeNoisyThreshold),  &seeNoisyThreshold },
         { stringify(seeQuietThreshold),  &seeQuietThreshold },
-        { stringify(lmrBaseQuiet),       &lmrBaseQuiet },
         { stringify(lmrBaseNoisy),       &lmrBaseNoisy },
-        { stringify(lmrMulQuiet),        &lmrMulQuiet },
+        { stringify(lmrBaseQuiet),       &lmrBaseQuiet },
         { stringify(lmrMulNoisy),        &lmrMulNoisy },
+        { stringify(lmrMulQuiet),        &lmrMulQuiet },
         { stringify(historyBonusMul),    &historyBonusMul },
         { stringify(historyBonusOffset), &historyBonusOffset },
         { stringify(historyBonusMax),    &historyBonusMax },

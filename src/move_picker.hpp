@@ -16,6 +16,8 @@ enum class MoveRanking : i32 {
 constexpr i32 getThreshold(
     const Position& pos, const HistoryTable& historyTable, const Move move)
 {
+    if (move.promotion()) return 0;
+
     const i32 noisyHist = historyTable[pos.sideToMove()][move.pieceType()][move.to()]
         .noisyHistory(pos.captured(move), move.promotion());
 
@@ -69,15 +71,16 @@ public:
                         std::nullopt, -30'000, -50'000, -40'000, std::nullopt, std::nullopt
                     };
 
-                    mScores[i]
-                        = promo && *promo != PieceType::Queen
-                        // Underpromotion
-                        ? *(UNDERPROMO_SCORE[*promo])
-                        : promo
-                        // Queen promotion
-                        ? (pos.SEE(move, 0) ? 30'000 : -10'000)
-                        // Capture without promotion
-                        : 20'000 * (pos.SEE(move, getThreshold(pos, historyTable, move)) ? 1 : -1);
+                    const i32 threshold = getThreshold(pos, historyTable, move);
+
+                    mScores[i] = promo && *promo != PieceType::Queen
+                               // Underpromotion
+                               ? *(UNDERPROMO_SCORE[*promo])
+                               : promo
+                               // Queen promotion
+                               ? (pos.SEE(move, threshold) ? 30'000 : -10'000)
+                               // Capture without promotion
+                               : 20'000 * (pos.SEE(move, threshold) ? 1 : -1);
                 }
                 else {
                     constexpr EnumArray<std::optional<i32>, PieceType> PROMO_SCORE = {

@@ -169,10 +169,10 @@ inline void setoption(const std::vector<std::string>& tokens, Searcher& searcher
 
             #pragma clang diagnostic pop
 
-            if (optionName == stringify(lmrBaseQuiet)
-            ||  optionName == stringify(lmrBaseNoisy)
-            ||  optionName == stringify(lmrMulQuiet)
-            ||  optionName == stringify(lmrMulNoisy))
+            if (optionName == stringify(lmrBaseNoisy)
+            ||  optionName == stringify(lmrBaseQuiet)
+            ||  optionName == stringify(lmrMulNoisy)
+            ||  optionName == stringify(lmrMulQuiet))
                 LMR_TABLE = getLmrTable();
 
             std::cout << "info string " << optionName
@@ -255,11 +255,11 @@ constexpr void go(
         if (!isMoveTime)
         {
             searchConfig.hardMs = static_cast<u64>(round(
-                static_cast<double>(*(searchConfig.hardMs)) * hardTimePercentage()
+                static_cast<double>(*(searchConfig.hardMs)) * timeHardPercentage()
             ));
 
             searchConfig.softMs = static_cast<u64>(round(
-                static_cast<double>(*(searchConfig.hardMs)) * softTimePercentage()
+                static_cast<double>(*(searchConfig.hardMs)) * timeSoftPercentage()
             ));
         }
     }

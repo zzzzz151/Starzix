@@ -364,7 +364,7 @@ private:
 
                 const double scaled
                     = static_cast<double>(*(mSearchConfig.softMs))
-                    * (1.5 - bestMoveNodesFraction * 0.75);
+                    * (nodesTmBase() - bestMoveNodesFraction * nodesTmMul());
 
                 return static_cast<u64>(round(scaled));
             };
@@ -722,7 +722,7 @@ private:
 
             // SEE pruning
             if (!td->pos.inCheck()
-            &&  !td->pos.SEE(move, 0 /*getThreshold(td->pos, td->historyTable, move)*/ ))
+            &&  !td->pos.SEE(move, 0 /* getThreshold(td->pos, td->historyTable, move) */ ))
                 continue;
 
             const std::optional<i32> optScore = makeMove(td, move, ply + 1);
