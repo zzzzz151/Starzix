@@ -50,6 +50,15 @@ public:
 
             if constexpr (moveGenType == MoveGenType::NoisyOnly)
             {
+                const auto getSEEThreshold = [&] () constexpr -> i32
+                {
+                    const i32 noisyHist = historyTable[pos.sideToMove()][move.pieceType()][move.to()]
+                        .noisyHistory(pos.captured(move), move.promotion());
+
+                    const float threshold = static_cast<float>(-noisyHist) * seeNoisyHistMul();
+                    return static_cast<i32>(round(threshold));
+                };
+
                 const std::optional<PieceType> promo = move.promotion();
 
                 if (doSEE) {
@@ -59,10 +68,13 @@ public:
                     };
 
                     mScores[i] = promo && *promo != PieceType::Queen
+                               // Underpromotion
                                ? *(UNDERPROMO_SCORE[*promo])
                                : promo
-                               ? (pos.SEE(move) ? 30'000 : -10'000) // Queen promo
-                               : 20'000 * (pos.SEE(move) ? 1 : -1);
+                               // Queen promotion
+                               ? (pos.SEE(move, 0) ? 30'000 : -10'000)
+                               // Capture without promotion
+                               : 20'000 * (pos.SEE(move, getSEEThreshold()) ? 1 : -1);
                 }
                 else {
                     constexpr EnumArray<std::optional<i32>, PieceType> PROMO_SCORE = {
@@ -89,7 +101,7 @@ public:
                 const bool enemyAttacksDst = hasSquare(pos.enemyAttacksNoStmKing(), move.to());
 
                 mScores[i] = historyTable[pos.sideToMove()][move.pieceType()][move.to()]
-                    .getHistory(enemyAttacksSrc, enemyAttacksDst, pos.lastMove());
+                    .quietHistory(enemyAttacksSrc, enemyAttacksDst, pos.lastMove());
             }
 
             i++;

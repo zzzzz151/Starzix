@@ -466,6 +466,7 @@ private:
         Bound bound = Bound::Upper;
 
         ArrayVec<Move, 256> failLowQuiets;
+        ArrayVec<std::pair<Move, std::optional<PieceType>>, 256> failLowNoisies;
 
         // Moves loop
 
@@ -501,6 +502,8 @@ private:
             const u64 nodesBefore = td->nodes;
 
             const std::optional<i32> optScore = makeMove(td, move, ply + 1);
+
+            const std::optional<PieceType> captured = td->pos.captured();
 
             i32 score = 0;
 
@@ -552,6 +555,8 @@ private:
             {
                 if (td->pos.isQuiet(move))
                     failLowQuiets.push_back(move);
+                else
+                    failLowNoisies.push_back({ move, captured });
 
                 continue;
             }
@@ -573,44 +578,57 @@ private:
 
             if (score < beta) continue;
 
-            // Fail high
+            // We have a fail high
 
             bound = Bound::Lower;
 
-            if (!isQuiet) break;
+            // Update histories
 
-            // We have a quiet move
-
-            plyData.killer = move;
-
-            // Increase move's history
-
-            const Bitboard enemyAttacks = td->pos.enemyAttacksNoStmKing();
+            HistoryEntry& histEntry = td->historyTable[td->pos.sideToMove()][move.pieceType()][move.to()];
 
             const i32 histBonus = std::clamp<i32>(
                 depth * historyBonusMul() - historyBonusOffset(), 0, historyBonusMax()
             );
 
-            td->historyTable[td->pos.sideToMove()][move.pieceType()][move.to()].update(
-                histBonus,
-                hasSquare(enemyAttacks, move.from()),
-                hasSquare(enemyAttacks, move.to()),
-                td->pos.lastMove()
-            );
-
-            // Decrease history of fail low quiets
-
             const i32 histMalus = -std::clamp<i32>(
                 depth * historyMalusMul() - historyMalusOffset(), 0, historyMalusMax()
             );
 
+            // Decrease history of fail low noisy moves
+            for (const auto [mov, optCaptured] : failLowNoisies)
+            {
+                td->historyTable[td->pos.sideToMove()][mov.pieceType()][mov.to()]
+                    .updateNoisyHistory(optCaptured, mov.promotion(), histMalus);
+            }
+
+            if (!isQuiet) {
+                // Increase history of this fail high noisy move
+                histEntry.updateNoisyHistory(captured, move.promotion(), histBonus);
+                break;
+            }
+
+            // At this point, this move is quiet
+
+            plyData.killer = move;
+
+            const Bitboard enemyAttacks = td->pos.enemyAttacksNoStmKing();
+
+            // Increase quiet histories of this fail high quiet move
+            histEntry.updateQuietHistories(
+                hasSquare(enemyAttacks, move.from()),
+                hasSquare(enemyAttacks, move.to()),
+                td->pos.lastMove(),
+                histBonus
+            );
+
+            // Decrease quiet histories of fail low quiet moves
             for (const Move m : failLowQuiets)
             {
-                td->historyTable[td->pos.sideToMove()][m.pieceType()][m.to()].update(
-                    histMalus,
+                td->historyTable[td->pos.sideToMove()][m.pieceType()][m.to()].updateQuietHistories(
                     hasSquare(enemyAttacks, m.from()),
                     hasSquare(enemyAttacks, m.to()),
-                    td->pos.lastMove()
+                    td->pos.lastMove(),
+                    histMalus
                 );
             }
 
