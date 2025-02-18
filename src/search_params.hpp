@@ -15,6 +15,10 @@
     #define MAYBE_CONST const
 #endif
 
+constexpr size_t MAX_DEPTH = 100;
+constexpr i32 INF = 30'000;
+constexpr i32 MIN_MATE_SCORE = INF - static_cast<i32>(MAX_DEPTH);
+
 template <typename T>
 struct TunableParam
 {
@@ -45,33 +49,29 @@ public:
 
 }; // struct TunableParam
 
-constexpr size_t MAX_DEPTH = 100;
-constexpr i32 INF = 30'000;
-constexpr i32 MIN_MATE_SCORE = INF - static_cast<i32>(MAX_DEPTH);
-
 // Time management
-MAYBE_CONSTEXPR TunableParam<double> hardTimePercentage = TunableParam<double>(0.5, 0.25, 0.75, 0.05);
-MAYBE_CONSTEXPR TunableParam<double> softTimePercentage = TunableParam<double>(0.05, 0.02, 0.20, 0.02);
+MAYBE_CONSTEXPR auto hardTimePercentage = TunableParam<double>(0.5, 0.25, 0.75, 0.05);
+MAYBE_CONSTEXPR auto softTimePercentage = TunableParam<double>(0.05, 0.02, 0.20, 0.02);
 
 // SEE thresholds
-MAYBE_CONSTEXPR TunableParam<float> seeNoisyHistMul = TunableParam<float>(0.05f, 0.0f, 0.2f, 0.02f);
-MAYBE_CONSTEXPR TunableParam<i32> seeNoisyThreshold = TunableParam<i32>(-150, -210, -10, 20);
-MAYBE_CONSTEXPR TunableParam<i32> seeQuietThreshold = TunableParam<i32>(-90, -210, -10, 20);
+MAYBE_CONSTEXPR auto seeNoisyHistMul   = TunableParam<float>(0.05f, 0.0f, 0.2f, 0.02f);
+MAYBE_CONSTEXPR auto seeNoisyThreshold = TunableParam<i32>(-150, -210, -10, 20);
+MAYBE_CONSTEXPR auto seeQuietThreshold = TunableParam<i32>(-90, -210, -10, 20);
 
 // LMR (Late move reductions)
-MAYBE_CONSTEXPR TunableParam<double> lmrBaseQuiet = TunableParam<double>(0.8, 0.3, 1.2, 0.1);
-MAYBE_CONSTEXPR TunableParam<double> lmrBaseNoisy = TunableParam<double>(0.8, 0.3, 1.2, 0.1);
-MAYBE_CONSTEXPR TunableParam<double> lmrMulQuiet  = TunableParam<double>(0.4, 0.2, 0.8, 0.1);
-MAYBE_CONSTEXPR TunableParam<double> lmrMulNoisy  = TunableParam<double>(0.4, 0.2, 0.8, 0.1);
+MAYBE_CONSTEXPR auto lmrBaseQuiet = TunableParam<double>(0.8, 0.3, 1.2, 0.1);
+MAYBE_CONSTEXPR auto lmrBaseNoisy = TunableParam<double>(0.8, 0.3, 1.2, 0.1);
+MAYBE_CONSTEXPR auto lmrMulQuiet  = TunableParam<double>(0.4, 0.2, 0.8, 0.1);
+MAYBE_CONSTEXPR auto lmrMulNoisy  = TunableParam<double>(0.4, 0.2, 0.8, 0.1);
 
 // History heuristic
 constexpr i32 HISTORY_MAX = 16384;
-MAYBE_CONSTEXPR TunableParam<i32> historyBonusMul    = TunableParam<i32>(300, 50, 600, 25);
-MAYBE_CONSTEXPR TunableParam<i32> historyBonusOffset = TunableParam<i32>(0, 0, 500, 100);
-MAYBE_CONSTEXPR TunableParam<i32> historyBonusMax    = TunableParam<i32>(1500, 500, 2500, 200);
-MAYBE_CONSTEXPR TunableParam<i32> historyMalusMul    = TunableParam<i32>(300, 50, 600, 25);
-MAYBE_CONSTEXPR TunableParam<i32> historyMalusOffset = TunableParam<i32>(0, 0, 500, 100);
-MAYBE_CONSTEXPR TunableParam<i32> historyMalusMax    = TunableParam<i32>(1500, 500, 2500, 200);
+MAYBE_CONSTEXPR auto historyBonusMul    = TunableParam<i32>(300, 50, 600, 25);
+MAYBE_CONSTEXPR auto historyBonusOffset = TunableParam<i32>(0, 0, 500, 100);
+MAYBE_CONSTEXPR auto historyBonusMax    = TunableParam<i32>(1500, 500, 2500, 200);
+MAYBE_CONSTEXPR auto historyMalusMul    = TunableParam<i32>(300, 50, 600, 25);
+MAYBE_CONSTEXPR auto historyMalusOffset = TunableParam<i32>(0, 0, 500, 100);
+MAYBE_CONSTEXPR auto historyMalusMax    = TunableParam<i32>(1500, 500, 2500, 200);
 
 // [depth][isQuietMove][legalMovesSeen]
 inline MultiArray<i32, MAX_DEPTH + 1, 2, 256> getLmrTable()

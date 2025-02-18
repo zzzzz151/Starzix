@@ -42,7 +42,7 @@ public:
     std::array<u64, 1ULL << 17> nodesByMove; // [Move.asU16()]
 
     // [stm][pieceType][targetSquare]
-    EnumArray<HistoryEntry, Color, PieceType, Square> historyTable = { };
+    HistoryTable historyTable = { };
 
     std::array<nnue::BothAccumulators, MAX_DEPTH + 1> bothAccsStack;
     size_t bothAccsIdx = 0;

@@ -87,3 +87,6 @@ public:
     }
 
 }; // struct HistoryEntry
+
+// [stm][pieceType][targetSquare]
+using HistoryTable = EnumArray<HistoryEntry, Color, PieceType, Square>;

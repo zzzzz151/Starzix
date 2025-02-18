@@ -175,7 +175,7 @@ public:
         bothAccs = nnue::BothAccumulators(pos);
 
         const auto initFinnyEntry = [&] (
-            const Color color, const bool mirrorVAxis, const size_t inputBucket) constexpr -> void
+            const Color color, const bool mirrorVAxis, const size_t inputBucket) constexpr
         {
             nnue::FinnyTableEntry& finnyEntry
                 = mainThreadData()->finnyTable[color][mirrorVAxis][inputBucket];
@@ -441,7 +441,9 @@ private:
 
                 const i32 score = optScore
                     ? -(*optScore)
-                    : -search<false, false, false>(td, depth - 3 - depth / 3, ply + 1, -beta, -alpha);
+                    : -search<false, false, false>(
+                          td, depth - 3 - depth / 3, ply + 1, -beta, -alpha
+                      );
 
                 undoMove(td);
 
@@ -493,7 +495,8 @@ private:
 
                 // SEE pruning
 
-                const i32 threshold = depth * (isQuiet ? seeQuietThreshold() : seeNoisyThreshold());
+                const i32 threshold
+                    = depth * (isQuiet ? seeQuietThreshold() : seeNoisyThreshold());
 
                 if (!isRoot && td->pos.stmHasNonPawns() && !td->pos.SEE(move, threshold))
                     continue;
@@ -526,13 +529,23 @@ private:
 
                 lmr = std::max<i32>(lmr, 0); // Don't extend depth
 
-                score = -search<false, false, true>(td, depth - 1 - lmr, ply + 1, -alpha - 1, -alpha);
+                score = -search<false, false, true>(
+                    td, depth - 1 - lmr, ply + 1, -alpha - 1, -alpha
+                );
 
                 if (score > alpha && lmr > 0)
-                    score = -search<false, false, !isCutNode>(td, depth - 1, ply + 1, -alpha - 1, -alpha);
+                {
+                    score = -search<false, false, !isCutNode>(
+                        td, depth - 1, ply + 1, -alpha - 1, -alpha
+                    );
+                }
             }
             else if (!isPvNode || legalMovesSeen > 1)
-                score = -search<false, false, !isCutNode>(td, depth - 1, ply + 1, -alpha - 1, -alpha);
+            {
+                score = -search<false, false, !isCutNode>(
+                    td, depth - 1, ply + 1, -alpha - 1, -alpha
+                );
+            }
 
             if (isPvNode && (legalMovesSeen == 1 || score > alpha))
                 score = -search<false, true, false>(td, depth - 1, ply + 1, -beta, -alpha);
@@ -584,7 +597,8 @@ private:
 
             // Update histories
 
-            HistoryEntry& histEntry = td->historyTable[td->pos.sideToMove()][move.pieceType()][move.to()];
+            HistoryEntry& histEntry
+                = td->historyTable[td->pos.sideToMove()][move.pieceType()][move.to()];
 
             const i32 histBonus = std::clamp<i32>(
                 depth * historyBonusMul() - historyBonusOffset(), 0, historyBonusMax()
@@ -707,7 +721,8 @@ private:
                 break;
 
             // SEE pruning
-            if (!td->pos.inCheck() && !td->pos.SEE(move))
+            if (!td->pos.inCheck()
+            &&  !td->pos.SEE(move, 0 /*getThreshold(td->pos, td->historyTable, move)*/ ))
                 continue;
 
             const std::optional<i32> optScore = makeMove(td, move, ply + 1);

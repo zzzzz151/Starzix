@@ -11,7 +11,8 @@ constexpr EnumArray<Bitboard, Color, Square> PAWN_ATTACKS = [] () consteval
 {
     EnumArray<Bitboard, Color, Square> pawnAttacks = { };
 
-    constexpr auto getPawnAttacks = [] (const Square square, const Color color) consteval -> Bitboard
+    constexpr auto getPawnAttacks = [] (
+        const Square square, const Color color) consteval -> Bitboard
     {
         const Rank rank = squareRank(square);
 
