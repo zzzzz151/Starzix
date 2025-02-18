@@ -453,9 +453,6 @@ private:
                 if (shouldStop(td)) return 0;
 
                 if (score >= beta) return score >= MIN_MATE_SCORE ? beta : score;
-
-                // Reset killer move of next tree level
-                td->pliesData[ply + 1].killer = MOVE_NONE;
             }
         }
 
