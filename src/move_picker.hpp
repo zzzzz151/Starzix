@@ -12,6 +12,17 @@ enum class MoveRanking : i32 {
     TtMove = 10, GoodNoisy = 9, Killer = 8, Quiet = 7, BadNoisy = 6
 };
 
+// SEE threshold
+constexpr i32 getThreshold(
+    const Position& pos, const HistoryTable& historyTable, const Move move)
+{
+    const i32 noisyHist = historyTable[pos.sideToMove()][move.pieceType()][move.to()]
+        .noisyHistory(pos.captured(move), move.promotion());
+
+    const float threshold = static_cast<float>(-noisyHist) * seeNoisyHistMul();
+    return static_cast<i32>(round(threshold));
+}
+
 struct MovesData
 {
 public:
@@ -26,7 +37,7 @@ public:
         const Move ttMove,
         const Move killer,
         const bool doSEE,
-        const EnumArray<HistoryEntry, Color, PieceType, Square>& historyTable)
+        const HistoryTable& historyTable)
     {
         static_assert(moveGenType != MoveGenType::AllMoves);
 
@@ -58,11 +69,15 @@ public:
                         std::nullopt, -30'000, -50'000, -40'000, std::nullopt, std::nullopt
                     };
 
-                    mScores[i] = promo && *promo != PieceType::Queen
-                               ? *(UNDERPROMO_SCORE[*promo])
-                               : promo
-                               ? (pos.SEE(move) ? 30'000 : -10'000) // Queen promo
-                               : 20'000 * (pos.SEE(move) ? 1 : -1);
+                    mScores[i]
+                        = promo && *promo != PieceType::Queen
+                        // Underpromotion
+                        ? *(UNDERPROMO_SCORE[*promo])
+                        : promo
+                        // Queen promotion
+                        ? (pos.SEE(move, 0) ? 30'000 : -10'000)
+                        // Capture without promotion
+                        : 20'000 * (pos.SEE(move, getThreshold(pos, historyTable, move)) ? 1 : -1);
                 }
                 else {
                     constexpr EnumArray<std::optional<i32>, PieceType> PROMO_SCORE = {
@@ -89,7 +104,7 @@ public:
                 const bool enemyAttacksDst = hasSquare(pos.enemyAttacksNoStmKing(), move.to());
 
                 mScores[i] = historyTable[pos.sideToMove()][move.pieceType()][move.to()]
-                    .getHistory(enemyAttacksSrc, enemyAttacksDst, pos.lastMove());
+                    .quietHistory(enemyAttacksSrc, enemyAttacksDst, pos.lastMove());
             }
 
             i++;
@@ -149,7 +164,7 @@ public:
 
     constexpr std::pair<Move, std::optional<MoveRanking>> nextLegal(
         Position& pos,
-        const EnumArray<HistoryEntry, Color, PieceType, Square>& historyTable)
+        const HistoryTable& historyTable)
     {
         // Maybe return TT move the first time this function is called
         if (!mTtMoveDone)

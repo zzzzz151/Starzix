@@ -857,8 +857,8 @@ public:
 
         Color ourColor = notSideToMove();
 
-        const auto popLeastValuable = [&] (const Bitboard ourAttackers) constexpr
-            -> std::optional<PieceType>
+        const auto popLeastValuable = [&] (
+            const Bitboard ourAttackers) constexpr -> std::optional<PieceType>
         {
             for (const PieceType pt : EnumIter<PieceType>())
             {
@@ -933,7 +933,8 @@ public:
     }
 
     // Do we have a legal move that results in position repetition?
-    constexpr bool hasUpcomingRepetition(const std::optional<size_t> searchPly = std::nullopt) const
+    constexpr bool hasUpcomingRepetition(
+        const std::optional<size_t> searchPly = std::nullopt) const
     {
         if (mStates.size() <= 3 || state().pliesSincePawnOrCapture < 3)
             return false;
@@ -947,7 +948,9 @@ public:
         const i32 rootStateIdx
             = searchPly ? numStates - static_cast<i32>(*searchPly) - 1 : -1;
 
-        u64 otherHash = state().zobristHash ^ mStates[mStates.size() - 2].zobristHash ^ ZOBRIST_COLOR;
+        u64 otherHash = state().zobristHash
+                      ^ mStates[mStates.size() - 2].zobristHash
+                      ^ ZOBRIST_COLOR;
 
         #pragma clang diagnostic push
         #pragma clang diagnostic ignored "-Wsign-conversion"

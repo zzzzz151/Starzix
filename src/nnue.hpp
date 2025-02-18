@@ -122,7 +122,7 @@ public:
         mAccumulators = NET->hiddenBiases;
 
         const auto activateFeature = [&] (
-            const Color pieceColor, const PieceType pt, const Square square) constexpr -> void
+            const Color pieceColor, const PieceType pt, const Square square) constexpr
         {
             for (const Color color : EnumIter<Color>())
             {
@@ -177,7 +177,7 @@ private:
         FinnyTableEntry& finnyEntry = finnyTable[accColor][mirrorVAxis][inputBucket];
 
         const auto updatePieces = [&] (
-            const Color pieceColor, const PieceType pt) constexpr -> void
+            const Color pieceColor, const PieceType pt) constexpr
         {
             const Bitboard bb = pos.getBb(pieceColor, pt);
             const Bitboard entryBb = finnyEntry.colorBbs[pieceColor] & finnyEntry.piecesBbs[pt];
@@ -264,7 +264,8 @@ public:
         || pos.captured() == PieceType::Queen)
             setInputBucket(colorMoving, pos.getBb(notColorMoving, PieceType::Queen));
 
-        // If our vertical axis mirroring toggled or our input bucket changed, reset our accumulator
+        // If our vertical axis mirroring toggled or our input bucket changed,
+        // reset our accumulator
         if  (mMirrorVAxis[colorMoving] != prevBothAccs.mMirrorVAxis[colorMoving]
         || mInputBucket[colorMoving] != prevBothAccs.mInputBucket[colorMoving])
             updateFinnyEntryAndAccumulator(finnyTable, colorMoving, pos);
@@ -296,18 +297,22 @@ public:
             if (pos.captured())
             {
                 const PieceType captured = *(pos.captured());
-                Square capturedSq = move.flag() == MoveFlag::EnPassant ? enPassantRelative(to) : to;
+
+                Square capturedSq = move.flag() == MoveFlag::EnPassant
+                                  ? enPassantRelative(to) : to;
 
                 if (mMirrorVAxis[color])
                     capturedSq = flipFile(capturedSq);
+
+                const auto& ftWeights = NET->ftWeights[color][inputBucket];
 
                 for (size_t i = 0; i < HIDDEN_LAYER_SIZE; i++)
                 {
                     mAccumulators[color][i]
                         = prevBothAccs.mAccumulators[color][i]
-                        - NET->ftWeights[color][inputBucket][colorMoving][pieceType][newFrom][i]
-                        + NET->ftWeights[color][inputBucket][colorMoving][place][newTo][i]
-                        - NET->ftWeights[color][inputBucket][notColorMoving][captured][capturedSq][i];
+                        - ftWeights[colorMoving][pieceType][newFrom][i]
+                        + ftWeights[colorMoving][place][newTo][i]
+                        - ftWeights[notColorMoving][captured][capturedSq][i];
                 }
             }
             else if (move.flag() == MoveFlag::Castling)
@@ -319,23 +324,27 @@ public:
                     rookTo   = flipFile(rookTo);
                 }
 
+                const auto& ftWeights = NET->ftWeights[color][inputBucket][colorMoving];
+
                 for (size_t i = 0; i < HIDDEN_LAYER_SIZE; i++)
                 {
                     mAccumulators[color][i]
                         = prevBothAccs.mAccumulators[color][i]
-                        - NET->ftWeights[color][inputBucket][colorMoving][pieceType][newFrom][i]
-                        + NET->ftWeights[color][inputBucket][colorMoving][place][newTo][i]
-                        - NET->ftWeights[color][inputBucket][colorMoving][PieceType::Rook][rookFrom][i]
-                        + NET->ftWeights[color][inputBucket][colorMoving][PieceType::Rook][rookTo][i];
+                        - ftWeights[pieceType][newFrom][i]
+                        + ftWeights[place][newTo][i]
+                        - ftWeights[PieceType::Rook][rookFrom][i]
+                        + ftWeights[PieceType::Rook][rookTo][i];
                 }
             }
             else {
+                const auto& ftWeights = NET->ftWeights[color][inputBucket][colorMoving];
+
                 for (size_t i = 0; i < HIDDEN_LAYER_SIZE; i++)
                 {
                     mAccumulators[color][i]
                         = prevBothAccs.mAccumulators[color][i]
-                        - NET->ftWeights[color][inputBucket][colorMoving][pieceType][newFrom][i]
-                        + NET->ftWeights[color][inputBucket][colorMoving][place][newTo][i];
+                        - ftWeights[pieceType][newFrom][i]
+                        + ftWeights[place][newTo][i];
                 }
             }
         }
@@ -372,8 +381,12 @@ constexpr i32 evaluate(const BothAccumulators& bothAccs, const Color stm)
                 hiddenNeurons = clampVec(hiddenNeurons, vecZero, vecQA);
 
                 // Load the respective N output weights
+
                 const i16& outputWeightsStart = NET->outputWeights[color != stm][i];
-                const Vec outputWeights = loadVec(reinterpret_cast<const Vec*>(&outputWeightsStart));
+
+                const Vec outputWeights = loadVec(
+                    reinterpret_cast<const Vec*>(&outputWeightsStart)
+                );
 
                 // Multiply each hidden neuron with its respective output weight
                 // We use mullo, which multiplies in the i32 world but returns the results as i16's

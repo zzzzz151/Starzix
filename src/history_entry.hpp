@@ -26,9 +26,11 @@ private:
 
     EnumArray<i16, PieceType, Square> mContHist = { };
 
+    MultiArray<i16, 7, 5> mNoisyHist = { }; // [pieceTypeCaptured][promotionPieceType]
+
 public:
 
-    constexpr i32 getHistory(
+    constexpr i32 quietHistory(
         const bool enemyAttacksSrc, const bool enemyAttacksDst, const Move lastMove) const
     {
         i32 total = static_cast<i32>(mMainHist[enemyAttacksSrc][enemyAttacksDst]);
@@ -39,11 +41,11 @@ public:
         return total;
     }
 
-    constexpr void update(
-        const i32 bonus,
+    constexpr void updateQuietHistories(
         const bool enemyAttacksSrc,
         const bool enemyAttacksDst,
-        const Move lastMove)
+        const Move lastMove,
+        const i32 bonus)
     {
         updateHistory(mMainHist[enemyAttacksSrc][enemyAttacksDst], bonus);
 
@@ -51,4 +53,40 @@ public:
             updateHistory(mContHist[lastMove.pieceType()][lastMove.to()], bonus);
     }
 
+private:
+
+    constexpr std::pair<size_t, size_t> noisyHistoryIdxs(
+        const std::optional<PieceType> captured, const std::optional<PieceType> promotion) const
+    {
+        const size_t firstIdx = captured ? static_cast<size_t>(*captured) : 6;
+
+        const size_t secondIdx
+            = promotion
+            ? static_cast<size_t>(*promotion) - static_cast<size_t>(PieceType::Knight)
+            : 4;
+
+        return { firstIdx, secondIdx };
+    }
+
+public:
+
+    constexpr i32 noisyHistory(
+        const std::optional<PieceType> captured, const std::optional<PieceType> promotion) const
+    {
+        const auto [firstIdx, secondIdx] = noisyHistoryIdxs(captured, promotion);
+        return static_cast<i32>(mNoisyHist[firstIdx][secondIdx]);
+    }
+
+    constexpr void updateNoisyHistory(
+        const std::optional<PieceType> captured,
+        const std::optional<PieceType> promotion,
+        const i32 bonus)
+    {
+        const auto [firstIdx, secondIdx] = noisyHistoryIdxs(captured, promotion);
+        updateHistory(mNoisyHist[firstIdx][secondIdx], bonus);
+    }
+
 }; // struct HistoryEntry
+
+// [stm][pieceType][targetSquare]
+using HistoryTable = EnumArray<HistoryEntry, Color, PieceType, Square>;

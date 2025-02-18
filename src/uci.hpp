@@ -158,11 +158,16 @@ inline void setoption(const std::vector<std::string>& tokens, Searcher& searcher
         {
             if (myParam == nullptr) return;
 
-            myParam->value = std::is_same<decltype(myParam->value), double>::value
+            #pragma clang diagnostic push
+            #pragma clang diagnostic ignored "-Wfloat-conversion"
+            #pragma clang diagnostic ignored "-Wimplicit-float-conversion"
+            #pragma clang diagnostic ignored "-Wimplicit-int-float-conversion"
+
+            myParam->value = myParam->isFloatOrDouble()
                            ? std::stod(optionValue)
-                           : std::is_same<decltype(myParam->value), float>::value
-                           ? std::stof(optionValue)
                            : std::stoi(optionValue);
+
+            #pragma clang diagnostic pop
 
             if (optionName == stringify(lmrBaseQuiet)
             ||  optionName == stringify(lmrBaseNoisy)

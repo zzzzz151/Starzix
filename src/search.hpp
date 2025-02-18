@@ -175,7 +175,7 @@ public:
         bothAccs = nnue::BothAccumulators(pos);
 
         const auto initFinnyEntry = [&] (
-            const Color color, const bool mirrorVAxis, const size_t inputBucket) constexpr -> void
+            const Color color, const bool mirrorVAxis, const size_t inputBucket) constexpr
         {
             nnue::FinnyTableEntry& finnyEntry
                 = mainThreadData()->finnyTable[color][mirrorVAxis][inputBucket];
@@ -441,7 +441,9 @@ private:
 
                 const i32 score = optScore
                     ? -(*optScore)
-                    : -search<false, false, false>(td, depth - 3 - depth / 3, ply + 1, -beta, -alpha);
+                    : -search<false, false, false>(
+                          td, depth - 3 - depth / 3, ply + 1, -beta, -alpha
+                      );
 
                 undoMove(td);
 
@@ -466,6 +468,7 @@ private:
         Bound bound = Bound::Upper;
 
         ArrayVec<Move, 256> failLowQuiets;
+        ArrayVec<std::pair<Move, std::optional<PieceType>>, 256> failLowNoisies; // move, captured
 
         // Moves loop
 
@@ -492,7 +495,8 @@ private:
 
                 // SEE pruning
 
-                const i32 threshold = depth * (isQuiet ? seeQuietThreshold() : seeNoisyThreshold());
+                const i32 threshold
+                    = depth * (isQuiet ? seeQuietThreshold() : seeNoisyThreshold());
 
                 if (!isRoot && td->pos.stmHasNonPawns() && !td->pos.SEE(move, threshold))
                     continue;
@@ -501,6 +505,8 @@ private:
             const u64 nodesBefore = td->nodes;
 
             const std::optional<i32> optScore = makeMove(td, move, ply + 1);
+
+            const std::optional<PieceType> captured = td->pos.captured();
 
             i32 score = 0;
 
@@ -523,13 +529,23 @@ private:
 
                 lmr = std::max<i32>(lmr, 0); // Don't extend depth
 
-                score = -search<false, false, true>(td, depth - 1 - lmr, ply + 1, -alpha - 1, -alpha);
+                score = -search<false, false, true>(
+                    td, depth - 1 - lmr, ply + 1, -alpha - 1, -alpha
+                );
 
                 if (score > alpha && lmr > 0)
-                    score = -search<false, false, !isCutNode>(td, depth - 1, ply + 1, -alpha - 1, -alpha);
+                {
+                    score = -search<false, false, !isCutNode>(
+                        td, depth - 1, ply + 1, -alpha - 1, -alpha
+                    );
+                }
             }
             else if (!isPvNode || legalMovesSeen > 1)
-                score = -search<false, false, !isCutNode>(td, depth - 1, ply + 1, -alpha - 1, -alpha);
+            {
+                score = -search<false, false, !isCutNode>(
+                    td, depth - 1, ply + 1, -alpha - 1, -alpha
+                );
+            }
 
             if (isPvNode && (legalMovesSeen == 1 || score > alpha))
                 score = -search<false, true, false>(td, depth - 1, ply + 1, -beta, -alpha);
@@ -552,6 +568,8 @@ private:
             {
                 if (td->pos.isQuiet(move))
                     failLowQuiets.push_back(move);
+                else
+                    failLowNoisies.push_back({ move, captured });
 
                 continue;
             }
@@ -573,44 +591,58 @@ private:
 
             if (score < beta) continue;
 
-            // Fail high
+            // We have a fail high
 
             bound = Bound::Lower;
 
-            if (!isQuiet) break;
+            // Update histories
 
-            // We have a quiet move
-
-            plyData.killer = move;
-
-            // Increase move's history
-
-            const Bitboard enemyAttacks = td->pos.enemyAttacksNoStmKing();
+            HistoryEntry& histEntry
+                = td->historyTable[td->pos.sideToMove()][move.pieceType()][move.to()];
 
             const i32 histBonus = std::clamp<i32>(
                 depth * historyBonusMul() - historyBonusOffset(), 0, historyBonusMax()
             );
 
-            td->historyTable[td->pos.sideToMove()][move.pieceType()][move.to()].update(
-                histBonus,
-                hasSquare(enemyAttacks, move.from()),
-                hasSquare(enemyAttacks, move.to()),
-                td->pos.lastMove()
-            );
-
-            // Decrease history of fail low quiets
-
             const i32 histMalus = -std::clamp<i32>(
                 depth * historyMalusMul() - historyMalusOffset(), 0, historyMalusMax()
             );
 
+            // Decrease history of fail low noisy moves
+            for (const auto [mov, optCaptured] : failLowNoisies)
+            {
+                td->historyTable[td->pos.sideToMove()][mov.pieceType()][mov.to()]
+                    .updateNoisyHistory(optCaptured, mov.promotion(), histMalus);
+            }
+
+            if (!isQuiet) {
+                // Increase history of this fail high noisy move
+                histEntry.updateNoisyHistory(captured, move.promotion(), histBonus);
+                break;
+            }
+
+            // At this point, this move is quiet
+
+            plyData.killer = move;
+
+            const Bitboard enemyAttacks = td->pos.enemyAttacksNoStmKing();
+
+            // Increase quiet histories of this fail high quiet move
+            histEntry.updateQuietHistories(
+                hasSquare(enemyAttacks, move.from()),
+                hasSquare(enemyAttacks, move.to()),
+                td->pos.lastMove(),
+                histBonus
+            );
+
+            // Decrease quiet histories of fail low quiet moves
             for (const Move m : failLowQuiets)
             {
-                td->historyTable[td->pos.sideToMove()][m.pieceType()][m.to()].update(
-                    histMalus,
+                td->historyTable[td->pos.sideToMove()][m.pieceType()][m.to()].updateQuietHistories(
                     hasSquare(enemyAttacks, m.from()),
                     hasSquare(enemyAttacks, m.to()),
-                    td->pos.lastMove()
+                    td->pos.lastMove(),
+                    histMalus
                 );
             }
 
@@ -689,7 +721,8 @@ private:
                 break;
 
             // SEE pruning
-            if (!td->pos.inCheck() && !td->pos.SEE(move))
+            if (!td->pos.inCheck()
+            &&  !td->pos.SEE(move, 0 /*getThreshold(td->pos, td->historyTable, move)*/ ))
                 continue;
 
             const std::optional<i32> optScore = makeMove(td, move, ply + 1);

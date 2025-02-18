@@ -40,7 +40,7 @@ constexpr ArrayVec<Move, 256> pseudolegalMoves(Position& pos)
         });
     }
 
-    const auto addPromos = [&] (const Square from, const Square to) constexpr -> void
+    const auto addPromos = [&] (const Square from, const Square to) constexpr
     {
         pseudolegals.push_back(Move(from, to, MoveFlag::QueenPromo));
         pseudolegals.push_back(Move(from, to, MoveFlag::KnightPromo));
@@ -213,7 +213,7 @@ constexpr ArrayVec<Move, 256> pseudolegalMoves(Position& pos)
 
 constexpr bool isPseudolegal(Position& pos, const Move move)
 {
-    const auto result = [&] () constexpr -> bool
+    const bool result = [&] () constexpr
     {
         if (move == MOVE_NONE) return false;
 
