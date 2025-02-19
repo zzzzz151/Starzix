@@ -103,11 +103,8 @@ public:
             }
             else if constexpr (moveGenType == MoveGenType::QuietOnly)
             {
-                const bool enemyAttacksSrc = hasSquare(pos.enemyAttacksNoStmKing(), move.from());
-                const bool enemyAttacksDst = hasSquare(pos.enemyAttacksNoStmKing(), move.to());
-
                 mScores[i] = historyTable[pos.sideToMove()][move.pieceType()][move.to()]
-                    .quietHistory(enemyAttacksSrc, enemyAttacksDst, pos.lastMove());
+                    .quietHistory(pos, move);
             }
 
             i++;
