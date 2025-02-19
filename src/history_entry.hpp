@@ -93,8 +93,8 @@ public:
         const std::optional<PieceType> promotion,
         const i32 bonus)
     {
-        i16& noisyHist = const_cast<i16&>(std::as_const(*this).noisyHistory(captured, promotion));
-        updateHistory(&noisyHist, bonus);
+        const i16& noisyHist = noisyHistory(captured, promotion);
+        updateHistory(const_cast<i16*>(&noisyHist), bonus);
     }
 
 }; // struct HistoryEntry
