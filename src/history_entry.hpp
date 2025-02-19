@@ -30,7 +30,7 @@ private:
 
     MultiArray<i16, 7, 5> mNoisyHist = { }; // [pieceTypeCaptured][promotionPieceType]
 
-    // main history, 1 ply cont hist, 2 ply cont hist
+    // main history, 1-ply cont hist, 2-ply cont hist
     constexpr const std::array<const i16*, 3> quietHistoriesPtrs(
         Position& pos, const Move move) const
     {
@@ -45,11 +45,11 @@ private:
 
         Move prevMove;
 
-        // 1 ply cont hist
+        // 1-ply cont hist
         if ((prevMove = pos.lastMove()) != MOVE_NONE)
             histories[1] = &mContHist[pos.notSideToMove()][prevMove.pieceType()][prevMove.to()];
 
-        // 2 ply cont hist
+        // 2-ply cont hist
         if ((prevMove = pos.nthToLastMove(2)) != MOVE_NONE)
             histories[2] = &mContHist[pos.sideToMove()][prevMove.pieceType()][prevMove.to()];
 
