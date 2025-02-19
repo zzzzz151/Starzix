@@ -625,25 +625,14 @@ private:
 
             plyData.killer = move;
 
-            const Bitboard enemyAttacks = td->pos.enemyAttacksNoStmKing();
-
             // Increase quiet histories of this fail high quiet move
-            histEntry.updateQuietHistories(
-                hasSquare(enemyAttacks, move.from()),
-                hasSquare(enemyAttacks, move.to()),
-                td->pos.lastMove(),
-                histBonus
-            );
+            histEntry.updateQuietHistories(td->pos, move, histBonus);
 
             // Decrease quiet histories of fail low quiet moves
             for (const Move m : failLowQuiets)
             {
-                td->historyTable[td->pos.sideToMove()][m.pieceType()][m.to()].updateQuietHistories(
-                    hasSquare(enemyAttacks, m.from()),
-                    hasSquare(enemyAttacks, m.to()),
-                    td->pos.lastMove(),
-                    histMalus
-                );
+                td->historyTable[td->pos.sideToMove()][m.pieceType()][m.to()]
+                    .updateQuietHistories(td->pos, m, histMalus);
             }
 
             break;
