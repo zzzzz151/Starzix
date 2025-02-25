@@ -113,6 +113,7 @@ public:
         mIdx = 0;
     }
 
+    // Incremental selection sort
     constexpr std::pair<Move, i32> next()
     {
         assert(mIdx);
@@ -120,13 +121,14 @@ public:
         if (*mIdx >= mMoves.size())
             return { MOVE_NONE, 0 };
 
-        // Incremental selection sort
+        size_t bestIdx = *mIdx;
+
         for (size_t i = *mIdx + 1; i < mMoves.size(); i++)
-            if (mScores[i] > mScores[*mIdx])
-            {
-                mMoves.swap(i, *mIdx);
-                std::swap(mScores[i], mScores[*mIdx]);
-            }
+            if (mScores[i] > mScores[bestIdx])
+                bestIdx = i;
+
+        mMoves.swap(bestIdx, *mIdx);
+        std::swap(mScores[bestIdx], mScores[*mIdx]);
 
         const std::pair<Move, i32> moveAndScore = { mMoves[*mIdx], mScores[*mIdx] };
 

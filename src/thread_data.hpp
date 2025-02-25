@@ -32,7 +32,7 @@ public:
 
     Position pos;
 
-    std::optional<i32> score = std::nullopt;
+    i32 rootDepth = 0;
 
     std::atomic<u64> nodes = 0;
     size_t maxPlyReached = 0;
@@ -101,7 +101,7 @@ constexpr i32 getEval(ThreadData* td, const size_t ply)
     return *eval;
 }
 
-constexpr std::optional<i32> makeMove(ThreadData* td, const Move move, const size_t newPly)
+constexpr GameState makeMove(ThreadData* td, const Move move, const size_t newPly)
 {
     td->pos.makeMove(move);
     td->nodes.fetch_add(1, std::memory_order_relaxed);
@@ -109,8 +109,9 @@ constexpr std::optional<i32> makeMove(ThreadData* td, const Move move, const siz
     // Update seldepth
     td->maxPlyReached = std::max<size_t>(td->maxPlyReached, newPly);
 
-    td->pliesData[newPly].pvLine.clear();
-    td->pliesData[newPly].eval = std::nullopt;
+    PlyData& newPlyData = td->pliesData[newPly];
+    newPlyData.pvLine.clear();
+    newPlyData.eval = std::nullopt;
 
     if (move != MOVE_NONE)
     {
@@ -118,18 +119,7 @@ constexpr std::optional<i32> makeMove(ThreadData* td, const Move move, const siz
         td->bothAccsStack[td->bothAccsIdx].mUpdated = false;
     }
 
-    const GameState gameState = td->pos.gameState(hasLegalMove, newPly);
-
-    if (gameState == GameState::Draw)
-        return 0;
-
-    if (gameState == GameState::Loss)
-        return -INF + static_cast<i32>(newPly);
-
-    if (newPly >= MAX_DEPTH)
-        return getEval(td, newPly);
-
-    return std::nullopt;
+    return td->pos.gameState(hasLegalMove, newPly);
 }
 
 constexpr void undoMove(ThreadData* td)
