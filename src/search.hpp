@@ -149,21 +149,18 @@ public:
         return nodes;
     }
 
-    inline std::pair<Move, i32> search(Position& pos, const SearchConfig& searchConfig)
+    inline Move search(Position& pos, const SearchConfig& searchConfig)
     {
         blockUntilSleep();
 
         mSearchConfig = searchConfig;
-
-        if (mSearchConfig.maxNodes && *(mSearchConfig.maxNodes) < std::numeric_limits<u64>::max())
-            *(mSearchConfig.maxNodes) += 1;
 
         // Init node counter of every thread to 1 (root node)
         for (ThreadData* td : mThreadsData)
             td->nodes.store(1, std::memory_order_relaxed);
 
         if (!hasLegalMove(pos))
-            return { MOVE_NONE, pos.inCheck() ? -INF : 0 };
+            return MOVE_NONE;
 
         mStopSearch.store(false, std::memory_order_relaxed);
 
@@ -210,7 +207,6 @@ public:
 
         for (ThreadData* td : mThreadsData)
         {
-            td->score = std::nullopt;
             td->pliesData[0] = PlyData();
             td->nodesByMove = { };
             td->bothAccsIdx = 0;
@@ -220,7 +216,7 @@ public:
 
         blockUntilSleep();
 
-        return { bestMoveAtRoot(mainThreadData()), *(mainThreadData()->score) };
+        return bestMoveAtRoot(mainThreadData());
     }
 
 private:
@@ -261,51 +257,30 @@ private:
         }
     }
 
-    constexpr bool shouldStop(const ThreadData* td)
+    constexpr bool isHardTimeUp(const ThreadData* td)
     {
-        if (mStopSearch.load(std::memory_order_relaxed))
-            return true;
-
-        // Only check stop conditions and modify mStopSearch in main thread
-        // Don't stop searching if depth 1 not completed
-        if (td != mainThreadData() || !(mainThreadData()->score))
-            return false;
-
-        // Hit nodes limit?
-        if (mSearchConfig.maxNodes && totalNodes() >= *(mSearchConfig.maxNodes))
-        {
+        if (td == mainThreadData()
+        && td->rootDepth > 1
+        && mSearchConfig.hardMs
+        && td->nodes.load(std::memory_order_relaxed) % 1024 == 0
+        && millisecondsElapsed(mSearchConfig.startTime) >= *(mSearchConfig.hardMs))
             mStopSearch.store(true, std::memory_order_relaxed);
-            return true;
-        }
 
-        // Check hard time limit every N nodes
-        if (!mSearchConfig.hardMs || td->nodes.load(std::memory_order_relaxed) % 1024 != 0)
-            return false;
-
-        // Hit hard time limit?
-        if (millisecondsElapsed(mSearchConfig.startTime) >= *(mSearchConfig.hardMs))
-        {
-            mStopSearch.store(true, std::memory_order_relaxed);
-            return true;
-        }
-
-        return false;
+        return mStopSearch.load(std::memory_order_relaxed);
     }
 
     constexpr void iterativeDeepening(ThreadData* td)
     {
-        for (i32 depth = 1; depth <= static_cast<i32>(mSearchConfig.getMaxDepth()); depth++)
+        for (td->rootDepth = 1; td->rootDepth <= static_cast<i32>(mSearchConfig.getMaxDepth()); td->rootDepth++)
         {
             td->maxPlyReached = 0; // Reset seldepth
 
-            const i32 score = search<true, true, false>(td, depth, 0, -INF, INF);
+            const i32 score = search<true, true, false>(td, td->rootDepth, 0, -INF, INF);
 
             if (mStopSearch.load(std::memory_order_relaxed))
                 break;
 
-            td->score = score;
-
-            // Only print uci info and check soft time limit in main thread
+            // Only print uci info and check limits in main thread
             if (td != mainThreadData())
                 continue;
 
@@ -314,17 +289,11 @@ private:
             const u64 msElapsed = millisecondsElapsed(mSearchConfig.startTime);
             const u64 nodes = totalNodes();
 
-            const bool hardMsHit = mSearchConfig.hardMs && msElapsed >= *(mSearchConfig.hardMs);
-            const bool maxNodesHit = mSearchConfig.maxNodes && nodes >= *(mSearchConfig.maxNodes);
-
-            if (hardMsHit || maxNodesHit)
-                mStopSearch.store(true, std::memory_order_relaxed);
-
             if (!mSearchConfig.printInfo)
-                goto checkSoftTime;
+                goto checkLimits;
 
             std::cout << "info"
-                      << " depth "    << depth
+                      << " depth "    << td->rootDepth
                       << " seldepth " << td->maxPlyReached
                       << " score ";
 
@@ -346,9 +315,15 @@ private:
 
             std::cout << std::endl;
 
-            checkSoftTime:
+            checkLimits:
 
-            // Stop searching if soft time limit has been hit
+            // Hard time limit hit?
+            if (mSearchConfig.hardMs && msElapsed >= *(mSearchConfig.hardMs))
+                break;
+
+            // Soft nodes limit hit?
+            if (mSearchConfig.maxNodes && nodes >= *(mSearchConfig.maxNodes))
+                break;
 
             // Nodes time management
             // Scale soft time limit based on nodes spent on best move at root
@@ -369,8 +344,9 @@ private:
                 return static_cast<u64>(round(scaled));
             };
 
+            // Soft time limit hit?
             if (mSearchConfig.softMs
-            && msElapsed >= (depth >= 6 ? softMsScaled() : *(mSearchConfig.softMs)))
+            && msElapsed >= (td->rootDepth >= 6 ? softMsScaled() : *(mSearchConfig.softMs)))
                 break;
         }
 
@@ -395,7 +371,7 @@ private:
         // Quiescence search at leaf nodes
         if (depth <= 0) return qSearch<isPvNode>(td, ply, alpha, beta);
 
-        if (shouldStop(td)) return 0;
+        if (isHardTimeUp(td)) return 0;
 
         if (!isRoot && alpha < 0 && td->pos.hasUpcomingRepetition(ply))
         {
@@ -422,14 +398,12 @@ private:
         || (ttBound == Bound::Lower && ttScore >= beta)))
             return ttScore;
 
+        if (ply >= MAX_DEPTH) return getEval(td, ply);
+
         // Reset killer move of next tree level
         td->pliesData[ply + 1].killer = MOVE_NONE;
 
         updateBothAccs(td);
-
-        const auto eval = [&] () constexpr -> i32 {
-            return getEval(td, ply);
-        };
 
         if (!isPvNode && !td->pos.inCheck())
         {
@@ -438,19 +412,23 @@ private:
             && td->pos.lastMove() != MOVE_NONE
             && td->pos.stmHasNonPawns()
             && !(ttHit && ttBound == Bound::Upper && ttScore < beta)
-            && eval() >= beta)
+            && getEval(td, ply) >= beta)
             {
-                const std::optional<i32> optScore = makeMove(td, MOVE_NONE, ply + 1);
+                const GameState newGameState = makeMove(td, MOVE_NONE, ply + 1);
 
-                const i32 score = optScore
-                    ? -(*optScore)
-                    : -search<false, false, false>(
-                          td, depth - 3 - depth / 3, ply + 1, -beta, -alpha
-                      );
+                const i32 nmpDepth = depth - 3 - depth / 3;
+
+                const i32 score
+                    = newGameState == GameState::Draw
+                    ? 0
+                    : newGameState == GameState::Loss
+                    ? INF - static_cast<i32>(ply + 1)
+                    : -search<false, false, false>(td, nmpDepth, ply + 1, -beta, -alpha);
 
                 undoMove(td);
 
-                if (shouldStop(td)) return 0;
+                if (mStopSearch.load(std::memory_order_relaxed))
+                    return 0;
 
                 if (score >= beta) return score >= MIN_MATE_SCORE ? beta : score;
             }
@@ -504,14 +482,15 @@ private:
 
             const u64 nodesBefore = td->nodes;
 
-            const std::optional<i32> optScore = makeMove(td, move, ply + 1);
+            const GameState newGameState = makeMove(td, move, ply + 1);
 
             const std::optional<PieceType> captured = td->pos.captured();
 
             i32 score = 0;
 
-            if (optScore) {
-                score = -(*optScore);
+            if (newGameState != GameState::Ongoing)
+            {
+                score = newGameState == GameState::Draw ? 0 : INF - static_cast<i32>(ply + 1);
                 goto moveSearched;
             }
 
@@ -554,7 +533,8 @@ private:
 
             undoMove(td);
 
-            if (shouldStop(td)) return 0;
+            if (mStopSearch.load(std::memory_order_relaxed))
+                return 0;
 
             assert(td->nodes > nodesBefore);
 
@@ -665,7 +645,7 @@ private:
         assert(alpha < beta);
         assert(isPvNode || alpha + 1 == beta);
 
-        if (shouldStop(td)) return 0;
+        if (isHardTimeUp(td)) return 0;
 
         if (alpha < 0 && td->pos.hasUpcomingRepetition(ply))
         {
@@ -674,9 +654,9 @@ private:
             if (alpha >= beta) return alpha;
         }
 
-        updateBothAccs(td);
-
         const i32 eval = getEval(td, ply);
+
+        if (ply >= MAX_DEPTH) return eval;
 
         if (!td->pos.inCheck())
         {
@@ -686,6 +666,8 @@ private:
 
             alpha = std::max<i32>(alpha, eval);
         }
+        else
+            updateBothAccs(td);
 
         // Reset killer move of next tree level
         td->pliesData[ply + 1].killer = MOVE_NONE;
@@ -715,15 +697,19 @@ private:
             &&  !td->pos.SEE(move, 0 /* getThreshold(td->pos, td->historyTable, move) */ ))
                 continue;
 
-            const std::optional<i32> optScore = makeMove(td, move, ply + 1);
+            const GameState newGameState = makeMove(td, move, ply + 1);
 
-            const i32 score = optScore
-                            ? -(*optScore)
-                            : -qSearch<isPvNode>(td, ply + 1, -beta, -alpha);
+            const i32 score
+                = newGameState == GameState::Draw
+                ? 0
+                : newGameState == GameState::Loss
+                ? INF - static_cast<i32>(ply + 1)
+                : -qSearch<isPvNode>(td, ply + 1, -beta, -alpha);
 
             undoMove(td);
 
-            if (shouldStop(td)) return 0;
+            if (mStopSearch.load(std::memory_order_relaxed))
+                return 0;
 
             bestScore = std::max<i32>(bestScore, score);
 

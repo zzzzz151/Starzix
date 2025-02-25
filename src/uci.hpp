@@ -264,7 +264,7 @@ constexpr void go(
         }
     }
 
-    const auto [bestMove, score] = searcher.search(pos, searchConfig);
+    const Move bestMove = searcher.search(pos, searchConfig);
 
     std::cout << "bestmove " << bestMove.toUci() << std::endl;
 }
