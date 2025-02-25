@@ -257,13 +257,16 @@ private:
         }
     }
 
-    constexpr bool isHardTimeUp(const ThreadData* td) const
+    constexpr bool isHardTimeUp(const ThreadData* td)
     {
-        return td == mainThreadData()
-            && td->rootDepth > 1
-            && mSearchConfig.hardMs
-            && td->nodes.load(std::memory_order_relaxed) % 1024 == 0
-            && millisecondsElapsed(mSearchConfig.startTime) >= *(mSearchConfig.hardMs);
+        if (td == mainThreadData()
+        && td->rootDepth > 1
+        && mSearchConfig.hardMs
+        && td->nodes.load(std::memory_order_relaxed) % 1024 == 0
+        && millisecondsElapsed(mSearchConfig.startTime) >= *(mSearchConfig.hardMs))
+            mStopSearch.store(true, std::memory_order_relaxed);
+
+        return mStopSearch.load(std::memory_order_relaxed);
     }
 
     constexpr void iterativeDeepening(ThreadData* td)
@@ -368,11 +371,7 @@ private:
         // Quiescence search at leaf nodes
         if (depth <= 0) return qSearch<isPvNode>(td, ply, alpha, beta);
 
-        if (isHardTimeUp(td))
-            mStopSearch.store(true, std::memory_order_relaxed);
-
-        if (mStopSearch.load(std::memory_order_relaxed))
-            return 0;
+        if (isHardTimeUp(td)) return 0;
 
         if (!isRoot && alpha < 0 && td->pos.hasUpcomingRepetition(ply))
         {
@@ -646,11 +645,7 @@ private:
         assert(alpha < beta);
         assert(isPvNode || alpha + 1 == beta);
 
-        if (isHardTimeUp(td))
-            mStopSearch.store(true, std::memory_order_relaxed);
-
-        if (mStopSearch.load(std::memory_order_relaxed))
-            return 0;
+        if (isHardTimeUp(td)) return 0;
 
         if (alpha < 0 && td->pos.hasUpcomingRepetition(ply))
         {
