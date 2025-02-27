@@ -49,7 +49,7 @@ Install clang++ and run ```make```
 - Inputs mirrored along vertical axis based on king square
 - 5 enemy queen input buckets
 - [Lc0](https://github.com/LeelaChessZero/lc0) data
-- Trained with [my trainer](https://github.com/zzzzz151/nn-trainer)
+- Trained with my trainer [Starway](https://github.com/zzzzz151/Starway)
 
 ### Search
 - Staged move gen
