@@ -45,11 +45,10 @@ public:
         mMove |= static_cast<u16>(flag);
 
         // No pawns in backranks
-        assert(!(
-            pieceType() == PieceType::Pawn
-            && (squareRank(to) == Rank::Rank1 || squareRank(to) == Rank::Rank8)
-            && !promotion()
-        ));
+        assert(pieceType() != PieceType::Pawn || !isBackrank(squareRank(from)));
+
+        // Pawn must promote
+        assert(pieceType() != PieceType::Pawn || !isBackrank(squareRank(to)) || promotion());
     }
 
     inline Move(std::string from, std::string to, MoveFlag flag)
