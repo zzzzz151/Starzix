@@ -20,7 +20,7 @@ namespace nnue {
 constexpr size_t HIDDEN_LAYER_SIZE = 1024;
 constexpr size_t NUM_INPUT_BUCKETS = 5;
 constexpr i32 SCALE = 400;
-constexpr i32 QA = 255;
+constexpr i32 QA = 256;
 constexpr i32 QB = 64;
 
 // Enemy queen input buckets (0 if enemy doesnt have exactly 1 queen)
