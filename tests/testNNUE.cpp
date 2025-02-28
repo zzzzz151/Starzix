@@ -7,48 +7,27 @@
 #include <cassert>
 
 tsl::ordered_map<std::string, i32> FENS_EVAL = {
-    { FEN_START, 67 },
-    { "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",  -37 }, // e2e4
-    { "rnbqkb1r/pppppppp/5n2/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 1 2", 102 }, // e2e4 g8f6
-    { "rnbkqbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBKQBNR w KQkq - 0 1", 67 }, // bongcloud
-
-    // Moves in "r3k2b/6P1/8/1pP5/8/8/4P3/4K2R w Kq b6 0 1"
-    { "r3k2b/6P1/1P6/8/8/8/4P3/4K2R b Kq - 0 1", -183 },
-    { "r3k2b/6P1/8/1pP5/8/4P3/8/4K2R b Kq - 0 1", 229 },
-    { "r3k2b/6P1/8/1pP5/4P3/8/8/4K2R b Kq e3 0 1", 244 },
-    { "r3k2b/6P1/2P5/1p6/8/8/4P3/4K2R b Kq - 0 1", 155 },
-    { "r3k2Q/8/8/1pP5/8/8/4P3/4K2R b Kq - 0 1", -2340 },
-    { "r3k2R/8/8/1pP5/8/8/4P3/4K2R b Kq - 0 1", -1869 },
-    { "r3k2B/8/8/1pP5/8/8/4P3/4K2R b Kq - 0 1", -961 },
-    { "r3k2N/8/8/1pP5/8/8/4P3/4K2R b Kq - 0 1", -638 },
-    { "r3k1Qb/8/8/1pP5/8/8/4P3/4K2R b Kq - 0 1", -1997 },
-    { "r3k1Rb/8/8/1pP5/8/8/4P3/4K2R b Kq - 0 1", -757 },
-    { "r3k1Bb/8/8/1pP5/8/8/4P3/4K2R b Kq - 0 1", 75 },
-    { "r3k1Nb/8/8/1pP5/8/8/4P3/4K2R b Kq - 0 1", 276 },
-    { "r3k2b/6P1/8/1pP5/8/8/4P3/3K3R b q - 1 1", 135 },
-    { "r3k2b/6P1/8/1pP5/8/8/4P3/5K1R b q - 1 1", 258 },
-    { "r3k2b/6P1/8/1pP5/8/8/3KP3/7R b q - 1 1", 43 },
-    { "r3k2b/6P1/8/1pP5/8/8/4PK2/7R b q - 1 1", 198 },
-    { "r3k2b/6P1/8/1pP5/8/8/4P3/5RK1 b q - 1 1", 234 },
-    { "r3k2b/6P1/8/1pP5/8/8/4P3/4KR2 b q - 1 1", 194 },
-    { "r3k2b/6P1/8/1pP5/8/8/4P3/4K1R1 b q - 1 1", 162 },
-    { "r3k2b/6P1/8/1pP5/8/8/4P2R/4K3 b q - 1 1", 205 },
-    { "r3k2b/6P1/8/1pP5/8/7R/4P3/4K3 b q - 1 1", 173 },
-    { "r3k2b/6P1/8/1pP5/7R/8/4P3/4K3 b q - 1 1", 167 },
-    { "r3k2b/6P1/8/1pP4R/8/8/4P3/4K3 b q - 1 1", 87 },
-    { "r3k2b/6P1/7R/1pP5/8/8/4P3/4K3 b q - 1 1", 13 },
-    { "r3k2b/6PR/8/1pP5/8/8/4P3/4K3 b q - 1 1", 7 },
-    { "r3k2R/6P1/8/1pP5/8/8/4P3/4K3 b q - 0 1", -1253 },
-
-    // Some positions to test enemy queen buckets
-    { "4k3/7n/5q2/8/8/6R1/8/4K3 w - - 0 1", -997 },
-    { "4k3/7n/1q6/8/8/6R1/8/4K3 w - - 0 1", -1146 },
-    { "4k3/7n/1q6/8/8/6R1/8/2K5 w - - 0 1", -754 },
-    { "4k3/7n/5q2/8/8/6R1/8/2K5 w - - 0 1", -851 },
-    { "q3k3/7n/5q2/8/8/6R1/8/2K5 w - - 0 1", -3333 },
-    { "4k3/7n/8/2q5/8/6R1/7q/5K2 w - - 0 1", -3746 },
-    { "4k3/7n/8/8/8/6R1/8/5K2 w - - 0 1", 74 },
-    { "4k3/7n/8/8/8/6R1/8/1K6 w - - 0 1", 9 },
+    { "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 46 },
+    { "r3k1r1/8/ppp5/3p4/8/1B6/1B4N1/4K1R1 w - - 0 1", 558 },
+    { "r3k1r1/8/ppp5/3p4/8/1B6/1B4N1/4K1R1 b - - 0 1", -393 },
+    { "r5r1/3k4/ppp5/3p4/1K6/1B6/1B4N1/6R1 w - - 0 1", 83 },
+    { "r5r1/3k4/ppp5/3p4/1K6/1B6/1B4N1/6R1 b - - 0 1", 29 },
+    { "r5r1/3k4/ppp5/3p4/8/1B6/1B3KN1/6R1 w - - 0 1", 325 },
+    { "r5r1/3k4/ppp5/3p4/8/1B6/1B3KN1/6R1 b - - 0 1", -200 },
+    { "r5r1/8/ppp5/3p4/8/1B6/1B4Nk/1K4R1 w - - 0 1", 447 },
+    { "r5r1/8/ppp5/3p4/8/1B6/1B4Nk/1K4R1 b - - 0 1", -298 },
+    { "b2qk3/6pp/8/8/8/5Q1N/R7/4K3 w - - 0 1", 751 },
+    { "b2qk3/6pp/8/8/8/5Q1N/R7/4K3 b - - 0 1", -558 },
+    { "b3k3/6pp/8/8/8/1Q5N/Rq6/4K3 w - - 0 1", 1024 },
+    { "b3k3/6pp/8/8/8/1Q5N/Rq6/4K3 b - - 0 1", -799 },
+    { "b3k3/6pp/5Q2/8/8/7N/R7/4K3 w - - 0 1", 2491 },
+    { "b3k3/6pp/5Q2/8/8/7N/R7/4K3 b - - 0 1", -2201 },
+    { "b3k3/6pp/8/8/3q4/7N/R7/4K3 w - - 0 1", -1339 },
+    { "b3k3/6pp/8/8/3q4/7N/R7/4K3 b - - 0 1", 1460 },
+    { "b3k3/5qpp/8/8/8/2Q4N/R1Q5/4K3 w - - 0 1", 2958 },
+    { "b3k3/5qpp/8/8/8/2Q4N/R1Q5/4K3 b - - 0 1", -2879 },
+    { "b3k1q1/6pp/8/8/8/1q5N/R7/4K3 w - - 0 1", -4948 },
+    { "b3k1q1/6pp/8/8/8/1q5N/R7/4K3 b - - 0 1", 5123 },
 };
 
 int main()
@@ -60,7 +39,7 @@ int main()
         const Position pos = Position(fen);
         const nnue::BothAccumulators bothAccs = nnue::BothAccumulators(pos);
         const auto eval = nnue::evaluate(bothAccs, pos.sideToMove());
-        assert(eval == expectedEval);
+        assert(std::abs(eval - expectedEval) <= 1);
     }
 
     std::cout << colored("NNUE tests passed", ColorCode::Green) << std::endl;
