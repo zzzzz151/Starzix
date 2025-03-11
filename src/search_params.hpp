@@ -55,6 +55,9 @@ MAYBE_CONSTEXPR auto timeSoftPercentage = TunableParam<double>(0.05, 0.02, 0.20,
 MAYBE_CONSTEXPR auto nodesTmBase = TunableParam<double>(1.5, 1.0, 2.0, 0.1);
 MAYBE_CONSTEXPR auto nodesTmMul  = TunableParam<double>(0.75, 0.5, 1.0, 0.1);
 
+// RFP (Reverse futility pruning)
+MAYBE_CONSTEXPR auto rfpDepthMul = TunableParam<i32>(75, 30, 180, 10);
+
 // SEE thresholds
 MAYBE_CONSTEXPR auto seeNoisyHistMul   = TunableParam<float>(0.05f, 0.0f, 0.2f, 0.02f);
 MAYBE_CONSTEXPR auto seeNoisyThreshold = TunableParam<i32>(-150, -210, -10, 20);
@@ -108,11 +111,13 @@ MAYBE_CONST MultiArray<i32, MAX_DEPTH + 1, 2, 256> LMR_TABLE = getLmrTable();
         TunableParam<double>*
     >;
 
-    tsl::ordered_map<std::string, TunableParamVariant> tunableParams = {
+    tsl::ordered_map<std::string, TunableParamVariant> tunableParams =
+    {
         { stringify(timeHardPercentage), &timeHardPercentage },
         { stringify(timeSoftPercentage), &timeSoftPercentage },
         { stringify(nodesTmBase),        &nodesTmBase },
         { stringify(nodesTmMul),         &nodesTmMul },
+        { stringify(rfpDepthMul),        &rfpDepthMul },
         { stringify(seeNoisyHistMul),    &seeNoisyHistMul },
         { stringify(seeNoisyThreshold),  &seeNoisyThreshold },
         { stringify(seeQuietThreshold),  &seeQuietThreshold },
