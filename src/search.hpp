@@ -476,6 +476,18 @@ private:
                 && legalMovesSeen > static_cast<size_t>(3 + depth * depth * 3 / 4))
                     break;
 
+                const i32 lmrDepth
+                    = depth - LMR_TABLE[static_cast<size_t>(depth)][isQuiet][legalMovesSeen];
+
+                // FP (Futility pruning)
+                if (!isPvNode
+                && !td->pos.inCheck()
+                && lmrDepth <= 6
+                && legalMovesSeen > 2
+                && alpha < MIN_MATE_SCORE
+                && alpha > getEval(td, ply) + fpBase() + std::max<i32>(lmrDepth, 1) * fpDepthMul())
+                    break;
+
                 // SEE pruning
 
                 const i32 threshold

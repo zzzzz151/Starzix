@@ -58,6 +58,10 @@ MAYBE_CONSTEXPR auto nodesTmMul  = TunableParam<double>(0.75, 0.5, 1.0, 0.1);
 // RFP (Reverse futility pruning)
 MAYBE_CONSTEXPR auto rfpDepthMul = TunableParam<i32>(75, 30, 180, 10);
 
+// FP (Futility pruning)
+MAYBE_CONSTEXPR auto fpBase     = TunableParam<i32>(120, 40, 260, 20);
+MAYBE_CONSTEXPR auto fpDepthMul = TunableParam<i32>(160, 40, 260, 20);
+
 // SEE thresholds
 MAYBE_CONSTEXPR auto seeNoisyHistMul   = TunableParam<float>(0.05f, 0.0f, 0.2f, 0.02f);
 MAYBE_CONSTEXPR auto seeNoisyThreshold = TunableParam<i32>(-150, -210, -10, 20);
@@ -118,6 +122,8 @@ MAYBE_CONST MultiArray<i32, MAX_DEPTH + 1, 2, 256> LMR_TABLE = getLmrTable();
         { stringify(nodesTmBase),        &nodesTmBase },
         { stringify(nodesTmMul),         &nodesTmMul },
         { stringify(rfpDepthMul),        &rfpDepthMul },
+        { stringify(fpBase),             &fpBase },
+        { stringify(fpDepthMul),         &fpDepthMul },
         { stringify(seeNoisyHistMul),    &seeNoisyHistMul },
         { stringify(seeNoisyThreshold),  &seeNoisyThreshold },
         { stringify(seeQuietThreshold),  &seeQuietThreshold },
