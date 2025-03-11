@@ -405,8 +405,13 @@ private:
 
         updateBothAccs(td);
 
+        // Node pruning
         if (!isPvNode && !td->pos.inCheck())
         {
+            // RFP (Reverse futility pruning)
+            if (depth <= 7 && getEval(td, ply) >= beta + depth * rfpDepthMul())
+                return getEval(td, ply);
+
             // NMP (Null move pruning)
             if (depth >= 3
             && td->pos.lastMove() != MOVE_NONE
