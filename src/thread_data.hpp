@@ -53,7 +53,7 @@ public:
     // [stm][Position.pawnsHash() % CORR_HIST_SIZE]
     EnumArray<std::array<i16, CORR_HIST_SIZE>, Color> pawnsCorrHist = { };
 
-    // [stm][pieceColor][[Position.nonPawnsHash() % CORR_HIST_SIZE]
+    // [stm][pieceColor][[Position.nonPawnsHash(pieceColor) % CORR_HIST_SIZE]
     EnumArray<std::array<i16, CORR_HIST_SIZE>, Color, Color> nonPawnsCorrHist = { };
 
     // Threading stuff
