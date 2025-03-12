@@ -86,7 +86,7 @@ MAYBE_CONSTEXPR auto historyMalusMax    = TunableParam<i32>(1500, 500, 2500, 200
 constexpr size_t CORR_HIST_SIZE = 16384;
 MAYBE_CONSTEXPR auto corrHistPawnsWeight    = TunableParam<float>(0.007f, 0.0f, 0.02f, 0.002f);
 MAYBE_CONSTEXPR auto corrHistNonPawnsWeight = TunableParam<float>(0.007f, 0.0f, 0.02f, 0.002f);
-MAYBE_CONSTEXPR auto corrHistLastMoveWeight = TunableParam<float>(0.005f, 0.0f, 0.02f, 0.002f);
+MAYBE_CONSTEXPR auto corrHistLastMoveWeight = TunableParam<float>(0.003f, 0.0f, 0.02f, 0.002f);
 
 // [depth][isQuietMove][legalMovesSeen]
 inline MultiArray<i32, MAX_DEPTH + 1, 2, 256> getLmrTable()
