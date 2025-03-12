@@ -12,7 +12,6 @@
 #include <atomic>
 #include <mutex>
 #include <condition_variable>
-#include <tuple>
 
 struct PlyData
 {
@@ -89,16 +88,28 @@ constexpr void updateBothAccs(ThreadData* td)
     }
 }
 
-constexpr const std::tuple<i16&, i16&, i16&> getCorrHists(ThreadData* td)
+constexpr std::array<i16*, 4> getCorrHists(ThreadData* td)
 {
     const size_t whiteNonPawnsIdx = td->pos.nonPawnsHash(Color::White) % CORR_HIST_SIZE;
     const size_t blackNonPawnsIdx = td->pos.nonPawnsHash(Color::Black) % CORR_HIST_SIZE;
 
-    return std::tie(
-        td->pawnsCorrHist[td->pos.sideToMove()][td->pos.pawnsHash() % CORR_HIST_SIZE],
-        td->nonPawnsCorrHist[td->pos.sideToMove()][Color::White][whiteNonPawnsIdx],
-        td->nonPawnsCorrHist[td->pos.sideToMove()][Color::Black][blackNonPawnsIdx]
-    );
+    i16* lastMoveCorrHistPtr = nullptr;
+    const Move lastMove = td->pos.lastMove();
+
+    if (lastMove != MOVE_NONE)
+    {
+        HistoryEntry& historyEntry
+            = td->historyTable[td->pos.sideToMove()][lastMove.pieceType()][lastMove.to()];
+
+        lastMoveCorrHistPtr = &(historyEntry.mCorrHist);
+    }
+
+    return {
+        &(td->pawnsCorrHist[td->pos.sideToMove()][td->pos.pawnsHash() % CORR_HIST_SIZE]),
+        &(td->nonPawnsCorrHist[td->pos.sideToMove()][Color::White][whiteNonPawnsIdx]),
+        &(td->nonPawnsCorrHist[td->pos.sideToMove()][Color::Black][blackNonPawnsIdx]),
+        lastMoveCorrHistPtr
+    };
 }
 
 constexpr i32 getEval(ThreadData* td, const size_t ply)
@@ -115,18 +126,19 @@ constexpr i32 getEval(ThreadData* td, const size_t ply)
 
         // Adjust eval with correction histories
 
-        const auto [pawnsCorr, whiteNonPawnsCorr, blackNonPawnsCorr] = getCorrHists(td);
+        const auto [pawnsCorr, whiteNonPawnsCorr, blackNonPawnsCorr, lastMoveCorr]
+            = getCorrHists(td);
 
         const i32 nonPawnsCorr
-            = static_cast<i32>(whiteNonPawnsCorr) + static_cast<i32>(blackNonPawnsCorr);
+            = static_cast<i32>(*whiteNonPawnsCorr) + static_cast<i32>(*blackNonPawnsCorr);
 
-        *eval += static_cast<i32>(round(
-            static_cast<float>(pawnsCorr) * corrHistPawnsWeight()
-        ));
+        float correction = static_cast<float>(*pawnsCorr)   * corrHistPawnsWeight()
+                         + static_cast<float>(nonPawnsCorr) * corrHistNonPawnsWeight();
 
-        *eval += static_cast<i32>(round(
-            static_cast<float>(nonPawnsCorr) * corrHistNonPawnsWeight()
-        ));
+        if (lastMoveCorr != nullptr)
+            correction += static_cast<float>(*lastMoveCorr) * corrHistLastMoveWeight();
+
+        *eval += static_cast<i32>(round(correction));
 
         // Clamp eval to avoid invalid values and checkmate values
         eval = std::clamp<i32>(*eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
