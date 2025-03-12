@@ -133,8 +133,9 @@ public:
         for (ThreadData* td : mThreadsData)
         {
             td->nodes.store(0, std::memory_order_relaxed);
-            td->historyTable  = { };
-            td->pawnsCorrHist = { };
+            td->historyTable     = { };
+            td->pawnsCorrHist    = { };
+            td->nonPawnsCorrHist = { };
         }
 
         resetTT(mTT);
@@ -663,10 +664,10 @@ private:
         {
             const i32 bonus = (bestScore - eval()) * depth;
 
-            updateHistory(
-                td->pawnsCorrHist[td->pos.sideToMove()][td->pos.pawnsHash() % CORR_HIST_SIZE],
-                bonus
-            );
+            std::apply([bonus] (auto&&... corrHists)
+            {
+                (updateHistory(&corrHists, bonus), ...);
+            }, getCorrHists(td));
         }
 
         assert(std::abs(bestScore) < INF);
