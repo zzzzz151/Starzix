@@ -89,7 +89,7 @@ constexpr void updateBothAccs(ThreadData* td)
     }
 }
 
-constexpr std::tuple<i16&, i16&, i16&> getCorrHists(ThreadData* td)
+constexpr const std::tuple<i16&, i16&, i16&> getCorrHists(ThreadData* td)
 {
     const size_t whiteNonPawnsIdx = td->pos.nonPawnsHash(Color::White) % CORR_HIST_SIZE;
     const size_t blackNonPawnsIdx = td->pos.nonPawnsHash(Color::Black) % CORR_HIST_SIZE;
