@@ -49,6 +49,8 @@ public:
 
     nnue::FinnyTable finnyTable; // [color][mirrorVAxis][inputBucket]
 
+    EnumArray<std::array<i16, CORR_HIST_SIZE>, Color> pawnsCorrHist = { };
+
     // Threading stuff
     ThreadState threadState = ThreadState::Sleeping;
     std::mutex mutex;
@@ -93,6 +95,13 @@ constexpr i32 getEval(ThreadData* td, const size_t ply)
         updateBothAccs(td);
 
         eval = nnue::evaluate(td->bothAccsStack[td->bothAccsIdx], td->pos.sideToMove());
+
+        // Adjust eval with correction histories
+
+        const i16 pawnsCorr
+            = td->pawnsCorrHist[td->pos.sideToMove()][td->pos.pawnsHash() % CORR_HIST_SIZE];
+
+        *eval += static_cast<i32>(round(static_cast<float>(pawnsCorr) * corrHistPawnsWeight()));
 
         // Clamp eval to avoid invalid values and checkmate values
         eval = std::clamp<i32>(*eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
