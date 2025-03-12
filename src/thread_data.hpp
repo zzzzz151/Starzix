@@ -12,6 +12,7 @@
 #include <atomic>
 #include <mutex>
 #include <condition_variable>
+#include <tuple>
 
 struct PlyData
 {
@@ -49,7 +50,11 @@ public:
 
     nnue::FinnyTable finnyTable; // [color][mirrorVAxis][inputBucket]
 
+    // [stm][Position.pawnsHash() % CORR_HIST_SIZE]
     EnumArray<std::array<i16, CORR_HIST_SIZE>, Color> pawnsCorrHist = { };
+
+    // [stm][pieceColor][[Position.nonPawnsHash(pieceColor) % CORR_HIST_SIZE]
+    EnumArray<std::array<i16, CORR_HIST_SIZE>, Color, Color> nonPawnsCorrHist = { };
 
     // Threading stuff
     ThreadState threadState = ThreadState::Sleeping;
@@ -84,6 +89,18 @@ constexpr void updateBothAccs(ThreadData* td)
     }
 }
 
+constexpr const std::tuple<i16&, i16&, i16&> getCorrHists(ThreadData* td)
+{
+    const size_t whiteNonPawnsIdx = td->pos.nonPawnsHash(Color::White) % CORR_HIST_SIZE;
+    const size_t blackNonPawnsIdx = td->pos.nonPawnsHash(Color::Black) % CORR_HIST_SIZE;
+
+    return std::tie(
+        td->pawnsCorrHist[td->pos.sideToMove()][td->pos.pawnsHash() % CORR_HIST_SIZE],
+        td->nonPawnsCorrHist[td->pos.sideToMove()][Color::White][whiteNonPawnsIdx],
+        td->nonPawnsCorrHist[td->pos.sideToMove()][Color::Black][blackNonPawnsIdx]
+    );
+}
+
 constexpr i32 getEval(ThreadData* td, const size_t ply)
 {
     std::optional<i32>& eval = td->pliesData[ply].eval;
@@ -98,10 +115,18 @@ constexpr i32 getEval(ThreadData* td, const size_t ply)
 
         // Adjust eval with correction histories
 
-        const i16 pawnsCorr
-            = td->pawnsCorrHist[td->pos.sideToMove()][td->pos.pawnsHash() % CORR_HIST_SIZE];
+        const auto [pawnsCorr, whiteNonPawnsCorr, blackNonPawnsCorr] = getCorrHists(td);
 
-        *eval += static_cast<i32>(round(static_cast<float>(pawnsCorr) * corrHistPawnsWeight()));
+        const i32 nonPawnsCorr
+            = static_cast<i32>(whiteNonPawnsCorr) + static_cast<i32>(blackNonPawnsCorr);
+
+        *eval += static_cast<i32>(round(
+            static_cast<float>(pawnsCorr) * corrHistPawnsWeight()
+        ));
+
+        *eval += static_cast<i32>(round(
+            static_cast<float>(nonPawnsCorr) * corrHistNonPawnsWeight()
+        ));
 
         // Clamp eval to avoid invalid values and checkmate values
         eval = std::clamp<i32>(*eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);

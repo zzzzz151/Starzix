@@ -84,7 +84,8 @@ MAYBE_CONSTEXPR auto historyMalusMax    = TunableParam<i32>(1500, 500, 2500, 200
 
 // Correction histories
 constexpr size_t CORR_HIST_SIZE = 16384;
-MAYBE_CONSTEXPR auto corrHistPawnsWeight = TunableParam<float>(0.007f, 0.0f, 0.02f, 0.002f);
+MAYBE_CONSTEXPR auto corrHistPawnsWeight    = TunableParam<float>(0.007f, 0.0f, 0.02f, 0.002f);
+MAYBE_CONSTEXPR auto corrHistNonPawnsWeight = TunableParam<float>(0.007f, 0.0f, 0.02f, 0.002f);
 
 // [depth][isQuietMove][legalMovesSeen]
 inline MultiArray<i32, MAX_DEPTH + 1, 2, 256> getLmrTable()
@@ -121,27 +122,28 @@ MAYBE_CONST MultiArray<i32, MAX_DEPTH + 1, 2, 256> LMR_TABLE = getLmrTable();
 
     tsl::ordered_map<std::string, TunableParamVariant> tunableParams =
     {
-        { stringify(timeHardPercentage),  &timeHardPercentage },
-        { stringify(timeSoftPercentage),  &timeSoftPercentage },
-        { stringify(nodesTmBase),         &nodesTmBase },
-        { stringify(nodesTmMul),          &nodesTmMul },
-        { stringify(rfpDepthMul),         &rfpDepthMul },
-        { stringify(fpBase),              &fpBase },
-        { stringify(fpDepthMul),          &fpDepthMul },
-        { stringify(seeNoisyHistMul),     &seeNoisyHistMul },
-        { stringify(seeNoisyThreshold),   &seeNoisyThreshold },
-        { stringify(seeQuietThreshold),   &seeQuietThreshold },
-        { stringify(lmrBaseNoisy),        &lmrBaseNoisy },
-        { stringify(lmrBaseQuiet),        &lmrBaseQuiet },
-        { stringify(lmrMulNoisy),         &lmrMulNoisy },
-        { stringify(lmrMulQuiet),         &lmrMulQuiet },
-        { stringify(historyBonusMul),     &historyBonusMul },
-        { stringify(historyBonusOffset),  &historyBonusOffset },
-        { stringify(historyBonusMax),     &historyBonusMax },
-        { stringify(historyMalusMul),     &historyMalusMul },
-        { stringify(historyMalusOffset),  &historyMalusOffset },
-        { stringify(historyMalusMax),     &historyMalusMax },
-        { stringify(corrHistPawnsWeight), &corrHistPawnsWeight }
+        { stringify(timeHardPercentage),     &timeHardPercentage },
+        { stringify(timeSoftPercentage),     &timeSoftPercentage },
+        { stringify(nodesTmBase),            &nodesTmBase },
+        { stringify(nodesTmMul),             &nodesTmMul },
+        { stringify(rfpDepthMul),            &rfpDepthMul },
+        { stringify(fpBase),                 &fpBase },
+        { stringify(fpDepthMul),             &fpDepthMul },
+        { stringify(seeNoisyHistMul),        &seeNoisyHistMul },
+        { stringify(seeNoisyThreshold),      &seeNoisyThreshold },
+        { stringify(seeQuietThreshold),      &seeQuietThreshold },
+        { stringify(lmrBaseNoisy),           &lmrBaseNoisy },
+        { stringify(lmrBaseQuiet),           &lmrBaseQuiet },
+        { stringify(lmrMulNoisy),            &lmrMulNoisy },
+        { stringify(lmrMulQuiet),            &lmrMulQuiet },
+        { stringify(historyBonusMul),        &historyBonusMul },
+        { stringify(historyBonusOffset),     &historyBonusOffset },
+        { stringify(historyBonusMax),        &historyBonusMax },
+        { stringify(historyMalusMul),        &historyMalusMul },
+        { stringify(historyMalusOffset),     &historyMalusOffset },
+        { stringify(historyMalusMax),        &historyMalusMax },
+        { stringify(corrHistPawnsWeight),    &corrHistPawnsWeight },
+        { stringify(corrHistNonPawnsWeight), &corrHistNonPawnsWeight }
     };
 
     inline void printSpsaInput()
