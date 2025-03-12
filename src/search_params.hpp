@@ -142,7 +142,7 @@ MAYBE_CONST MultiArray<i32, MAX_DEPTH + 1, 2, 256> LMR_TABLE = getLmrTable();
         { stringify(historyMalusMul),        &historyMalusMul },
         { stringify(historyMalusOffset),     &historyMalusOffset },
         { stringify(historyMalusMax),        &historyMalusMax },
-        { stringify(corrHistPawnsWeight),    &corrHistPawnsWeight }
+        { stringify(corrHistPawnsWeight),    &corrHistPawnsWeight },
         { stringify(corrHistNonPawnsWeight), &corrHistNonPawnsWeight }
     };
 
