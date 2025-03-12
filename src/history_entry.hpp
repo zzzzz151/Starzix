@@ -20,6 +20,11 @@ constexpr void updateHistory(i16* historyPtr, i32 bonus)
     assert(std::abs(*historyPtr) <= HISTORY_MAX);
 }
 
+constexpr void updateHistory(i16& history, const i32 bonus)
+{
+    updateHistory(&history, bonus);
+}
+
 struct HistoryEntry
 {
 private:

@@ -133,7 +133,8 @@ public:
         for (ThreadData* td : mThreadsData)
         {
             td->nodes.store(0, std::memory_order_relaxed);
-            td->historyTable = { };
+            td->historyTable  = { };
+            td->pawnsCorrHist = { };
         }
 
         resetTT(mTT);
@@ -271,7 +272,9 @@ private:
 
     constexpr void iterativeDeepening(ThreadData* td)
     {
-        for (td->rootDepth = 1; td->rootDepth <= static_cast<i32>(mSearchConfig.getMaxDepth()); td->rootDepth++)
+        const i32 maxDepth = static_cast<i32>(mSearchConfig.getMaxDepth());
+
+        for (td->rootDepth = 1; td->rootDepth <= maxDepth; td->rootDepth++)
         {
             td->maxPlyReached = 0; // Reset seldepth
 
@@ -398,7 +401,11 @@ private:
         || (ttBound == Bound::Lower && ttScore >= beta)))
             return ttScore;
 
-        if (ply >= MAX_DEPTH) return getEval(td, ply);
+        const auto eval = [&] () constexpr {
+            return getEval(td, ply);
+        };
+
+        if (ply >= MAX_DEPTH) return eval();
 
         // Reset killer move of next tree level
         td->pliesData[ply + 1].killer = MOVE_NONE;
@@ -409,15 +416,15 @@ private:
         if (!isPvNode && !td->pos.inCheck())
         {
             // RFP (Reverse futility pruning)
-            if (depth <= 7 && getEval(td, ply) >= beta + depth * rfpDepthMul())
-                return getEval(td, ply);
+            if (depth <= 7 && eval() >= beta + depth * rfpDepthMul())
+                return eval();
 
             // NMP (Null move pruning)
             if (depth >= 3
             && td->pos.lastMove() != MOVE_NONE
             && td->pos.stmHasNonPawns()
             && !(ttHit && ttBound == Bound::Upper && ttScore < beta)
-            && getEval(td, ply) >= beta)
+            && eval() >= beta)
             {
                 const GameState newGameState = makeMove(td, MOVE_NONE, ply + 1);
 
@@ -485,7 +492,7 @@ private:
                 && lmrDepth <= 6
                 && legalMovesSeen > 2
                 && alpha < MIN_MATE_SCORE
-                && alpha > getEval(td, ply) + fpBase() + std::max<i32>(lmrDepth, 1) * fpDepthMul())
+                && alpha > eval() + fpBase() + std::max<i32>(lmrDepth, 1) * fpDepthMul())
                     break;
 
                 // SEE pruning
@@ -646,6 +653,21 @@ private:
             bound,
             bestMove
         );
+
+        // Update correction histories
+        if (!td->pos.inCheck()
+        && std::abs(bestScore) < MIN_MATE_SCORE
+        && (bestMove == MOVE_NONE || td->pos.isQuiet(bestMove))
+        && !(bound == Bound::Lower && bestScore <= eval())
+        && !(bound == Bound::Upper && bestScore >= eval()))
+        {
+            const i32 bonus = (bestScore - eval()) * depth;
+
+            updateHistory(
+                td->pawnsCorrHist[td->pos.sideToMove()][td->pos.pawnsHash() % CORR_HIST_SIZE],
+                bonus
+            );
+        }
 
         assert(std::abs(bestScore) < INF);
         return bestScore;
