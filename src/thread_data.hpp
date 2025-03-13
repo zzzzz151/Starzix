@@ -96,7 +96,7 @@ constexpr std::array<i16*, 4> getCorrHists(ThreadData* td)
     i16* lastMoveCorrHistPtr = nullptr;
     const Move lastMove = td->pos.lastMove();
 
-    if (lastMove != MOVE_NONE)
+    if (lastMove)
     {
         HistoryEntry& historyEntry
             = td->historyTable[td->pos.sideToMove()][lastMove.pieceType()][lastMove.to()];
@@ -159,7 +159,7 @@ constexpr GameState makeMove(ThreadData* td, const Move move, const size_t newPl
     newPlyData.pvLine.clear();
     newPlyData.eval = std::nullopt;
 
-    if (move != MOVE_NONE)
+    if (move)
     {
         td->bothAccsIdx++;
         td->bothAccsStack[td->bothAccsIdx].mUpdated = false;
@@ -170,7 +170,7 @@ constexpr GameState makeMove(ThreadData* td, const Move move, const size_t newPl
 
 constexpr void undoMove(ThreadData* td)
 {
-    if (td->pos.lastMove() != MOVE_NONE)
+    if (td->pos.lastMove())
         td->bothAccsIdx--;
 
     td->pos.undoMove();

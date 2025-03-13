@@ -447,7 +447,7 @@ public:
 
     constexpr std::optional<PieceType> captured(const Move move) const
     {
-        assert(move != MOVE_NONE);
+        assert(move);
 
         return move.flag() == MoveFlag::EnPassant
              ? PieceType::Pawn
@@ -456,7 +456,7 @@ public:
 
     constexpr bool isQuiet(const Move move) const
     {
-        assert(move != MOVE_NONE);
+        assert(move);
 
         return !isOccupied(move.to())
             && move.flag() != MoveFlag::EnPassant
@@ -662,7 +662,7 @@ public:
         state().pinned = std::nullopt;
         state().enemyAttacksNoStmKing = std::nullopt;
 
-        if (move == MOVE_NONE) {
+        if (!move) {
             assert(!inCheck());
 
             state().colorToMove = notSideToMove();
@@ -823,7 +823,7 @@ public:
     // Static Exchange Evaluation
     constexpr bool SEE(const Move move, const i32 threshold = 0) const
     {
-        assert(move != MOVE_NONE);
+        assert(move);
 
         constexpr EnumArray<i32, PieceType> SEE_PIECE_VALUES = { 100, 300, 300, 500, 900, 0 };
 
@@ -917,7 +917,7 @@ public:
     {
         u64 hashAfter = zobristHash() ^ ZOBRIST_COLOR;
 
-        if (move == MOVE_NONE) return hashAfter;
+        if (!move) return hashAfter;
 
         const Square to = move.to();
         const std::optional<PieceType> captured = pieceTypeAt(to);

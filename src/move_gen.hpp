@@ -215,7 +215,7 @@ constexpr bool isPseudolegal(Position& pos, const Move move)
 {
     const bool result = [&] () constexpr
     {
-        if (move == MOVE_NONE) return false;
+        if (!move) return false;
 
         const Color stm = pos.sideToMove();
 

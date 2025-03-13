@@ -22,6 +22,8 @@ private:
 
 public:
 
+    constexpr operator bool() const { return mMove != 0; }
+
     constexpr bool operator==(const Move other) const
     {
         return mMove == other.mMove;

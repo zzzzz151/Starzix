@@ -61,7 +61,7 @@ public:
 
         mBound = newBound;
 
-        if (mZobristHash != newHash || newMove != MOVE_NONE)
+        if (mZobristHash != newHash || newMove)
             mMove = newMove.asU16();
     }
 

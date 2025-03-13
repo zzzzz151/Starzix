@@ -43,14 +43,14 @@ private:
             &mMainHist[enemyAttacksSrc][enemyAttacksDst], nullptr, nullptr
         };
 
-        Move prevMove;
-
         // 1-ply cont hist
-        if ((prevMove = pos.lastMove()) != MOVE_NONE)
+        Move prevMove = pos.lastMove();
+        if (prevMove)
             histories[1] = &mContHist[pos.notSideToMove()][prevMove.pieceType()][prevMove.to()];
 
         // 2-ply cont hist
-        if ((prevMove = pos.nthToLastMove(2)) != MOVE_NONE)
+        prevMove = pos.nthToLastMove(2);
+        if (prevMove)
             histories[2] = &mContHist[pos.sideToMove()][prevMove.pieceType()][prevMove.to()];
 
         return histories;
