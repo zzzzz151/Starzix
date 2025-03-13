@@ -664,10 +664,8 @@ private:
         {
             const i32 bonus = (bestScore - eval()) * depth;
 
-            std::apply([bonus] (auto&&... corrHists)
-            {
-                (updateHistory(&corrHists, bonus), ...);
-            }, getCorrHists(td));
+            for (i16* corrHistPtr : getCorrHists(td))
+                updateHistory(corrHistPtr, bonus);
         }
 
         assert(std::abs(bestScore) < INF);
