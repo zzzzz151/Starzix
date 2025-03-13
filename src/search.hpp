@@ -361,7 +361,8 @@ private:
 
     template<bool isRoot, bool isPvNode, bool isCutNode>
     constexpr i32 search(
-        ThreadData* td, i32 depth,
+        ThreadData* td,
+        i32 depth,
         const size_t ply,
         i32 alpha,
         const i32 beta,
