@@ -55,6 +55,10 @@ MAYBE_CONSTEXPR auto timeSoftPercentage = TunableParam<double>(0.05, 0.02, 0.20,
 MAYBE_CONSTEXPR auto nodesTmBase = TunableParam<double>(1.5, 1.0, 2.0, 0.1);
 MAYBE_CONSTEXPR auto nodesTmMul  = TunableParam<double>(0.75, 0.5, 1.0, 0.1);
 
+// Aspiration windows
+MAYBE_CONSTEXPR auto aspStartDelta = TunableParam<i32>(15, 5, 25, 5);
+MAYBE_CONSTEXPR auto aspDeltaMul   = TunableParam<double>(1.5, 1.2, 2.0, 0.1);
+
 // RFP (Reverse futility pruning)
 MAYBE_CONSTEXPR auto rfpDepthMul = TunableParam<i32>(75, 30, 180, 10);
 
@@ -130,6 +134,8 @@ MAYBE_CONST MultiArray<i32, MAX_DEPTH + 1, 2, 256> LMR_TABLE = getLmrTable();
         { stringify(timeSoftPercentage),     &timeSoftPercentage },
         { stringify(nodesTmBase),            &nodesTmBase },
         { stringify(nodesTmMul),             &nodesTmMul },
+        { stringify(aspStartDelta),          &aspStartDelta },
+        { stringify(aspDeltaMul),            &aspDeltaMul },
         { stringify(rfpDepthMul),            &rfpDepthMul },
         { stringify(fpBase),                 &fpBase },
         { stringify(fpDepthMul),             &fpDepthMul },

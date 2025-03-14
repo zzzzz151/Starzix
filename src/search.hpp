@@ -274,12 +274,15 @@ private:
     constexpr void iterativeDeepening(ThreadData* td)
     {
         const i32 maxDepth = static_cast<i32>(mSearchConfig.getMaxDepth());
+        i32 score = 0;
 
         for (td->rootDepth = 1; td->rootDepth <= maxDepth; td->rootDepth++)
         {
             td->maxPlyReached = 0; // Reset seldepth
 
-            const i32 score = search<true, true, false>(td, td->rootDepth, 0, -INF, INF);
+            score = td->rootDepth >= 4
+                  ? aspirationWindows(td, score)
+                  : search<true, true, false>(td, td->rootDepth, 0, -INF, INF);
 
             if (mStopSearch.load(std::memory_order_relaxed))
                 break;
@@ -358,6 +361,39 @@ private:
         // If main thread, signal other threads to stop searching
         if (td == mainThreadData())
             mStopSearch.store(true, std::memory_order_relaxed);
+    }
+
+    constexpr i32 aspirationWindows(ThreadData* td, i32 score)
+    {
+        assert(td->rootDepth > 1);
+
+        i32 depth = td->rootDepth;
+        i32 delta = aspStartDelta();
+        i32 alpha = std::max<i32>(score - delta, -INF);
+        i32 beta  = std::min<i32>(score + delta, INF);
+
+        while (true)
+        {
+            score = search<true, true, false>(td, depth, 0, alpha, beta);
+
+            if (isHardTimeUp(td)) return 0;
+
+            if (score <= alpha)
+            {
+                beta = (alpha + beta) / 2;
+                alpha = std::max<i32>(alpha - delta, -INF);
+                depth = td->rootDepth;
+            }
+            else if (score >= beta)
+            {
+                beta = std::min<i32>(beta + delta, INF);
+                if (depth > 1) depth--;
+            }
+            else
+                return score;
+
+            delta = static_cast<i32>(round(static_cast<double>(delta) * aspDeltaMul()));
+        }
     }
 
     template<bool isRoot, bool isPvNode, bool isCutNode>
