@@ -533,8 +533,12 @@ private:
                     td, newDepth / 2, ply, singularBeta - 1, singularBeta, ttMove
                 );
 
-                newDepth += singularScore < singularBeta;
-                newDepth += singularScore < singularBeta - doubleExtMargin();
+                // Single or double extension
+                if (singularScore < singularBeta)
+                    newDepth += 1 + (singularScore < singularBeta - doubleExtMargin());
+                // Multicut
+                else if (singularScore >= beta && std::abs(singularScore) < MIN_MATE_SCORE)
+                    return singularScore;
             }
 
             const u64 nodesBefore = td->nodes;
