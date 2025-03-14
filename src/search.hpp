@@ -534,6 +534,7 @@ private:
                 );
 
                 newDepth += singularScore < singularBeta;
+                newDepth += singularScore < singularBeta - doubleExtMargin();
             }
 
             const u64 nodesBefore = td->nodes;

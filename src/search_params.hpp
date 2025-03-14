@@ -67,6 +67,9 @@ MAYBE_CONSTEXPR auto seeNoisyHistMul   = TunableParam<float>(0.05f, 0.0f, 0.2f, 
 MAYBE_CONSTEXPR auto seeNoisyThreshold = TunableParam<i32>(-150, -210, -10, 20);
 MAYBE_CONSTEXPR auto seeQuietThreshold = TunableParam<i32>(-90, -210, -10, 20);
 
+// SE (Singular extensions)
+MAYBE_CONSTEXPR auto doubleExtMargin = TunableParam<i32>(12, 1, 51, 10);
+
 // LMR (Late move reductions)
 MAYBE_CONSTEXPR auto lmrBaseNoisy = TunableParam<double>(0.8, 0.3, 1.2, 0.1);
 MAYBE_CONSTEXPR auto lmrBaseQuiet = TunableParam<double>(0.8, 0.3, 1.2, 0.1);
@@ -133,6 +136,7 @@ MAYBE_CONST MultiArray<i32, MAX_DEPTH + 1, 2, 256> LMR_TABLE = getLmrTable();
         { stringify(seeNoisyHistMul),        &seeNoisyHistMul },
         { stringify(seeNoisyThreshold),      &seeNoisyThreshold },
         { stringify(seeQuietThreshold),      &seeQuietThreshold },
+        { stringify(doubleExtMargin),        &doubleExtMargin },
         { stringify(lmrBaseNoisy),           &lmrBaseNoisy },
         { stringify(lmrBaseQuiet),           &lmrBaseQuiet },
         { stringify(lmrMulNoisy),            &lmrMulNoisy },
