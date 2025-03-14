@@ -333,11 +333,12 @@ private:
             // Scale soft time limit based on nodes spent on best move at root
             const auto softMsScaled = [&] () constexpr -> u64
             {
+                const u64 threadNodes   = td->nodes.load(std::memory_order_relaxed);
                 const u64 bestMoveNodes = td->nodesByMove[bestMoveAtRoot(td).asU16()];
 
                 const double bestMoveNodesFraction
                     = static_cast<double>(bestMoveNodes)
-                    / static_cast<double>(std::max<u64>(td->nodes, 1));
+                    / static_cast<double>(std::max<u64>(threadNodes, 1));
 
                 assert(bestMoveNodesFraction >= 0.0 && bestMoveNodesFraction <= 1.0);
 
@@ -541,7 +542,7 @@ private:
                     return singularScore;
             }
 
-            const u64 nodesBefore = td->nodes;
+            const u64 nodesBefore = td->nodes.load(std::memory_order_relaxed);
 
             const GameState newGameState = makeMove(td, move, ply + 1);
 
@@ -597,10 +598,13 @@ private:
             if (mStopSearch.load(std::memory_order_relaxed))
                 return 0;
 
-            assert(td->nodes > nodesBefore);
+            assert(td->nodes.load(std::memory_order_relaxed) > nodesBefore);
 
             if constexpr (isRoot)
-                td->nodesByMove[move.asU16()] += td->nodes - nodesBefore;
+            {
+                td->nodesByMove[move.asU16()]
+                    += td->nodes.load(std::memory_order_relaxed) - nodesBefore;
+            }
 
             bestScore = std::max<i32>(bestScore, score);
 
