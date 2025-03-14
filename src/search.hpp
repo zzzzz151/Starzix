@@ -369,8 +369,8 @@ private:
 
         i32 depth = td->rootDepth;
         i32 delta = aspStartDelta();
-        i32 alpha = std::max<i32>(-INF, score - delta);
-        i32 beta  = std::min<i32>(INF,  score + delta);
+        i32 alpha = std::max<i32>(score - delta, -INF);
+        i32 beta  = std::min<i32>(score + delta, INF);
 
         while (true)
         {
