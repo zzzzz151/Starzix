@@ -38,6 +38,7 @@ public:
         Position& pos,
         const Move ttMove,
         const Move killer,
+        const Move excludedMove,
         const bool doSEE,
         const HistoryTable& historyTable)
     {
@@ -54,7 +55,7 @@ public:
         {
             const Move move = mMoves[i];
 
-            if (move == ttMove || move == killer)
+            if (move == ttMove || move == killer || move == excludedMove)
             {
                 mMoves.swap(i, mMoves.size() - 1);
                 mMoves.pop_back();
@@ -145,6 +146,7 @@ private:
 
     Move mTtMove = MOVE_NONE;
     Move mKiller = MOVE_NONE;
+    Move mExcludedMove = MOVE_NONE;
 
     bool mTtMoveDone = false;
     bool mKillerDone = false;
@@ -157,11 +159,16 @@ public:
 
     bool mNoisiesOnly = false;
 
-    constexpr MovePicker(const bool noisiesOnly, const Move ttMove, const Move killer)
+    constexpr MovePicker(
+        const bool noisiesOnly,
+        const Move ttMove,
+        const Move killer,
+        const Move excludedMove = MOVE_NONE)
     {
         mNoisiesOnly = noisiesOnly;
         mTtMove = ttMove;
         mKiller = killer;
+        mExcludedMove = excludedMove;
     }
 
     constexpr std::pair<Move, std::optional<MoveRanking>> nextLegal(
@@ -173,7 +180,8 @@ public:
         {
             mTtMoveDone = true;
 
-            if (mTtMove != MOVE_NONE
+            if (mTtMove
+            && mTtMove != mExcludedMove
             && (!mNoisiesOnly || !pos.isQuiet(mTtMove))
             && isPseudolegal(pos, mTtMove)
             && isPseudolegalLegal(pos, mTtMove))
@@ -182,7 +190,7 @@ public:
 
         // If not done already, gen and score noisy moves
         mNoisiesData.genAndScoreMoves<MoveGenType::NoisyOnly>(
-            pos, mTtMove, MOVE_NONE, !mNoisiesOnly, historyTable
+            pos, mTtMove, MOVE_NONE, mExcludedMove, !mNoisiesOnly, historyTable
         );
 
         // Find next noisy move
@@ -190,7 +198,7 @@ public:
         {
             const auto [move, score] = mNoisiesData.next();
 
-            if (move == MOVE_NONE) break;
+            if (!move) break;
 
             if (score < 0) {
                 mBadNoisyReady = true;
@@ -209,7 +217,8 @@ public:
         {
             mKillerDone = true;
 
-            if (mKiller != MOVE_NONE
+            if (mKiller
+            && mKiller != mExcludedMove
             && pos.isQuiet(mKiller)
             && isPseudolegal(pos, mKiller)
             && isPseudolegalLegal(pos, mKiller))
@@ -218,7 +227,7 @@ public:
 
         // If not done already, gen and score quiet moves
         mQuietsData.genAndScoreMoves<MoveGenType::QuietOnly>(
-            pos, mTtMove, mKiller, true, historyTable
+            pos, mTtMove, mKiller, mExcludedMove, true, historyTable
         );
 
         // Yield quiet moves
@@ -226,7 +235,7 @@ public:
         {
             const auto [move, score] = mQuietsData.next();
 
-            if (move == MOVE_NONE) break;
+            if (!move) break;
 
             if (isPseudolegalLegal(pos, move))
                 return { move, MoveRanking::Quiet };

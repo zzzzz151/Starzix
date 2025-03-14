@@ -67,7 +67,7 @@ constexpr CuckooData CUCKOO_DATA = [] () consteval
                 std::swap(cuckooData.moves[i], move);
 
                 // Arrived at empty slot?
-                if (move == MOVE_NONE) break;
+                if (!move) break;
 
                 // Push victim to alternative slot
                 i = i == h1(hash) ? h2(hash) : h1(hash);

@@ -360,7 +360,13 @@ private:
     }
 
     template<bool isRoot, bool isPvNode, bool isCutNode>
-    constexpr i32 search(ThreadData* td, i32 depth, const size_t ply, i32 alpha, const i32 beta)
+    constexpr i32 search(
+        ThreadData* td,
+        i32 depth,
+        const size_t ply,
+        i32 alpha,
+        const i32 beta,
+        const Move singularMove = MOVE_NONE)
     {
         assert(hasLegalMove(td->pos));
         assert(isRoot == (ply == 0));
@@ -387,11 +393,13 @@ private:
         depth = std::min<i32>(depth, static_cast<i32>(MAX_DEPTH));
 
         // Probe TT for TT entry
-        TTEntry& ttEntry = getEntry(mTT, td->pos.zobristHash());
+        TTEntry* ttEntryPtr = singularMove ? nullptr : &getEntry(mTT, td->pos.zobristHash());
 
         // Get TT entry data
         const auto [ttHit, ttDepth, ttScore, ttBound, ttMove]
-            = ttEntry.get(td->pos.zobristHash(), static_cast<i16>(ply));
+            = ttEntryPtr == nullptr
+            ? std::tuple{ false, 0, 0, Bound::None, MOVE_NONE }
+            : ttEntryPtr->get(td->pos.zobristHash(), static_cast<i16>(ply));
 
         // TT cutoff
         if (!isPvNode
@@ -414,7 +422,7 @@ private:
         updateBothAccs(td);
 
         // Node pruning
-        if (!isPvNode && !td->pos.inCheck())
+        if (!isPvNode && !td->pos.inCheck() && !singularMove)
         {
             // RFP (Reverse futility pruning)
             if (depth <= 7 && eval() >= beta + depth * rfpDepthMul())
@@ -422,7 +430,7 @@ private:
 
             // NMP (Null move pruning)
             if (depth >= 3
-            && td->pos.lastMove() != MOVE_NONE
+            && td->pos.lastMove()
             && td->pos.stmHasNonPawns()
             && !(ttHit && ttBound == Bound::Upper && ttScore < beta)
             && eval() >= beta)
@@ -448,7 +456,7 @@ private:
         }
 
         // IIR (Internal iterative reduction)
-        if (depth >= 4 && ttMove == MOVE_NONE)
+        if (depth >= 4 && !ttMove && !singularMove)
             depth--;
 
         PlyData& plyData = td->pliesData[ply];
@@ -463,14 +471,16 @@ private:
 
         // Moves loop
 
-        MovePicker movePicker = MovePicker(false, ttMove, plyData.killer);
+        MovePicker movePicker = MovePicker(false, ttMove, plyData.killer, singularMove);
 
         while (true)
         {
             // moveRanking is a std::optional<MoveRanking>
             const auto [move, moveRanking] = movePicker.nextLegal(td->pos, td->historyTable);
 
-            if (move == MOVE_NONE) break;
+            if (!move) break;
+
+            assert(move != singularMove);
 
             legalMovesSeen++;
             const bool isQuiet = td->pos.isQuiet(move);
@@ -505,6 +515,27 @@ private:
                     continue;
             }
 
+            i32 newDepth = depth - 1;
+
+            // SE (Singular extensions)
+            // In singular searches, ttMove = MOVE_NONE, which prevents SE
+            if (!isRoot
+            && move == ttMove
+            && static_cast<i32>(ply) < td->rootDepth * 2
+            && depth >= 8
+            && ttDepth >= depth - 3
+            && std::abs(ttScore) < MIN_MATE_SCORE
+            && ttBound == Bound::Lower)
+            {
+                const i32 singularBeta = ttScore - depth;
+
+                const i32 singularScore = search<isRoot, false, isCutNode>(
+                    td, newDepth / 2, ply, singularBeta - 1, singularBeta, ttMove
+                );
+
+                newDepth += singularScore < singularBeta;
+            }
+
             const u64 nodesBefore = td->nodes;
 
             const GameState newGameState = makeMove(td, move, ply + 1);
@@ -534,25 +565,25 @@ private:
                 lmr = std::max<i32>(lmr, 0); // Don't extend depth
 
                 score = -search<false, false, true>(
-                    td, depth - 1 - lmr, ply + 1, -alpha - 1, -alpha
+                    td, newDepth - lmr, ply + 1, -alpha - 1, -alpha
                 );
 
                 if (score > alpha && lmr > 0)
                 {
                     score = -search<false, false, !isCutNode>(
-                        td, depth - 1, ply + 1, -alpha - 1, -alpha
+                        td, newDepth, ply + 1, -alpha - 1, -alpha
                     );
                 }
             }
             else if (!isPvNode || legalMovesSeen > 1)
             {
                 score = -search<false, false, !isCutNode>(
-                    td, depth - 1, ply + 1, -alpha - 1, -alpha
+                    td, newDepth, ply + 1, -alpha - 1, -alpha
                 );
             }
 
             if (isPvNode && (legalMovesSeen == 1 || score > alpha))
-                score = -search<false, true, false>(td, depth - 1, ply + 1, -beta, -alpha);
+                score = -search<false, true, false>(td, newDepth, ply + 1, -beta, -alpha);
 
             moveSearched:
 
@@ -643,29 +674,36 @@ private:
             break;
         }
 
-        assert(legalMovesSeen > 0);
-
-        // Update TT entry
-        ttEntry.update(
-            td->pos.zobristHash(),
-            static_cast<u8>(depth),
-            static_cast<i16>(bestScore),
-            static_cast<i16>(ply),
-            bound,
-            bestMove
-        );
-
-        // Update correction histories
-        if (!td->pos.inCheck()
-        && std::abs(bestScore) < MIN_MATE_SCORE
-        && (bestMove == MOVE_NONE || td->pos.isQuiet(bestMove))
-        && !(bound == Bound::Lower && bestScore <= eval())
-        && !(bound == Bound::Upper && bestScore >= eval()))
+        if (legalMovesSeen == 0)
         {
-            const i32 bonus = (bestScore - eval()) * depth;
+            assert(singularMove);
+            return alpha;
+        }
 
-            for (i16* corrHistPtr : getCorrHists(td))
-                updateHistory(corrHistPtr, bonus);
+        if (!singularMove)
+        {
+            // Update TT entry
+            ttEntryPtr->update(
+                td->pos.zobristHash(),
+                static_cast<u8>(depth),
+                static_cast<i16>(bestScore),
+                static_cast<i16>(ply),
+                bound,
+                bestMove
+            );
+
+            // Update correction histories
+            if (!td->pos.inCheck()
+            && std::abs(bestScore) < MIN_MATE_SCORE
+            && (!bestMove || td->pos.isQuiet(bestMove))
+            && !(bound == Bound::Lower && bestScore <= eval())
+            && !(bound == Bound::Upper && bestScore >= eval()))
+            {
+                const i32 bonus = (bestScore - eval()) * depth;
+
+                for (i16* corrHistPtr : getCorrHists(td))
+                    updateHistory(corrHistPtr, bonus);
+            }
         }
 
         assert(std::abs(bestScore) < INF);
@@ -724,7 +762,7 @@ private:
             // moveRanking is a std::optional<MoveRanking>
             const auto [move, moveRanking] = movePicker.nextLegal(td->pos, td->historyTable);
 
-            if (move == MOVE_NONE) break;
+            if (!move) break;
 
             // Prune underpromotions
             if (bestScore > -MIN_MATE_SCORE && move.isUnderpromotion())

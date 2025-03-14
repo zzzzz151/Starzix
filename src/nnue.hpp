@@ -240,7 +240,7 @@ public:
         const Color notColorMoving = oppColor(colorMoving);
 
         const Move move = pos.lastMove();
-        assert(move != MOVE_NONE);
+        assert(move);
 
         const Square from = move.from();
         const Square to   = move.to();
