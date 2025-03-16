@@ -41,6 +41,11 @@ public:
         return value;
     }
 
+    constexpr TunableParam operator/(const T x)
+    {
+        return TunableParam(value / x, min / x, max / x, step / x);
+    }
+
     constexpr bool isFloatOrDouble() const
     {
         return std::is_same<decltype(value), float>::value
@@ -79,6 +84,7 @@ MAYBE_CONSTEXPR auto lmrBaseNoisy = TunableParam<double>(0.8, 0.3, 1.2, 0.1);
 MAYBE_CONSTEXPR auto lmrBaseQuiet = TunableParam<double>(0.8, 0.3, 1.2, 0.1);
 MAYBE_CONSTEXPR auto lmrMulNoisy  = TunableParam<double>(0.4, 0.2, 0.8, 0.1);
 MAYBE_CONSTEXPR auto lmrMulQuiet  = TunableParam<double>(0.4, 0.2, 0.8, 0.1);
+MAYBE_CONSTEXPR auto lmrQuietHistoryMul = TunableParam<float>(0.9f, 0.0f, 0.9f, 0.1f) / 10'000.0f;
 
 // History heuristic
 constexpr i32 HISTORY_MAX = 16384;
@@ -91,9 +97,9 @@ MAYBE_CONSTEXPR auto historyMalusMax    = TunableParam<i32>(1500, 500, 2500, 200
 
 // Correction histories
 constexpr size_t CORR_HIST_SIZE = 16384;
-MAYBE_CONSTEXPR auto corrHistPawnsWeight    = TunableParam<float>(0.007f, 0.0f, 0.02f, 0.002f);
-MAYBE_CONSTEXPR auto corrHistNonPawnsWeight = TunableParam<float>(0.007f, 0.0f, 0.02f, 0.002f);
-MAYBE_CONSTEXPR auto corrHistLastMoveWeight = TunableParam<float>(0.003f, 0.0f, 0.02f, 0.002f);
+MAYBE_CONSTEXPR auto corrHistPawnsWeight    = TunableParam<float>(0.7f, 0.0f, 2.0f, 0.2f) / 100.0f;
+MAYBE_CONSTEXPR auto corrHistNonPawnsWeight = TunableParam<float>(0.7f, 0.0f, 2.0f, 0.2f) / 100.0f;
+MAYBE_CONSTEXPR auto corrHistLastMoveWeight = TunableParam<float>(0.3f, 0.0f, 2.0f, 0.2f) / 100.0f;
 
 // [depth][isQuietMove][legalMovesSeen]
 inline MultiArray<i32, MAX_DEPTH + 1, 2, 256> getLmrTable()
@@ -147,6 +153,7 @@ MAYBE_CONST MultiArray<i32, MAX_DEPTH + 1, 2, 256> LMR_TABLE = getLmrTable();
         { stringify(lmrBaseQuiet),           &lmrBaseQuiet },
         { stringify(lmrMulNoisy),            &lmrMulNoisy },
         { stringify(lmrMulQuiet),            &lmrMulQuiet },
+        { stringify(lmrQuietHistoryMul),     &lmrQuietHistoryMul },
         { stringify(historyBonusMul),        &historyBonusMul },
         { stringify(historyBonusOffset),     &historyBonusOffset },
         { stringify(historyBonusMax),        &historyBonusMax },

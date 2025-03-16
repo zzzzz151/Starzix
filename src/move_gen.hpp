@@ -30,7 +30,7 @@ constexpr ArrayVec<Move, 256> pseudolegalMoves(Position& pos)
         const Square enPassantSquare = *(pos.enPassantSquare());
 
         const Bitboard ourEpPawns
-            = ourPawns & getPawnAttacks(enPassantSquare, pos.notSideToMove());
+            = ourPawns & getPawnAttacks(enPassantSquare, !pos.sideToMove());
 
         ITERATE_BITBOARD(ourEpPawns, ourPawnSquare,
         {
@@ -233,7 +233,7 @@ constexpr bool isPseudolegal(Position& pos, const Move move)
             if (move.flag() == MoveFlag::EnPassant)
                 return pos.enPassantSquare() && *(pos.enPassantSquare()) == to;
 
-            const Bitboard wrongAttacks = getPawnAttacks(from, pos.notSideToMove());
+            const Bitboard wrongAttacks = getPawnAttacks(from, !pos.sideToMove());
 
             // Pawn attacking in wrong direction?
             if (hasSquare(wrongAttacks, to))
@@ -524,7 +524,7 @@ constexpr bool hasLegalMove(Position& pos)
     const Bitboard enPassantSqBb = squareBb(enPassantSquare);
 
     const Bitboard ourNearbyPawns = pos.getBb(stm, PieceType::Pawn)
-                                  & getPawnAttacks(enPassantSquare, pos.notSideToMove());
+                                  & getPawnAttacks(enPassantSquare, !pos.sideToMove());
 
     ITERATE_BITBOARD(ourNearbyPawns, ourPawnSquare,
     {

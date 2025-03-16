@@ -3,6 +3,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cassert>
 
 using u8 = uint8_t;
 using u16 = uint16_t;
@@ -49,3 +50,9 @@ enum class Rank : i8 {
     Rank5 = 4, Rank6 = 5, Rank7 = 6, Rank8 = 7,
     Count = 8
 };
+
+constexpr Color operator!(const Color color)
+{
+    assert(color != Color::Count);
+    return color == Color::White ? Color::Black : Color::White;
+}

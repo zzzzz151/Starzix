@@ -512,8 +512,8 @@ private:
 
         while (true)
         {
-            // moveRanking is a std::optional<MoveRanking>
-            const auto [move, moveRanking] = movePicker.nextLegal(td->pos, td->historyTable);
+            // Move, std::optional<i32>
+            const auto [move, moveScore] = movePicker.nextLegal(td->pos, td->historyTable);
 
             if (!move) break;
 
@@ -522,8 +522,7 @@ private:
             legalMovesSeen++;
             const bool isQuiet = td->pos.isQuiet(move);
 
-            if (bestScore > -MIN_MATE_SCORE
-            && static_cast<i32>(*moveRanking) < static_cast<i32>(MoveRanking::GoodNoisy))
+            if (bestScore > -MIN_MATE_SCORE && (isQuiet || *moveScore < 0))
             {
                 // LMP (Late move pruning)
                 if (!isPvNode
@@ -578,6 +577,9 @@ private:
                     return singularScore;
             }
 
+            HistoryEntry& histEntry
+                = td->historyTable[td->pos.sideToMove()][move.pieceType()][move.to()];
+
             const u64 nodesBefore = td->nodes.load(std::memory_order_relaxed);
 
             const GameState newGameState = makeMove(td, move, ply + 1);
@@ -595,14 +597,22 @@ private:
             // PVS (Principal variation search)
 
             // LMR (Late move reductions)
-            if (depth >= 2
-            && legalMovesSeen > 1 + isRoot
-            && static_cast<i32>(*moveRanking) < static_cast<i32>(MoveRanking::GoodNoisy))
+            if (depth >= 2 && legalMovesSeen > 1 + isRoot && (isQuiet || *moveScore < 0))
             {
                 i32 lmr = LMR_TABLE[static_cast<size_t>(depth)][isQuiet][legalMovesSeen]
                         - isPvNode
                         - td->pos.inCheck()
                         + isCutNode * 2;
+
+                if (isQuiet) {
+                    const PosState posState = td->pos.getState();
+                    td->pos.undoMove();
+
+                    const auto history = static_cast<float>(histEntry.quietHistory(td->pos, move));
+                    lmr -= static_cast<i32>(round(history * lmrQuietHistoryMul()));
+
+                    td->pos.pushState(posState);
+                }
 
                 lmr = std::max<i32>(lmr, 0); // Don't extend depth
 
@@ -677,9 +687,6 @@ private:
             bound = Bound::Lower;
 
             // Update histories
-
-            HistoryEntry& histEntry
-                = td->historyTable[td->pos.sideToMove()][move.pieceType()][move.to()];
 
             const i32 histBonus = std::clamp<i32>(
                 depth * historyBonusMul() - historyBonusOffset(), 0, historyBonusMax()
@@ -804,8 +811,8 @@ private:
 
         while (true)
         {
-            // moveRanking is a std::optional<MoveRanking>
-            const auto [move, moveRanking] = movePicker.nextLegal(td->pos, td->historyTable);
+            // Move, std::optional<i32>
+            const auto [move, moveScore] = movePicker.nextLegal(td->pos, td->historyTable);
 
             if (!move) break;
 
@@ -815,7 +822,7 @@ private:
 
             // SEE pruning
             if (!td->pos.inCheck()
-            &&  !td->pos.SEE(move, 0 /* getThreshold(td->pos, td->historyTable, move) */ ))
+            &&  !td->pos.SEE(move, 0 /* getSEEThreshold(td->pos, td->historyTable, move) */ ))
                 continue;
 
             const GameState newGameState = makeMove(td, move, ply + 1);
