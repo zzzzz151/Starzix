@@ -46,7 +46,7 @@ private:
         // 1-ply cont hist
         Move prevMove = pos.lastMove();
         if (prevMove)
-            histories[1] = &mContHist[pos.notSideToMove()][prevMove.pieceType()][prevMove.to()];
+            histories[1] = &mContHist[!pos.sideToMove()][prevMove.pieceType()][prevMove.to()];
 
         // 2-ply cont hist
         prevMove = pos.nthToLastMove(2);

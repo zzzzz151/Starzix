@@ -8,12 +8,7 @@
 #include "move_gen.hpp"
 #include "history_entry.hpp"
 
-enum class MoveRanking : i32 {
-    TtMove = 10, GoodNoisy = 9, Killer = 8, Quiet = 7, BadNoisy = 6
-};
-
-// SEE threshold
-constexpr i32 getThreshold(
+constexpr i32 getSEEThreshold(
     const Position& pos, const HistoryTable& historyTable, const Move move)
 {
     if (move.promotion()) return 0;
@@ -72,7 +67,7 @@ public:
                         std::nullopt, -30'000, -50'000, -40'000, std::nullopt, std::nullopt
                     };
 
-                    const i32 threshold = getThreshold(pos, historyTable, move);
+                    const i32 threshold = getSEEThreshold(pos, historyTable, move);
 
                     mScores[i] = promo && *promo != PieceType::Queen
                                // Underpromotion
@@ -171,7 +166,8 @@ public:
         mExcludedMove = excludedMove;
     }
 
-    constexpr std::pair<Move, std::optional<MoveRanking>> nextLegal(
+    // Returns move and its score
+    constexpr std::pair<Move, std::optional<i32>> nextLegal(
         Position& pos,
         const HistoryTable& historyTable)
     {
@@ -185,7 +181,7 @@ public:
             && (!mNoisiesOnly || !pos.isQuiet(mTtMove))
             && isPseudolegal(pos, mTtMove)
             && isPseudolegalLegal(pos, mTtMove))
-                return { mTtMove, MoveRanking::TtMove };
+                return { mTtMove, std::nullopt };
         }
 
         // If not done already, gen and score noisy moves
@@ -207,7 +203,7 @@ public:
 
             // Yield good noisy move
             if (isPseudolegalLegal(pos, move))
-                return { move, MoveRanking::GoodNoisy };
+                return { move, score };
         }
 
         if (mNoisiesOnly) goto badNoisyMove;
@@ -222,7 +218,7 @@ public:
             && pos.isQuiet(mKiller)
             && isPseudolegal(pos, mKiller)
             && isPseudolegalLegal(pos, mKiller))
-                return { mKiller, MoveRanking::Killer };
+                return { mKiller, std::nullopt };
         }
 
         // If not done already, gen and score quiet moves
@@ -238,7 +234,7 @@ public:
             if (!move) break;
 
             if (isPseudolegalLegal(pos, move))
-                return { move, MoveRanking::Quiet };
+                return { move, score };
         }
 
         badNoisyMove:
@@ -251,7 +247,7 @@ public:
             const Move move = mNoisiesData.mMoves[*(mNoisiesData.mIdx) - 1];
 
             if (isPseudolegalLegal(pos, move))
-                return { move, MoveRanking::BadNoisy };
+                return { move, mNoisiesData.mScores[*(mNoisiesData.mIdx) - 1] };
 
             return nextLegal(pos, historyTable);
         }

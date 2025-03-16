@@ -158,13 +158,6 @@ constexpr Square enPassantRelative(const Square square)
     return asEnum<Square>(static_cast<i32>(square) ^ 8);
 }
 
-// Color utils
-
-constexpr Color oppColor(const Color color)
-{
-    return color == Color::White ? Color::Black : Color::White;
-}
-
 // Piece type utils
 
 constexpr char letterOf(const Color color, const PieceType pieceType)

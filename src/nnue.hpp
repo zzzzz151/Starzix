@@ -235,9 +235,8 @@ public:
         mMirrorVAxis = prevBothAccs.mMirrorVAxis;
         mInputBucket = prevBothAccs.mInputBucket;
 
-        // Move already made in the position
-        const Color colorMoving = pos.notSideToMove();
-        const Color notColorMoving = oppColor(colorMoving);
+        // Move has already been made
+        const Color colorMoving = !pos.sideToMove();
 
         const Move move = pos.lastMove();
         assert(move);
@@ -262,7 +261,7 @@ public:
         // or if we captured a queen
         if (mMirrorVAxis[colorMoving] != prevBothAccs.mMirrorVAxis[colorMoving]
         || pos.captured() == PieceType::Queen)
-            setInputBucket(colorMoving, pos.getBb(notColorMoving, PieceType::Queen));
+            setInputBucket(colorMoving, pos.getBb(!colorMoving, PieceType::Queen));
 
         // If our vertical axis mirroring toggled or our input bucket changed,
         // reset our accumulator
@@ -273,11 +272,11 @@ public:
         // If our queen moved or we promoted to a queen, enemy's input bucket may have changed
         if (pieceType == PieceType::Queen || promotion == PieceType::Queen)
         {
-            setInputBucket(notColorMoving, pos.getBb(colorMoving, PieceType::Queen));
+            setInputBucket(!colorMoving, pos.getBb(colorMoving, PieceType::Queen));
 
             // If their input bucket changed, reset their accumulator
-            if  (mInputBucket[notColorMoving] != prevBothAccs.mInputBucket[notColorMoving])
-                updateFinnyEntryAndAccumulator(finnyTable, notColorMoving, pos);
+            if  (mInputBucket[!colorMoving] != prevBothAccs.mInputBucket[!colorMoving])
+                updateFinnyEntryAndAccumulator(finnyTable, !colorMoving, pos);
         }
 
         // Update accumulators with the move played
@@ -312,7 +311,7 @@ public:
                         = prevBothAccs.mAccumulators[color][i]
                         - ftWeights[colorMoving][pieceType][newFrom][i]
                         + ftWeights[colorMoving][place][newTo][i]
-                        - ftWeights[notColorMoving][captured][capturedSq][i];
+                        - ftWeights[!colorMoving][captured][capturedSq][i];
                 }
             }
             else if (move.flag() == MoveFlag::Castling)
@@ -372,7 +371,7 @@ constexpr i32 evaluate(const BothAccumulators& bothAccs, const Color stm)
         const Vec vecQA   = setEpi16(QA); // N i16 QA's
         Vec vecSum = vecZero; // N/2 i32 zeros, the total running sum
 
-        for (const Color color : { stm, oppColor(stm) })
+        for (const Color color : { stm, !stm })
             for (size_t i = 0; i < HIDDEN_LAYER_SIZE; i += sizeof(Vec) / sizeof(i16))
             {
                 // Load the next N hidden neurons and clamp them to [0, QA]
@@ -403,7 +402,7 @@ constexpr i32 evaluate(const BothAccumulators& bothAccs, const Color stm)
 
         sum = sumVec(vecSum); // Add the N/2 i32's to get final sum (i32)
     #else
-        for (const Color color : { stm, oppColor(stm) })
+        for (const Color color : { stm, !stm })
             for (size_t i = 0; i < HIDDEN_LAYER_SIZE; i++)
             {
                 const i16 clipped = std::clamp<i16>(bothAccs.mAccumulators[color][i], 0, QA);

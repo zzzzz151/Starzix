@@ -165,6 +165,16 @@ public:
         state().checkers = attackers(kingSquare()) & them();
     }
 
+    constexpr PosState getState() const
+    {
+        return state();
+    }
+
+    constexpr void pushState(const PosState& state)
+    {
+        mStates.push_back(state);
+    }
+
     constexpr size_t numStates() const
     {
         return mStates.size();
@@ -173,11 +183,6 @@ public:
     constexpr Color sideToMove() const
     {
         return state().colorToMove;
-    }
-
-    constexpr Color notSideToMove() const
-    {
-        return oppColor(sideToMove());
     }
 
     constexpr auto colorBbs() const {
@@ -208,7 +213,7 @@ public:
     }
 
     constexpr Bitboard them() const {
-        return getBb(notSideToMove());
+        return getBb(!sideToMove());
     }
 
     constexpr Bitboard occupied() const {
@@ -620,7 +625,7 @@ public:
 
         // Calculate and cache
         const Bitboard occNoStmKing = occupied() ^ squareBb(kingSquare());
-        state().enemyAttacksNoStmKing = attacks(notSideToMove(), occNoStmKing);
+        state().enemyAttacksNoStmKing = attacks(!sideToMove(), occNoStmKing);
 
         return *(state().enemyAttacksNoStmKing);
     }
@@ -665,7 +670,7 @@ public:
         if (!move) {
             assert(!inCheck());
 
-            state().colorToMove = notSideToMove();
+            state().colorToMove = !sideToMove();
             state().zobristHash ^= ZOBRIST_COLOR;
 
             if (state().enPassantSquare)
@@ -705,7 +710,7 @@ public:
         }
         else if (moveFlag == MoveFlag::EnPassant)
         {
-            removePiece(notSideToMove(), PieceType::Pawn, enPassantRelative(to));
+            removePiece(!sideToMove(), PieceType::Pawn, enPassantRelative(to));
             placePiece(sideToMove(), PieceType::Pawn, to);
 
             state().captured = PieceType::Pawn;
@@ -714,7 +719,7 @@ public:
             state().captured = pieceTypeAt(to);
 
             if (state().captured)
-                removePiece(notSideToMove(), *(state().captured), to);
+                removePiece(!sideToMove(), *(state().captured), to);
 
             placePiece(sideToMove(), promotion ? *promotion : pieceType, to);
         }
@@ -752,7 +757,7 @@ public:
             state().zobristHash ^= ZOBRIST_FILES[squareFile(enPassantSquare)];
         }
 
-        state().colorToMove = notSideToMove();
+        state().colorToMove = !sideToMove();
         state().zobristHash ^= ZOBRIST_COLOR;
 
         if (pieceType == PieceType::Pawn || state().captured)
@@ -855,7 +860,7 @@ public:
         Bitboard occ = occupied() ^ squareBb(from) ^ squareBb(to);
         Bitboard attackers = this->attackers(to, occ);
 
-        Color ourColor = notSideToMove();
+        Color ourColor = !sideToMove();
 
         const auto popLeastValuable = [&] (
             const Bitboard ourAttackers) constexpr -> std::optional<PieceType>
@@ -894,7 +899,7 @@ public:
             attackersUpdated:
 
             attackers &= occ;
-            ourColor = oppColor(ourColor);
+            ourColor = !ourColor;
 
             score = -score - 1;
 
@@ -905,7 +910,7 @@ public:
             && optNext
             && *optNext == PieceType::King
             && (attackers & getBb(ourColor)) > 0)
-                ourColor = oppColor(ourColor);
+                ourColor = !ourColor;
 
             if (score >= 0) break;
         }
@@ -924,7 +929,7 @@ public:
         const PieceType pt = move.pieceType();
 
         if (captured)
-            hashAfter ^= ZOBRIST_PIECES[notSideToMove()][*captured][to];
+            hashAfter ^= ZOBRIST_PIECES[!sideToMove()][*captured][to];
 
         hashAfter ^= ZOBRIST_PIECES[sideToMove()][pt][move.from()];
         hashAfter ^= ZOBRIST_PIECES[sideToMove()][pt][to];
