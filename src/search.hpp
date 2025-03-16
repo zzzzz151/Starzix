@@ -604,23 +604,15 @@ private:
                         - td->pos.inCheck()
                         + isCutNode * 2;
 
-                float historyAdjustment = 0.0f;
-
                 if (isQuiet) {
                     const PosState posState = td->pos.getState();
                     td->pos.undoMove();
 
-                    const auto history = histEntry.quietHistory(td->pos, move);
-                    historyAdjustment = static_cast<float>(history) * lmrHistoryQuietMul();
+                    const auto history = static_cast<float>(histEntry.quietHistory(td->pos, move));
+                    lmr -= static_cast<i32>(round(history * lmrQuietHistoryMul()));
 
                     td->pos.pushState(posState);
                 }
-                else {
-                    const auto history = histEntry.noisyHistory(captured, move.promotion());
-                    historyAdjustment = static_cast<float>(history) * lmrHistoryNoisyMul();
-                }
-
-                lmr -= static_cast<i32>(round(historyAdjustment));
 
                 lmr = std::max<i32>(lmr, 0); // Don't extend depth
 
