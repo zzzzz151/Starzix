@@ -10,9 +10,11 @@
 
     #define MAYBE_CONSTEXPR
     #define MAYBE_CONST
+    #define CONSTEXPR_OR_CONST const
 #else
     #define MAYBE_CONSTEXPR constexpr
     #define MAYBE_CONST const
+    #define CONSTEXPR_OR_CONST constexpr
 #endif
 
 constexpr size_t MAX_DEPTH = 100;
@@ -60,12 +62,22 @@ MAYBE_CONSTEXPR auto timeSoftPercentage = TunableParam<double>(0.05, 0.02, 0.20,
 MAYBE_CONSTEXPR auto nodesTmBase = TunableParam<double>(1.5, 1.0, 2.0, 0.1);
 MAYBE_CONSTEXPR auto nodesTmMul  = TunableParam<double>(0.75, 0.5, 1.0, 0.1);
 
+// Pieces values
+MAYBE_CONSTEXPR auto pawnValue  = TunableParam<i32>(100, 50, 200, 50);
+MAYBE_CONSTEXPR auto minorValue = TunableParam<i32>(300, 200, 500, 50);
+MAYBE_CONSTEXPR auto rookValue  = TunableParam<i32>(500, 500, 900, 50);
+MAYBE_CONSTEXPR auto queenValue = TunableParam<i32>(900, 900, 1500, 100);
+
 // Aspiration windows
 MAYBE_CONSTEXPR auto aspStartDelta = TunableParam<i32>(15, 5, 25, 5);
 MAYBE_CONSTEXPR auto aspDeltaMul   = TunableParam<double>(1.5, 1.2, 2.0, 0.1);
 
 // RFP (Reverse futility pruning)
 MAYBE_CONSTEXPR auto rfpDepthMul = TunableParam<i32>(75, 30, 180, 10);
+
+// Razoring
+MAYBE_CONSTEXPR auto razoringBase     = TunableParam<i32>(450, 150, 600, 50);
+MAYBE_CONSTEXPR auto razoringDepthMul = TunableParam<i32>(300, 150, 600, 15);
 
 // FP (Futility pruning)
 MAYBE_CONSTEXPR auto fpBase     = TunableParam<i32>(120, 40, 260, 20);
@@ -140,9 +152,15 @@ MAYBE_CONST MultiArray<i32, MAX_DEPTH + 1, 2, 256> LMR_TABLE = getLmrTable();
         { stringify(timeSoftPercentage),     &timeSoftPercentage },
         { stringify(nodesTmBase),            &nodesTmBase },
         { stringify(nodesTmMul),             &nodesTmMul },
+        { stringify(pawnValue),              &pawnValue },
+        { stringify(minorValue),             &minorValue },
+        { stringify(rookValue),              &rookValue },
+        { stringify(queenValue),             &queenValue },
         { stringify(aspStartDelta),          &aspStartDelta },
         { stringify(aspDeltaMul),            &aspDeltaMul },
         { stringify(rfpDepthMul),            &rfpDepthMul },
+        { stringify(razoringBase),           &razoringBase },
+        { stringify(razoringDepthMul),       &razoringDepthMul },
         { stringify(fpBase),                 &fpBase },
         { stringify(fpDepthMul),             &fpDepthMul },
         { stringify(seeNoisyHistMul),        &seeNoisyHistMul },

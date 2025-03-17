@@ -6,6 +6,7 @@
 #include "move.hpp"
 #include "attacks.hpp"
 #include "cuckoo.hpp"
+#include "search_params.hpp"
 
 enum class GameState : i32 {
     Draw, Loss, Ongoing
@@ -830,24 +831,27 @@ public:
     {
         assert(move);
 
-        constexpr EnumArray<i32, PieceType> SEE_PIECE_VALUES = { 100, 300, 300, 500, 900, 0 };
+        CONSTEXPR_OR_CONST EnumArray<i32, PieceType> PIECES_VALUES = {
+        //      P            N             B             R            Q         K
+            pawnValue(), minorValue(), minorValue(), rookValue(), queenValue(), 0
+        };
 
         i32 score = -threshold;
 
         const std::optional<PieceType> captured = this->captured(move);
 
         if (captured)
-            score += SEE_PIECE_VALUES[*captured];
+            score += PIECES_VALUES[*captured];
 
         const std::optional<PieceType> promotion = move.promotion();
 
         if (promotion)
-            score += SEE_PIECE_VALUES[*promotion] - SEE_PIECE_VALUES[PieceType::Pawn];
+            score += PIECES_VALUES[*promotion] - PIECES_VALUES[PieceType::Pawn];
 
         if (score < 0) return false;
 
         const PieceType next = promotion ? *promotion : move.pieceType();
-        score -= SEE_PIECE_VALUES[next];
+        score -= PIECES_VALUES[next];
 
         if (score >= 0) return true;
 
@@ -903,7 +907,7 @@ public:
 
             score = -score - 1;
 
-            if (optNext) score -= SEE_PIECE_VALUES[*optNext];
+            if (optNext) score -= PIECES_VALUES[*optNext];
 
             // If our only attacker is our king, but the opponent still has defenders
             if (score >= 0
