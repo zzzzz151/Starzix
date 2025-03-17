@@ -489,9 +489,6 @@ private:
 
                 undoMove(td);
 
-                if (mStopSearch.load(std::memory_order_relaxed))
-                    return 0;
-
                 if (score >= beta) return score >= MIN_MATE_SCORE ? beta : score;
             }
         }
