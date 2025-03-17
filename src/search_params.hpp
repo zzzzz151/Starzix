@@ -67,6 +67,10 @@ MAYBE_CONSTEXPR auto aspDeltaMul   = TunableParam<double>(1.5, 1.2, 2.0, 0.1);
 // RFP (Reverse futility pruning)
 MAYBE_CONSTEXPR auto rfpDepthMul = TunableParam<i32>(75, 30, 180, 10);
 
+// Razoring
+MAYBE_CONSTEXPR auto razoringBase     = TunableParam<i32>(450, 150, 600, 25);
+MAYBE_CONSTEXPR auto razoringDepthMul = TunableParam<i32>(300, 150, 600, 15);
+
 // FP (Futility pruning)
 MAYBE_CONSTEXPR auto fpBase     = TunableParam<i32>(120, 40, 260, 20);
 MAYBE_CONSTEXPR auto fpDepthMul = TunableParam<i32>(160, 40, 260, 20);
@@ -143,6 +147,8 @@ MAYBE_CONST MultiArray<i32, MAX_DEPTH + 1, 2, 256> LMR_TABLE = getLmrTable();
         { stringify(aspStartDelta),          &aspStartDelta },
         { stringify(aspDeltaMul),            &aspDeltaMul },
         { stringify(rfpDepthMul),            &rfpDepthMul },
+        { stringify(razoringBase),           &razoringBase },
+        { stringify(razoringDepthMul),       &razoringDepthMul },
         { stringify(fpBase),                 &fpBase },
         { stringify(fpDepthMul),             &fpDepthMul },
         { stringify(seeNoisyHistMul),        &seeNoisyHistMul },

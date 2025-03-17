@@ -465,6 +465,10 @@ private:
             if (depth <= 7 && eval() >= beta + depth * rfpDepthMul())
                 return eval();
 
+            // Razoring
+            if (eval() < alpha - razoringBase() - depth * depth * razoringDepthMul())
+                return qSearch<isPvNode>(td, ply, alpha, beta);
+
             // NMP (Null move pruning)
             if (depth >= 3
             && td->pos.lastMove()
