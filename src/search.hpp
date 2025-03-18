@@ -623,6 +623,9 @@ private:
 
                 if (score > alpha && lmr > 0)
                 {
+                    // Deeper search?
+                    newDepth += score > bestScore + deeperBase() + newDepth * 2;
+
                     score = -search<false, false, !isCutNode>(
                         td, newDepth, ply + 1, -alpha - 1, -alpha
                     );
