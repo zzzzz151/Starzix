@@ -261,6 +261,7 @@ private:
 
     constexpr bool isHardTimeUp(const ThreadData* td)
     {
+        // Only check time in main thread and if depth 1 completed
         if (td == mainThreadData()
         && td->rootDepth > 1
         && mSearchConfig.hardMs
@@ -378,12 +379,14 @@ private:
 
             if (isHardTimeUp(td)) return 0;
 
+            // Fail low?
             if (score <= alpha)
             {
                 beta = (alpha + beta) / 2;
                 alpha = std::max<i32>(alpha - delta, -INF);
                 depth = td->rootDepth;
             }
+            // Fail high?
             else if (score >= beta)
             {
                 beta = std::min<i32>(beta + delta, INF);
@@ -420,6 +423,7 @@ private:
 
         if (isHardTimeUp(td)) return 0;
 
+        // Detect upcoming repetition (cuckoo)
         if (!isRoot && alpha < 0 && td->pos.hasUpcomingRepetition(ply))
         {
             alpha = 0;
@@ -473,7 +477,7 @@ private:
             if (depth >= 3
             && td->pos.lastMove()
             && td->pos.stmHasNonPawns()
-            && !(ttHit && ttBound == Bound::Upper && ttScore < beta)
+            && !(ttHit && ttScore < beta && ttBound == Bound::Upper)
             && eval() >= beta)
             {
                 const GameState newGameState = makeMove(td, MOVE_NONE, ply + 1);
@@ -508,9 +512,7 @@ private:
         ArrayVec<std::pair<Move, std::optional<PieceType>>, 256> failLowNoisies; // move, captured
 
         // Moves loop
-
         MovePicker movePicker = MovePicker(false, ttMove, plyData.killer, singularMove);
-
         while (true)
         {
             // Move, std::optional<i32>
@@ -518,11 +520,13 @@ private:
 
             if (!move) break;
 
+            // In singular searches, singular move (TT move) isn't searched
             assert(move != singularMove);
 
             legalMovesSeen++;
             const bool isQuiet = td->pos.isQuiet(move);
 
+            // Moves loop pruning at shallow depths
             if (bestScore > -MIN_MATE_SCORE && (isQuiet || *moveScore < 0))
             {
                 // LMP (Late move pruning)
@@ -564,7 +568,7 @@ private:
             && std::abs(ttScore) < MIN_MATE_SCORE
             && ttBound == Bound::Lower)
             {
-                const i32 singularBeta = ttScore - depth;
+                const i32 singularBeta = std::max<i32>(ttScore - depth, -MIN_MATE_SCORE);
 
                 const i32 singularScore = search<isRoot, false, isCutNode>(
                     td, newDepth / 2, ply, singularBeta - 1, singularBeta, ttMove
@@ -605,6 +609,7 @@ private:
                         - td->pos.inCheck()
                         + isCutNode * 2;
 
+                // Less reduction the higher the move's history and vice-versa
                 if (isQuiet) {
                     const PosState posState = td->pos.getState();
                     td->pos.undoMove();
@@ -615,14 +620,19 @@ private:
                     td->pos.pushState(posState);
                 }
 
-                lmr = std::max<i32>(lmr, 0); // Don't extend depth
+                lmr = std::max<i32>(lmr, 0); // Don't extend
 
+                // Reduced null window search
                 score = -search<false, false, true>(
                     td, newDepth - lmr, ply + 1, -alpha - 1, -alpha
                 );
 
                 if (score > alpha && lmr > 0)
                 {
+                    // Deeper research?
+                    newDepth += score > bestScore + deeperBase() + newDepth * 2;
+
+                    // Null window search
                     score = -search<false, false, !isCutNode>(
                         td, newDepth, ply + 1, -alpha - 1, -alpha
                     );
@@ -630,11 +640,13 @@ private:
             }
             else if (!isPvNode || legalMovesSeen > 1)
             {
+                // Null window search
                 score = -search<false, false, !isCutNode>(
                     td, newDepth, ply + 1, -alpha - 1, -alpha
                 );
             }
 
+            // Full window search
             if (isPvNode && (legalMovesSeen == 1 || score > alpha))
                 score = -search<false, true, false>(td, newDepth, ply + 1, -beta, -alpha);
 
@@ -776,6 +788,7 @@ private:
 
         if (isHardTimeUp(td)) return 0;
 
+        // Detect upcoming repetition (cuckoo)
         if (alpha < 0 && td->pos.hasUpcomingRepetition(ply))
         {
             alpha = 0;
@@ -804,7 +817,7 @@ private:
         i32 bestScore = td->pos.inCheck() ? -INF : eval;
         Move bestMove = MOVE_NONE;
 
-        // Moves loop
+        // Moves loop (if not in check, only noisy moves)
 
         MovePicker movePicker = MovePicker(
             !td->pos.inCheck(), MOVE_NONE, td->pliesData[ply].killer
@@ -821,7 +834,7 @@ private:
             if (bestScore > -MIN_MATE_SCORE && move.isUnderpromotion())
                 break;
 
-            // SEE pruning
+            // SEE pruning (skip bad noisy moves)
             if (!td->pos.inCheck()
             &&  !td->pos.SEE(move, 0 /* getSEEThreshold(td->pos, td->historyTable, move) */ ))
                 continue;
@@ -844,6 +857,7 @@ private:
 
             if (score > alpha)
             {
+                // This move didn't fail low
                 alpha = score;
                 bestMove = move;
             }
