@@ -498,7 +498,7 @@ private:
         }
 
         // IIR (Internal iterative reduction)
-        if (depth >= 4 && !ttMove && !singularMove)
+        if ((isPvNode || isCutNode) && depth >= 4 && !ttMove && !singularMove)
             depth--;
 
         PlyData& plyData = td->pliesData[ply];
