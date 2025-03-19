@@ -99,7 +99,8 @@ MAYBE_CONSTEXPR auto lmrMulQuiet  = TunableParam<double>(0.4, 0.2, 0.8, 0.1);
 MAYBE_CONSTEXPR auto lmrQuietHistoryMul = TunableParam<float>(0.9f, 0.0f, 0.9f, 0.1f) / 10'000.0f;
 
 // PVS + LMR
-MAYBE_CONSTEXPR auto deeperBase = TunableParam<i32>(43, 10, 100, 15);
+MAYBE_CONSTEXPR auto deeperBase      = TunableParam<i32>(43, 0, 100, 20);
+MAYBE_CONSTEXPR auto shallowerMargin = TunableParam<i32>(10, 0, 100, 20);
 
 // History heuristic
 constexpr i32 HISTORY_MAX = 16384;
@@ -176,6 +177,7 @@ MAYBE_CONST MultiArray<i32, MAX_DEPTH + 1, 2, 256> LMR_TABLE = getLmrTable();
         { stringify(lmrMulQuiet),            &lmrMulQuiet },
         { stringify(lmrQuietHistoryMul),     &lmrQuietHistoryMul },
         { stringify(deeperBase),             &deeperBase },
+        { stringify(shallowerMargin),        &shallowerMargin },
         { stringify(historyBonusMul),        &historyBonusMul },
         { stringify(historyBonusOffset),     &historyBonusOffset },
         { stringify(historyBonusMax),        &historyBonusMax },

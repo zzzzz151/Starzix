@@ -629,8 +629,9 @@ private:
 
                 if (score > alpha && lmr > 0)
                 {
-                    // Deeper research?
+                    // Deeper or shallower research?
                     newDepth += score > bestScore + deeperBase() + newDepth * 2;
+                    newDepth -= score < bestScore + shallowerMargin();
 
                     // Null window search
                     score = -search<false, false, !isCutNode>(
