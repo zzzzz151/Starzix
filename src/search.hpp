@@ -532,7 +532,7 @@ private:
                 // LMP (Late move pruning)
                 if (!isPvNode
                 && !td->pos.inCheck()
-                && legalMovesSeen > static_cast<size_t>(3 + depth * depth * 3 / 4))
+                && legalMovesSeen > static_cast<size_t>(3 + depth * depth))
                     break;
 
                 const i32 lmrDepth
