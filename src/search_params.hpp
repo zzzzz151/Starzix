@@ -37,7 +37,7 @@ public:
         assert(step > 0);
     }
 
-    // overload function operator
+    // Function operator
     constexpr T operator () () const
     {
         return value;

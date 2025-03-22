@@ -424,12 +424,8 @@ private:
         if (isHardTimeUp(td)) return 0;
 
         // Detect upcoming repetition (cuckoo)
-        if (!isRoot && alpha < 0 && td->pos.hasUpcomingRepetition(ply))
-        {
-            alpha = 0;
-
-            if (alpha >= beta) return alpha;
-        }
+        if (!isRoot && alpha < 0 && td->pos.hasUpcomingRepetition(ply) && (alpha = 0) >= beta)
+            return 0;
 
         depth = std::min<i32>(depth, static_cast<i32>(MAX_DEPTH));
 
@@ -439,7 +435,7 @@ private:
         // Get TT entry data
         const auto [ttHit, ttDepth, ttScore, ttBound, ttMove]
             = ttEntryPtr == nullptr
-            ? std::tuple{ false, 0, 0, Bound::None, MOVE_NONE }
+            ? NO_TT_ENTRY_DATA
             : ttEntryPtr->get(td->pos.zobristHash(), static_cast<i16>(ply));
 
         // TT cutoff
@@ -457,10 +453,10 @@ private:
 
         if (ply >= MAX_DEPTH) return eval();
 
+        updateBothAccs(td);
+
         // Reset killer move of next tree level
         td->pliesData[ply + 1].killer = MOVE_NONE;
-
-        updateBothAccs(td);
 
         // Node pruning
         if (!isPvNode && !td->pos.inCheck() && !singularMove)
@@ -477,8 +473,8 @@ private:
             if (depth >= 3
             && td->pos.lastMove()
             && td->pos.stmHasNonPawns()
-            && !(ttHit && ttScore < beta && ttBound == Bound::Upper)
-            && eval() >= beta)
+            && eval() >= beta
+            && !(ttHit && ttScore < beta && ttBound == Bound::Upper))
             {
                 const GameState newGameState = makeMove(td, MOVE_NONE, ply + 1);
 
@@ -508,8 +504,10 @@ private:
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::Upper;
 
+        // Keep track of moves that fail low
+        // For noisy moves, also remember the captured piece type (none for non-capture promotions)
         ArrayVec<Move, 256> failLowQuiets;
-        ArrayVec<std::pair<Move, std::optional<PieceType>>, 256> failLowNoisies; // move, captured
+        ArrayVec<std::pair<Move, std::optional<PieceType>>, 256> failLowNoisies;
 
         // Moves loop
         MovePicker movePicker = MovePicker(false, ttMove, plyData.killer, singularMove);
@@ -604,10 +602,12 @@ private:
             // LMR (Late move reductions)
             if (depth >= 2 && legalMovesSeen > 1 + isRoot && (isQuiet || *moveScore < 0))
             {
-                i32 lmr = LMR_TABLE[static_cast<size_t>(depth)][isQuiet][legalMovesSeen]
-                        - isPvNode
-                        - td->pos.inCheck()
-                        + isCutNode * 2;
+                // Base reduction
+                i32 r = LMR_TABLE[static_cast<size_t>(depth)][isQuiet][legalMovesSeen];
+
+                r -= isPvNode;          // Reduce PV nodes less
+                r += isCutNode * 2;     // Reduce more if parent node expects to fail high
+                r -= td->pos.inCheck(); // Reduce moves that give check less
 
                 // Less reduction the higher the move's history and vice-versa
                 if (isQuiet) {
@@ -615,19 +615,19 @@ private:
                     td->pos.undoMove();
 
                     const auto history = static_cast<float>(histEntry.quietHistory(td->pos, move));
-                    lmr -= static_cast<i32>(round(history * lmrQuietHistoryMul()));
+                    r -= static_cast<i32>(round(history * lmrQuietHistoryMul()));
 
                     td->pos.pushState(posState);
                 }
 
-                lmr = std::max<i32>(lmr, 0); // Don't extend
+                r = std::max<i32>(r, 0); // Don't extend
 
                 // Reduced null window search
                 score = -search<false, false, true>(
-                    td, newDepth - lmr, ply + 1, -alpha - 1, -alpha
+                    td, newDepth - r, ply + 1, -alpha - 1, -alpha
                 );
 
-                if (score > alpha && lmr > 0)
+                if (score > alpha && r > 0)
                 {
                     // Deeper or shallower research?
                     newDepth += score > bestScore + deeperBase() + newDepth * 2;
@@ -790,12 +790,8 @@ private:
         if (isHardTimeUp(td)) return 0;
 
         // Detect upcoming repetition (cuckoo)
-        if (alpha < 0 && td->pos.hasUpcomingRepetition(ply))
-        {
-            alpha = 0;
-
-            if (alpha >= beta) return alpha;
-        }
+        if (alpha < 0 && td->pos.hasUpcomingRepetition(ply) && (alpha = 0) >= beta)
+            return 0;
 
         const i32 eval = getEval(td, ply);
 
