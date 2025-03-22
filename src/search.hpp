@@ -462,11 +462,11 @@ private:
         if (!isPvNode && !td->pos.inCheck() && !singularMove)
         {
             // RFP (Reverse futility pruning)
-            if (depth <= 7 && eval() >= beta + depth * rfpDepthMul())
+            if (depth <= 7 && eval() - beta >= depth * rfpDepthMul())
                 return eval();
 
             // Razoring
-            if (eval() < alpha - razoringBase() - depth * depth * razoringDepthMul())
+            if (alpha - eval() > razoringBase() + depth * depth * razoringDepthMul())
                 return qSearch<isPvNode>(td, ply, alpha, beta);
 
             // NMP (Null move pruning)
@@ -542,7 +542,7 @@ private:
                 && lmrDepth <= 6
                 && legalMovesSeen > 2
                 && alpha < MIN_MATE_SCORE
-                && alpha > eval() + fpBase() + std::max<i32>(lmrDepth, 1) * fpDepthMul())
+                && alpha - eval() > fpBase() + std::max<i32>(lmrDepth, 1) * fpDepthMul())
                     break;
 
                 // SEE pruning
@@ -574,7 +574,7 @@ private:
 
                 // Single or double extension
                 if (singularScore < singularBeta)
-                    newDepth += 1 + (singularScore < singularBeta - doubleExtMargin());
+                    newDepth += 1 + (singularBeta - singularScore > doubleExtMargin());
                 // Multicut
                 else if (singularScore >= beta && std::abs(singularScore) < MIN_MATE_SCORE)
                     return singularScore;
@@ -630,8 +630,8 @@ private:
                 if (score > alpha && r > 0)
                 {
                     // Deeper or shallower research?
-                    newDepth += score > bestScore + deeperBase() + newDepth * 2;
-                    newDepth -= score < bestScore + shallowerMargin();
+                    newDepth += score - bestScore > deeperBase() + newDepth * 2;
+                    newDepth -= score - bestScore < shallowerMargin();
 
                     // Null window search
                     score = -search<false, false, !isCutNode>(
