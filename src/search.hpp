@@ -447,11 +447,9 @@ private:
         || (ttBound == Bound::Lower && ttScore >= beta)))
             return ttScore;
 
-        const auto eval = [&] () constexpr {
-            return getEval(td, ply);
-        };
+        const i32 eval = getEval(td, ply);
 
-        if (ply >= MAX_DEPTH) return eval();
+        if (ply >= MAX_DEPTH) return eval;
 
         updateBothAccs(td);
 
@@ -462,18 +460,18 @@ private:
         if (!isPvNode && !td->pos.inCheck() && !singularMove)
         {
             // RFP (Reverse futility pruning)
-            if (depth <= 7 && eval() - beta >= depth * rfpDepthMul())
-                return eval();
+            if (depth <= 7 && eval - beta >= depth * rfpDepthMul())
+                return eval;
 
             // Razoring
-            if (alpha - eval() > razoringBase() + depth * depth * razoringDepthMul())
+            if (alpha - eval > razoringBase() + depth * depth * razoringDepthMul())
                 return qSearch<isPvNode>(td, ply, alpha, beta);
 
             // NMP (Null move pruning)
             if (depth >= 3
             && td->pos.lastMove()
             && td->pos.stmHasNonPawns()
-            && eval() >= beta
+            && eval >= beta
             && !(ttHit && ttScore < beta && ttBound == Bound::Upper))
             {
                 const GameState newGameState = makeMove(td, MOVE_NONE, ply + 1);
@@ -542,7 +540,7 @@ private:
                 && lmrDepth <= 6
                 && legalMovesSeen > 2
                 && alpha < MIN_MATE_SCORE
-                && alpha - eval() > fpBase() + std::max<i32>(lmrDepth, 1) * fpDepthMul())
+                && alpha - eval > fpBase() + std::max<i32>(lmrDepth, 1) * fpDepthMul())
                     break;
 
                 // SEE pruning
@@ -762,10 +760,10 @@ private:
             if (!td->pos.inCheck()
             && std::abs(bestScore) < MIN_MATE_SCORE
             && (!bestMove || td->pos.isQuiet(bestMove))
-            && !(bound == Bound::Lower && bestScore <= eval())
-            && !(bound == Bound::Upper && bestScore >= eval()))
+            && !(bound == Bound::Lower && bestScore <= eval)
+            && !(bound == Bound::Upper && bestScore >= eval))
             {
-                const i32 bonus = (bestScore - eval()) * depth;
+                const i32 bonus = (bestScore - eval) * depth;
 
                 for (i16* corrHistPtr : getCorrHists(td))
                     updateHistory(corrHistPtr, bonus);
