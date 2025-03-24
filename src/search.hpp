@@ -410,7 +410,7 @@ private:
     {
         assert(hasLegalMove(td->pos));
         assert(isRoot == (ply == 0));
-        assert(ply >= 0 && ply < MAX_DEPTH);
+        assert(ply >= 0 && ply <= MAX_DEPTH);
         assert(std::abs(alpha) <= INF);
         assert(std::abs(beta) <= INF);
         assert(alpha < beta);
@@ -620,18 +620,23 @@ private:
 
                 r = std::max<i32>(r, 0); // Don't extend
 
+                const i32 reducedDepth = newDepth - r;
+
                 // Reduced null window search
                 score = -search<false, false, true>(
-                    td, newDepth - r, ply + 1, -alpha - 1, -alpha
+                    td, reducedDepth, ply + 1, -alpha - 1, -alpha
                 );
 
-                if (score > alpha && r > 0)
+                if (score > alpha && reducedDepth < newDepth)
                 {
                     // Deeper or shallower research?
                     newDepth += score - bestScore > deeperBase() + newDepth * 2;
                     newDepth -= score - bestScore < shallowerMargin();
+                }
 
-                    // Null window search
+                if (score > alpha && reducedDepth < newDepth)
+                {
+                    // Null window research
                     score = -search<false, false, !isCutNode>(
                         td, newDepth, ply + 1, -alpha - 1, -alpha
                     );
@@ -779,7 +784,7 @@ private:
     constexpr i32 qSearch(ThreadData* td, const size_t ply, i32 alpha, const i32 beta)
     {
         assert(hasLegalMove(td->pos));
-        assert(ply > 0 && ply < MAX_DEPTH);
+        assert(ply > 0 && ply <= MAX_DEPTH);
         assert(std::abs(alpha) <= INF);
         assert(std::abs(beta) <= INF);
         assert(alpha < beta);
