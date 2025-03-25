@@ -73,7 +73,7 @@ MAYBE_CONSTEXPR auto aspStartDelta = TunableParam<i32>(15, 5, 25, 5);
 MAYBE_CONSTEXPR auto aspDeltaMul   = TunableParam<double>(1.5, 1.2, 2.0, 0.1);
 
 // RFP (Reverse futility pruning)
-MAYBE_CONSTEXPR auto rfpDepthMul = TunableParam<i32>(75, 30, 180, 10);
+MAYBE_CONSTEXPR auto rfpDepthMul = TunableParam<i32>(75, 30, 160, 10);
 
 // Razoring
 MAYBE_CONSTEXPR auto razoringBase     = TunableParam<i32>(450, 150, 600, 50);
