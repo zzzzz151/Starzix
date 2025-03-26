@@ -508,11 +508,11 @@ private:
         ArrayVec<std::pair<Move, std::optional<PieceType>>, 256> failLowNoisies;
 
         // Moves loop
-        MovePicker movePicker = MovePicker(false, ttMove, plyData.killer, singularMove);
+        MovePicker mp = MovePicker(false, ttMove, plyData.killer, singularMove);
         while (true)
         {
             // Move, std::optional<i32>
-            const auto [move, moveScore] = movePicker.nextLegal(td->pos, td->historyTable);
+            const auto [move, moveScore] = mp.nextLegal(td->pos, td->historyTable);
 
             if (!move) break;
 
@@ -817,15 +817,11 @@ private:
         Move bestMove = MOVE_NONE;
 
         // Moves loop (if not in check, only noisy moves)
-
-        MovePicker movePicker = MovePicker(
-            !td->pos.inCheck(), MOVE_NONE, td->pliesData[ply].killer
-        );
-
+        MovePicker mp = MovePicker(!td->pos.inCheck(), MOVE_NONE, td->pliesData[ply].killer);
         while (true)
         {
             // Move, std::optional<i32>
-            const auto [move, moveScore] = movePicker.nextLegal(td->pos, td->historyTable);
+            const auto [move, moveScore] = mp.nextLegal(td->pos, td->historyTable);
 
             if (!move) break;
 
