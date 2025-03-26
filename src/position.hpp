@@ -166,21 +166,6 @@ public:
         state().checkers = attackers(kingSquare()) & them();
     }
 
-    constexpr PosState getState() const
-    {
-        return state();
-    }
-
-    constexpr void pushState(const PosState& state)
-    {
-        mStates.push_back(state);
-    }
-
-    constexpr size_t numStates() const
-    {
-        return mStates.size();
-    }
-
     constexpr Color sideToMove() const
     {
         return state().colorToMove;

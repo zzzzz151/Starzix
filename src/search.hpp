@@ -578,9 +578,6 @@ private:
                     return singularScore;
             }
 
-            HistoryEntry& histEntry
-                = td->historyTable[td->pos.sideToMove()][move.pieceType()][move.to()];
-
             const u64 nodesBefore = td->nodes.load(std::memory_order_relaxed);
 
             const GameState newGameState = makeMove(td, move, ply + 1);
@@ -608,14 +605,10 @@ private:
                 r -= td->pos.inCheck(); // Reduce moves that give check less
 
                 // Less reduction the higher the move's history and vice-versa
-                if (isQuiet) {
-                    const PosState posState = td->pos.getState();
-                    td->pos.undoMove();
-
-                    const auto history = static_cast<float>(histEntry.quietHistory(td->pos, move));
+                if (isQuiet && moveScore)
+                {
+                    const float history = static_cast<float>(*moveScore);
                     r -= static_cast<i32>(round(history * lmrQuietHistoryMul()));
-
-                    td->pos.pushState(posState);
                 }
 
                 r = std::max<i32>(r, 0); // Don't extend
@@ -704,6 +697,9 @@ private:
             bound = Bound::Lower;
 
             // Update histories
+
+            HistoryEntry& histEntry
+                = td->historyTable[td->pos.sideToMove()][move.pieceType()][move.to()];
 
             const i32 histBonus = std::clamp<i32>(
                 depth * historyBonusMul() - historyBonusOffset(), 0, historyBonusMax()

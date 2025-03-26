@@ -94,7 +94,7 @@ inline void runCommand(std::string& command, Position& pos, Searcher& searcher)
     }
     else if (tokens[0] == "makemove" && tokens.size() == 2)
         pos.makeMove(tokens[1]);
-    else if (command == "undomove" && pos.numStates() > 1)
+    else if (command == "undomove" && pos.lastMove())
         pos.undoMove();
     #if defined(TUNE)
     else if (command == "spsainput")
