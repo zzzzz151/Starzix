@@ -17,7 +17,7 @@ constexpr i32 getSEEThreshold(
         .noisyHistory(pos.captured(move), move.promotion());
 
     const float threshold = static_cast<float>(-noisyHist) * seeNoisyHistMul();
-    return static_cast<i32>(round(threshold));
+    return lround(threshold);
 }
 
 struct MovesData
