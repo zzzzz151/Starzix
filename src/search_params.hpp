@@ -93,11 +93,11 @@ MAYBE_CONSTEXPR auto seeQuietHistMul   = TunableParam<float>(1.3f, 0.0f, 2.0f, 0
 MAYBE_CONSTEXPR auto doubleExtMargin = TunableParam<i32>(30, 1, 51, 10);
 
 // LMR (Late move reductions)
-MAYBE_CONSTEXPR auto lmrBaseNoisy = TunableParam<double>(0.74, 0.3, 1.2, 0.1);
-MAYBE_CONSTEXPR auto lmrBaseQuiet = TunableParam<double>(0.8, 0.3, 1.2, 0.1);
-MAYBE_CONSTEXPR auto lmrMulNoisy  = TunableParam<double>(0.2, 0.2, 0.8, 0.1);
-MAYBE_CONSTEXPR auto lmrMulQuiet  = TunableParam<double>(0.51, 0.2, 0.8, 0.1);
-MAYBE_CONSTEXPR auto lmrQuietHistoryMul = TunableParam<float>(0.84f, 0.0f, 0.9f, 0.1f) / 10'000.0f;
+MAYBE_CONSTEXPR auto lmrBaseNoisy    = TunableParam<double>(0.74, 0.3, 1.2, 0.1);
+MAYBE_CONSTEXPR auto lmrBaseQuiet    = TunableParam<double>(0.8, 0.3, 1.2, 0.1);
+MAYBE_CONSTEXPR auto lmrMulNoisy     = TunableParam<double>(0.2, 0.2, 0.8, 0.1);
+MAYBE_CONSTEXPR auto lmrMulQuiet     = TunableParam<double>(0.51, 0.2, 0.8, 0.1);
+MAYBE_CONSTEXPR auto lmrQuietHistMul = TunableParam<float>(0.84f, 0.0f, 0.9f, 0.1f) / 10'000.0f;
 
 // PVS + LMR
 MAYBE_CONSTEXPR auto deeperBase      = TunableParam<i32>(63, 0, 100, 20);
@@ -177,7 +177,7 @@ MAYBE_CONST MultiArray<i32, MAX_DEPTH + 1, 2, 256> LMR_TABLE = getLmrTable();
         { stringify(lmrBaseQuiet),           &lmrBaseQuiet },
         { stringify(lmrMulNoisy),            &lmrMulNoisy },
         { stringify(lmrMulQuiet),            &lmrMulQuiet },
-        { stringify(lmrQuietHistoryMul),     &lmrQuietHistoryMul },
+        { stringify(lmrQuietHistMul),        &lmrQuietHistMul },
         { stringify(deeperBase),             &deeperBase },
         { stringify(shallowerMargin),        &shallowerMargin },
         { stringify(historyBonusMul),        &historyBonusMul },

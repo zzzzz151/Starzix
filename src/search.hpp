@@ -612,7 +612,7 @@ private:
                 r -= td->pos.inCheck(); // Reduce moves that give check less
 
                 // For quiet moves, less reduction the higher the move's history and vice-versa
-                r -= lround(quietHistory * lmrQuietHistoryMul());
+                r -= lround(quietHistory * lmrQuietHistMul());
 
                 r = std::max<i32>(r, 0); // Don't extend
 
