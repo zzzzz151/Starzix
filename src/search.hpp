@@ -520,7 +520,12 @@ private:
             assert(move != singularMove);
 
             legalMovesSeen++;
+
             const bool isQuiet = td->pos.isQuiet(move);
+
+            const float quietHistory = static_cast<float>(
+                isQuiet && moveScore ? *moveScore : 0
+            );
 
             // Moves loop pruning at shallow depths
             if (bestScore > -MIN_MATE_SCORE && (isQuiet || *moveScore < 0))
@@ -545,8 +550,10 @@ private:
 
                 // SEE pruning
 
-                const i32 threshold
-                    = depth * (isQuiet ? seeQuietThreshold() : seeNoisyThreshold());
+                i32 threshold = isQuiet ? seeQuietThreshold() : seeNoisyThreshold();
+                threshold *= depth;
+                threshold -= static_cast<i32>(round(quietHistory * seeQuietHistMul()));
+                threshold = std::min<i32>(threshold, -1);
 
                 if (!isRoot && td->pos.stmHasNonPawns() && !td->pos.SEE(move, threshold))
                     continue;
@@ -604,12 +611,8 @@ private:
                 r += isCutNode * 2;     // Reduce more if parent node expects to fail high
                 r -= td->pos.inCheck(); // Reduce moves that give check less
 
-                // Less reduction the higher the move's history and vice-versa
-                if (isQuiet && moveScore)
-                {
-                    const float history = static_cast<float>(*moveScore);
-                    r -= static_cast<i32>(round(history * lmrQuietHistoryMul()));
-                }
+                // For quiet moves, less reduction the higher the move's history and vice-versa
+                r -= static_cast<i32>(round(quietHistory * lmrQuietHistoryMul()));
 
                 r = std::max<i32>(r, 0); // Don't extend
 
