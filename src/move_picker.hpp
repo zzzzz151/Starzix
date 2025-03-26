@@ -50,7 +50,8 @@ public:
 
             if constexpr (moveGenType == MoveGenType::NoisyOnly)
             {
-                const std::optional<PieceType> promo = move.promotion();
+                const std::optional<PieceType> captured = pos.captured(move);
+                const std::optional<PieceType> promo    = move.promotion();
 
                 if (doSEE) {
                     constexpr EnumArray<std::optional<i32>, PieceType> UNDERPROMO_SCORE = {
@@ -58,8 +59,7 @@ public:
                         std::nullopt, -30'000, -50'000, -40'000, std::nullopt, std::nullopt
                     };
 
-                    const i32 noisyHist
-                        = histEntry.noisyHistory(pos.captured(move), move.promotion());
+                    const i32 noisyHist = histEntry.noisyHistory(captured, move.promotion());
 
                     const i32 threshold = static_cast<i32>(lround(
                         static_cast<float>(-noisyHist) * seeNoisyHistMul()
@@ -85,7 +85,6 @@ public:
 
                 // MVVLVA (most valuable victim, least valuable attacker)
 
-                const std::optional<PieceType> captured = pos.captured(move);
                 const i32 iCaptured = captured ? static_cast<i32>(*captured) + 1 : 0;
 
                 const PieceType pt = move.pieceType();
