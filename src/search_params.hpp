@@ -129,13 +129,13 @@ inline MultiArray<i32, MAX_DEPTH + 1, 2, 256> getLmrTable()
             const double a = ln(static_cast<double>(depth));
             const double b = ln(static_cast<double>(legalMovesSeen));
 
-            lmrTable[depth][false][legalMovesSeen] = lround(
+            lmrTable[depth][false][legalMovesSeen] = static_cast<i32>(lround(
                 lmrBaseNoisy() + a * b * lmrMulNoisy()
-            );
+            ));
 
-            lmrTable[depth][true][legalMovesSeen] = lround(
+            lmrTable[depth][true][legalMovesSeen] = static_cast<i32>(lround(
                 lmrBaseQuiet() + a * b * lmrMulQuiet()
-            );
+            ));
         }
 
     return lmrTable;

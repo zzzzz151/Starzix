@@ -395,7 +395,7 @@ private:
             else
                 return score;
 
-            delta = lround(static_cast<double>(delta) * aspDeltaMul());
+            delta = static_cast<i32>(lround(static_cast<double>(delta) * aspDeltaMul()));
         }
     }
 
@@ -834,8 +834,7 @@ private:
                 break;
 
             // SEE pruning (skip bad noisy moves)
-            if (!td->pos.inCheck()
-            &&  !td->pos.SEE(move, 0 /* getSEEThreshold(td->pos, td->historyTable, move) */ ))
+            if (!td->pos.inCheck() && !td->pos.SEE(move))
                 continue;
 
             const GameState newGameState = makeMove(td, move, ply + 1);

@@ -8,18 +8,6 @@
 #include "move_gen.hpp"
 #include "history_entry.hpp"
 
-constexpr i32 getSEEThreshold(
-    const Position& pos, const HistoryTable& historyTable, const Move move)
-{
-    if (move.promotion()) return 0;
-
-    const i32 noisyHist = historyTable[pos.sideToMove()][move.pieceType()][move.to()]
-        .noisyHistory(pos.captured(move), move.promotion());
-
-    const float threshold = static_cast<float>(-noisyHist) * seeNoisyHistMul();
-    return lround(threshold);
-}
-
 struct MovesData
 {
 public:
@@ -57,6 +45,9 @@ public:
                 continue;
             }
 
+            const HistoryEntry& histEntry
+                = historyTable[pos.sideToMove()][move.pieceType()][move.to()];
+
             if constexpr (moveGenType == MoveGenType::NoisyOnly)
             {
                 const std::optional<PieceType> promo = move.promotion();
@@ -67,14 +58,19 @@ public:
                         std::nullopt, -30'000, -50'000, -40'000, std::nullopt, std::nullopt
                     };
 
-                    const i32 threshold = getSEEThreshold(pos, historyTable, move);
+                    const i32 noisyHist
+                        = histEntry.noisyHistory(pos.captured(move), move.promotion());
+
+                    const i32 threshold = static_cast<i32>(lround(
+                        static_cast<float>(-noisyHist) * seeNoisyHistMul()
+                    ));
 
                     mScores[i] = promo && *promo != PieceType::Queen
                                // Underpromotion
                                ? *(UNDERPROMO_SCORE[*promo])
                                : promo
                                // Queen promotion
-                               ? (pos.SEE(move, threshold) ? 30'000 : -10'000)
+                               ? (pos.SEE(move) ? 30'000 : -10'000)
                                // Capture without promotion
                                : 20'000 * (pos.SEE(move, threshold) ? 1 : -1);
                 }
@@ -98,10 +94,7 @@ public:
                 mScores[i] += iCaptured * 100 - iPieceType;
             }
             else if constexpr (moveGenType == MoveGenType::QuietOnly)
-            {
-                mScores[i] = historyTable[pos.sideToMove()][move.pieceType()][move.to()]
-                    .quietHistory(pos, move);
-            }
+                mScores[i] = histEntry.quietHistory(pos, move);
 
             i++;
         }
