@@ -78,7 +78,7 @@ inline void printTTSize(const std::vector<TTEntry>& tt)
 {
     const size_t bytes = tt.size() * sizeof(TTEntry);
     const double mebibytes = static_cast<double>(bytes) / (1024.0 * 1024.0);
-    const size_t mebibytesRounded = static_cast<size_t>(round(mebibytes));
+    const size_t mebibytesRounded = static_cast<size_t>(llround(mebibytes));
 
     std::cout << "info string TT size " << mebibytesRounded << " MiB"
               << " (" << tt.size() << " entries)"

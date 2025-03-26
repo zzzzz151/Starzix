@@ -138,7 +138,7 @@ constexpr i32 getEval(ThreadData* td, const size_t ply)
         if (lastMoveCorr != nullptr)
             correction += static_cast<float>(*lastMoveCorr) * corrHistLastMoveWeight();
 
-        *eval += static_cast<i32>(round(correction));
+        *eval += lround(correction);
 
         // Clamp eval to avoid invalid values and checkmate values
         eval = std::clamp<i32>(*eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);

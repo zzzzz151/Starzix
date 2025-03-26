@@ -350,7 +350,7 @@ private:
                     = static_cast<double>(*(mSearchConfig.softMs))
                     * (nodesTmBase() - bestMoveNodesFraction * nodesTmMul());
 
-                return static_cast<u64>(round(scaled));
+                return static_cast<u64>(llround(scaled));
             };
 
             // Soft time limit hit?
@@ -395,7 +395,7 @@ private:
             else
                 return score;
 
-            delta = static_cast<i32>(round(static_cast<double>(delta) * aspDeltaMul()));
+            delta = lround(static_cast<double>(delta) * aspDeltaMul());
         }
     }
 
@@ -552,7 +552,7 @@ private:
 
                 i32 threshold = isQuiet ? seeQuietThreshold() : seeNoisyThreshold();
                 threshold *= depth;
-                threshold -= static_cast<i32>(round(quietHistory * seeQuietHistMul()));
+                threshold -= lround(quietHistory * seeQuietHistMul());
                 threshold = std::min<i32>(threshold, -1);
 
                 if (!isRoot && td->pos.stmHasNonPawns() && !td->pos.SEE(move, threshold))
@@ -612,7 +612,7 @@ private:
                 r -= td->pos.inCheck(); // Reduce moves that give check less
 
                 // For quiet moves, less reduction the higher the move's history and vice-versa
-                r -= static_cast<i32>(round(quietHistory * lmrQuietHistoryMul()));
+                r -= lround(quietHistory * lmrQuietHistoryMul());
 
                 r = std::max<i32>(r, 0); // Don't extend
 

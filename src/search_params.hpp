@@ -86,8 +86,8 @@ MAYBE_CONSTEXPR auto fpDepthMul = TunableParam<i32>(170, 40, 260, 20);
 // SEE thresholds
 MAYBE_CONSTEXPR auto seeNoisyThreshold = TunableParam<i32>(-167, -210, -10, 20);
 MAYBE_CONSTEXPR auto seeQuietThreshold = TunableParam<i32>(-84, -210, -10, 20);
-MAYBE_CONSTEXPR auto seeNoisyHistMul   = TunableParam<float>(3.9f, 0.0f, 7.5f, 0.5f)  / 100.0f;
-MAYBE_CONSTEXPR auto seeQuietHistMul   = TunableParam<float>(1.3f, 0.0f, 2.5f, 0.25f) / 100.0f;
+MAYBE_CONSTEXPR auto seeNoisyHistMul   = TunableParam<float>(3.9f, 0.0f, 6.0f, 0.5f)  / 100.0f;
+MAYBE_CONSTEXPR auto seeQuietHistMul   = TunableParam<float>(1.3f, 0.0f, 2.0f, 0.25f) / 100.0f;
 
 // SE (Singular extensions)
 MAYBE_CONSTEXPR auto doubleExtMargin = TunableParam<i32>(30, 1, 51, 10);
@@ -129,13 +129,13 @@ inline MultiArray<i32, MAX_DEPTH + 1, 2, 256> getLmrTable()
             const double a = ln(static_cast<double>(depth));
             const double b = ln(static_cast<double>(legalMovesSeen));
 
-            lmrTable[depth][false][legalMovesSeen] = static_cast<i32>(round(
+            lmrTable[depth][false][legalMovesSeen] = lround(
                 lmrBaseNoisy() + a * b * lmrMulNoisy()
-            ));
+            );
 
-            lmrTable[depth][true][legalMovesSeen] = static_cast<i32>(round(
+            lmrTable[depth][true][legalMovesSeen] = lround(
                 lmrBaseQuiet() + a * b * lmrMulQuiet()
-            ));
+            );
         }
 
     return lmrTable;

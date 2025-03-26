@@ -254,11 +254,11 @@ constexpr void go(
 
         if (!isMoveTime)
         {
-            searchConfig.hardMs = static_cast<u64>(round(
+            searchConfig.hardMs = static_cast<u64>(llround(
                 static_cast<double>(*(searchConfig.hardMs)) * timeHardPercentage()
             ));
 
-            searchConfig.softMs = static_cast<u64>(round(
+            searchConfig.softMs = static_cast<u64>(llround(
                 static_cast<double>(*(searchConfig.hardMs)) * timeSoftPercentage()
             ));
         }
