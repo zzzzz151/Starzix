@@ -472,7 +472,7 @@ private:
             && td->pos.lastMove()
             && td->pos.stmHasNonPawns()
             && eval >= beta
-            && !(ttHit && ttScore < beta && ttBound == Bound::Upper))
+            && !(ttScore < beta && ttBound == Bound::Upper))
             {
                 const GameState newGameState = makeMove(td, MOVE_NONE, ply + 1);
 
