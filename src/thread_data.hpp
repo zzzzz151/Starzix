@@ -147,7 +147,7 @@ constexpr i32 getEval(ThreadData* td, const size_t ply)
     return *eval;
 }
 
-constexpr GameState makeMove(ThreadData* td, const Move move, const size_t newPly)
+constexpr void makeMove(ThreadData* td, const Move move, const size_t newPly)
 {
     td->pos.makeMove(move);
     td->nodes.fetch_add(1, std::memory_order_relaxed);
@@ -164,8 +164,6 @@ constexpr GameState makeMove(ThreadData* td, const Move move, const size_t newPl
         td->bothAccsIdx++;
         td->bothAccsStack[td->bothAccsIdx].mUpdated = false;
     }
-
-    return td->pos.gameState(hasLegalMove, newPly);
 }
 
 constexpr void undoMove(ThreadData* td)

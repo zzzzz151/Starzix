@@ -408,7 +408,6 @@ private:
         const i32 beta,
         const Move singularMove = MOVE_NONE)
     {
-        assert(hasLegalMove(td->pos));
         assert(isRoot == (ply == 0));
         assert(ply >= 0 && ply <= MAX_DEPTH);
         assert(std::abs(alpha) <= INF);
@@ -423,9 +422,20 @@ private:
 
         if (isHardTimeUp(td)) return 0;
 
-        // Detect upcoming repetition (cuckoo)
-        if (!isRoot && alpha < 0 && td->pos.hasUpcomingRepetition(ply) && (alpha = 0) >= beta)
-            return 0;
+        if constexpr (!isRoot)
+        {
+            const GameState gameState = td->pos.gameState(hasLegalMove, ply);
+
+            if (gameState == GameState::Draw)
+                return 0;
+
+            if (gameState == GameState::Loss)
+                return -INF + static_cast<i32>(ply);
+
+            // Detect upcoming repetition (cuckoo)
+            if (alpha < 0 && td->pos.hasUpcomingRepetition(ply) && (alpha = 0) >= beta)
+                return 0;
+        }
 
         depth = std::min<i32>(depth, static_cast<i32>(MAX_DEPTH));
 
@@ -473,16 +483,13 @@ private:
             && eval >= beta
             && !(ttScore < beta && ttBound == Bound::Upper))
             {
-                const GameState newGameState = makeMove(td, MOVE_NONE, ply + 1);
+                makeMove(td, MOVE_NONE, ply + 1);
 
                 const i32 nmpDepth = depth - 3 - depth / 3;
 
-                const i32 score
-                    = newGameState == GameState::Draw
-                    ? 0
-                    : newGameState == GameState::Loss
-                    ? INF - static_cast<i32>(ply + 1)
-                    : -search<false, false, false>(td, nmpDepth, ply + 1, -beta, -alpha);
+                const i32 score = -search<false, false, false>(
+                    td, nmpDepth, ply + 1, -beta, -alpha
+                );
 
                 undoMove(td);
 
@@ -586,19 +593,13 @@ private:
 
             const u64 nodesBefore = td->nodes.load(std::memory_order_relaxed);
 
-            const GameState newGameState = makeMove(td, move, ply + 1);
+            makeMove(td, move, ply + 1);
 
             const std::optional<PieceType> captured = td->pos.captured();
 
-            i32 score = 0;
-
-            if (newGameState != GameState::Ongoing)
-            {
-                score = newGameState == GameState::Draw ? 0 : INF - static_cast<i32>(ply + 1);
-                goto moveSearched;
-            }
-
             // PVS (Principal variation search)
+
+            i32 score = 0;
 
             // LMR (Late move reductions)
             if (depth >= 2 && legalMovesSeen > 1 + isRoot && (isQuiet || *moveScore < 0))
@@ -648,8 +649,6 @@ private:
             // Full window search
             if (isPvNode && (legalMovesSeen == 1 || score > alpha))
                 score = -search<false, true, false>(td, newDepth, ply + 1, -beta, -alpha);
-
-            moveSearched:
 
             undoMove(td);
 
@@ -781,7 +780,6 @@ private:
     template<bool isPvNode>
     constexpr i32 qSearch(ThreadData* td, const size_t ply, i32 alpha, const i32 beta)
     {
-        assert(hasLegalMove(td->pos));
         assert(ply > 0 && ply <= MAX_DEPTH);
         assert(std::abs(alpha) <= INF);
         assert(std::abs(beta) <= INF);
@@ -789,6 +787,14 @@ private:
         assert(isPvNode || alpha + 1 == beta);
 
         if (isHardTimeUp(td)) return 0;
+
+        const GameState gameState = td->pos.gameState(hasLegalMove, ply);
+
+        if (gameState == GameState::Draw)
+            return 0;
+
+        if (gameState == GameState::Loss)
+            return -INF + static_cast<i32>(ply);
 
         // Detect upcoming repetition (cuckoo)
         if (alpha < 0 && td->pos.hasUpcomingRepetition(ply) && (alpha = 0) >= beta)
@@ -832,14 +838,9 @@ private:
             if (!td->pos.inCheck() && !td->pos.SEE(move))
                 continue;
 
-            const GameState newGameState = makeMove(td, move, ply + 1);
+            makeMove(td, move, ply + 1);
 
-            const i32 score
-                = newGameState == GameState::Draw
-                ? 0
-                : newGameState == GameState::Loss
-                ? INF - static_cast<i32>(ply + 1)
-                : -qSearch<isPvNode>(td, ply + 1, -beta, -alpha);
+            const i32 score = -qSearch<isPvNode>(td, ply + 1, -beta, -alpha);
 
             undoMove(td);
 
