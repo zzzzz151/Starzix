@@ -11,9 +11,9 @@ enum class Bound : u8 {
     None = 0, Exact = 1, Lower = 2, Upper = 3
 };
 
-// ttHit, ttDepth, ttScore, ttBound, ttMove
-constexpr std::tuple<bool, i32, i32, Bound, Move> NO_TT_ENTRY_DATA = {
-    false, 0, 0, Bound::None, MOVE_NONE
+// ttDepth, ttScore, ttBound, ttMove
+constexpr std::tuple<i32, i32, Bound, Move> NO_TT_ENTRY_DATA = {
+    0, 0, Bound::None, MOVE_NONE
 };
 
 struct TTEntry
@@ -28,11 +28,11 @@ private:
 
 public:
 
-    // ttHit, ttDepth, ttScore, ttBound, ttMove
-    constexpr std::tuple<bool, i32, i32, Bound, Move> get(
+    // ttDepth, ttScore, ttBound, ttMove
+    constexpr std::tuple<i32, i32, Bound, Move> get(
         const u64 zobristHash, const i16 ply) const
     {
-        if (mZobristHash != zobristHash)
+        if (mZobristHash != zobristHash || mBound == Bound::None)
             return NO_TT_ENTRY_DATA;
 
         const i16 score = mScore >= MIN_MATE_SCORE  ? mScore - ply
@@ -40,7 +40,6 @@ public:
                         : mScore;
 
         return {
-            true,
             static_cast<i32>(mDepth),
             static_cast<i32>(score),
             mBound,

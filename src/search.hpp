@@ -433,14 +433,13 @@ private:
         TTEntry* ttEntryPtr = singularMove ? nullptr : &getEntry(mTT, td->pos.zobristHash());
 
         // Get TT entry data
-        const auto [ttHit, ttDepth, ttScore, ttBound, ttMove]
+        const auto [ttDepth, ttScore, ttBound, ttMove]
             = ttEntryPtr == nullptr
             ? NO_TT_ENTRY_DATA
             : ttEntryPtr->get(td->pos.zobristHash(), static_cast<i16>(ply));
 
         // TT cutoff
         if (!isPvNode
-        && ttHit
         && ttDepth >= depth
         && (ttBound == Bound::Exact
         || (ttBound == Bound::Upper && ttScore <= alpha)
