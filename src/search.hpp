@@ -485,7 +485,7 @@ private:
             {
                 makeMove(td, MOVE_NONE, ply + 1);
 
-                const i32 nmpDepth = depth - 3 - depth / 3;
+                const i32 nmpDepth = depth - 4 - depth / 3;
 
                 const i32 score = -search<false, false, false>(
                     td, nmpDepth, ply + 1, -beta, -alpha
