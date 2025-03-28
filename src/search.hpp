@@ -7,10 +7,10 @@
 #include "move_gen.hpp"
 #include "search_params.hpp"
 #include "nnue.hpp"
+#include "tt.hpp"
 #include "history_entry.hpp"
 #include "thread_data.hpp"
 #include "move_picker.hpp"
-#include "tt.hpp"
 #include "cuckoo.hpp"
 #include <atomic>
 #include <thread>
@@ -483,9 +483,9 @@ private:
             && eval >= beta
             && !(ttScore < beta && ttBound == Bound::Upper))
             {
-                makeMove(td, MOVE_NONE, ply + 1);
-
                 const i32 nmpDepth = depth - 4 - depth / 3;
+
+                makeMove(td, MOVE_NONE, ply + 1, nmpDepth > 0 ? &mTT : nullptr);
 
                 const i32 score = -search<false, false, false>(
                     td, nmpDepth, ply + 1, -beta, -alpha
@@ -591,7 +591,7 @@ private:
 
             const u64 nodesBefore = td->nodes.load(std::memory_order_relaxed);
 
-            makeMove(td, move, ply + 1);
+            makeMove(td, move, ply + 1, newDepth > 0 ? &mTT : nullptr);
 
             const std::optional<PieceType> captured = td->pos.captured();
 

@@ -7,6 +7,7 @@
 #include "move_gen.hpp"
 #include "search_params.hpp"
 #include "nnue.hpp"
+#include "tt.hpp"
 #include "history_entry.hpp"
 #include <algorithm>
 #include <atomic>
@@ -147,9 +148,18 @@ constexpr i32 getEval(ThreadData* td, const size_t ply)
     return *eval;
 }
 
-constexpr void makeMove(ThreadData* td, const Move move, const size_t newPly)
+constexpr void makeMove(
+    ThreadData* td, const Move move, const size_t newPly, std::vector<TTEntry>* ttPtr = nullptr)
 {
     td->pos.makeMove(move);
+
+    // Prefetch TT entry
+    if (ttPtr != nullptr)
+    {
+        const TTEntry& ttEntry = getEntry(*ttPtr, td->pos.zobristHash());
+        __builtin_prefetch(&ttEntry);
+    }
+
     td->nodes.fetch_add(1, std::memory_order_relaxed);
 
     // Update seldepth
