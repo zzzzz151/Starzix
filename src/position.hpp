@@ -907,25 +907,6 @@ public:
         return sideToMove() != ourColor;
     }
 
-    constexpr u64 roughHashAfter(const Move move) const
-    {
-        u64 hashAfter = zobristHash() ^ ZOBRIST_COLOR;
-
-        if (!move) return hashAfter;
-
-        const Square to = move.to();
-        const std::optional<PieceType> captured = pieceTypeAt(to);
-        const PieceType pt = move.pieceType();
-
-        if (captured)
-            hashAfter ^= ZOBRIST_PIECES[!sideToMove()][*captured][to];
-
-        hashAfter ^= ZOBRIST_PIECES[sideToMove()][pt][move.from()];
-        hashAfter ^= ZOBRIST_PIECES[sideToMove()][pt][to];
-
-        return hashAfter;
-    }
-
     // Do we have a legal move that results in position repetition?
     constexpr bool hasUpcomingRepetition(
         const std::optional<size_t> searchPly = std::nullopt) const

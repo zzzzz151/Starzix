@@ -61,7 +61,7 @@ constexpr std::array BENCH_FENS {
     "7k/8/7P/5B2/5K2/8/8/8 b - - 0 175"
 };
 
-inline void bench(const i32 depth = 14)
+inline void bench(const i32 depth = 15)
 {
     Searcher searcher = Searcher();
 

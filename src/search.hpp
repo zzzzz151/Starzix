@@ -537,9 +537,7 @@ private:
             if (bestScore > -MIN_MATE_SCORE && (isQuiet || *moveScore < 0))
             {
                 // LMP (Late move pruning)
-                if (!isPvNode
-                && !td->pos.inCheck()
-                && legalMovesSeen > static_cast<size_t>(3 + depth * depth))
+                if (!isPvNode && legalMovesSeen > static_cast<size_t>(3 + depth * depth))
                     break;
 
                 const i32 lmrDepth
