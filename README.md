@@ -1,6 +1,12 @@
-# Starzix - C++ chess engine
+# Starzix
 
-# Elo (Starzix 6.0)
+Starzix is a strong C++ chess engine that communicates using UCI.
+
+The search is a standard fail-soft negamax principal variation search with various enhancements such as alpha-beta pruning, quiescence search and transposition table.
+
+For evaluation, it uses a `(768x2x5 -> 1024)x2 -> 1` horizontally mirrored NNUE trained on [Lc0](https://github.com/LeelaChessZero/lc0) data with my trainer [Starway](https://github.com/zzzzz151/Starway).
+
+# Elo (v6.0)
 
 [CCRL Blitz 8 Threads](https://www.computerchess.org.uk/ccrl/404/): 3764 (#9/768)
 
@@ -35,55 +41,3 @@ Install clang++ and run ```make```
 - bench \<depth\>
 
 - eval
-
-# Features
-
-### Board
-- Bitboards
-- Zobrist hashing
-- Pseudolegal move gen (magic bitboards and lookup tables)
-- Copymake make/undo move
-
-### NNUE evaluation
-- (768x2x5 -> 1024)x2 -> 1
-- Inputs mirrored along vertical axis based on king square
-- 5 enemy queen input buckets
-- [Lc0](https://github.com/LeelaChessZero/lc0) data
-- Trained with my trainer [Starway](https://github.com/zzzzz151/Starway)
-
-### Search
-- Staged move gen
-- Fail-soft Negamax
-- Principal variation search
-- Iterative deepening
-- Quiescence search
-- Aspiration windows
-- Transposition table
-- Alpha-beta pruning
-- Reverse futility pruning
-- Razoring
-- Null move pruning
-- Probcut
-- Late move pruning
-- Futility pruning
-- SEE pruning
-- Internal iterative reduction
-- Late move reductions
-- Singular extensions
-- Correction histories
-- Cuckoo (detect upcoming repetition)
-- Time management (hard limit, soft limit, nodes TM)
-- Multithreading / Lazy SMP
-
-### Move ordering
-- TT move
-- Good noisy moves by SEE + MVVLVA
-- Killer move
-- Quiet moves by history
-- Bad noisy moves (underpromotions last)
-
-### Moves history
-- Main history
-- Continuation histories (1 ply, 2 ply, 4 ply)
-- Noisy history
-- History malus and gravity
