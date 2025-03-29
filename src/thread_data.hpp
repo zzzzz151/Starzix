@@ -149,16 +149,13 @@ constexpr i32 getEval(ThreadData* td, const size_t ply)
 }
 
 constexpr void makeMove(
-    ThreadData* td, const Move move, const size_t newPly, std::vector<TTEntry>* ttPtr = nullptr)
+    ThreadData* td, const Move move, const size_t newPly, std::vector<TTEntry>& tt)
 {
     td->pos.makeMove(move);
 
     // Prefetch TT entry
-    if (ttPtr != nullptr)
-    {
-        const TTEntry& ttEntry = getEntry(*ttPtr, td->pos.zobristHash());
-        __builtin_prefetch(&ttEntry);
-    }
+    const TTEntry& ttEntry = getEntry(tt, td->pos.zobristHash());
+    __builtin_prefetch(&ttEntry);
 
     td->nodes.fetch_add(1, std::memory_order_relaxed);
 

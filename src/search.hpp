@@ -485,7 +485,7 @@ private:
             {
                 const i32 nmpDepth = depth - 4 - depth / 3;
 
-                makeMove(td, MOVE_NONE, ply + 1, nmpDepth > 0 ? &mTT : nullptr);
+                makeMove(td, MOVE_NONE, ply + 1, mTT);
 
                 const i32 score = -search<false, false, false>(
                     td, nmpDepth, ply + 1, -beta, -alpha
@@ -590,7 +590,7 @@ private:
 
             const u64 nodesBefore = td->nodes.load(std::memory_order_relaxed);
 
-            makeMove(td, move, ply + 1, newDepth > 0 ? &mTT : nullptr);
+            makeMove(td, move, ply + 1, mTT);
 
             const std::optional<PieceType> captured = td->pos.captured();
 
@@ -797,6 +797,19 @@ private:
         if (alpha < 0 && td->pos.hasUpcomingRepetition(ply) && (alpha = 0) >= beta)
             return 0;
 
+        // Probe TT for TT entry
+        const TTEntry& ttEntry = getEntry(mTT, td->pos.zobristHash());
+
+        // Get TT entry data
+        const auto [ttDepth, ttScore, ttBound, ttMove]
+            = ttEntry.get(td->pos.zobristHash(), static_cast<i16>(ply));
+
+        // TT cutoff
+        if (ttBound == Bound::Exact
+        || (ttBound == Bound::Upper && ttScore <= alpha)
+        || (ttBound == Bound::Lower && ttScore >= beta))
+            return ttScore;
+
         const i32 eval = getEval(td, ply);
 
         if (ply >= MAX_DEPTH) return eval;
@@ -835,7 +848,7 @@ private:
             if (!td->pos.inCheck() && !td->pos.SEE(move))
                 continue;
 
-            makeMove(td, move, ply + 1);
+            makeMove(td, move, ply + 1, mTT);
 
             const i32 score = -qSearch<isPvNode>(td, ply + 1, -beta, -alpha);
 
