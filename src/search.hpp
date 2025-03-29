@@ -418,7 +418,7 @@ private:
         assert(!(isPvNode && isCutNode));
 
         // Quiescence search at leaf nodes
-        if (depth <= 0) return qSearch<isPvNode>(td, ply, alpha, beta);
+        if (depth <= 0) return qSearch<isPvNode, true>(td, ply, alpha, beta);
 
         if (isHardTimeUp(td)) return 0;
 
@@ -474,7 +474,7 @@ private:
 
             // Razoring
             if (alpha - eval > razoringBase() + depth * depth * razoringDepthMul())
-                return qSearch<isPvNode>(td, ply, alpha, beta);
+                return qSearch<isPvNode, true>(td, ply, alpha, beta);
 
             // NMP (Null move pruning)
             if (depth >= 3
@@ -483,9 +483,9 @@ private:
             && eval >= beta
             && !(ttScore < beta && ttBound == Bound::Upper))
             {
-                const i32 nmpDepth = depth - 4 - depth / 3;
+                makeMove(td, MOVE_NONE, ply + 1, &mTT);
 
-                makeMove(td, MOVE_NONE, ply + 1, nmpDepth > 0 ? &mTT : nullptr);
+                const i32 nmpDepth = depth - 4 - depth / 3;
 
                 const i32 score = -search<false, false, false>(
                     td, nmpDepth, ply + 1, -beta, -alpha
@@ -590,7 +590,7 @@ private:
 
             const u64 nodesBefore = td->nodes.load(std::memory_order_relaxed);
 
-            makeMove(td, move, ply + 1, newDepth > 0 ? &mTT : nullptr);
+            makeMove(td, move, ply + 1, &mTT);
 
             const std::optional<PieceType> captured = td->pos.captured();
 
@@ -774,7 +774,7 @@ private:
     }
 
     // Quiescence search
-    template<bool isPvNode>
+    template<bool isPvNode, bool isFirstCall>
     constexpr i32 qSearch(ThreadData* td, const size_t ply, i32 alpha, const i32 beta)
     {
         assert(ply > 0 && ply <= MAX_DEPTH);
@@ -796,6 +796,22 @@ private:
         // Detect upcoming repetition (cuckoo)
         if (alpha < 0 && td->pos.hasUpcomingRepetition(ply) && (alpha = 0) >= beta)
             return 0;
+
+        if constexpr (!isPvNode && isFirstCall)
+        {
+            // Probe TT for TT entry
+            const TTEntry& ttEntry = getEntry(mTT, td->pos.zobristHash());
+
+            // Get TT entry data
+            const auto [ttDepth, ttScore, ttBound, ttMove]
+                = ttEntry.get(td->pos.zobristHash(), static_cast<i16>(ply));
+
+            // TT cutoff
+            if (ttBound == Bound::Exact
+            || (ttBound == Bound::Upper && ttScore <= alpha)
+            || (ttBound == Bound::Lower && ttScore >= beta))
+                return ttScore;
+        }
 
         const i32 eval = getEval(td, ply);
 
@@ -837,7 +853,7 @@ private:
 
             makeMove(td, move, ply + 1);
 
-            const i32 score = -qSearch<isPvNode>(td, ply + 1, -beta, -alpha);
+            const i32 score = -qSearch<isPvNode, false>(td, ply + 1, -beta, -alpha);
 
             undoMove(td);
 
