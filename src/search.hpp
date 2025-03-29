@@ -483,9 +483,9 @@ private:
             && eval >= beta
             && !(ttScore < beta && ttBound == Bound::Upper))
             {
-                const i32 nmpDepth = depth - 4 - depth / 3;
+                makeMove(td, MOVE_NONE, ply + 1, &mTT);
 
-                makeMove(td, MOVE_NONE, ply + 1, mTT);
+                const i32 nmpDepth = depth - 4 - depth / 3;
 
                 const i32 score = -search<false, false, false>(
                     td, nmpDepth, ply + 1, -beta, -alpha
@@ -590,7 +590,7 @@ private:
 
             const u64 nodesBefore = td->nodes.load(std::memory_order_relaxed);
 
-            makeMove(td, move, ply + 1, mTT);
+            makeMove(td, move, ply + 1, &mTT);
 
             const std::optional<PieceType> captured = td->pos.captured();
 
@@ -851,7 +851,7 @@ private:
             if (!td->pos.inCheck() && !td->pos.SEE(move))
                 continue;
 
-            makeMove(td, move, ply + 1, mTT);
+            makeMove(td, move, ply + 1);
 
             const i32 score = -qSearch<isPvNode, false>(td, ply + 1, -beta, -alpha);
 
