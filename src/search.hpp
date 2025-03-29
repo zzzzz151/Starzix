@@ -534,18 +534,17 @@ private:
             );
 
             // Moves loop pruning at shallow depths
-            if (bestScore > -MIN_MATE_SCORE && (isQuiet || *moveScore < 0))
+            if (!isRoot && bestScore > -MIN_MATE_SCORE && (isQuiet || *moveScore < 0))
             {
                 // LMP (Late move pruning)
-                if (!isPvNode && legalMovesSeen > static_cast<size_t>(3 + depth * depth))
+                if (legalMovesSeen > static_cast<size_t>(3 + depth * depth))
                     break;
 
                 const i32 lmrDepth
                     = depth - LMR_TABLE[static_cast<size_t>(depth)][isQuiet][legalMovesSeen];
 
                 // FP (Futility pruning)
-                if (!isPvNode
-                && !td->pos.inCheck()
+                if (!td->pos.inCheck()
                 && lmrDepth <= 6
                 && legalMovesSeen > 2
                 && alpha < MIN_MATE_SCORE
@@ -559,7 +558,7 @@ private:
                 threshold -= lround(quietHistory * seeQuietHistMul());
                 threshold = std::min<i32>(threshold, -1);
 
-                if (!isRoot && td->pos.stmHasNonPawns() && !td->pos.SEE(move, threshold))
+                if (td->pos.stmHasNonPawns() && !td->pos.SEE(move, threshold))
                     continue;
             }
 
