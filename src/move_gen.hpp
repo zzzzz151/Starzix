@@ -25,7 +25,7 @@ constexpr ArrayVec<Move, 256> pseudolegalMoves(Position& pos)
     const Bitboard ourQueens  = pos.getBb(stm, PieceType::Queen);
 
     // En passant
-    if (moveGenType != MoveGenType::QuietOnly && pos.enPassantSquare())
+    if (moveGenType != MoveGenType::QuietOnly && pos.enPassantSquare().has_value())
     {
         const Square enPassantSquare = *(pos.enPassantSquare());
 
@@ -231,7 +231,7 @@ constexpr bool isPseudolegal(Position& pos, const Move move)
         {
             // If en passant, is en passant square the move's target square?
             if (move.flag() == MoveFlag::EnPassant)
-                return pos.enPassantSquare() && *(pos.enPassantSquare()) == to;
+                return pos.enPassantSquare() == to;
 
             const Bitboard wrongAttacks = getPawnAttacks(from, !pos.sideToMove());
 
@@ -515,7 +515,7 @@ constexpr bool hasLegalMove(Position& pos)
         }
     });
 
-    if (!pos.enPassantSquare())
+    if (!pos.enPassantSquare().has_value())
         return false;
 
     // Check if en passant is legal

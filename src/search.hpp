@@ -264,9 +264,9 @@ private:
         // Only check time in main thread and if depth 1 completed
         if (td == mainThreadData()
         && td->rootDepth > 1
-        && mSearchConfig.hardMs
+        && mSearchConfig.hardMs.has_value()
         && td->nodes.load(std::memory_order_relaxed) % 1024 == 0
-        && millisecondsElapsed(mSearchConfig.startTime) >= *(mSearchConfig.hardMs))
+        && millisecondsElapsed(mSearchConfig.startTime) >= mSearchConfig.hardMs)
             mStopSearch.store(true, std::memory_order_relaxed);
 
         return mStopSearch.load(std::memory_order_relaxed);
@@ -326,11 +326,11 @@ private:
             checkLimits:
 
             // Hard time limit hit?
-            if (mSearchConfig.hardMs && msElapsed >= *(mSearchConfig.hardMs))
+            if (mSearchConfig.hardMs.has_value() && msElapsed >= mSearchConfig.hardMs)
                 break;
 
             // Soft nodes limit hit?
-            if (mSearchConfig.maxNodes && nodes >= *(mSearchConfig.maxNodes))
+            if (mSearchConfig.maxNodes.has_value() && nodes >= mSearchConfig.maxNodes)
                 break;
 
             // Nodes time management
@@ -354,8 +354,8 @@ private:
             };
 
             // Soft time limit hit?
-            if (mSearchConfig.softMs
-            && msElapsed >= (td->rootDepth >= 6 ? softMsScaled() : *(mSearchConfig.softMs)))
+            if (mSearchConfig.softMs.has_value()
+            && msElapsed >= (td->rootDepth >= 6 ? softMsScaled() : mSearchConfig.softMs))
                 break;
         }
 
@@ -452,11 +452,12 @@ private:
         if (!isPvNode
         && ttDepth >= depth
         && (ttBound == Bound::Exact
-        || (ttBound == Bound::Upper && ttScore <= alpha)
-        || (ttBound == Bound::Lower && ttScore >= beta)))
-            return ttScore;
+        || (ttBound == Bound::Upper && ttScore.value() <= alpha)
+        || (ttBound == Bound::Lower && ttScore.value() >= beta)))
+            return ttScore.value();
 
-        const i32 eval = getEval(td, ply);
+        PlyData& plyData = td->pliesData[ply];
+        const i32 eval = getEval(td, plyData);
 
         if (ply >= MAX_DEPTH) return eval;
 
@@ -481,7 +482,7 @@ private:
             && td->pos.lastMove()
             && td->pos.stmHasNonPawns()
             && eval >= beta
-            && !(ttScore < beta && ttBound == Bound::Upper))
+            && !(ttBound == Bound::Upper && ttScore.value() < beta))
             {
                 makeMove(td, MOVE_NONE, ply + 1, &mTT);
 
@@ -500,8 +501,6 @@ private:
         // IIR (Internal iterative reduction)
         if ((isPvNode || isCutNode) && depth >= 4 && !ttMove && !singularMove)
             depth--;
-
-        PlyData& plyData = td->pliesData[ply];
 
         size_t legalMovesSeen = 0;
         i32 bestScore = -INF;
@@ -530,11 +529,11 @@ private:
             const bool isQuiet = td->pos.isQuiet(move);
 
             const float quietHistory = static_cast<float>(
-                isQuiet && moveScore ? *moveScore : 0
+                isQuiet && moveScore.has_value() ? *moveScore : 0
             );
 
             // Moves loop pruning at shallow depths
-            if (!isRoot && bestScore > -MIN_MATE_SCORE && (isQuiet || *moveScore < 0))
+            if (!isRoot && bestScore > -MIN_MATE_SCORE && (isQuiet || moveScore.value() < 0))
             {
                 // LMP (Late move pruning)
                 if (legalMovesSeen > static_cast<size_t>(3 + depth * depth))
@@ -571,10 +570,10 @@ private:
             && static_cast<i32>(ply) < td->rootDepth * 2
             && depth >= 8
             && ttDepth >= depth - 3
-            && std::abs(ttScore) < MIN_MATE_SCORE
+            && std::abs(ttScore.value()) < MIN_MATE_SCORE
             && ttBound == Bound::Lower)
             {
-                const i32 singularBeta = std::max<i32>(ttScore - depth, -MIN_MATE_SCORE);
+                const i32 singularBeta = std::max<i32>(ttScore.value() - depth, -MIN_MATE_SCORE);
 
                 const i32 singularScore = search<isRoot, false, isCutNode>(
                     td, newDepth / 2, ply, singularBeta - 1, singularBeta, ttMove
@@ -599,7 +598,7 @@ private:
             i32 score = 0;
 
             // LMR (Late move reductions)
-            if (depth >= 2 && legalMovesSeen > 1 + isRoot && (isQuiet || *moveScore < 0))
+            if (depth >= 2 && legalMovesSeen > 1 + isRoot && (isQuiet || moveScore.value() < 0))
             {
                 // Base reduction
                 i32 r = LMR_TABLE[static_cast<size_t>(depth)][isQuiet][legalMovesSeen];
@@ -808,12 +807,12 @@ private:
 
             // TT cutoff
             if (ttBound == Bound::Exact
-            || (ttBound == Bound::Upper && ttScore <= alpha)
-            || (ttBound == Bound::Lower && ttScore >= beta))
-                return ttScore;
+            || (ttBound == Bound::Upper && ttScore.value() <= alpha)
+            || (ttBound == Bound::Lower && ttScore.value() >= beta))
+                return ttScore.value();
         }
 
-        const i32 eval = getEval(td, ply);
+        const i32 eval = getEval(td, td->pliesData[ply]);
 
         if (ply >= MAX_DEPTH) return eval;
 

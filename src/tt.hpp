@@ -12,8 +12,8 @@ enum class Bound : u8 {
 };
 
 // ttDepth, ttScore, ttBound, ttMove
-constexpr std::tuple<i32, i32, Bound, Move> NO_TT_ENTRY_DATA = {
-    0, 0, Bound::None, MOVE_NONE
+constexpr std::tuple<std::optional<i32>, std::optional<i32>, Bound, Move> NO_TT_ENTRY_DATA = {
+    std::nullopt, std::nullopt, Bound::None, MOVE_NONE
 };
 
 struct TTEntry
@@ -24,12 +24,12 @@ private:
     u8 mDepth = 0;
     i16 mScore = 0;
     Bound mBound = Bound::None;
-    u16 mMove = MOVE_NONE.asU16();
+    u16 mMove = 0;
 
 public:
 
     // ttDepth, ttScore, ttBound, ttMove
-    constexpr std::tuple<i32, i32, Bound, Move> get(
+    constexpr std::tuple<std::optional<i32>, std::optional<i32>, Bound, Move> get(
         const u64 zobristHash, const i16 ply) const
     {
         if (mZobristHash != zobristHash || mBound == Bound::None)

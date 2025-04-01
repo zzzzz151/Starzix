@@ -348,11 +348,12 @@ public:
                 const Square square = toSquare(file, rank);
                 const std::optional<PieceType> pt = pieceTypeAt(square);
 
-                if (pt && emptySoFar > 0)
+                if (pt.has_value() && emptySoFar > 0)
                     myFen += std::to_string(emptySoFar);
 
-                if (pt) {
-                    myFen += letterOf(*colorAt(square), *pt);
+                if (pt.has_value())
+                {
+                    myFen += letterOf(colorAt(square).value(), *pt);
                     emptySoFar = 0;
                 }
                 else
@@ -390,7 +391,7 @@ public:
 
         myFen += " ";
 
-        myFen += state().enPassantSquare
+        myFen += state().enPassantSquare.has_value()
                ? squareToStr(*(state().enPassantSquare))
                : "-";
 
@@ -413,7 +414,7 @@ public:
                 const Square square = toSquare(file, rank);
                 const std::optional<PieceType> pt = pieceTypeAt(square);
 
-                std::cout << (pt ? letterOf(*colorAt(square), *pt) : '.')
+                std::cout << (pt.has_value() ? letterOf(colorAt(square).value(), *pt) : '.')
                           << (file == File::H ? '|' : ' ');
             }
 
@@ -451,7 +452,7 @@ public:
 
         return !isOccupied(move.to())
             && move.flag() != MoveFlag::EnPassant
-            && !move.promotion();
+            && !move.promotion().has_value();
     }
 
     constexpr GameState gameState(
@@ -509,14 +510,18 @@ public:
             = std::max<i32>(0, numStates - pliesSincePawnOrCapture - 1);
 
         const i32 rootStateIdx
-            = searchPly ? numStates - static_cast<i32>(*searchPly) - 1 : -1;
+            = searchPly.has_value() ? numStates - static_cast<i32>(*searchPly) - 1 : -1;
 
         size_t count = 0;
 
+        #pragma clang diagnostic push
+        #pragma clang diagnostic ignored "-Wsign-conversion"
+
         for (i32 i = numStates - 3; i >= stateIdxAfterPawnOrCapture; i -= 2)
-            if (mStates[static_cast<size_t>(i)].zobristHash == state().zobristHash
-            && (i > rootStateIdx || ++count == 2))
+            if (mStates[i].zobristHash == zobristHash() && (i > rootStateIdx || ++count == 2))
                 return GameState::Draw;
+
+        #pragma clang diagnostic pop // #pragma clang diagnostic ignored "-Wsign-conversion"
 
         return GameState::Ongoing;
     }
@@ -532,7 +537,8 @@ public:
     constexpr Bitboard pinned()
     {
         // Cached?
-        if (state().pinned) return *(state().pinned);
+        if (state().pinned.has_value())
+            return *(state().pinned);
 
         const Square kingSquare = this->kingSquare();
 
@@ -605,8 +611,8 @@ public:
 
     constexpr Bitboard enemyAttacksNoStmKing()
     {
-        // If cached, return it
-        if (state().enemyAttacksNoStmKing)
+        // Cached?
+        if (state().enemyAttacksNoStmKing.has_value())
             return *(state().enemyAttacksNoStmKing);
 
         // Calculate and cache
@@ -659,7 +665,7 @@ public:
             state().colorToMove = !sideToMove();
             state().zobristHash ^= ZOBRIST_COLOR;
 
-            if (state().enPassantSquare)
+            if (state().enPassantSquare.has_value())
             {
                 const Square enPassantSquare = *(state().enPassantSquare);
                 state().enPassantSquare = std::nullopt;
@@ -704,10 +710,10 @@ public:
         else {
             state().captured = pieceTypeAt(to);
 
-            if (state().captured)
+            if (state().captured.has_value())
                 removePiece(!sideToMove(), *(state().captured), to);
 
-            placePiece(sideToMove(), promotion ? *promotion : pieceType, to);
+            placePiece(sideToMove(), promotion.has_value() ? *promotion : pieceType, to);
         }
 
         state().zobristHash ^= state().castlingRights; // XOR old castling rights out
@@ -728,7 +734,7 @@ public:
         state().zobristHash ^= state().castlingRights; // XOR new castling rights in
 
         // Remove old en passant square if one exists
-        if (state().enPassantSquare)
+        if (state().enPassantSquare.has_value())
         {
             const Square enPassantSquare = *(state().enPassantSquare);
             state().enPassantSquare = std::nullopt;
@@ -746,7 +752,7 @@ public:
         state().colorToMove = !sideToMove();
         state().zobristHash ^= ZOBRIST_COLOR;
 
-        if (pieceType == PieceType::Pawn || state().captured)
+        if (pieceType == PieceType::Pawn || state().captured.has_value())
             state().pliesSincePawnOrCapture = 0;
         else
             state().pliesSincePawnOrCapture++;
@@ -768,10 +774,6 @@ public:
         const Square from = strToSquare(uciMove.substr(0, 2));
         const Square to   = strToSquare(uciMove.substr(2, 2));
 
-        const std::optional<PieceType> pt = pieceTypeAt(from);
-
-        if (!pt) throw std::logic_error("No piece in this square to move");
-
         // Promotion?
         if (uciMove.size() == 5)
         {
@@ -788,12 +790,13 @@ public:
                 return Move(from, to, MoveFlag::QueenPromo);
         }
 
-        MoveFlag moveFlag = asEnum<MoveFlag>(static_cast<i32>(*pt) + 1);
+        const std::optional<PieceType> pt = pieceTypeAt(from);
+        MoveFlag moveFlag = asEnum<MoveFlag>(static_cast<i32>(pt.value()) + 1);
         const i32 squaresTraveled = std::abs(static_cast<i32>(to) - static_cast<i32>(from));
 
-        if (*pt == PieceType::King && squaresTraveled == 2)
+        if (pt.value() == PieceType::King && squaresTraveled == 2)
             moveFlag = MoveFlag::Castling;
-        else if (*pt == PieceType::Pawn)
+        else if (pt.value() == PieceType::Pawn)
         {
             if (isBackrank(squareRank(to)))
                 moveFlag = MoveFlag::QueenPromo;
@@ -825,17 +828,17 @@ public:
 
         const std::optional<PieceType> captured = this->captured(move);
 
-        if (captured)
+        if (captured.has_value())
             score += PIECES_VALUES[*captured];
 
         const std::optional<PieceType> promotion = move.promotion();
 
-        if (promotion)
+        if (promotion.has_value())
             score += PIECES_VALUES[*promotion] - PIECES_VALUES[PieceType::Pawn];
 
         if (score < 0) return false;
 
-        const PieceType next = promotion ? *promotion : move.pieceType();
+        const PieceType next = promotion.has_value() ? *promotion : move.pieceType();
         score -= PIECES_VALUES[next];
 
         if (score >= 0) return true;
@@ -875,30 +878,24 @@ public:
 
             const std::optional<PieceType> optNext = popLeastValuable(ourAttackers);
 
-            if (!optNext) goto attackersUpdated;
-
-            if (*optNext == PieceType::Pawn
-            ||  *optNext == PieceType::Bishop
-            ||  *optNext == PieceType::Queen)
+            if (optNext == PieceType::Pawn
+            ||  optNext == PieceType::Bishop
+            ||  optNext == PieceType::Queen)
                 attackers |= bishopsQueens & getBishopAttacks(to, occ);
 
-            if (*optNext == PieceType::Rook || *optNext == PieceType::Queen)
+            if (optNext == PieceType::Rook || optNext == PieceType::Queen)
                 attackers |= rooksQueens & getRookAttacks(to, occ);
-
-            attackersUpdated:
 
             attackers &= occ;
             ourColor = !ourColor;
 
             score = -score - 1;
 
-            if (optNext) score -= PIECES_VALUES[*optNext];
+            if (optNext.has_value())
+                score -= PIECES_VALUES[*optNext];
 
             // If our only attacker is our king, but the opponent still has defenders
-            if (score >= 0
-            && optNext
-            && *optNext == PieceType::King
-            && (attackers & getBb(ourColor)) > 0)
+            if (score >= 0 && optNext == PieceType::King && (attackers & getBb(ourColor)) > 0)
                 ourColor = !ourColor;
 
             if (score >= 0) break;
@@ -921,7 +918,7 @@ public:
             = std::max<i32>(0, numStates - pliesSincePawnOrCapture - 1);
 
         const i32 rootStateIdx
-            = searchPly ? numStates - static_cast<i32>(*searchPly) - 1 : -1;
+            = searchPly.has_value() ? numStates - static_cast<i32>(*searchPly) - 1 : -1;
 
         u64 otherHash = state().zobristHash
                       ^ mStates[mStates.size() - 2].zobristHash

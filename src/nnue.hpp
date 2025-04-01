@@ -246,7 +246,7 @@ public:
 
         const PieceType pieceType = move.pieceType();
         const std::optional<PieceType> promotion = move.promotion();
-        const PieceType place = promotion ? *promotion : pieceType;
+        const PieceType place = promotion.has_value() ? *promotion : pieceType;
 
         // If king moved, we update mMirrorVAxis[colorMoving]
         // Our vertical axis mirroring toggles if our king just crossed vertical axis
@@ -293,7 +293,7 @@ public:
             const Square newFrom = mMirrorVAxis[color] ? flipFile(from) : from;
             const Square newTo   = mMirrorVAxis[color] ? flipFile(to)   : to;
 
-            if (pos.captured())
+            if (pos.captured().has_value())
             {
                 const PieceType captured = *(pos.captured());
 

@@ -80,10 +80,10 @@ public:
     constexpr const i16& noisyHistory(
         const std::optional<PieceType> captured, const std::optional<PieceType> promotion) const
     {
-        const size_t firstIdx = captured ? static_cast<size_t>(*captured) : 6;
+        const size_t firstIdx = captured.has_value() ? static_cast<size_t>(*captured) : 6;
 
         const size_t secondIdx
-            = promotion
+            = promotion.has_value()
             ? static_cast<size_t>(*promotion) - static_cast<size_t>(PieceType::Knight)
             : 4;
 

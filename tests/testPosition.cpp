@@ -119,12 +119,5 @@ int main() {
     pos.makeMove(MOVE_NONE);
     assert(pos.fen() == "1rq1kbnr/p2b2p1/1p2p2p/3p1pP1/1Q1pP3/1PP4P/P2B1P1R/RN2KBN1 b Qk - 1 15");
 
-    // Position.roughHashAfter()
-    pos = Position("r1b1kbnr/ppp2ppp/2np4/1B2p1q1/3P4/1P2PP2/P1P3PP/RNBQK1NR b KQkq - 0 5");
-    const Move move = Move(Square::G5, Square::E3, MoveFlag::Queen);
-    const auto hashAfter = pos.roughHashAfter(move);
-    pos.makeMove(move);
-    assert(hashAfter == pos.zobristHash());
-
     std::cout << colored("Position tests passed", ColorCode::Green) << std::endl;
 }

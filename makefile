@@ -1,6 +1,6 @@
 CXX := clang++
 WARNINGS := -Wall -Wextra -Werror -Wunused -Wconversion -Wsign-conversion -Wshadow -Wpedantic -Wold-style-cast
-CXXFLAGS := -std=c++23 -O3 -funroll-loops -flto -fuse-ld=lld -fconstexpr-steps=100000000 $(WARNINGS)
+CXXFLAGS := -std=c++23 -O3 -flto -fuse-ld=lld -funroll-loops -fconstexpr-steps=100000000 $(WARNINGS)
 SUFFIX :=
 
 ifeq ($(OS), Windows_NT)
@@ -17,6 +17,8 @@ endif
 
 all:
 	$(CXX) $(CXXFLAGS) -march=native -DNDEBUG src/*.cpp -o $(EXE)$(SUFFIX)
+debug:
+	$(CXX) $(CXXFLAGS) -march=native src/*.cpp -o $(EXE)$(SUFFIX)
 test:
 	$(CXX) $(CXXFLAGS) -march=native tests/testPosition.cpp -o testPosition$(SUFFIX)
 	./testPosition$(SUFFIX)
@@ -27,7 +29,7 @@ test:
 	$(CXX) $(CXXFLAGS) -march=native tests/testGameState.cpp -o testGameState$(SUFFIX)
 	./testGameState$(SUFFIX)
 
-	$(CXX) $(CXXFLAGS) -march=native tests/testSEE.cpp -o testSEE$(SUFFIX)
+	$(CXX) $(CXXFLAGS) -march=native -DTUNE tests/testSEE.cpp -o testSEE$(SUFFIX)
 	./testSEE$(SUFFIX)
 
 	$(CXX) $(CXXFLAGS) -march=native tests/testNNUE.cpp -o testNNUE$(SUFFIX)

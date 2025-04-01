@@ -113,17 +113,15 @@ constexpr std::array<i16*, 4> getCorrHists(ThreadData* td)
     };
 }
 
-constexpr i32 getEval(ThreadData* td, const size_t ply)
+constexpr i32 getEval(ThreadData* td, PlyData& plyData)
 {
-    std::optional<i32>& eval = td->pliesData[ply].eval;
-
     if (td->pos.inCheck())
-        eval = 0;
-    else if (!eval)
+        plyData.eval = 0;
+    else if (!plyData.eval.has_value())
     {
         updateBothAccs(td);
 
-        eval = nnue::evaluate(td->bothAccsStack[td->bothAccsIdx], td->pos.sideToMove());
+        plyData.eval = nnue::evaluate(td->bothAccsStack[td->bothAccsIdx], td->pos.sideToMove());
 
         // Adjust eval with correction histories
 
@@ -139,13 +137,13 @@ constexpr i32 getEval(ThreadData* td, const size_t ply)
         if (lastMoveCorr != nullptr)
             correction += static_cast<float>(*lastMoveCorr) * corrHistLastMoveWeight();
 
-        *eval += lround(correction);
+        *(plyData.eval) += lround(correction);
 
         // Clamp eval to avoid invalid values and checkmate values
-        eval = std::clamp<i32>(*eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
+        plyData.eval = std::clamp<i32>(*(plyData.eval), -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
     }
 
-    return *eval;
+    return *(plyData.eval);
 }
 
 constexpr void makeMove(

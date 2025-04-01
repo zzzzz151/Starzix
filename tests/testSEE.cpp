@@ -7,6 +7,11 @@
 int main() {
     std::cout << colored("Running SEE tests...", ColorCode::Yellow) << std::endl;
 
+    pawnValue.value  = 100;
+    minorValue.value = 300;
+    rookValue.value  = 500;
+    queenValue.value = 900;
+
     std::ifstream inputFile("tests/SEE.txt");
     assert(inputFile.is_open());
 

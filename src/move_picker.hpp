@@ -28,7 +28,7 @@ public:
         static_assert(moveGenType != MoveGenType::AllMoves);
 
         // Already generated and scored?
-        if (mIdx) return;
+        if (mIdx.has_value()) return;
 
         // Generate pseudolegal moves
         mMoves = pseudolegalMoves<moveGenType>(pos);
@@ -50,42 +50,39 @@ public:
 
             if constexpr (moveGenType == MoveGenType::NoisyOnly)
             {
+                const EnumArray<std::optional<i32>, PieceType> PROMO_SCORE = {
+                    std::nullopt, // P
+                    -30'000,      // N
+                    -50'000,      // B
+                    -40'000,      // R
+                    doSEE ? std::nullopt : std::optional<i32>(20'000), // Q
+                    std::nullopt  // K
+                };
+
                 const std::optional<PieceType> captured = pos.captured(move);
                 const std::optional<PieceType> promo    = move.promotion();
 
-                if (doSEE) {
-                    constexpr EnumArray<std::optional<i32>, PieceType> UNDERPROMO_SCORE = {
-                    //       P           N        B        R          Q             K
-                        std::nullopt, -30'000, -50'000, -40'000, std::nullopt, std::nullopt
-                    };
-
-                    const i32 noisyHist = histEntry.noisyHistory(captured, move.promotion());
+                if (!doSEE)
+                    mScores[i] = promo.has_value() ? *(PROMO_SCORE[*promo]) : 10'000;
+                else if (promo.has_value())
+                {
+                    mScores[i] = promo == PieceType::Queen
+                               ? (pos.SEE(move) ? 30'000 : -10'000)
+                               : *(PROMO_SCORE[*promo]);
+                }
+                else {
+                    const i32 noisyHist = histEntry.noisyHistory(captured, promo);
 
                     const i32 threshold = static_cast<i32>(lround(
                         static_cast<float>(-noisyHist) * seeNoisyHistMul()
                     ));
 
-                    mScores[i] = promo && *promo != PieceType::Queen
-                               // Underpromotion
-                               ? *(UNDERPROMO_SCORE[*promo])
-                               : promo
-                               // Queen promotion
-                               ? (pos.SEE(move) ? 30'000 : -10'000)
-                               // Capture without promotion
-                               : 20'000 * (pos.SEE(move, threshold) ? 1 : -1);
-                }
-                else {
-                    constexpr EnumArray<std::optional<i32>, PieceType> PROMO_SCORE = {
-                        //   P           N        B        R       Q          K
-                        std::nullopt, -30'000, -50'000, -40'000, 20'000, std::nullopt
-                    };
-
-                    mScores[i] = promo ? *(PROMO_SCORE[*promo]) : 10'000;
+                    mScores[i] = 20'000 * (pos.SEE(move, threshold) ? 1 : -1);
                 }
 
-                // MVVLVA (most valuable victim, least valuable attacker)
+                // MVVLVA (Most valuable victim, least valuable attacker)
 
-                const i32 iCaptured = captured ? static_cast<i32>(*captured) + 1 : 0;
+                const i32 iCaptured = captured.has_value() ? static_cast<i32>(*captured) + 1 : 0;
 
                 const PieceType pt = move.pieceType();
                 const i32 iPieceType = pt == PieceType::King ? 0 : static_cast<i32>(pt) + 1;
@@ -104,9 +101,9 @@ public:
     // Incremental selection sort
     constexpr std::pair<Move, i32> next()
     {
-        assert(mIdx);
+        assert(mIdx.has_value());
 
-        if (*mIdx >= mMoves.size())
+        if (mIdx >= mMoves.size())
             return { MOVE_NONE, 0 };
 
         size_t bestIdx = *mIdx;
@@ -206,6 +203,7 @@ public:
             mKillerDone = true;
 
             if (mKiller
+            && mKiller != mTtMove
             && mKiller != mExcludedMove
             && pos.isQuiet(mKiller)
             && isPseudolegal(pos, mKiller)

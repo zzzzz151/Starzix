@@ -50,7 +50,10 @@ public:
         assert(pieceType() != PieceType::Pawn || !isBackrank(squareRank(from)));
 
         // Pawn must promote
-        assert(pieceType() != PieceType::Pawn || !isBackrank(squareRank(to)) || promotion());
+        assert(pieceType() != PieceType::Pawn
+            || !isBackrank(squareRank(to))
+            || promotion().has_value()
+        );
     }
 
     inline Move(std::string from, std::string to, MoveFlag flag)
@@ -105,7 +108,7 @@ public:
     constexpr bool isUnderpromotion() const
     {
         const std::optional<PieceType> promo = promotion();
-        return promo && *promo != PieceType::Queen;
+        return promo.has_value() && promo != PieceType::Queen;
     }
 
     inline std::string toUci() const
@@ -165,9 +168,9 @@ static_assert(Move(Square::E1, Square::G1, MoveFlag::Castling)
 
 // Test Move.promotion()
 
-static_assert(!Move(Square::D4, Square::D5, MoveFlag::Pawn)          .promotion());
-static_assert(!Move(Square::D2, Square::D4, MoveFlag::PawnDoublePush).promotion());
-static_assert(!Move(Square::D5, Square::E6, MoveFlag::EnPassant)     .promotion());
+static_assert(!Move(Square::D4, Square::D5, MoveFlag::Pawn)          .promotion().has_value());
+static_assert(!Move(Square::D2, Square::D4, MoveFlag::PawnDoublePush).promotion().has_value());
+static_assert(!Move(Square::D5, Square::E6, MoveFlag::EnPassant)     .promotion().has_value());
 
 static_assert(Move(Square::A2, Square::A1, MoveFlag::KnightPromo)
     .promotion() == PieceType::Knight);
@@ -175,8 +178,8 @@ static_assert(Move(Square::A2, Square::A1, MoveFlag::KnightPromo)
 static_assert(Move(Square::A2, Square::A1, MoveFlag::QueenPromo)
     .promotion() == PieceType::Queen);
 
-static_assert(!Move(Square::B1, Square::C3, MoveFlag::Knight)        .promotion());
-static_assert(!Move(Square::E1, Square::G1, MoveFlag::Castling)      .promotion());
+static_assert(!Move(Square::B1, Square::C3, MoveFlag::Knight)  .promotion().has_value());
+static_assert(!Move(Square::E1, Square::G1, MoveFlag::Castling).promotion().has_value());
 
 // Test Move.isUnderpromotion()
 static_assert(!Move(Square::D4, Square::D5, MoveFlag::Pawn)      .isUnderpromotion());
