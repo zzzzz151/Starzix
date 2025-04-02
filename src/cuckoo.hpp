@@ -22,7 +22,7 @@ struct CuckooData
 {
 public:
     std::array<u64, 8192>  hashes = { };
-    std::array<Move, 8192> moves  = { };
+    std::array<Move, 8192> moves  = makeArray<Move, 8192>(MOVE_NONE);
 };
 
 constexpr CuckooData CUCKOO_DATA = [] () consteval

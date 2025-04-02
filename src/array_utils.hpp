@@ -5,6 +5,14 @@
 #include <array>
 #include <cassert>
 
+template<typename T, std::size_t N>
+constexpr std::array<T, N> makeArray(const T value)
+{
+    std::array<T, N> arr;
+    arr.fill(value);
+    return arr;
+}
+
 // EnumArray
 
 template<typename T, typename... Es>

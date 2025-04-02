@@ -18,7 +18,7 @@ struct Move
 private:
 
     // 16 bits: ffffff tttttt FFFF (f = from, t = to, F = flag)
-    u16 mMove = 0;
+    u16 mMove;
 
 public:
 
@@ -34,7 +34,7 @@ public:
         return mMove != other.mMove;
     }
 
-    constexpr Move() = default;
+    constexpr Move() { } // Does not init mMove
 
     constexpr Move(const u16 move) {
         mMove = move;
@@ -133,7 +133,7 @@ public:
 
 }; // struct Move
 
-constexpr Move MOVE_NONE = Move();
+constexpr Move MOVE_NONE = Move(0);
 
 static_assert(sizeof(Move) == 2); // 2 bytes
 
