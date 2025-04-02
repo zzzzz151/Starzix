@@ -102,7 +102,7 @@ public:
             && mUpdated == other.mUpdated;
     }
 
-    constexpr BothAccumulators() = default;
+    constexpr BothAccumulators() { } // Does not init member vars
 
     constexpr BothAccumulators(const Position& pos)
     {
