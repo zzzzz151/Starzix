@@ -507,10 +507,16 @@ private:
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::Upper;
 
+        struct MoveAndPiece
+        {
+        public:
+            Move move;
+            PieceType pieceType;
+        };
+
         // Keep track of moves that fail low
-        // For noisy moves, also remember the captured piece type (none for non-capture promotions)
-        ArrayVec<Move, 256> failLowQuiets;
-        ArrayVec<std::pair<Move, std::optional<PieceType>>, 256> failLowNoisies;
+        ArrayVec<Move, 256>         failLowQuiets;
+        ArrayVec<MoveAndPiece, 256> failLowNoisies;
 
         // Moves loop
         MovePicker mp = MovePicker(false, ttMove, plyData.killer, singularMove);
@@ -661,10 +667,12 @@ private:
             // Fail low?
             if (score <= alpha)
             {
-                if (td->pos.isQuiet(move))
+                if (isQuiet)
                     failLowQuiets.push_back(move);
-                else
-                    failLowNoisies.push_back({ move, captured });
+                else {
+                    const PieceType pt = captured.value_or(PieceType::King);
+                    failLowNoisies.push_back(MoveAndPiece{ .move = move, .pieceType = pt });
+                }
 
                 continue;
             }
@@ -704,8 +712,11 @@ private:
             );
 
             // Decrease history of fail low noisy moves
-            for (const auto [mov, optCaptured] : failLowNoisies)
+            for (const auto [mov, pt] : failLowNoisies)
             {
+                std::optional<PieceType> optCaptured
+                    = pt != PieceType::King ? std::optional<PieceType>(pt) : std::nullopt;
+
                 td->historyTable[td->pos.sideToMove()][mov.pieceType()][mov.to()]
                     .updateNoisyHistory(optCaptured, mov.promotion(), histMalus);
             }
