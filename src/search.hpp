@@ -850,8 +850,9 @@ private:
 
             if (!move) break;
 
-            // Prune underpromotions
-            if (bestScore > -MIN_MATE_SCORE && move.isUnderpromotion())
+            // If in check and found non-losing move, only search good noisy moves
+            // Always prune underpromotions
+            if (bestScore > -MIN_MATE_SCORE && (td->pos.isQuiet(move) || moveScore < 0))
                 break;
 
             // SEE pruning (skip bad noisy moves)
