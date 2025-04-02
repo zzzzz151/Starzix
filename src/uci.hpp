@@ -96,6 +96,29 @@ inline void runCommand(std::string& command, Position& pos, Searcher& searcher)
         pos.makeMove(tokens[1]);
     else if (command == "undomove" && pos.lastMove())
         pos.undoMove();
+    else if (command == "movepicker")
+    {
+        const std::unique_ptr<HistoryTable> historyTable = std::make_unique<HistoryTable>();
+
+        const auto printMoves = [&] (const bool noisiesOnly) constexpr
+        {
+            MovePicker mp = MovePicker(noisiesOnly, MOVE_NONE, MOVE_NONE);
+
+            while (true) {
+                const auto [move, moveScore] = mp.nextLegal(pos, *historyTable);
+
+                if (!move) break;
+
+                std::cout << move.toUci() << ": " << moveScore << std::endl;
+            }
+        };
+
+        std::cout << "All moves" << std::endl;
+        printMoves(false);
+
+        std::cout << "\nNoisy moves" << std::endl;
+        printMoves(true);
+    }
     #if defined(TUNE)
     else if (command == "spsainput")
         printSpsaInput();

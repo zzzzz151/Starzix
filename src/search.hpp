@@ -516,7 +516,7 @@ private:
         MovePicker mp = MovePicker(false, ttMove, plyData.killer, singularMove);
         while (true)
         {
-            // Move, std::optional<i32>
+            // Move, i32
             const auto [move, moveScore] = mp.nextLegal(td->pos, td->historyTable);
 
             if (!move) break;
@@ -527,13 +527,10 @@ private:
             legalMovesSeen++;
 
             const bool isQuiet = td->pos.isQuiet(move);
-
-            const float quietHistory = static_cast<float>(
-                isQuiet && moveScore.has_value() ? *moveScore : 0
-            );
+            const float quietHistory = static_cast<float>(isQuiet ? moveScore : 0);
 
             // Moves loop pruning at shallow depths
-            if (!isRoot && bestScore > -MIN_MATE_SCORE && (isQuiet || moveScore.value() < 0))
+            if (!isRoot && bestScore > -MIN_MATE_SCORE && (isQuiet || moveScore < 0))
             {
                 // LMP (Late move pruning)
                 if (legalMovesSeen > static_cast<size_t>(3 + depth * depth))
@@ -598,7 +595,7 @@ private:
             i32 score = 0;
 
             // LMR (Late move reductions)
-            if (depth >= 2 && legalMovesSeen > 1 + isRoot && (isQuiet || moveScore.value() < 0))
+            if (depth >= 2 && legalMovesSeen > 1 + isRoot && (isQuiet || moveScore < 0))
             {
                 // Base reduction
                 i32 r = LMR_TABLE[static_cast<size_t>(depth)][isQuiet][legalMovesSeen];
@@ -837,7 +834,7 @@ private:
         MovePicker mp = MovePicker(!td->pos.inCheck(), MOVE_NONE, td->pliesData[ply].killer);
         while (true)
         {
-            // Move, std::optional<i32>
+            // Move, i32
             const auto [move, moveScore] = mp.nextLegal(td->pos, td->historyTable);
 
             if (!move) break;
