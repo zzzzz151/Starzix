@@ -470,11 +470,8 @@ private:
         // Node pruning
         if (!isPvNode && !td->pos.inCheck() && !singularMove)
         {
-            const bool oppWorsening
-                = !isRoot
-                && !td->pos.inCheck()
-                && !td->pliesData[ply - 1].inCheck
-                && eval > -td->pliesData[ply - 1].eval.value();
+            const PlyData& prevPlyData = td->pliesData[ply - 1];
+            const bool oppWorsening = !prevPlyData.inCheck && eval > -prevPlyData.eval.value();
 
             // RFP (Reverse futility pruning)
             if (depth <= 7
