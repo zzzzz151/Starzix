@@ -210,6 +210,7 @@ public:
         for (ThreadData* td : mThreadsData)
         {
             td->pliesData[0] = PlyData();
+            td->pliesData[0].inCheck = td->pos.inCheck();
             td->nodesByMove = { };
             td->bothAccsIdx = 0;
 
@@ -469,10 +470,16 @@ private:
         // Node pruning
         if (!isPvNode && !td->pos.inCheck() && !singularMove)
         {
+            const bool oppWorsening
+                = !isRoot
+                && !td->pos.inCheck()
+                && !td->pliesData[ply - 1].inCheck
+                && eval > -td->pliesData[ply - 1].eval.value();
+
             // RFP (Reverse futility pruning)
             if (depth <= 7
             && std::abs(beta) < MIN_MATE_SCORE
-            && eval - beta >= depth * rfpDepthMul())
+            && eval - beta >= std::max<i32>(depth - oppWorsening, 1) * rfpDepthMul())
                 return (eval + beta) / 2;
 
             // Razoring
