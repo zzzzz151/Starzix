@@ -18,7 +18,7 @@ int main(int argc, char* argv[])
     #endif
 
     Position pos = START_POS;
-    Searcher searcher = Searcher();
+    Searcher searcher = { };
     printTTSize(searcher.mTT);
 
     // If a command is passed in program args, run it and exit

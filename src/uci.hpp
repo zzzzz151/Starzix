@@ -235,7 +235,7 @@ constexpr void position(const std::vector<std::string>& tokens, Position& pos)
 constexpr void go(
     const std::vector<std::string>& tokens, Position& pos, Searcher& searcher)
 {
-    SearchConfig searchConfig = SearchConfig();
+    SearchConfig searchConfig = { };
 
     [[maybe_unused]] u64 incrementMs = 0;
     bool isMoveTime = false;

@@ -209,7 +209,7 @@ public:
 
         for (ThreadData* td : mThreadsData)
         {
-            td->pliesData[0] = PlyData();
+            td->pliesData[0] = { };
             td->pliesData[0].inCheck = td->pos.inCheck();
             td->nodesByMove = { };
             td->bothAccsIdx = 0;
