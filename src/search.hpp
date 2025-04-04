@@ -470,8 +470,10 @@ private:
         if (!isPvNode && !td->pos.inCheck() && !singularMove)
         {
             // RFP (Reverse futility pruning)
-            if (depth <= 7 && eval - beta >= depth * rfpDepthMul())
-                return eval;
+            if (depth <= 7
+            && std::abs(beta) < MIN_MATE_SCORE
+            && eval - beta >= depth * rfpDepthMul())
+                return (eval + beta) / 2;
 
             // Razoring
             if (alpha - eval > razoringBase() + depth * depth * razoringDepthMul())
