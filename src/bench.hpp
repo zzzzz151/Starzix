@@ -63,9 +63,9 @@ constexpr std::array BENCH_FENS {
 
 inline void bench(const i32 depth = 15)
 {
-    Searcher searcher = Searcher();
+    Searcher searcher = { };
 
-    SearchConfig searchConfig = SearchConfig();
+    SearchConfig searchConfig = { };
     searchConfig.setMaxDepth(depth);
     searchConfig.printInfo = false;
 

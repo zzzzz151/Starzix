@@ -208,9 +208,9 @@ consteval Bitboard rookAttacksSlow(const Square square, const Bitboard occupied)
 struct MagicEntry
 {
 public:
-    Bitboard attacksEmptyBoardNoEdges = 0;
-    u64 magic = 0;
-    u64 shift = 0;
+    Bitboard attacksEmptyBoardNoEdges;
+    u64 magic;
+    u64 shift;
 };
 
 // [square]
@@ -236,7 +236,7 @@ constexpr EnumArray<MagicEntry, Square> BISHOP_MAGIC_ENTRIES = [] () consteval
         0x1000042304105ULL, 0x10008830412a00ULL, 0x2520081090008908ULL, 0x40102000a0a60140ULL,
     };
 
-    EnumArray<MagicEntry, Square> bishopMagicEntries = { };
+    EnumArray<MagicEntry, Square> bishopMagicEntries;
 
     for (const Square square : EnumIter<Square>())
     {
@@ -279,7 +279,7 @@ constexpr EnumArray<MagicEntry, Square> ROOK_MAGIC_ENTRIES = [] () consteval
         0x489a000810200402ULL, 0x1004400080a13ULL, 0x4000011008020084ULL, 0x26002114058042ULL,
     };
 
-    EnumArray<MagicEntry, Square> rookMagicEntries = { };
+    EnumArray<MagicEntry, Square> rookMagicEntries;
 
     for (const Square square : EnumIter<Square>())
     {

@@ -18,6 +18,7 @@ struct PlyData
 {
 public:
 
+    bool inCheck;
     ArrayVec<Move, MAX_DEPTH + 1> pvLine;
     std::optional<i32> eval = std::nullopt;
     Move killer = MOVE_NONE;
@@ -164,6 +165,7 @@ constexpr void makeMove(
     td->maxPlyReached = std::max<size_t>(td->maxPlyReached, newPly);
 
     PlyData& newPlyData = td->pliesData[newPly];
+    newPlyData.inCheck = td->pos.inCheck();
     newPlyData.pvLine.clear();
     newPlyData.eval = std::nullopt;
 
