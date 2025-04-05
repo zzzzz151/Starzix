@@ -513,16 +513,10 @@ private:
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::Upper;
 
-        struct MoveAndPiece
-        {
-        public:
-            Move move;
-            PieceType pieceType;
-        };
-
         // Keep track of moves that fail low
-        ArrayVec<Move, 256>         failLowQuiets;
-        ArrayVec<MoveAndPiece, 256> failLowNoisies;
+        ArrayVec<Move, 256> failLowQuiets;
+        ArrayVec<Move, 256> failLowNoisies;
+        ArrayVec<PieceType, 256> capturedArray;
 
         // Moves loop
         MovePicker mp = MovePicker(false, ttMove, plyData.killer, singularMove);
@@ -673,12 +667,9 @@ private:
             // Fail low?
             if (score <= alpha)
             {
-                if (isQuiet)
-                    failLowQuiets.push_back(move);
-                else {
-                    const PieceType pt = captured.value_or(PieceType::King);
-                    failLowNoisies.push_back(MoveAndPiece{ .move = move, .pieceType = pt });
-                }
+                (isQuiet ? failLowQuiets : failLowNoisies).push_back(move);
+
+                if (!isQuiet) capturedArray.push_back(captured.value_or(PieceType::King));
 
                 continue;
             }
@@ -718,13 +709,17 @@ private:
             );
 
             // Decrease history of fail low noisy moves
-            for (const auto [mov, pt] : failLowNoisies)
+            for (size_t i = 0; i < failLowNoisies.size(); i++)
             {
-                std::optional<PieceType> optCaptured
-                    = pt != PieceType::King ? std::optional<PieceType>(pt) : std::nullopt;
+                const auto [move2, captured2]
+                    = std::pair<Move, PieceType>{ failLowNoisies[i], capturedArray[i] };
 
-                td->historyTable[td->pos.sideToMove()][mov.pieceType()][mov.to()]
-                    .updateNoisyHistory(optCaptured, mov.promotion(), histMalus);
+                HistoryEntry& histEntry2
+                    = td->historyTable[td->pos.sideToMove()][move2.pieceType()][move2.to()];
+
+                histEntry2.updateNoisyHistory(
+                    std::optional<PieceType>(captured2), move2.promotion(), histMalus
+                );
             }
 
             if (!isQuiet) {
@@ -741,10 +736,12 @@ private:
             histEntry.updateQuietHistories(td->pos, move, histBonus);
 
             // Decrease quiet histories of fail low quiet moves
-            for (const Move m : failLowQuiets)
+            for (const Move move2 : failLowQuiets)
             {
-                td->historyTable[td->pos.sideToMove()][m.pieceType()][m.to()]
-                    .updateQuietHistories(td->pos, m, histMalus);
+                HistoryEntry& histEntry2
+                    = td->historyTable[td->pos.sideToMove()][move2.pieceType()][move2.to()];
+
+                histEntry2.updateQuietHistories(td->pos, move2, histMalus);
             }
 
             break;

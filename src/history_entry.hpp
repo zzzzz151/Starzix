@@ -28,7 +28,7 @@ private:
 
     EnumArray<i16, Color, PieceType, Square> mContHist = { };
 
-    MultiArray<i16, 7, 5> mNoisyHist = { }; // [pieceTypeCaptured][promotionPieceType]
+    EnumArray<i16, PieceType, PieceType> mNoisyHist = { }; // [captured][promotion] (King if none)
 
     // Main history, 1-ply cont hist, 2-ply cont hist
     constexpr const std::array<const i16*, 3> quietHistoriesPtrs(
@@ -77,17 +77,10 @@ public:
             updateHistory(const_cast<i16*>(historyPtr), bonus);
     }
 
-    constexpr const i16& noisyHistory(
+    constexpr i32 noisyHistory(
         const std::optional<PieceType> captured, const std::optional<PieceType> promotion) const
     {
-        const size_t firstIdx = captured.has_value() ? static_cast<size_t>(*captured) : 6;
-
-        const size_t secondIdx
-            = promotion.has_value()
-            ? static_cast<size_t>(*promotion) - static_cast<size_t>(PieceType::Knight)
-            : 4;
-
-        return mNoisyHist[firstIdx][secondIdx];
+        return mNoisyHist[captured.value_or(PieceType::King)][promotion.value_or(PieceType::King)];
     }
 
     constexpr void updateNoisyHistory(
@@ -95,8 +88,10 @@ public:
         const std::optional<PieceType> promotion,
         const i32 bonus)
     {
-        const i16& noisyHist = noisyHistory(captured, promotion);
-        updateHistory(const_cast<i16*>(&noisyHist), bonus);
+        i16& noisyHist
+            = mNoisyHist[captured.value_or(PieceType::King)][promotion.value_or(PieceType::King)];
+
+        updateHistory(&noisyHist, bonus);
     }
 
 }; // struct HistoryEntry
