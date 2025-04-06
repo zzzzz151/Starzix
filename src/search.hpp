@@ -547,7 +547,7 @@ private:
 
                 // FP (Futility pruning)
                 if (!td->pos.inCheck()
-                && lmrDepth <= 6
+                && lmrDepth <= 7
                 && legalMovesSeen > 2
                 && alpha < MIN_MATE_SCORE
                 && alpha - eval > fpBase() + std::max<i32>(lmrDepth, 1) * fpDepthMul())
