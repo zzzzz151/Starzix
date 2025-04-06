@@ -203,19 +203,19 @@ public:
 
         constexpr EnumArray<std::optional<i32>, PieceType> PROMO_SCORE = {
             std::nullopt, // P
-            -30'000,      // N
-            -50'000,      // B
-            -40'000,      // R
-            20'000,       // Q
-            std::nullopt  // K
+            -3, // N
+            -5, // B
+            -4, // R
+            2,  // Q
+            std::nullopt // K
         };
 
         if (mNoisiesOnly)
-            score = promo.has_value() ? PROMO_SCORE[*promo].value() : 10'000;
+            score = promo.has_value() ? PROMO_SCORE[*promo].value() : 1;
         else if (promo.has_value())
         {
             score = promo == PieceType::Queen
-                  ? (pos.SEE(move) ? 30'000 : -10'000)
+                  ? (pos.SEE(move) ? 3 : -1)
                   : PROMO_SCORE[*promo].value();
         }
         else {
@@ -228,8 +228,10 @@ public:
                 static_cast<float>(-noisyHist) * seeNoisyHistMul()
             ));
 
-            score = 20'000 * (pos.SEE(move, threshold) ? 1 : -1);
+            score = 2 * (pos.SEE(move, threshold) ? 1 : -1);
         }
+
+        score *= 10'000;
 
         // MVVLVA (most valuable victim, least valuable attacker)
 
