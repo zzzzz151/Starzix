@@ -146,7 +146,7 @@ inline bool runCommand(std::string &command, Searcher &searcher)
 }
 
 inline void uci() {
-    std::cout << "id name Starzix" << std::endl;
+    std::cout << "id name Starzix 6.1" << std::endl;
     std::cout << "id author zzzzz" << std::endl;
     std::cout << "option name Hash type spin default 32 min 1 max 131072" << std::endl;
     std::cout << "option name Threads type spin default 1 min 1 max 512" << std::endl;
