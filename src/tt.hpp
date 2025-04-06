@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <cstring>
 #include "utils.hpp"
 #include "move.hpp"
 #include "search_params.hpp"
@@ -16,7 +17,7 @@ struct TTEntry {
     u64 zobristHash = 0;
     i16 score = 0;
     u16 move = MOVE_NONE.encoded();
-    u16 depthBoundAge; // from lowest to highest bits: 7 for depth, 2 for bound, 7 for age
+    u16 depthBoundAge = 0; // from lowest to highest bits: 7 for depth, 2 for bound, 7 for age
 
     constexpr i32 depth() const {
         return depthBoundAge & 0b1111111;
@@ -82,7 +83,7 @@ inline void printTTSize(const std::vector<TTEntry> &tt)
 
 constexpr void resizeTT(std::vector<TTEntry> &tt, i64 newSizeMB)
 {
-    newSizeMB = std::clamp(newSizeMB, (i64)1, (i64)65536);
+    newSizeMB = std::max(newSizeMB, (i64)1);
     const u64 numEntries = (u64)newSizeMB * 1024 * 1024 / (u64)sizeof(TTEntry);
 
     tt.clear(); // remove all elements
@@ -92,8 +93,5 @@ constexpr void resizeTT(std::vector<TTEntry> &tt, i64 newSizeMB)
 
 constexpr void resetTT(std::vector<TTEntry> &tt)
 {
-    const auto numEntries = tt.size();
-    tt.clear(); // remove all elements
-    tt.resize(numEntries);
-    tt.shrink_to_fit();
+    std::memset(tt.data(), 0, tt.size() * sizeof(TTEntry));
 }

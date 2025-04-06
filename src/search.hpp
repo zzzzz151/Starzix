@@ -115,7 +115,7 @@ class Searcher {
 
     inline int setThreads(int numThreads)
     {
-        numThreads = std::clamp(numThreads, 0, 256);
+        numThreads = std::max(numThreads, 0);
 
         blockUntilSleep();
 
