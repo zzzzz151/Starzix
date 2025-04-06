@@ -210,6 +210,11 @@ public:
             std::nullopt // K
         };
 
+        const HistoryEntry& histEntry
+            = historyTable[pos.sideToMove()][move.pieceType()][move.to()];
+
+        const i32 noisyHist = histEntry.noisyHistory(captured, promo);
+
         if (mNoisiesOnly)
             score = promo.has_value() ? PROMO_SCORE[*promo].value() : 1;
         else if (promo.has_value())
@@ -219,11 +224,6 @@ public:
                   : PROMO_SCORE[*promo].value();
         }
         else {
-            const HistoryEntry& histEntry
-                = historyTable[pos.sideToMove()][move.pieceType()][move.to()];
-
-            const i32 noisyHist = histEntry.noisyHistory(captured, promo);
-
             const i32 threshold = static_cast<i32>(lround(
                 static_cast<float>(-noisyHist) * seeNoisyHistMul()
             ));
@@ -231,16 +231,10 @@ public:
             score = 2 * (pos.SEE(move, threshold) ? 1 : -1);
         }
 
-        score *= 10'000;
-
-        // MVVLVA (most valuable victim, least valuable attacker)
-
+        // MVV (most valuable victim)
         const i32 iCaptured = captured.has_value() ? static_cast<i32>(*captured) + 1 : 0;
 
-        const PieceType pt = move.pieceType();
-        const i32 iPieceType = pt == PieceType::King ? 0 : static_cast<i32>(pt) + 1;
-
-        return score + iCaptured * 100 - iPieceType;
+        return score * 100'000 + noisyHist + iCaptured;
     }
 
 }; // class MovePicker
