@@ -571,7 +571,7 @@ private:
             if (!isRoot
             && move == ttMove
             && static_cast<i32>(ply) < td->rootDepth * 2
-            && depth >= 8
+            && depth >= 6
             && ttDepth >= depth - 3
             && std::abs(ttScore.value()) < MIN_MATE_SCORE
             && ttBound == Bound::Lower)
