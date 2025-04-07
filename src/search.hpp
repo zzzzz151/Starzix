@@ -691,7 +691,7 @@ private:
 
             if (score < beta) continue;
 
-            // We have a fail high
+            // This move failed high
 
             bound = Bound::Lower;
 
@@ -722,7 +722,8 @@ private:
                 );
             }
 
-            if (!isQuiet) {
+            if (!isQuiet)
+            {
                 // Increase history of this fail high noisy move
                 histEntry.updateNoisyHistory(captured, move.promotion(), histBonus);
                 break;
@@ -732,10 +733,10 @@ private:
 
             plyData.killer = move;
 
-            // Increase quiet histories of this fail high quiet move
+            // Increase histories of this fail high quiet move
             histEntry.updateQuietHistories(td->pos, move, histBonus);
 
-            // Decrease quiet histories of fail low quiet moves
+            // Decrease histories of fail low quiet moves
             for (const Move move2 : failLowQuiets)
             {
                 HistoryEntry& histEntry2
