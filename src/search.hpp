@@ -598,7 +598,7 @@ private:
 
             // PVS (Principal variation search)
 
-            i32 score = 0;
+            i32 score = 0, numFailHighs = 0;
 
             // LMR (Late move reductions)
             if (depth >= 2 && legalMovesSeen > 1 + isRoot && (isQuiet || moveScore < 0))
@@ -622,6 +622,8 @@ private:
                     td, reducedDepth, ply + 1, -alpha - 1, -alpha
                 );
 
+                numFailHighs += score > alpha;
+
                 if (score > alpha && reducedDepth < newDepth)
                 {
                     // Deeper or shallower research?
@@ -635,6 +637,8 @@ private:
                     score = -search<false, false, !isCutNode>(
                         td, newDepth, ply + 1, -alpha - 1, -alpha
                     );
+
+                    numFailHighs += score > alpha;
                 }
             }
             else if (!isPvNode || legalMovesSeen > 1)
@@ -643,11 +647,16 @@ private:
                 score = -search<false, false, !isCutNode>(
                     td, newDepth, ply + 1, -alpha - 1, -alpha
                 );
+
+                numFailHighs += score > alpha;
             }
 
             // Full window search
             if (isPvNode && (legalMovesSeen == 1 || score > alpha))
+            {
                 score = -search<false, true, false>(td, newDepth, ply + 1, -beta, -alpha);
+                numFailHighs += score >= beta;
+            }
 
             undoMove(td);
 
@@ -700,9 +709,11 @@ private:
             HistoryEntry& histEntry
                 = td->historyTable[td->pos.sideToMove()][move.pieceType()][move.to()];
 
-            const i32 histBonus = std::clamp<i32>(
+            i32 histBonus = std::clamp<i32>(
                 depth * historyBonusMul() - historyBonusOffset(), 0, historyBonusMax()
             );
+
+            histBonus *= numFailHighs;
 
             const i32 histMalus = -std::clamp<i32>(
                 depth * historyMalusMul() - historyMalusOffset(), 0, historyMalusMax()
