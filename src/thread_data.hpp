@@ -90,27 +90,34 @@ constexpr void updateBothAccs(ThreadData* td)
     }
 }
 
-constexpr std::array<i16*, 4> getCorrHists(ThreadData* td)
+constexpr auto corrHistsPtrs(ThreadData* td)
 {
     const size_t whiteNonPawnsIdx = td->pos.nonPawnsHash(Color::White) % CORR_HIST_SIZE;
     const size_t blackNonPawnsIdx = td->pos.nonPawnsHash(Color::Black) % CORR_HIST_SIZE;
 
-    i16* lastMoveCorrHistPtr = nullptr;
-    const Move lastMove = td->pos.lastMove();
+    Move prevMove = td->pos.lastMove();
+    i16* lastMoveCorrPtr = nullptr;
+    i16* contCorrPtr     = nullptr;
 
-    if (lastMove)
+    if (prevMove)
     {
-        HistoryEntry& historyEntry
-            = td->historyTable[td->pos.sideToMove()][lastMove.pieceType()][lastMove.to()];
+        HistoryEntry& histEntry
+            = td->historyTable[td->pos.sideToMove()][prevMove.pieceType()][prevMove.to()];
 
-        lastMoveCorrHistPtr = &(historyEntry.mCorrHist);
+        lastMoveCorrPtr = &(histEntry.mCorrHist);
+
+        prevMove = td->pos.nthToLastMove(2);
+
+        if (prevMove)
+            contCorrPtr = &(histEntry.mContCorrHist[prevMove.pieceType()][prevMove.to()]);
     }
 
-    return {
+    return std::array {
         &(td->pawnsCorrHist[td->pos.sideToMove()][td->pos.pawnsHash() % CORR_HIST_SIZE]),
         &(td->nonPawnsCorrHist[td->pos.sideToMove()][Color::White][whiteNonPawnsIdx]),
         &(td->nonPawnsCorrHist[td->pos.sideToMove()][Color::Black][blackNonPawnsIdx]),
-        lastMoveCorrHistPtr
+        lastMoveCorrPtr,
+        contCorrPtr
     };
 }
 
@@ -126,17 +133,21 @@ constexpr i32 getEval(ThreadData* td, PlyData& plyData)
 
         // Adjust eval with correction histories
 
-        const auto [pawnsCorr, whiteNonPawnsCorr, blackNonPawnsCorr, lastMoveCorr]
-            = getCorrHists(td);
+        const auto [
+            pawnsCorrPtr, whiteNonPawnsCorrPtr, blackNonPawnsCorrPtr, lastMoveCorrPtr, contCorrPtr
+        ] = corrHistsPtrs(td);
 
         const i32 nonPawnsCorr
-            = static_cast<i32>(*whiteNonPawnsCorr) + static_cast<i32>(*blackNonPawnsCorr);
+            = static_cast<i32>(*whiteNonPawnsCorrPtr) + static_cast<i32>(*blackNonPawnsCorrPtr);
 
-        float correction = static_cast<float>(*pawnsCorr)   * corrHistPawnsWeight()
-                         + static_cast<float>(nonPawnsCorr) * corrHistNonPawnsWeight();
+        float correction = static_cast<float>(*pawnsCorrPtr) * corrHistPawnsWeight()
+                         + static_cast<float>(nonPawnsCorr)  * corrHistNonPawnsWeight();
 
-        if (lastMoveCorr != nullptr)
-            correction += static_cast<float>(*lastMoveCorr) * corrHistLastMoveWeight();
+        if (lastMoveCorrPtr != nullptr)
+            correction += static_cast<float>(*lastMoveCorrPtr) * corrHistLastMoveWeight();
+
+        if (contCorrPtr != nullptr)
+            correction += static_cast<float>(*contCorrPtr) * corrHistContWeight();
 
         *(plyData.eval) += lround(correction);
 

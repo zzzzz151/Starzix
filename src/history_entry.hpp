@@ -60,6 +60,8 @@ public:
 
     i16 mCorrHist = 0;
 
+    EnumArray<i16, PieceType, Square> mContCorrHist = { };
+
     constexpr i32 quietHistory(Position& pos, const Move move) const
     {
         i32 total = 0;
