@@ -117,6 +117,7 @@ constexpr size_t CORR_HIST_SIZE = 16384;
 MAYBE_CONSTEXPR auto corrHistPawnsWeight    = TunableParam<float>(.56f, 0.0f, 2.0f, 0.2f) / 100.0f;
 MAYBE_CONSTEXPR auto corrHistNonPawnsWeight = TunableParam<float>(.94f, 0.0f, 2.0f, 0.2f) / 100.0f;
 MAYBE_CONSTEXPR auto corrHistLastMoveWeight = TunableParam<float>(.39f, 0.0f, 2.0f, 0.2f) / 100.0f;
+MAYBE_CONSTEXPR auto corrHistContWeight     = TunableParam<float>(.39f, 0.0f, 2.0f, 0.2f) / 100.0f;
 
 // [depth][isQuietMove][legalMovesSeen]
 inline MultiArray<i32, MAX_DEPTH + 1, 2, 256> getLmrTable()
@@ -188,7 +189,8 @@ MAYBE_CONST MultiArray<i32, MAX_DEPTH + 1, 2, 256> LMR_TABLE = getLmrTable();
         { stringify(historyMalusMax),        &historyMalusMax },
         { stringify(corrHistPawnsWeight),    &corrHistPawnsWeight },
         { stringify(corrHistNonPawnsWeight), &corrHistNonPawnsWeight },
-        { stringify(corrHistLastMoveWeight), &corrHistLastMoveWeight }
+        { stringify(corrHistLastMoveWeight), &corrHistLastMoveWeight },
+        { stringify(corrHistContWeight),     &corrHistContWeight }
     };
 
     inline void printSpsaInput()

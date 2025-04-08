@@ -775,7 +775,7 @@ private:
             {
                 const i32 bonus = (bestScore - eval) * depth;
 
-                for (i16* corrHistPtr : getCorrHists(td))
+                for (i16* corrHistPtr : corrHistsPtrs(td))
                     updateHistory(corrHistPtr, bonus);
             }
         }
