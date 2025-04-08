@@ -95,11 +95,11 @@ constexpr auto corrHistsPtrs(ThreadData* td)
     const size_t whiteNonPawnsIdx = td->pos.nonPawnsHash(Color::White) % CORR_HIST_SIZE;
     const size_t blackNonPawnsIdx = td->pos.nonPawnsHash(Color::Black) % CORR_HIST_SIZE;
 
-    Move prevMove;
+    Move prevMove = td->pos.lastMove();
     i16* lastMoveCorrPtr = nullptr;
     i16* contCorrPtr     = nullptr;
 
-    if ((prevMove = td->pos.lastMove()))
+    if (prevMove)
     {
         HistoryEntry& histEntry
             = td->historyTable[td->pos.sideToMove()][prevMove.pieceType()][prevMove.to()];
