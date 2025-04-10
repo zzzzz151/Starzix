@@ -144,9 +144,9 @@ inline void uci()
 
                 std::cout << "\noption name " << paramName
                           << " type string"
-                          << " default " << myParam->value
-                          << " min "     << myParam->min
-                          << " max "     << myParam->max;
+                          << " default " << std::fixed << myParam->value
+                          << " min "     << std::fixed << myParam->min
+                          << " max "     << std::fixed << myParam->max;
 
             }, tunableParam);
         }
@@ -199,7 +199,7 @@ inline void setoption(const std::vector<std::string>& tokens, Searcher& searcher
                 LMR_TABLE = getLmrTable();
 
             std::cout << "info string " << optionName
-                      << " set to "     << myParam->value
+                      << " set to "     << std::fixed << myParam->value
                       << std::endl;
         }, tunableParam);
     }

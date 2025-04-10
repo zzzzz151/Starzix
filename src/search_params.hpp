@@ -57,67 +57,67 @@ public:
 }; // struct TunableParam
 
 // Time management
-MAYBE_CONSTEXPR auto timeHardPercentage = TunableParam<double>(0.65, 0.25, 0.75, 0.1);
-MAYBE_CONSTEXPR auto timeSoftPercentage = TunableParam<double>(9.6, 2.0, 20.0, 2.0) / 100.0;
-MAYBE_CONSTEXPR auto nodesTmBase = TunableParam<double>(1.45, 1.0, 2.0, 0.1);
-MAYBE_CONSTEXPR auto nodesTmMul  = TunableParam<double>(0.97, 0.5, 1.0, 0.1);
+MAYBE_CONSTEXPR auto timeHardPercentage = TunableParam<double>(0.71, 0.25, 0.75, 0.1);
+MAYBE_CONSTEXPR auto timeSoftPercentage = TunableParam<double>(12.5, 2.0, 20.0, 2.0) / 100.0;
+MAYBE_CONSTEXPR auto nodesTmBase = TunableParam<double>(1.23, 1.0, 2.0, 0.1);
+MAYBE_CONSTEXPR auto nodesTmMul  = TunableParam<double>(1.0, 0.5, 1.0, 0.1);
 
 // Pieces values
-MAYBE_CONSTEXPR auto pawnValue  = TunableParam<i32>(168, 50, 200, 50);
-MAYBE_CONSTEXPR auto minorValue = TunableParam<i32>(324, 200, 500, 50);
-MAYBE_CONSTEXPR auto rookValue  = TunableParam<i32>(508, 500, 900, 50);
-MAYBE_CONSTEXPR auto queenValue = TunableParam<i32>(929, 900, 1500, 100);
+MAYBE_CONSTEXPR auto pawnValue  = TunableParam<i32>(170, 50, 200, 50);
+MAYBE_CONSTEXPR auto minorValue = TunableParam<i32>(333, 200, 500, 50);
+MAYBE_CONSTEXPR auto rookValue  = TunableParam<i32>(512, 500, 900, 50);
+MAYBE_CONSTEXPR auto queenValue = TunableParam<i32>(984, 900, 1500, 100);
 
 // Aspiration windows
-MAYBE_CONSTEXPR auto aspStartDelta = TunableParam<i32>(14, 5, 25, 5);
-MAYBE_CONSTEXPR auto aspDeltaMul   = TunableParam<double>(1.4, 1.2, 2.0, 0.1);
+MAYBE_CONSTEXPR auto aspStartDelta = TunableParam<i32>(16, 5, 25, 5);
+MAYBE_CONSTEXPR auto aspDeltaMul   = TunableParam<double>(1.37, 1.2, 2.0, 0.1);
 
 // RFP (Reverse futility pruning)
-MAYBE_CONSTEXPR auto rfpDepthMul = TunableParam<i32>(69, 30, 150, 10);
+MAYBE_CONSTEXPR auto rfpDepthMul = TunableParam<i32>(72, 30, 150, 10);
 
 // Razoring
-MAYBE_CONSTEXPR auto razoringBase     = TunableParam<i32>(362, 150, 600, 50);
-MAYBE_CONSTEXPR auto razoringDepthMul = TunableParam<i32>(293, 150, 600, 15);
+MAYBE_CONSTEXPR auto razoringBase     = TunableParam<i32>(365, 150, 600, 50);
+MAYBE_CONSTEXPR auto razoringDepthMul = TunableParam<i32>(276, 150, 600, 15);
 
 // FP (Futility pruning)
-MAYBE_CONSTEXPR auto fpBase     = TunableParam<i32>(139, 40, 260, 20);
-MAYBE_CONSTEXPR auto fpDepthMul = TunableParam<i32>(170, 40, 260, 20);
+MAYBE_CONSTEXPR auto fpBase     = TunableParam<i32>(130, 40, 260, 20);
+MAYBE_CONSTEXPR auto fpDepthMul = TunableParam<i32>(175, 40, 260, 20);
 
 // SEE thresholds
-MAYBE_CONSTEXPR auto seeNoisyThreshold = TunableParam<i32>(-167, -210, -10, 20);
-MAYBE_CONSTEXPR auto seeQuietThreshold = TunableParam<i32>(-84, -210, -10, 20);
-MAYBE_CONSTEXPR auto seeNoisyHistMul   = TunableParam<float>(3.9f, 0.0f, 6.0f, 0.5f)  / 100.0f;
-MAYBE_CONSTEXPR auto seeQuietHistMul   = TunableParam<float>(1.3f, 0.0f, 2.0f, 0.25f) / 100.0f;
+MAYBE_CONSTEXPR auto seeNoisyThreshold = TunableParam<i32>(-198, -210, -10, 20);
+MAYBE_CONSTEXPR auto seeQuietThreshold = TunableParam<i32>(-82, -210, -10, 20);
+MAYBE_CONSTEXPR auto seeNoisyHistMul   = TunableParam<float>(3.76f, 0.0f, 6.0f, 0.5f)  / 100.0f;
+MAYBE_CONSTEXPR auto seeQuietHistMul   = TunableParam<float>(1.53f, 0.0f, 2.0f, 0.25f) / 100.0f;
 
 // SE (Singular extensions)
-MAYBE_CONSTEXPR auto doubleExtMargin = TunableParam<i32>(30, 1, 51, 10);
+MAYBE_CONSTEXPR auto doubleExtMargin = TunableParam<i32>(29, 1, 51, 10);
 
 // LMR (Late move reductions)
-MAYBE_CONSTEXPR auto lmrBaseNoisy    = TunableParam<double>(0.74, 0.3, 1.2, 0.1);
-MAYBE_CONSTEXPR auto lmrBaseQuiet    = TunableParam<double>(0.8, 0.3, 1.2, 0.1);
-MAYBE_CONSTEXPR auto lmrMulNoisy     = TunableParam<double>(0.2, 0.2, 0.8, 0.1);
-MAYBE_CONSTEXPR auto lmrMulQuiet     = TunableParam<double>(0.51, 0.2, 0.8, 0.1);
-MAYBE_CONSTEXPR auto lmrQuietHistMul = TunableParam<float>(0.84f, 0.0f, 0.9f, 0.1f) / 10'000.0f;
+MAYBE_CONSTEXPR auto lmrBaseNoisy    = TunableParam<double>(0.65, 0.3, 1.2, 0.1);
+MAYBE_CONSTEXPR auto lmrBaseQuiet    = TunableParam<double>(0.87, 0.3, 1.2, 0.1);
+MAYBE_CONSTEXPR auto lmrMulNoisy     = TunableParam<double>(0.21, 0.2, 0.8, 0.1);
+MAYBE_CONSTEXPR auto lmrMulQuiet     = TunableParam<double>(0.48, 0.2, 0.8, 0.1);
+MAYBE_CONSTEXPR auto lmrQuietHistMul = TunableParam<float>(8.76f, 0.0f, 9.0f, 1.0f) / 100'000.0f;
 
 // PVS + LMR
-MAYBE_CONSTEXPR auto deeperBase      = TunableParam<i32>(63, 0, 100, 20);
-MAYBE_CONSTEXPR auto shallowerMargin = TunableParam<i32>(30, 0, 100, 20);
+MAYBE_CONSTEXPR auto deeperBase      = TunableParam<i32>(67, 0, 100, 20);
+MAYBE_CONSTEXPR auto shallowerMargin = TunableParam<i32>(35, 0, 100, 20);
 
 // History heuristic
 constexpr i32 HISTORY_MAX = 16384;
-MAYBE_CONSTEXPR auto historyBonusMul    = TunableParam<i32>(299, 50, 600, 25);
-MAYBE_CONSTEXPR auto historyBonusOffset = TunableParam<i32>(27, 0, 500, 100);
-MAYBE_CONSTEXPR auto historyBonusMax    = TunableParam<i32>(1825, 500, 2500, 200);
-MAYBE_CONSTEXPR auto historyMalusMul    = TunableParam<i32>(312, 50, 600, 25);
-MAYBE_CONSTEXPR auto historyMalusOffset = TunableParam<i32>(30, 0, 500, 100);
-MAYBE_CONSTEXPR auto historyMalusMax    = TunableParam<i32>(1251, 500, 2500, 200);
+MAYBE_CONSTEXPR auto historyBonusMul    = TunableParam<i32>(306, 50, 600, 25);
+MAYBE_CONSTEXPR auto historyBonusOffset = TunableParam<i32>(19, 0, 500, 100);
+MAYBE_CONSTEXPR auto historyBonusMax    = TunableParam<i32>(1824, 500, 2500, 200);
+MAYBE_CONSTEXPR auto historyMalusMul    = TunableParam<i32>(357, 50, 600, 25);
+MAYBE_CONSTEXPR auto historyMalusOffset = TunableParam<i32>(57, 0, 500, 100);
+MAYBE_CONSTEXPR auto historyMalusMax    = TunableParam<i32>(1166, 500, 2500, 200);
 
 // Correction histories
 constexpr size_t CORR_HIST_SIZE = 16384;
-MAYBE_CONSTEXPR auto corrHistPawnsWeight    = TunableParam<float>(.56f, 0.0f, 2.0f, 0.2f) / 100.0f;
-MAYBE_CONSTEXPR auto corrHistNonPawnsWeight = TunableParam<float>(.94f, 0.0f, 2.0f, 0.2f) / 100.0f;
-MAYBE_CONSTEXPR auto corrHistLastMoveWeight = TunableParam<float>(.39f, 0.0f, 2.0f, 0.2f) / 100.0f;
-MAYBE_CONSTEXPR auto corrHistContWeight     = TunableParam<float>(.39f, 0.0f, 2.0f, 0.2f) / 100.0f;
+MAYBE_CONSTEXPR auto corrHistPawnsWeight    = TunableParam<float>(0.71f, .0f, 2.0f, .2f) / 100.0f;
+MAYBE_CONSTEXPR auto corrHistNonPawnsWeight = TunableParam<float>(1.19f, .0f, 2.0f, .2f) / 100.0f;
+MAYBE_CONSTEXPR auto corrHistLastMoveWeight = TunableParam<float>(0.49f, .0f, 2.0f, .2f) / 100.0f;
+MAYBE_CONSTEXPR auto corrHistContWeight     = TunableParam<float>(0.73f, .0f, 2.0f, .2f) / 100.0f;
 
 // [depth][isQuietMove][legalMovesSeen]
 inline MultiArray<i32, MAX_DEPTH + 1, 2, 256> getLmrTable()
@@ -206,10 +206,10 @@ MAYBE_CONST MultiArray<i32, MAX_DEPTH + 1, 2, 256> LMR_TABLE = getLmrTable();
 
                 std::cout << paramName
                           << ", " << (myParam->isFloatOrDouble() ? "float" : "int")
-                          << ", " << myParam->value
-                          << ", " << myParam->min
-                          << ", " << myParam->max
-                          << ", " << myParam->step
+                          << ", " << std::fixed << myParam->value
+                          << ", " << std::fixed << myParam->min
+                          << ", " << std::fixed << myParam->max
+                          << ", " << std::fixed << myParam->step
                           << ", 0.002"
                           << "\n";
             }, tunableParam);
