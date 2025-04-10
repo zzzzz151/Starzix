@@ -92,14 +92,6 @@ constexpr void resizeTT(std::vector<TTEntry>& tt, const size_t newMebibytes)
     tt.shrink_to_fit();
 }
 
-constexpr void resetTT(std::vector<TTEntry>& tt)
-{
-    const auto numEntries = tt.size();
-    tt.clear(); // Remove all elements
-    tt.resize(numEntries);
-    tt.shrink_to_fit();
-}
-
 constexpr TTEntry& getEntry(std::vector<TTEntry>& tt, const u64 zobristHash)
 {
     assert(tt.size() > 0);

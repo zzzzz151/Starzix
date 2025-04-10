@@ -130,7 +130,7 @@ inline void uci()
     std::cout << "id name Starzix";
     std::cout << "\nid author zzzzz";
     std::cout << "\noption name Hash type spin default 32 min 1 max 131072";
-    std::cout << "\noption name Threads type spin default 1 min 1 max 256";
+    std::cout << "\noption name Threads type spin default 1 min 1 max 512";
 
     #if defined(TUNE)
         for (const auto& pair : tunableParams)

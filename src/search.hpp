@@ -13,6 +13,7 @@
 #include "move_picker.hpp"
 #include "cuckoo.hpp"
 #include <atomic>
+#include <cstring>
 #include <thread>
 #include <mutex>
 #include <condition_variable>
@@ -138,7 +139,7 @@ public:
             td->nonPawnsCorrHist = { };
         }
 
-        resetTT(mTT);
+        std::memset(mTT.data(), 0, mTT.size() * sizeof(TTEntry));
     }
 
     constexpr u64 totalNodes() const
