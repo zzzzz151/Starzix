@@ -127,7 +127,14 @@ public:
             && pos.isQuiet(mKiller)
             && isPseudolegal(pos, mKiller)
             && isPseudolegalLegal(pos, mKiller))
-                return ScoredMove{ .move = mKiller, .score = 0 };
+            {
+                const HistoryEntry& histEntry
+                    = historyTable[pos.sideToMove()][mKiller.pieceType()][mKiller.to()];
+
+                const i32 quietHist = histEntry.quietHistory(pos, mKiller);
+
+                return ScoredMove{ .move = mKiller, .score = quietHist };
+            }
 
             return nextLegal(pos, historyTable);
         }
