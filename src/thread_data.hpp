@@ -45,6 +45,12 @@ public:
 
     std::array<u64, 1ULL << 17> nodesByMove; // [Move.asU16()]
 
+    // [stm][pawnsHash % 16384]
+    EnumArray<std::array<Move, 16384>, Color> pawnStructMoves = {
+        MOVE_NONE_ARRAY_16384, MOVE_NONE_ARRAY_16384
+    };
+
+    // [stm][pieceType][targetSquare]
     HistoryTable historyTable = { };
 
     std::array<nnue::BothAccumulators, MAX_DEPTH + 1> bothAccsStack;
@@ -57,11 +63,6 @@ public:
 
     // [stm][pieceColor][[pieceColorNonPawnsHash % CORR_HIST_SIZE]
     EnumArray<std::array<i16, CORR_HIST_SIZE>, Color, Color> nonPawnsCorrHist = { };
-
-    // [stm][pawnsHash % 16384]
-    EnumArray<std::array<Move, 16384>, Color> pawnStructMoves = {
-        MOVE_NONE_ARRAY_16384, MOVE_NONE_ARRAY_16384
-    };
 
     // Threading stuff
     ThreadState threadState = ThreadState::Sleeping;

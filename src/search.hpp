@@ -134,10 +134,10 @@ public:
         for (ThreadData* td : mThreadsData)
         {
             td->nodes.store(0, std::memory_order_relaxed);
+            td->pawnStructMoves  = { MOVE_NONE_ARRAY_16384, MOVE_NONE_ARRAY_16384 };
             td->historyTable     = { };
             td->pawnsCorrHist    = { };
             td->nonPawnsCorrHist = { };
-            td->pawnStructMoves  = { MOVE_NONE_ARRAY_16384, MOVE_NONE_ARRAY_16384 };
         }
 
         std::memset(mTT.data(), 0, mTT.size() * sizeof(TTEntry));
