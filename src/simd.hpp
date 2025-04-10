@@ -86,7 +86,8 @@
             // Add the lower and upper half vertically:
             xmm0 = _mm_add_epi32(xmm0, xmm1);
 
-            // Shuffle the result so that the lower 32-bits are directly above the second-lower 32-bits:
+            // Shuffle the result so that the lower 32-bits
+            // are directly above the second-lower 32-bits:
             xmm1 = _mm_shuffle_epi32(xmm0, _MM_SHUFFLE(2, 3, 0, 1));
 
             // Add the lower 32-bits to the second-lower 32-bits vertically:
