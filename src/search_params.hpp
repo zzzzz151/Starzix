@@ -112,6 +112,9 @@ MAYBE_CONSTEXPR auto historyMalusMul    = TunableParam<i32>(357, 50, 600, 25);
 MAYBE_CONSTEXPR auto historyMalusOffset = TunableParam<i32>(57, 0, 500, 100);
 MAYBE_CONSTEXPR auto historyMalusMax    = TunableParam<i32>(1166, 500, 2500, 200);
 
+// Pawn structure move bonus is half of max quiet history
+constexpr i32 PAWN_STRUCT_MOVE_BONUS = HISTORY_MAX * 3 / 2;
+
 // Correction histories
 constexpr size_t CORR_HIST_SIZE = 16384;
 MAYBE_CONSTEXPR auto corrHistPawnsWeight    = TunableParam<float>(0.71f, .0f, 2.0f, .2f) / 100.0f;

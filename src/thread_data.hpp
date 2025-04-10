@@ -14,6 +14,8 @@
 #include <mutex>
 #include <condition_variable>
 
+constexpr auto MOVE_NONE_ARRAY_16384 = makeArray<Move, 16384>(MOVE_NONE);
+
 struct PlyData
 {
 public:
@@ -55,6 +57,11 @@ public:
 
     // [stm][pieceColor][[pieceColorNonPawnsHash % CORR_HIST_SIZE]
     EnumArray<std::array<i16, CORR_HIST_SIZE>, Color, Color> nonPawnsCorrHist = { };
+
+    // [stm][pawnsHash % 16384]
+    EnumArray<std::array<Move, 16384>, Color> pawnStructMoves = {
+        MOVE_NONE_ARRAY_16384, MOVE_NONE_ARRAY_16384
+    };
 
     // Threading stuff
     ThreadState threadState = ThreadState::Sleeping;
@@ -192,4 +199,9 @@ constexpr void undoMove(ThreadData* td)
         td->bothAccsIdx--;
 
     td->pos.undoMove();
+}
+
+constexpr Move& pawnStructMove(ThreadData* td)
+{
+    return td->pawnStructMoves[td->pos.sideToMove()][td->pos.pawnsHash() % 16384];
 }

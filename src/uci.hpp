@@ -102,7 +102,7 @@ inline void runCommand(std::string& command, Position& pos, Searcher& searcher)
 
         const auto printMoves = [&] (const bool noisiesOnly) constexpr
         {
-            MovePicker mp = MovePicker(noisiesOnly, MOVE_NONE, MOVE_NONE);
+            MovePicker mp = MovePicker(noisiesOnly, MOVE_NONE, MOVE_NONE, MOVE_NONE);
 
             while (true) {
                 const auto [move, moveScore] = mp.nextLegal(pos, *historyTable);

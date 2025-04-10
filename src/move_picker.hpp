@@ -44,9 +44,10 @@ private:
 
     bool mNoisiesOnly = false;
 
-    Move mTtMove = MOVE_NONE;
-    Move mKiller = MOVE_NONE;
-    Move mExcludedMove = MOVE_NONE;
+    Move mTtMove         = MOVE_NONE;
+    Move mKiller         = MOVE_NONE;
+    Move mPawnStructMove = MOVE_NONE;
+    Move mExcludedMove   = MOVE_NONE;
 
     ArrayVec<ScoredMove, 256> mNoisies, mQuiets;
 
@@ -58,11 +59,13 @@ public:
         const bool noisiesOnly,
         const Move ttMove,
         const Move killer,
+        const Move pawnStructMove,
         const Move excludedMove = MOVE_NONE)
     {
         mNoisiesOnly = noisiesOnly;
         mTtMove = ttMove;
         mKiller = killer;
+        mPawnStructMove = pawnStructMove;
         mExcludedMove = excludedMove;
     }
 
@@ -151,7 +154,10 @@ public:
 
                 const i32 quietHist = histEntry.quietHistory(pos, move);
 
-                mQuiets.push_back(ScoredMove{ .move = move, .score = quietHist });
+                mQuiets.push_back(ScoredMove{
+                    .move = move,
+                    .score = (move == mPawnStructMove) * PAWN_STRUCT_MOVE_BONUS + quietHist
+                });
             }
 
             mStage++;
@@ -160,12 +166,16 @@ public:
         // Yield quiet moves
         case 5:
         {
-            const ScoredMove scoredMove = nextBest(mQuiets);
+            ScoredMove scoredMove = nextBest(mQuiets);
 
             if (!scoredMove.move)
                 mStage++;
             else if (isPseudolegalLegal(pos, scoredMove.move))
+            {
+                // Adjust pawn structure move's score so that we return its quiet history
+                scoredMove.score -= (scoredMove.move == mPawnStructMove) * PAWN_STRUCT_MOVE_BONUS;
                 return scoredMove;
+            }
 
             return nextLegal(pos, historyTable);
         }

@@ -137,6 +137,7 @@ public:
             td->historyTable     = { };
             td->pawnsCorrHist    = { };
             td->nonPawnsCorrHist = { };
+            td->pawnStructMoves  = { MOVE_NONE_ARRAY_16384, MOVE_NONE_ARRAY_16384 };
         }
 
         std::memset(mTT.data(), 0, mTT.size() * sizeof(TTEntry));
@@ -520,7 +521,11 @@ private:
         ArrayVec<PieceType, 256> capturedArray;
 
         // Moves loop
-        MovePicker mp = MovePicker(false, ttMove, plyData.killer, singularMove);
+
+        MovePicker mp = MovePicker(
+            false, ttMove, plyData.killer, pawnStructMove(td), singularMove
+        );
+
         while (true)
         {
             // Move, i32
@@ -744,6 +749,7 @@ private:
             // At this point, this move is quiet
 
             plyData.killer = move;
+            pawnStructMove(td) = move;
 
             // Increase histories of this fail high quiet move
             histEntry.updateQuietHistories(td->pos, move, histBonus);
@@ -858,7 +864,11 @@ private:
         Move bestMove = MOVE_NONE;
 
         // Moves loop (if not in check, only noisy moves)
-        MovePicker mp = MovePicker(!td->pos.inCheck(), MOVE_NONE, td->pliesData[ply].killer);
+
+        MovePicker mp = MovePicker(
+            !td->pos.inCheck(), MOVE_NONE, td->pliesData[ply].killer, pawnStructMove(td)
+        );
+
         while (true)
         {
             // Move, i32
