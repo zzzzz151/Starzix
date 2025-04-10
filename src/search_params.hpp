@@ -206,10 +206,10 @@ MAYBE_CONST MultiArray<i32, MAX_DEPTH + 1, 2, 256> LMR_TABLE = getLmrTable();
 
                 std::cout << paramName
                           << ", " << (myParam->isFloatOrDouble() ? "float" : "int")
-                          << ", " << myParam->value
-                          << ", " << myParam->min
-                          << ", " << myParam->max
-                          << ", " << myParam->step
+                          << ", " << std::fixed << myParam->value
+                          << ", " << std::fixed << myParam->min
+                          << ", " << std::fixed << myParam->max
+                          << ", " << std::fixed << myParam->step
                           << ", 0.002"
                           << "\n";
             }, tunableParam);
