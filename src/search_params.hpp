@@ -104,7 +104,7 @@ MAYBE_CONSTEXPR auto deeperBase      = TunableParam<i32>(67, 0, 100, 20);
 MAYBE_CONSTEXPR auto shallowerMargin = TunableParam<i32>(35, 0, 100, 20);
 
 // Pawn structure move bonus
-constexpr i32 PAWN_STRUCT_MOVE_BONUS = 40960;
+constexpr i32 PAWN_STRUCT_MOVE_BONUS = 36864;
 
 // History heuristic
 constexpr i32 HISTORY_MAX = 16384;
