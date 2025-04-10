@@ -16,7 +16,7 @@ else
 endif
 
 all:
-	$(CXX) $(CXXFLAGS) -march=native -DNDEBUG -DTUNE src/*.cpp -o $(EXE)$(SUFFIX)
+	$(CXX) $(CXXFLAGS) -march=native -DNDEBUG src/*.cpp -o $(EXE)$(SUFFIX)
 debug:
 	$(CXX) $(CXXFLAGS) -march=native src/*.cpp -o $(EXE)$(SUFFIX)
 test:
