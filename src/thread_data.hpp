@@ -45,7 +45,6 @@ public:
 
     std::array<u64, 1ULL << 17> nodesByMove; // [Move.asU16()]
 
-    // [stm][pieceType][targetSquare]
     HistoryTable historyTable = { };
 
     // [stm][pawnsHash % 16384]

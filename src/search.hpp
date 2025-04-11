@@ -749,7 +749,9 @@ private:
             // At this point, this move is quiet
 
             plyData.killer = move;
-            pawnStructMove(td) = move;
+
+            if (td->pos.getBb(PieceType::Pawn) > 0)
+                pawnStructMove(td) = move;
 
             // Increase histories of this fail high quiet move
             histEntry.updateQuietHistories(td->pos, move, histBonus);

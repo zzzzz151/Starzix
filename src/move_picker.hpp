@@ -144,6 +144,10 @@ public:
         // Generate and score quiet moves
         case 4:
         {
+            // If no pawns, there's no pawn structure move
+            if (pos.getBb(PieceType::Pawn) == 0)
+                mPawnStructMove = MOVE_NONE;
+
             for (const Move move : pseudolegalMoves<MoveGenType::QuietOnly>(pos))
             {
                 if (move == mTtMove || move == mKiller || move == mExcludedMove)
