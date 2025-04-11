@@ -103,9 +103,6 @@ MAYBE_CONSTEXPR auto lmrQuietHistMul = TunableParam<float>(8.76f, 0.0f, 9.0f, 1.
 MAYBE_CONSTEXPR auto deeperBase      = TunableParam<i32>(67, 0, 100, 20);
 MAYBE_CONSTEXPR auto shallowerMargin = TunableParam<i32>(35, 0, 100, 20);
 
-// Pawn structure move bonus
-constexpr i32 PAWN_STRUCT_MOVE_BONUS = 36864;
-
 // History heuristic
 constexpr i32 HISTORY_MAX = 16384;
 MAYBE_CONSTEXPR auto historyBonusMul    = TunableParam<i32>(306, 50, 600, 25);
@@ -114,6 +111,9 @@ MAYBE_CONSTEXPR auto historyBonusMax    = TunableParam<i32>(1824, 500, 2500, 200
 MAYBE_CONSTEXPR auto historyMalusMul    = TunableParam<i32>(357, 50, 600, 25);
 MAYBE_CONSTEXPR auto historyMalusOffset = TunableParam<i32>(57, 0, 500, 100);
 MAYBE_CONSTEXPR auto historyMalusMax    = TunableParam<i32>(1166, 500, 2500, 200);
+
+// Pawn structure move bonus
+constexpr i32 PAWN_STRUCT_MOVE_BONUS = HISTORY_MAX * 3 / 4;
 
 // Correction histories
 constexpr size_t CORR_HIST_SIZE = 16384;
