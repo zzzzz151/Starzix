@@ -21,7 +21,7 @@ constexpr EnumArray<std::array<Square, 2>, Color> CASTLING_ROOK_FROM =
     std::array<Square, 2> { Square::H8, Square::A8 }
 };
 
-// [kingTargetSquare]
+// [kingDst]
 constexpr EnumArray<std::pair<Square, Square>, Square> CASTLING_ROOK_FROM_TO = [] () consteval
 {
     EnumArray<std::pair<Square, Square>, Square> castlingRookFromTo = { };
@@ -38,8 +38,8 @@ struct PosState
 {
 public:
     Color colorToMove = Color::White;
-    EnumArray<Bitboard, Color>     colorBbs  = { }; // [color]
-    EnumArray<Bitboard, PieceType> piecesBbs = { }; // [pieceType]
+    EnumArray<Bitboard, Color>     colorBbs  = { };
+    EnumArray<Bitboard, PieceType> piecesBbs = { };
     Bitboard castlingRights = 0;
     std::optional<Square> enPassantSquare = std::nullopt;
     u8 pliesSincePawnOrCapture = 0;
@@ -121,7 +121,7 @@ public:
                                    : thisChar == 'q' ? PieceType::Queen
                                    : PieceType::King;
 
-                placePiece(color, pt, square);
+                togglePiece(color, pt, square);
 
                 currentFile = addAndClamp<File>(currentFile, 1);
             }
@@ -297,31 +297,14 @@ public:
 
 private:
 
-    constexpr void placePiece(
+    constexpr void togglePiece(
         const Color color, const PieceType pieceType, const Square square)
     {
-        assert(!isOccupied(square));
-
-        state().colorBbs[color]      |= squareBb(square);
-        state().piecesBbs[pieceType] |= squareBb(square);
-
-        updateHashes(color, pieceType, square);
-    }
-
-    constexpr void removePiece(
-        const Color color, const PieceType pieceType, const Square square)
-    {
-        assert(hasSquare(getBb(color, pieceType), square));
+        assert(!isOccupied(square) || hasSquare(getBb(color, pieceType), square));
 
         state().colorBbs[color]      ^= squareBb(square);
         state().piecesBbs[pieceType] ^= squareBb(square);
 
-        updateHashes(color, pieceType, square);
-    }
-
-    constexpr void updateHashes(
-        const Color color, const PieceType pieceType, const Square square)
-    {
         state().zobristHash ^= ZOBRIST_PIECES[color][pieceType][square];
 
         if (pieceType == PieceType::Pawn)
@@ -687,23 +670,23 @@ public:
         const std::optional<PieceType> promotion = move.promotion();
         const PieceType pieceType = move.pieceType();
 
-        removePiece(sideToMove(), pieceType, from);
+        togglePiece(sideToMove(), pieceType, from);
 
         if (moveFlag == MoveFlag::Castling)
         {
-            placePiece(sideToMove(), PieceType::King, to);
+            togglePiece(sideToMove(), PieceType::King, to);
 
             const auto [rookFrom, rookTo] = CASTLING_ROOK_FROM_TO[to];
 
-            removePiece(sideToMove(), PieceType::Rook, rookFrom);
-            placePiece(sideToMove(), PieceType::Rook, rookTo);
+            togglePiece(sideToMove(), PieceType::Rook, rookFrom);
+            togglePiece(sideToMove(), PieceType::Rook, rookTo);
 
             state().captured = std::nullopt;
         }
         else if (moveFlag == MoveFlag::EnPassant)
         {
-            removePiece(!sideToMove(), PieceType::Pawn, enPassantRelative(to));
-            placePiece(sideToMove(), PieceType::Pawn, to);
+            togglePiece(!sideToMove(), PieceType::Pawn, enPassantRelative(to));
+            togglePiece(sideToMove(), PieceType::Pawn, to);
 
             state().captured = PieceType::Pawn;
         }
@@ -711,9 +694,9 @@ public:
             state().captured = pieceTypeAt(to);
 
             if (state().captured.has_value())
-                removePiece(!sideToMove(), *(state().captured), to);
+                togglePiece(!sideToMove(), *(state().captured), to);
 
-            placePiece(sideToMove(), promotion.has_value() ? *promotion : pieceType, to);
+            togglePiece(sideToMove(), promotion.has_value() ? *promotion : pieceType, to);
         }
 
         state().zobristHash ^= state().castlingRights; // XOR old castling rights out

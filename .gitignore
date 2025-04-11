@@ -5,11 +5,11 @@
 **/Starzix
 **/*.pdb
 
-testPosition
-testMoveGen
-testGameState
-testSEE
-testNNUE
+test-position
+test-move-gen
+test-game-state
+test-SEE
+test-NNUE
 
 stderr.txt
 stderr1.txt

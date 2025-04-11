@@ -66,31 +66,30 @@ struct FinnyTableEntry
 {
 public:
 
-    alignas(sizeof(Vec)) HLArray accumulator; // [hiddenNeuronIdx]
+    alignas(sizeof(Vec)) HLArray accumulator;
 
-    EnumArray<Bitboard, Color>     colorBbs;  // [color]
-    EnumArray<Bitboard, PieceType> piecesBbs; // [pieceType]
+    EnumArray<Bitboard, Color>     colorBbs;
+    EnumArray<Bitboard, PieceType> piecesBbs;
 };
 
 // [mirrorVAxis][inputBucket]
 using FinnyTableForColor = MultiArray<FinnyTableEntry, 2, NUM_INPUT_BUCKETS>;
 
-// [color][mirrorVAxis][inputBucket]
+// [accumulatorColor][mirrorVAxis][inputBucket]
 using FinnyTable = EnumArray<FinnyTableForColor, Color>;
 
 struct BothAccumulators
 {
 public:
 
-    // [color][hiddenNeuronIdx]
     alignas(sizeof(Vec)) EnumArray<HLArray, Color> mAccumulators;
 
     // If a king is on right side of board,
     // mirror all pieces along vertical axis
     // in that color's accumulator
-    EnumArray<bool, Color> mMirrorVAxis = { false, false }; // [color]
+    EnumArray<bool, Color> mMirrorVAxis = { false, false };
 
-    EnumArray<size_t, Color> mInputBucket = { 0, 0 }; // [color]
+    EnumArray<size_t, Color> mInputBucket = { 0, 0 };
 
     bool mUpdated = false;
 

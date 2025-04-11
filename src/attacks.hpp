@@ -6,7 +6,6 @@
 
 namespace internal {
 
-// [color][square]
 constexpr EnumArray<Bitboard, Color, Square> PAWN_ATTACKS = [] () consteval
 {
     EnumArray<Bitboard, Color, Square> pawnAttacks = { };
@@ -42,7 +41,6 @@ constexpr EnumArray<Bitboard, Color, Square> PAWN_ATTACKS = [] () consteval
     return pawnAttacks;
 }();
 
-// [square]
 constexpr EnumArray<Bitboard, Square> KNIGHT_ATTACKS = [] () consteval
 {
     EnumArray<Bitboard, Square> knightAttacks;
@@ -63,7 +61,6 @@ constexpr EnumArray<Bitboard, Square> KNIGHT_ATTACKS = [] () consteval
     return knightAttacks;
 }();
 
-// [square]
 constexpr EnumArray<Bitboard, Square> KING_ATTACKS = [] () consteval
 {
     EnumArray<Bitboard, Square> kingAttacks;
@@ -213,10 +210,8 @@ public:
     u64 shift;
 };
 
-// [square]
 constexpr EnumArray<MagicEntry, Square> BISHOP_MAGIC_ENTRIES = [] () consteval
 {
-    // [square]
     constexpr EnumArray<u64, Square> BISHOP_MAGICS = {
         0x89a1121896040240ULL, 0x2004844802002010ULL, 0x2068080051921000ULL, 0x62880a0220200808ULL,
         0x4042004000000ULL, 0x100822020200011ULL, 0xc00444222012000aULL, 0x28808801216001ULL,
@@ -256,10 +251,8 @@ constexpr EnumArray<MagicEntry, Square> BISHOP_MAGIC_ENTRIES = [] () consteval
     return bishopMagicEntries;
 }();
 
-// [square]
 constexpr EnumArray<MagicEntry, Square> ROOK_MAGIC_ENTRIES = [] () consteval
 {
-    // [square]
     constexpr EnumArray<u64, Square> ROOK_MAGICS = {
         0xa8002c000108020ULL, 0x6c00049b0002001ULL, 0x100200010090040ULL, 0x2480041000800801ULL,
         0x280028004000800ULL, 0x900410008040022ULL, 0x280020001001080ULL, 0x2880002041000080ULL,

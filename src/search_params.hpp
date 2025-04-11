@@ -142,8 +142,7 @@ inline MultiArray<i32, MAX_DEPTH + 1, 2, 256> getLmrTable()
     return lmrTable;
 }
 
-// [depth][isQuietMove][legalMovesSeen]
-MAYBE_CONST MultiArray<i32, MAX_DEPTH + 1, 2, 256> LMR_TABLE = getLmrTable();
+MAYBE_CONST auto LMR_TABLE = getLmrTable();
 
 #if defined(TUNE)
     using TunableParamVariant = std::variant<

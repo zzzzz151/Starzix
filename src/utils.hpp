@@ -244,7 +244,6 @@ inline void printBitboard(const Bitboard bb)
 
 constexpr u64 ZOBRIST_COLOR = 591679071752537765ULL;
 
-// [color][pieceType][square]
 constexpr EnumArray<u64, Color, PieceType, Square> ZOBRIST_PIECES = [] () consteval
 {
     EnumArray<u64, Color, PieceType, Square> zobristPieces = { };
@@ -259,7 +258,6 @@ constexpr EnumArray<u64, Color, PieceType, Square> ZOBRIST_PIECES = [] () conste
     return zobristPieces;
 }();
 
-// [file]
 constexpr EnumArray<u64, File> ZOBRIST_FILES = {
     12228382040141709029ULL, 2494223668561036951ULL,
     7849557628814744642ULL, 16000570245257669890ULL,

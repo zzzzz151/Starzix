@@ -20,20 +20,20 @@ all:
 debug:
 	$(CXX) $(CXXFLAGS) -march=native src/*.cpp -o $(EXE)$(SUFFIX)
 test:
-	$(CXX) $(CXXFLAGS) -march=native tests/testPosition.cpp -o testPosition$(SUFFIX)
-	./testPosition$(SUFFIX)
+	$(CXX) $(CXXFLAGS) -march=native tests/test_position.cpp -o test-position$(SUFFIX)
+	./test-position$(SUFFIX)
 
-	$(CXX) $(CXXFLAGS) -march=native tests/testMoveGen.cpp -o testMoveGen$(SUFFIX)
-	./testMoveGen$(SUFFIX)
+	$(CXX) $(CXXFLAGS) -march=native tests/test_move_gen.cpp -o test-move-gen$(SUFFIX)
+	./test-move-gen$(SUFFIX)
 
-	$(CXX) $(CXXFLAGS) -march=native tests/testGameState.cpp -o testGameState$(SUFFIX)
-	./testGameState$(SUFFIX)
+	$(CXX) $(CXXFLAGS) -march=native tests/test_game_state.cpp -o test-game-state$(SUFFIX)
+	./test-game-state$(SUFFIX)
 
-	$(CXX) $(CXXFLAGS) -march=native -DTUNE tests/testSEE.cpp -o testSEE$(SUFFIX)
-	./testSEE$(SUFFIX)
+	$(CXX) $(CXXFLAGS) -march=native -DTUNE tests/test_SEE.cpp -o test-SEE$(SUFFIX)
+	./test-SEE$(SUFFIX)
 
-	$(CXX) $(CXXFLAGS) -march=native tests/testNNUE.cpp -o testNNUE$(SUFFIX)
-	./testNNUE$(SUFFIX)
+	$(CXX) $(CXXFLAGS) -march=native tests/test_NNUE.cpp -o test-NNUE$(SUFFIX)
+	./test-NNUE$(SUFFIX)
 tune:
 	$(CXX) $(CXXFLAGS) -march=native -DNDEBUG -DTUNE src/*.cpp -o $(EXE)$(SUFFIX)
 release:

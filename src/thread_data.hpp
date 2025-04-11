@@ -43,18 +43,17 @@ public:
 
     std::array<u64, 1ULL << 17> nodesByMove; // [Move.asU16()]
 
-    // [stm][pieceType][targetSquare]
     HistoryTable historyTable = { };
 
     std::array<nnue::BothAccumulators, MAX_DEPTH + 1> bothAccsStack;
     size_t bothAccsIdx = 0;
 
-    nnue::FinnyTable finnyTable; // [color][mirrorVAxis][inputBucket]
+    nnue::FinnyTable finnyTable;
 
-    // [stm][Position.pawnsHash() % CORR_HIST_SIZE]
+    // [stm][pawnsHash % CORR_HIST_SIZE]
     EnumArray<std::array<i16, CORR_HIST_SIZE>, Color> pawnsCorrHist = { };
 
-    // [stm][pieceColor][[Position.nonPawnsHash(pieceColor) % CORR_HIST_SIZE]
+    // [stm][pieceColor][[pieceColorNonPawnsHash % CORR_HIST_SIZE]
     EnumArray<std::array<i16, CORR_HIST_SIZE>, Color, Color> nonPawnsCorrHist = { };
 
     // Threading stuff
