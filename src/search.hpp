@@ -459,7 +459,33 @@ private:
             return ttScore.value();
 
         PlyData& plyData = td->pliesData[ply];
+        const PlyData* prevPlyData = isRoot ? nullptr : &(td->pliesData[ply - 1]);
+
         const i32 eval = getEval(td, plyData);
+
+        const Move lastMove = td->pos.lastMove();
+
+        // Update last move's history based on static eval diff
+        if (!isRoot
+        && !td->pos.inCheck()
+        && !prevPlyData->inCheck
+        && lastMove
+        && !td->pos.captured().has_value()
+        && !lastMove.promotion().has_value())
+        {
+            const PosState posState = td->pos.getState();
+            td->pos.undoMove();
+
+            HistoryEntry& histEntry
+                = td->historyTable[td->pos.sideToMove()][lastMove.pieceType()][lastMove.to()];
+
+            const i32 improvementScaled = -(eval + prevPlyData->eval.value()) * 8;
+            const i32 histBonus = std::clamp<i32>(improvementScaled, -1000, 1000) + 500;
+
+            histEntry.updateQuietHistories(td->pos, lastMove, histBonus);
+
+            td->pos.pushState(posState);
+        }
 
         if (ply >= MAX_DEPTH) return eval;
 
@@ -471,8 +497,7 @@ private:
         // Node pruning
         if (!isPvNode && !td->pos.inCheck() && !singularMove)
         {
-            const PlyData& prevPlyData = td->pliesData[ply - 1];
-            const bool oppWorsening = !prevPlyData.inCheck && eval > -prevPlyData.eval.value();
+            const bool oppWorsening = !prevPlyData->inCheck && eval > -prevPlyData->eval.value();
 
             // RFP (Reverse futility pruning)
             if (depth <= 7
