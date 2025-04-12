@@ -1,28 +1,19 @@
 .vscode/
-.vscode
 
 **/*.exe
 **/starzix
+**/Starzix
 **/*.pdb
-**/starzix-avx2
-**/starzix-avx512
 
-testsCore
-testsSEE
-testsNNUE
+test-position
+test-move-gen
+test-game-state
+test-SEE
+test-NNUE
 
-games.txt
-games.pgn
-debug.txt
-notes.txt
 stderr.txt
 stderr1.txt
 stderr2.txt
 
-sprt.py
 *.epd
 *.pgn
-
-**/sample.cpp
-**/test.cpp
-

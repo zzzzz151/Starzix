@@ -3,7 +3,7 @@
 #pragma once
 
 #include "utils.hpp"
-#include "board.hpp"
+#include "position.hpp"
 #include "search.hpp"
 
 constexpr std::array BENCH_FENS {
@@ -56,36 +56,35 @@ constexpr std::array BENCH_FENS {
     "rnbqkb1r/pppppppp/5n2/8/2PP4/8/PP2PPPP/RNBQKBNR b KQkq c3 0 2",
     "2rr2k1/1p4bp/p1q1p1p1/4Pp1n/2PB4/1PN3P1/P3Q2P/2RR2K1 w - f6 0 20",
     "3br1k1/p1pn3p/1p3n2/5pNq/2P1p3/1PN3PP/P2Q1PB1/4R1K1 w - - 0 23",
-    "2r2b2/5p2/5k2/p1r1pP2/P2pB3/1P3P2/K1P3R1/7R w - - 23 93"
+    "2r2b2/5p2/5k2/p1r1pP2/P2pB3/1P3P2/K1P3R1/7R w - - 23 93",
+    "8/P6p/2K1q1pk/2Q5/4p3/8/7P/8 w - - 4 44",
+    "7k/8/7P/5B2/5K2/8/8/8 b - - 0 175"
 };
 
-inline void bench(const int depth = 14)
+inline void bench(const i32 depth = 14)
 {
-    Searcher searcher = Searcher();
+    Searcher searcher = { };
 
-    u64 totalNodes = 0, totalMilliseconds = 0;
+    SearchConfig searchConfig = { };
+    searchConfig.setMaxDepth(depth);
+    searchConfig.printInfo = false;
+
+    u64 totalNodes = 0, totalMs = 0;
 
     for (const std::string fen : BENCH_FENS)
     {
-        searcher.ucinewgame();
-        searcher.board() = Board(fen);
+        Position pos = Position(fen);
 
-        const std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
+        std::chrono::time_point<std::chrono::steady_clock> startTime
+            = std::chrono::steady_clock::now();
 
-        searcher.search(
-            depth,
-            std::numeric_limits<u64>::max(),
-            startTime,
-            std::numeric_limits<u64>::max(),
-            std::numeric_limits<u64>::max(),
-            false
-        );
+        searcher.search(pos, searchConfig);
 
-        totalMilliseconds += millisecondsElapsed(startTime);
+        totalMs += millisecondsElapsed(startTime);
         totalNodes += searcher.totalNodes();
     }
 
     std::cout << totalNodes << " nodes "
-              << totalNodes * 1000 / std::max((u64)totalMilliseconds, (u64)1) << " nps"
+              << getNps(totalNodes, totalMs) << " nps"
               << std::endl;
 }

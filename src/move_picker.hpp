@@ -3,259 +3,245 @@
 #pragma once
 
 #include "utils.hpp"
-#include "board.hpp"
+#include "move.hpp"
+#include "position.hpp"
+#include "move_gen.hpp"
 #include "history_entry.hpp"
 
-enum class MoveGenStage : int {
-    TT_MOVE_NEXT = 0, TT_MOVE_YIELDED, GEN_SCORE_NOISIES, GOOD_NOISIES,
-    KILLER_NEXT, KILLER_YIELDED, GEN_SCORE_QUIETS, QUIETS, BAD_NOISIES, END
+struct ScoredMove
+{
+public:
+    Move move;
+    i32 score;
 };
 
-constexpr i32 GOOD_SCORE = 1'000'000;
-
-// Incremental sorting with partial selection sort
-constexpr Move partialSelectionSort(
-    ArrayVec<Move, 256> &moves, std::array<i32, 256> &movesScores, const int idx)
+// Incremental selection sort
+constexpr ScoredMove nextBest(ArrayVec<ScoredMove, 256>& scoredMoves)
 {
-    assert(idx < int(moves.size()));
+    if (scoredMoves.size() == 0)
+        return ScoredMove{ .move = MOVE_NONE, .score = 0 };
 
-    for (size_t i = idx + 1; i < moves.size(); i++)
-        if (movesScores[i] > movesScores[idx])
-        {
-            moves.swap(i, idx);
-            std::swap(movesScores[i], movesScores[idx]);
-        }
+    size_t bestIdx = 0;
 
-    return moves[idx];
+    for (size_t i = 1; i < scoredMoves.size(); i++)
+        if (scoredMoves[i].score > scoredMoves[bestIdx].score)
+            bestIdx = i;
+
+    const ScoredMove best = scoredMoves[bestIdx];
+
+    // Swap best ScoredMove to the end and pop it
+    scoredMoves.swap(bestIdx, scoredMoves.size() - 1);
+    scoredMoves.pop_back();
+
+    return best;
 }
 
-struct MovePicker {
-    private:
+class MovePicker
+{
+private:
 
-    MoveGenStage mStage = MoveGenStage::TT_MOVE_NEXT;
-    bool mNoisiesOnlyNoUnderpromos;
+    i32 mStage = 0;
 
-    ArrayVec<Move, 256> mNoisies, mQuiets;
-    std::array<i32, 256> mNoisiesScores, mQuietsScores;
-    int mNoisiesIdx = -1, mQuietsIdx = -1;
+    bool mNoisiesOnly = false;
 
-    bool mBadNoisyReady = false;
+    Move mTtMove = MOVE_NONE;
+    Move mKiller = MOVE_NONE;
+    Move mExcludedMove = MOVE_NONE;
 
-    public:
+    ArrayVec<ScoredMove, 256> mNoisies, mQuiets;
 
-    constexpr MovePicker(const bool noisiesOnlyNoUnderpromos) {
-        mNoisiesOnlyNoUnderpromos = noisiesOnlyNoUnderpromos;
+    ScoredMove mFirstBadNoisy = { .move = MOVE_NONE, .score = 0 };
+
+public:
+
+    constexpr MovePicker(
+        const bool noisiesOnly,
+        const Move ttMove,
+        const Move killer,
+        const Move excludedMove = MOVE_NONE)
+    {
+        mNoisiesOnly = noisiesOnly;
+        mTtMove = ttMove;
+        mKiller = killer;
+        mExcludedMove = excludedMove;
     }
 
-    constexpr MoveGenStage stage() const { return mStage; }
-
-    constexpr i32 moveScore() const
+    constexpr ScoredMove nextLegal(Position& pos, const HistoryTable& historyTable)
     {
-        assert(mStage == MoveGenStage::QUIETS
-            || mStage == MoveGenStage::GOOD_NOISIES
-            || mStage == MoveGenStage::BAD_NOISIES
-        );
-
-        return mStage == MoveGenStage::QUIETS ? mQuietsScores[mQuietsIdx] : mNoisiesScores[mNoisiesIdx];
-    }
-
-    constexpr Move next(Board &board, const Move ttMove, const Move killer,
-        MultiArray<HistoryEntry, 2, 6, 64> &historyTable, Move excludedMove = MOVE_NONE)
-    {
-        assert(killer == MOVE_NONE || board.isQuiet(killer));
-
-        Move move = MOVE_NONE;
-        const int stm = int(board.sideToMove());
-
         switch (mStage)
         {
-        case MoveGenStage::TT_MOVE_NEXT:
+        // TT move
+        case 0:
         {
-            if (ttMove != excludedMove
-            && !(mNoisiesOnlyNoUnderpromos && ttMove != MOVE_NONE && !board.isNoisyNotUnderpromo(ttMove))
-            && board.isPseudolegal(ttMove)
-            && board.isPseudolegalLegal(ttMove))
-            {
-                mStage = MoveGenStage::TT_MOVE_YIELDED;
-                return ttMove;
-            }
+            mStage++;
 
-            mStage = MoveGenStage::GEN_SCORE_NOISIES;
-            break;
+            if (mTtMove
+            && mTtMove != mExcludedMove
+            && (!mNoisiesOnly || !pos.isQuiet(mTtMove))
+            && isPseudolegal(pos, mTtMove)
+            && isPseudolegalLegal(pos, mTtMove))
+                return ScoredMove{ .move = mTtMove, .score = 0 };
+
+            return nextLegal(pos, historyTable);
         }
-        case MoveGenStage::TT_MOVE_YIELDED:
+        // Generate and score noisy moves
+        case 1:
         {
-            mStage = MoveGenStage::GEN_SCORE_NOISIES;
-            break;
-        }
-        case MoveGenStage::GEN_SCORE_NOISIES:
-        {
-            // Generate pseudolegal noisy moves, except underpromotions
-            board.pseudolegalMoves(mNoisies, MoveGenType::NOISIES, !mNoisiesOnlyNoUnderpromos);
-
-            // Score moves
-            size_t i = 0;
-            while (i < mNoisies.size())
-            {
-                move = mNoisies[i];
-
-                assert(mNoisiesOnlyNoUnderpromos ? board.isNoisyNotUnderpromo(move) : !board.isQuiet(move));
-
-                // Remove TT move and excluded move from list
-                if (move == ttMove || move == excludedMove) {
-                    mNoisies.swap(i, mNoisies.size() - 1);
-                    mNoisies.pop_back();
-                    continue;
-                }
-
-                const PieceType captured = board.captured(move);
-                const PieceType promotion = move.promotion();
-
-                if (mNoisiesOnlyNoUnderpromos)
-                    mNoisiesScores[i] = promotion == PieceType::QUEEN ? GOOD_SCORE : 0;
-                else if (promotion == PieceType::QUEEN)
-                    mNoisiesScores[i] = board.SEE(move, 0) ? GOOD_SCORE * 2 : 0;
-                else if (promotion != PieceType::NONE)
+            for (const Move move : pseudolegalMoves<MoveGenType::NoisyOnly>(pos))
+                if (move != mTtMove && move != mExcludedMove)
                 {
-                    // Underpromotions ordering: knight -> rook -> bishop
-                    constexpr std::array<i32, 4> UNDERPROMO_BONUS = { 0, 30000, 10000, 20000 }; // [promotionPieceType]
-
-                    mNoisiesScores[i] = -GOOD_SCORE * 2 + UNDERPROMO_BONUS[(int)promotion];
-                }
-                else {
-                    const int pt = int(move.pieceType());
-                    const i32 noisyHist = historyTable[stm][pt][move.to()].noisyHistory(captured, promotion);
-
-                    mNoisiesScores[i] = board.SEE(move, -noisyHist * seeNoisyHistMul()) ? GOOD_SCORE : -GOOD_SCORE;
+                    const i32 score = scoreNoisy(move, pos, historyTable);
+                    mNoisies.push_back(ScoredMove{ .move = move, .score = score });
                 }
 
-                // MVVLVA (most valuable victim, least valuable attacker)
-                if (captured != PieceType::NONE)
-                    mNoisiesScores[i] += 1000 + 100 * (i32)captured - i32(move.pieceType());
+            mStage++;
+            return nextLegal(pos, historyTable);
+        }
+        // Yield good noisy moves
+        case 2:
+        {
+            const ScoredMove scoredMove = nextBest(mNoisies);
 
-                i++;
+            if (!scoredMove.move || scoredMove.score < 0)
+            {
+                // Save the best bad noisy move for the bad noisy moves stage
+                if (scoredMove.move) mFirstBadNoisy = scoredMove;
+
+                // If only noisy moves, start yielding bad noisy moves
+                // Otherwise, go on to the quiet moves
+                mStage = mNoisiesOnly ? 6 : mStage + 1;
+            }
+            else if (isPseudolegalLegal(pos, scoredMove.move))
+                return scoredMove;
+
+            return nextLegal(pos, historyTable);
+        }
+        // Killer move (quiet)
+        case 3:
+        {
+            mStage++;
+
+            if (mKiller
+            && mKiller != mTtMove
+            && mKiller != mExcludedMove
+            && pos.isQuiet(mKiller)
+            && isPseudolegal(pos, mKiller)
+            && isPseudolegalLegal(pos, mKiller))
+            {
+                const HistoryEntry& histEntry
+                    = historyTable[pos.sideToMove()][mKiller.pieceType()][mKiller.to()];
+
+                const i32 quietHist = histEntry.quietHistory(pos, mKiller);
+
+                return ScoredMove{ .move = mKiller, .score = quietHist };
             }
 
-            mStage = MoveGenStage::GOOD_NOISIES;
-            break;
+            return nextLegal(pos, historyTable);
         }
-        case MoveGenStage::GOOD_NOISIES:
+        // Generate and score quiet moves
+        case 4:
         {
-            while (++mNoisiesIdx < int(mNoisies.size()))
+            for (const Move move : pseudolegalMoves<MoveGenType::QuietOnly>(pos))
             {
-                move = partialSelectionSort(mNoisies, mNoisiesScores, mNoisiesIdx);
-
-                if (moveScore() < GOOD_SCORE) {
-                    mBadNoisyReady = true;
-                    break;
-                }
-
-                if (board.isPseudolegalLegal(move))
-                    return move;
-            }
-
-            mStage = mNoisiesOnlyNoUnderpromos ? MoveGenStage::BAD_NOISIES : MoveGenStage::KILLER_NEXT;
-            break;
-        }
-        case MoveGenStage::KILLER_NEXT:
-        {
-            if (killer != excludedMove && board.isPseudolegal(killer) && board.isPseudolegalLegal(killer))
-            {
-                mStage = MoveGenStage::KILLER_YIELDED;
-                return killer;
-            }
-
-            mStage = MoveGenStage::GEN_SCORE_QUIETS;
-            break;
-        }
-        case MoveGenStage::KILLER_YIELDED:
-        {
-            mStage = MoveGenStage::GEN_SCORE_QUIETS;
-            break;
-        }
-        case MoveGenStage::GEN_SCORE_QUIETS:
-        {
-            // Generate pseudolegal quiet moves (promotions excluded)
-            board.pseudolegalMoves(mQuiets, MoveGenType::QUIETS);
-
-            const Color nstm = board.oppSide();
-
-            const std::array<Move, 3> lastMoves = {
-                board.lastMove(), board.nthToLastMove(2), board.nthToLastMove(4)
-            };
-
-            // Score moves
-            size_t j = 0;
-            while (j < mQuiets.size())
-            {
-                move = mQuiets[j];
-                assert(board.isQuiet(move));
-
-                // Remove TT move and killer move and excluded move from list
-                if (move == ttMove || move == killer || move == excludedMove)
-                {
-                    mQuiets.swap(j, mQuiets.size() - 1);
-                    mQuiets.pop_back();
+                if (move == mTtMove || move == mKiller || move == mExcludedMove)
                     continue;
-                }
 
-                const int pt = int(move.pieceType());
+                const HistoryEntry& histEntry
+                    = historyTable[pos.sideToMove()][move.pieceType()][move.to()];
 
-                mQuietsScores[j] = historyTable[stm][pt][move.to()].quietHistory(
-                    board.isSquareAttacked(move.from(), nstm),
-                    board.isSquareAttacked(move.to(),   nstm),
-                    lastMoves
-                );
+                const i32 quietHist = histEntry.quietHistory(pos, move);
 
-                j++;
+                mQuiets.push_back(ScoredMove{ .move = move, .score = quietHist });
             }
 
-            mStage = MoveGenStage::QUIETS;
-            break;
+            mStage++;
+            return nextLegal(pos, historyTable);
         }
-        case MoveGenStage::QUIETS:
+        // Yield quiet moves
+        case 5:
         {
-            move = MOVE_NONE;
+            const ScoredMove scoredMove = nextBest(mQuiets);
 
-            while (++mQuietsIdx < int(mQuiets.size()))
-            {
-                move = partialSelectionSort(mQuiets, mQuietsScores, mQuietsIdx);
+            if (!scoredMove.move)
+                mStage++;
+            else if (isPseudolegalLegal(pos, scoredMove.move))
+                return scoredMove;
 
-                if (board.isPseudolegalLegal(move))
-                    return move;
-            }
-
-            mStage = MoveGenStage::BAD_NOISIES;
-            break;
+            return nextLegal(pos, historyTable);
         }
-        case MoveGenStage::BAD_NOISIES:
+        // Yield bad noisy moves
+        case 6:
         {
-            if (mBadNoisyReady) {
-                assert(moveScore() < GOOD_SCORE);
-                mBadNoisyReady = false;
-
-                if (board.isPseudolegalLegal(mNoisies[mNoisiesIdx]))
-                    return mNoisies[mNoisiesIdx];
-            }
-
-            move = MOVE_NONE;
-
-            while (++mNoisiesIdx < int(mNoisies.size()))
+            // We may already have the best bad noisy move
+            // (from the ending of the good noisy moves stage)
+            if (mFirstBadNoisy.move)
             {
-                move = partialSelectionSort(mNoisies, mNoisiesScores, mNoisiesIdx);
-                assert(moveScore() < GOOD_SCORE);
+                const ScoredMove firstBadNoisy = mFirstBadNoisy;
+                mFirstBadNoisy = ScoredMove{ .move = MOVE_NONE, .score = 0 };
 
-                if (board.isPseudolegalLegal(move))
-                    return move;
+                if (isPseudolegalLegal(pos, firstBadNoisy.move))
+                    return firstBadNoisy;
             }
 
-            mStage = MoveGenStage::END;
-            break;
+            const ScoredMove scoredMove = nextBest(mNoisies);
+
+            if (!scoredMove.move)
+                mStage++;
+            else if (isPseudolegalLegal(pos, scoredMove.move))
+                return scoredMove;
+
+            return nextLegal(pos, historyTable);
         }
+        // No more legal moves
         default:
-            return MOVE_NONE;
+        {
+            return ScoredMove{ .move = MOVE_NONE, .score = 0 };
+        }
+        } // switch (mStage)
+    }
+
+    constexpr i32 scoreNoisy(
+        const Move move, const Position& pos, const HistoryTable& historyTable)
+    {
+        i32 score = 0;
+
+        const std::optional<PieceType> captured = pos.captured(move);
+        const std::optional<PieceType> promo    = move.promotion();
+
+        constexpr EnumArray<std::optional<i32>, PieceType> PROMO_SCORE = {
+            std::nullopt, // P
+            -3, // N
+            -5, // B
+            -4, // R
+            2,  // Q
+            std::nullopt // K
+        };
+
+        const HistoryEntry& histEntry
+            = historyTable[pos.sideToMove()][move.pieceType()][move.to()];
+
+        const i32 noisyHist = histEntry.noisyHistory(captured, promo);
+
+        if (mNoisiesOnly)
+            score = promo.has_value() ? *PROMO_SCORE[*promo] : 1;
+        else if (promo.has_value())
+        {
+            score = promo == PieceType::Queen
+                  ? (pos.SEE(move) ? 3 : -1)
+                  : *PROMO_SCORE[*promo];
+        }
+        else {
+            const i32 threshold = static_cast<i32>(lround(
+                static_cast<float>(-noisyHist) * seeNoisyHistMul()
+            ));
+
+            score = 2 * (pos.SEE(move, threshold) ? 1 : -1);
         }
 
-        return next(board, ttMove, killer, historyTable, excludedMove);
+        // MVV (most valuable victim)
+        const i32 iCaptured = captured.has_value() ? static_cast<i32>(*captured) + 1 : 0;
+
+        return score * 100'000 + noisyHist + iCaptured;
     }
-};
+
+}; // class MovePicker

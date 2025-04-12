@@ -3,68 +3,143 @@
 #pragma once
 
 #include "utils.hpp"
+#include "position.hpp"
+#include "move_gen.hpp"
 #include "search_params.hpp"
+#include "nnue.hpp"
+#include "tt.hpp"
+#include "history_entry.hpp"
 #include "thread_data.hpp"
 #include "move_picker.hpp"
-#include "history_entry.hpp"
-#include "tt.hpp"
-#include "nnue.hpp"
-#include <thread>
+#include "cuckoo.hpp"
 #include <atomic>
+#include <cstring>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
 
-class Searcher {
-    private:
+struct SearchConfig
+{
+private:
+
+    size_t maxDepth = MAX_DEPTH;
+
+public:
+
+    std::optional<u64> maxNodes = std::nullopt;
+
+    std::chrono::time_point<std::chrono::steady_clock> startTime
+        = std::chrono::steady_clock::now();
+
+    std::optional<u64> hardMs = std::nullopt;
+    std::optional<u64> softMs = std::nullopt;
+
+    bool printInfo = true;
+
+    constexpr auto getMaxDepth() const
+    {
+        return this->maxDepth;
+    }
+
+    constexpr void setMaxDepth(const i32 newMaxDepth)
+    {
+        this->maxDepth = static_cast<size_t>(std::clamp<i32>(
+            newMaxDepth, 1, static_cast<i32>(MAX_DEPTH)
+        ));
+    }
+
+}; // struct SearchConfig
+
+class Searcher
+{
+private:
 
     std::vector<ThreadData*> mThreadsData   = { };
     std::vector<std::thread> mNativeThreads = { };
 
-    // Search limits
-    i32 mMaxDepth = MAX_DEPTH;
-    u64 mMaxNodes = std::numeric_limits<u64>::max();
-    std::chrono::time_point<std::chrono::steady_clock> mStartTime = std::chrono::steady_clock::now();
-    u64 mHardMs = std::numeric_limits<u64>::max();
-    u64 mSoftMs = std::numeric_limits<u64>::max();
-
-    bool mPrintInfo = true;
+    SearchConfig mSearchConfig;
 
     std::atomic<bool> mStopSearch = false;
 
-    public:
+    constexpr const ThreadData* mainThreadData() const
+    {
+        assert(!mThreadsData.empty());
+        return mThreadsData[0];
+    }
+
+    constexpr ThreadData* mainThreadData()
+    {
+        assert(!mThreadsData.empty());
+        return mThreadsData[0];
+    }
+
+public:
 
     std::vector<TTEntry> mTT = { }; // Transposition table
 
     inline Searcher() {
-        resizeTT(mTT, 32);
         setThreads(1);
+        resizeTT(mTT, 32); // Default TT size is 32 MiB
     }
 
     inline ~Searcher() {
         setThreads(0);
     }
 
+    inline void setThreads(const size_t numThreads)
+    {
+        blockUntilSleep();
+
+        // Remove threads
+        while (!mThreadsData.empty())
+        {
+            ThreadData* td = mThreadsData.back();
+
+            wakeThread(td, ThreadState::ExitAsap);
+
+            {
+                std::unique_lock<std::mutex> lock(td->mutex);
+
+                td->cv.wait(lock, [td] {
+                    return td->threadState == ThreadState::Exited;
+                });
+            }
+
+            if (mNativeThreads.back().joinable())
+                mNativeThreads.back().join();
+
+            mNativeThreads.pop_back();
+            delete td, mThreadsData.pop_back();
+        }
+
+        mThreadsData.reserve(numThreads);
+        mNativeThreads.reserve(numThreads);
+
+        // Add threads
+        while (mThreadsData.size() < numThreads)
+        {
+            ThreadData* td = new ThreadData();
+            std::thread nativeThread([=, this]() mutable { loopThread(td); });
+
+            mThreadsData.push_back(td);
+            mNativeThreads.push_back(std::move(nativeThread));
+        }
+
+        mThreadsData.shrink_to_fit();
+        mNativeThreads.shrink_to_fit();
+    }
+
     constexpr void ucinewgame()
     {
-        board() = START_BOARD;
-        mainThreadData()->pliesData[0].pvLine.clear(); // reset best root move
-
-        resetTT(mTT);
-
         for (ThreadData* td : mThreadsData)
         {
-            td->nodes = 0;
+            td->nodes.store(0, std::memory_order_relaxed);
             td->historyTable     = { };
             td->pawnsCorrHist    = { };
             td->nonPawnsCorrHist = { };
         }
-    }
 
-    constexpr Board& board() const { return mainThreadData()->board; }
-
-    constexpr Move bestMoveRoot() const
-    {
-        return mainThreadData()->pliesData[0].pvLine.size() > 0
-               ? mainThreadData()->pliesData[0].pvLine[0]
-               : MOVE_NONE;
+        std::memset(mTT.data(), 0, mTT.size() * sizeof(TTEntry));
     }
 
     constexpr u64 totalNodes() const
@@ -72,32 +147,104 @@ class Searcher {
         u64 nodes = 0;
 
         for (const ThreadData* td : mThreadsData)
-            nodes += td->nodes;
+            nodes += td->nodes.load(std::memory_order_relaxed);
 
         return nodes;
     }
 
-    private:
+    inline Move search(Position& pos, const SearchConfig& searchConfig)
+    {
+        blockUntilSleep();
 
-    constexpr ThreadData* mainThreadData() const { return mThreadsData[0]; }
+        mSearchConfig = searchConfig;
 
-    inline void loop(ThreadData* td)
+        // Init node counter of every thread to 1 (root node)
+        for (ThreadData* td : mThreadsData)
+            td->nodes.store(1, std::memory_order_relaxed);
+
+        if (!hasLegalMove(pos))
+            return MOVE_NONE;
+
+        mStopSearch.store(false, std::memory_order_relaxed);
+
+        // Init main thread's position
+        mainThreadData()->pos = pos;
+
+        // Init main thread's root accumulator
+        nnue::BothAccumulators& bothAccs = mainThreadData()->bothAccsStack[0];
+        bothAccs = nnue::BothAccumulators(pos);
+
+        const auto initFinnyEntry = [&] (
+            const Color color, const bool mirrorVAxis, const size_t inputBucket) constexpr
+        {
+            nnue::FinnyTableEntry& finnyEntry
+                = mainThreadData()->finnyTable[color][mirrorVAxis][inputBucket];
+
+            if (mirrorVAxis == bothAccs.mMirrorVAxis[color]
+            &&  inputBucket == bothAccs.mInputBucket[color])
+            {
+                finnyEntry.accumulator = bothAccs.mAccumulators[color];
+                finnyEntry.colorBbs  = pos.colorBbs();
+                finnyEntry.piecesBbs = pos.piecesBbs();
+            }
+            else {
+                finnyEntry.accumulator = nnue::NET->hiddenBiases[color];
+                finnyEntry.colorBbs  = { };
+                finnyEntry.piecesBbs = { };
+            }
+        };
+
+        // Init main thread's finny table
+        for (const Color color : EnumIter<Color>())
+            for (const bool mirrorVAxis : { false, true })
+                for (size_t inputBucket = 0; inputBucket < nnue::NUM_INPUT_BUCKETS; inputBucket++)
+                    initFinnyEntry(color, mirrorVAxis, inputBucket);
+
+        // Init position, root accumulator and finny table of secondary threads
+        for (size_t i = 1; i < mThreadsData.size(); i++)
+        {
+            mThreadsData[i]->pos = pos;
+            mThreadsData[i]->bothAccsStack[0] = bothAccs;
+            mThreadsData[i]->finnyTable = mainThreadData()->finnyTable;
+        }
+
+        for (ThreadData* td : mThreadsData)
+        {
+            td->pliesData[0] = { };
+            td->pliesData[0].inCheck = td->pos.inCheck();
+            td->nodesByMove = { };
+            td->bothAccsIdx = 0;
+
+            wakeThread(td, ThreadState::Searching);
+        }
+
+        blockUntilSleep();
+
+        return bestMoveAtRoot(mainThreadData());
+    }
+
+private:
+
+    inline void loopThread(ThreadData* td)
     {
         while (true) {
             std::unique_lock<std::mutex> lock(td->mutex);
-            td->cv.wait(lock, [&] { return td->threadState != ThreadState::SLEEPING; });
 
-            if (td->threadState == ThreadState::SEARCHING)
-                iterativeDeepening(*td);
-            else if (td->threadState == ThreadState::EXIT_ASAP)
+            td->cv.wait(lock, [&] {
+                return td->threadState != ThreadState::Sleeping;
+            });
+
+            if (td->threadState == ThreadState::Searching)
+                iterativeDeepening(td);
+            else if (td->threadState == ThreadState::ExitAsap)
                 break;
 
-            td->threadState = ThreadState::SLEEPING;
+            td->threadState = ThreadState::Sleeping;
             td->cv.notify_one();
         }
 
         std::unique_lock<std::mutex> lock(td->mutex);
-        td->threadState = ThreadState::EXITED;
+        td->threadState = ThreadState::Exited;
         lock.unlock();
         td->cv.notify_all();
     }
@@ -107,811 +254,651 @@ class Searcher {
         for (ThreadData* td : mThreadsData)
         {
             std::unique_lock<std::mutex> lock(td->mutex);
-            td->cv.wait(lock, [&] { return td->threadState == ThreadState::SLEEPING; });
+
+            td->cv.wait(lock, [&] {
+                return td->threadState == ThreadState::Sleeping;
+            });
         }
     }
 
-    public:
-
-    inline int setThreads(int numThreads)
+    constexpr bool isHardTimeUp(const ThreadData* td)
     {
-        numThreads = std::max(numThreads, 0);
+        // Only check time in main thread and if depth 1 completed
+        if (td == mainThreadData()
+        && td->rootDepth > 1
+        && mSearchConfig.hardMs.has_value()
+        && td->nodes.load(std::memory_order_relaxed) % 1024 == 0
+        && millisecondsElapsed(mSearchConfig.startTime) >= mSearchConfig.hardMs)
+            mStopSearch.store(true, std::memory_order_relaxed);
 
-        blockUntilSleep();
-
-        const Board board = mThreadsData.empty() ? START_BOARD : mainThreadData()->board;
-
-        // Remove threads
-        while (!mThreadsData.empty())
-        {
-            ThreadData* lastThreadData = mThreadsData.back();
-
-            lastThreadData->wake(ThreadState::EXIT_ASAP);
-
-            {
-                std::unique_lock<std::mutex> lock(lastThreadData->mutex);
-
-                lastThreadData->cv.wait(lock, [lastThreadData] {
-                    return lastThreadData->threadState == ThreadState::EXITED;
-                });
-            }
-
-            if (mNativeThreads.back().joinable())
-                mNativeThreads.back().join();
-
-            mNativeThreads.pop_back();
-            delete lastThreadData, mThreadsData.pop_back();
-        }
-
-        mThreadsData.reserve(numThreads);
-        mNativeThreads.reserve(numThreads);
-
-        // Add threads
-        while (int(mThreadsData.size()) < numThreads)
-        {
-            ThreadData* threadData = new ThreadData();
-            std::thread nativeThread([=, this]() mutable { loop(threadData); });
-
-            mThreadsData.push_back(threadData);
-            mNativeThreads.push_back(std::move(nativeThread));
-        }
-
-        mThreadsData.shrink_to_fit();
-        mNativeThreads.shrink_to_fit();
-
-        if (!mThreadsData.empty())
-            mainThreadData()->board = board;
-
-        return numThreads;
+        return mStopSearch.load(std::memory_order_relaxed);
     }
 
-    inline std::pair<Move, i32> search(
-        const i32 maxDepth,
-        const u64 maxNodes,
-        const std::chrono::time_point<std::chrono::steady_clock> startTime,
-        const u64 hardMs,
-        const u64 softMs,
-        const bool printInfo)
+    constexpr void iterativeDeepening(ThreadData* td)
     {
-        mMaxDepth = std::clamp(maxDepth, 1, MAX_DEPTH);
-        mMaxNodes = maxNodes;
-        mStartTime = startTime;
-        mHardMs = hardMs;
-        mSoftMs = softMs;
+        const i32 maxDepth = static_cast<i32>(mSearchConfig.getMaxDepth());
+        i32 score = 0;
 
-        mPrintInfo = printInfo;
-        mStopSearch = false;
-
-        blockUntilSleep();
-
-        mainThreadData()->nodes = 0;
-        mainThreadData()->accumulators[0] = BothAccumulators(mainThreadData()->board);
-
-        // Init main thread's finny table
-        for (const int color : {WHITE, BLACK})
-            for (const int mirrorHorizontally : {false, true})
-                for (int inputBucket = 0; inputBucket < nnue::NUM_INPUT_BUCKETS; inputBucket++)
-                {
-                    FinnyTableEntry &finnyEntry = mainThreadData()->finnyTable[color][mirrorHorizontally][inputBucket];
-
-                    if (mirrorHorizontally == mainThreadData()->accumulators[0].mMirrorHorizontally[color]
-                    && inputBucket == mainThreadData()->accumulators[0].mInputBucket[color])
-                    {
-                        finnyEntry.accumulator = mainThreadData()->accumulators[0].mAccumulators[color];
-                        mainThreadData()->board.getColorBitboards(finnyEntry.colorBitboards);
-                        mainThreadData()->board.getPiecesBitboards(finnyEntry.piecesBitboards);
-                    }
-                    else {
-                        finnyEntry.accumulator = nnue::NET->hiddenBiases[color];
-                        finnyEntry.colorBitboards  = { };
-                        finnyEntry.piecesBitboards = { };
-                    }
-                }
-
-        // Init auxiliar threads
-        for (size_t i = 1; i < mThreadsData.size(); i++)
+        for (td->rootDepth = 1; td->rootDepth <= maxDepth; td->rootDepth++)
         {
-            mThreadsData[i]->nodes = 0;
-            mThreadsData[i]->board = mainThreadData()->board;
-            mThreadsData[i]->accumulators[0] = mainThreadData()->accumulators[0];
-            mThreadsData[i]->finnyTable = mainThreadData()->finnyTable;
-        }
+            td->maxPlyReached = 0; // Reset seldepth
 
-        for (ThreadData* td : mThreadsData)
-        {
-            td->nodesByMove = { };
-            td->pliesData[0] = PlyData();
-            td->accumulatorPtr = &(td->accumulators[0]);
-            td->wake(ThreadState::SEARCHING);
-        }
-
-        blockUntilSleep();
-
-        return { bestMoveRoot(), mainThreadData()->score };
-    }
-
-    private:
-
-    constexpr void iterativeDeepening(ThreadData &td)
-    {
-        td.score = VALUE_NONE;
-        for (i32 iterationDepth = 1; iterationDepth <= mMaxDepth; iterationDepth++)
-        {
-            td.maxPlyReached = 0;
-
-            const i32 iterationScore = iterationDepth >= aspMinDepth()
-                                       ? aspiration(td, iterationDepth)
-                                       : search(td, iterationDepth, 0, -INF, INF, false, DOUBLE_EXTENSIONS_MAX);
+            score = td->rootDepth >= 4
+                  ? aspirationWindows(td, score)
+                  : search<true, true, false>(td, td->rootDepth, 0, -INF, INF);
 
             if (mStopSearch.load(std::memory_order_relaxed))
                 break;
 
-            td.score = iterationScore;
-
-            // If not main thread, continue
-            if (&td != mainThreadData()) continue;
-
-            const u64 msElapsed = millisecondsElapsed(mStartTime);
-
-            mStopSearch = msElapsed >= mHardMs
-                          || (mMaxNodes < std::numeric_limits<i64>::max() && totalNodes() >= mMaxNodes);
+            // Only print uci info and check limits in main thread
+            if (td != mainThreadData())
+                continue;
 
             // Print uci info
-            if (mPrintInfo)
-            {
-                std::cout << "info"
-                          << " depth "    << iterationDepth
-                          << " seldepth " << td.maxPlyReached;
 
-                if (abs(td.score) < MIN_MATE_SCORE)
-                    std::cout << " score cp " << td.score;
-                else {
-                    const i32 movesTillMate = round((INF - abs(td.score)) / 2.0);
-                    std::cout << " score mate " << (td.score > 0 ? movesTillMate : -movesTillMate);
-                }
+            const u64 msElapsed = millisecondsElapsed(mSearchConfig.startTime);
+            const u64 nodes = totalNodes();
 
-                const u64 nodes = totalNodes();
+            if (!mSearchConfig.printInfo)
+                goto checkLimits;
 
-                std::cout << " nodes " << nodes
-                          << " nps "   << nodes * 1000 / std::max(msElapsed, (u64)1)
-                          << " time "  << msElapsed
-                          << " pv";
+            std::cout << "info"
+                      << " depth "    << td->rootDepth
+                      << " seldepth " << td->maxPlyReached
+                      << " score ";
 
-                for (const Move move : td.pliesData[0].pvLine)
-                    std::cout << " " << move.toUci();
-
-                std::cout << std::endl;
+            if (std::abs(score) < MIN_MATE_SCORE)
+                std::cout << "cp " << score;
+            else {
+                const i32 pliesToMate = INF - std::abs(score);
+                const i32 fullMovesToMate = (pliesToMate + 1) / 2;
+                std::cout << "mate " << (score > 0 ? fullMovesToMate : -fullMovesToMate);
             }
 
-            // Check soft time limit (in case one exists)
+            std::cout << " nodes " << nodes
+                      << " nps "   << getNps(nodes, msElapsed)
+                      << " time "  << msElapsed
+                      << " pv";
 
-            if (mSoftMs >= std::numeric_limits<i64>::max()) continue;
+            for (const Move move : td->pliesData[0].pvLine)
+                std::cout << " " << move.toUci();
 
-            // Nodes time management: scale soft time limit based on nodes spent on best move
-            const auto scaledSoftMs = [&]() constexpr -> u64
+            std::cout << std::endl;
+
+            checkLimits:
+
+            // Hard time limit hit?
+            if (mSearchConfig.hardMs.has_value() && msElapsed >= mSearchConfig.hardMs)
+                break;
+
+            // Soft nodes limit hit?
+            if (mSearchConfig.maxNodes.has_value() && nodes >= mSearchConfig.maxNodes)
+                break;
+
+            // Nodes time management
+            // Scale soft time limit based on nodes spent on best move at root
+            const auto softMsScaled = [&] () constexpr -> u64
             {
-                const double bestMoveNodes = td.nodesByMove[bestMoveRoot().encoded()];
-                const double bestMoveNodesFraction = bestMoveNodes / std::max<double>(td.nodes, 1.0);
+                const u64 threadNodes   = td->nodes.load(std::memory_order_relaxed);
+                const u64 bestMoveNodes = td->nodesByMove[bestMoveAtRoot(td).asU16()];
+
+                const double bestMoveNodesFraction
+                    = static_cast<double>(bestMoveNodes)
+                    / static_cast<double>(std::max<u64>(threadNodes, 1));
+
                 assert(bestMoveNodesFraction >= 0.0 && bestMoveNodesFraction <= 1.0);
-                return (double)mSoftMs * (1.5 - bestMoveNodesFraction);
+
+                const double scaled
+                    = static_cast<double>(*(mSearchConfig.softMs))
+                    * (nodesTmBase() - bestMoveNodesFraction * nodesTmMul());
+
+                return static_cast<u64>(llround(scaled));
             };
 
-            if (msElapsed >= (iterationDepth >= aspMinDepth() ? scaledSoftMs() : mSoftMs))
+            // Soft time limit hit?
+            if (mSearchConfig.softMs.has_value()
+            && msElapsed >= (td->rootDepth >= 6 ? softMsScaled() : mSearchConfig.softMs))
                 break;
         }
 
         // If main thread, signal other threads to stop searching
-        if (&td == mainThreadData()) mStopSearch = true;
+        if (td == mainThreadData())
+            mStopSearch.store(true, std::memory_order_relaxed);
     }
 
-    constexpr bool shouldStop(const ThreadData &td)
+    constexpr i32 aspirationWindows(ThreadData* td, i32 score)
     {
-        if (mStopSearch.load(std::memory_order_relaxed))
-            return true;
+        assert(td->rootDepth > 1);
 
-        // Only check stop conditions and modify mStopSearch in main thread
-        // Don't stop searching if depth 1 not completed
-        if (&td != mainThreadData() || mainThreadData()->score == VALUE_NONE)
-            return false;
+        i32 depth = td->rootDepth;
+        i32 delta = aspStartDelta();
+        i32 alpha = std::max<i32>(score - delta, -INF);
+        i32 beta  = std::min<i32>(score + delta, INF);
 
-        if (mMaxNodes < std::numeric_limits<i64>::max() && totalNodes() >= mMaxNodes)
-            return mStopSearch = true;
+        while (true)
+        {
+            score = search<true, true, false>(td, depth, 0, alpha, beta);
 
-        // Check time every N nodes
-        if (td.nodes % 1024 != 0) return false;
+            if (isHardTimeUp(td)) return 0;
 
-        return mStopSearch = (millisecondsElapsed(mStartTime) >= mHardMs);
-    }
-
-    constexpr i32 aspiration(ThreadData &td, const i32 iterationDepth)
-    {
-        // Aspiration Windows
-        // Search with a small window, adjusting it and researching until the score is inside the window
-
-        i32 depth = iterationDepth;
-        i32 delta = aspInitialDelta();
-        i32 alpha = std::max(-INF, td.score - delta);
-        i32 beta  = std::min(INF,  td.score + delta);
-
-        while (true) {
-            i32 score = search(td, depth, 0, alpha, beta, false, DOUBLE_EXTENSIONS_MAX);
-
-            if (shouldStop(td)) return 0;
-
-            if (score >= beta) {
-                beta = std::min(beta + delta, INF);
-                if (depth > 1) depth--;
-            }
-            else if (score <= alpha)
+            // Fail low?
+            if (score <= alpha)
             {
                 beta = (alpha + beta) / 2;
-                alpha = std::max(alpha - delta, -INF);
-                depth = iterationDepth;
+                alpha = std::max<i32>(alpha - delta, -INF);
+                depth = td->rootDepth;
+            }
+            // Fail high?
+            else if (score >= beta)
+            {
+                beta = std::min<i32>(beta + delta, INF);
+                if (depth > 1) depth--;
             }
             else
                 return score;
 
-            delta *= aspDeltaMul();
+            delta = static_cast<i32>(lround(static_cast<double>(delta) * aspDeltaMul()));
         }
     }
 
-    constexpr i32 search(ThreadData &td, i32 depth, const i32 ply, i32 alpha, i32 beta,
-        const bool cutNode, i32 doubleExtsLeft, const Move singularMove = MOVE_NONE)
+    template<bool isRoot, bool isPvNode, bool isCutNode>
+    constexpr i32 search(
+        ThreadData* td,
+        i32 depth,
+        const size_t ply,
+        i32 alpha,
+        const i32 beta,
+        const Move singularMove = MOVE_NONE)
     {
-        assert(ply >= 0 && ply <= mMaxDepth);
-        assert(alpha >= -INF && alpha <= INF);
-        assert(beta  >= -INF && beta  <= INF);
+        assert(isRoot == (ply == 0));
+        assert(ply >= 0 && ply <= MAX_DEPTH);
+        assert(std::abs(alpha) <= INF);
+        assert(std::abs(beta) <= INF);
         assert(alpha < beta);
-
-        if (shouldStop(td)) return 0;
-
-        // Cuckoo / detect upcoming repetition
-        if (ply > 0 && alpha < 0 && td.board.hasUpcomingRepetition(ply))
-        {
-            alpha = 0;
-            if (alpha >= beta) return alpha;
-        }
+        assert(!(isRoot && !isPvNode));
+        assert(isPvNode || alpha + 1 == beta);
+        assert(!(isPvNode && isCutNode));
 
         // Quiescence search at leaf nodes
-        if (depth <= 0) return qSearch(td, ply, alpha, beta);
+        if (depth <= 0) return qSearch<isPvNode, true>(td, ply, alpha, beta);
 
-        if (depth > mMaxDepth) depth = mMaxDepth;
+        if (isHardTimeUp(td)) return 0;
 
-        const bool pvNode = beta > alpha + 1 || ply == 0;
+        if constexpr (!isRoot)
+        {
+            const GameState gameState = td->pos.gameState(hasLegalMove, ply);
 
-        // Probe TT
-        const auto ttEntryIdx = TTEntryIndex(td.board.zobristHash(), mTT.size());
-        TTEntry ttEntry = singularMove != MOVE_NONE ? TTEntry() : mTT[ttEntryIdx];
-        const bool ttHit = td.board.zobristHash() == ttEntry.zobristHash;
-        Move ttMove = MOVE_NONE;
+            if (gameState == GameState::Draw)
+                return 0;
 
-        if (ttHit) {
-            ttEntry.adjustScore(ply);
-            ttMove = Move(ttEntry.move);
+            if (gameState == GameState::Loss)
+                return -INF + static_cast<i32>(ply);
 
-            // TT cutoff (not done in singular searches since ttHit is false)
-            if (!pvNode
-            && ttEntry.depth() >= depth
-            && (ttEntry.bound() == Bound::EXACT
-            || (ttEntry.bound() == Bound::LOWER && ttEntry.score >= beta)
-            || (ttEntry.bound() == Bound::UPPER && ttEntry.score <= alpha)))
-                return ttEntry.score;
+            // Detect upcoming repetition (cuckoo)
+            if (alpha < 0 && td->pos.hasUpcomingRepetition(ply) && (alpha = 0) >= beta)
+                return 0;
         }
 
-        PlyData* plyDataPtr = &(td.pliesData[ply]);
+        depth = std::min<i32>(depth, static_cast<i32>(MAX_DEPTH));
 
-        // Max ply cutoff
-        if (ply >= mMaxDepth)
-            return td.board.inCheck() ? 0 : td.updateAccumulatorAndEval(plyDataPtr->eval);
+        // Probe TT for TT entry
+        TTEntry& ttEntry = ttEntryRef(mTT, td->pos.zobristHash());
 
-        const i32 eval = td.updateAccumulatorAndEval(plyDataPtr->eval);
+        // Get TT entry data
+        const auto [ttDepth, ttScore, ttBound, ttMove]
+            = ttEntry.get(td->pos.zobristHash(), static_cast<i16>(ply));
 
-        const int improving = ply <= 1 || eval == VALUE_NONE || (plyDataPtr - 2)->eval == VALUE_NONE
-                              ? 0
-                              : eval - (plyDataPtr - 2)->eval >= improvingThreshold()
-                              ? 1
-                              : eval - (plyDataPtr - 2)->eval <= -improvingThreshold()
-                              ? -1
-                              : 0;
+        // TT cutoff
+        if (!isPvNode
+        && !singularMove
+        && ttDepth >= depth
+        && (ttBound == Bound::Exact
+        || (ttBound == Bound::Upper && ttScore <= alpha)
+        || (ttBound == Bound::Lower && ttScore >= beta)))
+            return *ttScore;
 
-        (plyDataPtr + 1)->killer = MOVE_NONE;
+        PlyData& plyData = td->pliesData[ply];
+        const i32 eval = getEval(td, plyData);
+
+        if (ply >= MAX_DEPTH) return eval;
+
+        updateBothAccs(td);
+
+        // Reset killer move of next tree level
+        td->pliesData[ply + 1].killer = MOVE_NONE;
 
         // Node pruning
-        if (!pvNode && !td.board.inCheck() && singularMove == MOVE_NONE)
+        if (!isPvNode && !td->pos.inCheck() && !singularMove)
         {
-            // RFP (Reverse futility pruning) / Static NMP
-            if (depth <= rfpMaxDepth()
-            && eval >= beta + (depth - improving) * rfpDepthMul())
-                return eval;
+            const i32 parentEval = *(td->pliesData[ply - 1].eval);
+            const bool oppWorsening = !td->pliesData[ply - 1].inCheck && eval > -parentEval;
+
+            // RFP (Reverse futility pruning)
+            if (depth <= 7
+            && std::abs(beta) < MIN_MATE_SCORE
+            && eval - beta >= std::max<i32>(depth - oppWorsening, 1) * rfpDepthMul())
+                return (eval + beta) / 2;
 
             // Razoring
-            if (depth <= razoringMaxDepth()
-            && abs(alpha) < 2000
-            && eval + depth * razoringDepthMul() < alpha)
-            {
-                const i32 score = qSearch(td, ply, alpha, beta);
-
-                if (shouldStop(td)) return 0;
-
-                if (score <= alpha) return score;
-            }
+            if (alpha - eval > razoringBase() + depth * depth * razoringDepthMul())
+                return qSearch<isPvNode, true>(td, ply, alpha, beta);
 
             // NMP (Null move pruning)
-            if (depth >= nmpMinDepth()
-            && td.board.lastMove() != MOVE_NONE
+            if (depth >= 3
+            && td->pos.lastMove()
+            && td->pos.stmHasNonPawns()
             && eval >= beta
-            && eval >= beta + nmpEvalBetaMargin() - depth * nmpEvalBetaMul()
-            && !(ttHit && ttEntry.bound() == Bound::UPPER && ttEntry.score < beta)
-            && td.board.hasNonPawnMaterial(td.board.sideToMove()))
+            && !(ttBound == Bound::Upper && ttScore < beta))
             {
-                td.makeMove(MOVE_NONE, ply + 1, mTT);
+                makeMove(td, MOVE_NONE, ply + 1, &mTT);
 
-                const i32 nmpDepth = depth - nmpBaseReduction() - depth * nmpDepthMul()
-                                     - (ttMove != MOVE_NONE && !td.board.isQuiet(ttMove));
+                const i32 nmpDepth = depth - 4 - depth / 3;
 
-                const i32 score = td.board.isDraw(ply + 1) ? 0
-                                  : -search(td, nmpDepth, ply + 1, -beta, -alpha, !cutNode, doubleExtsLeft);
+                const i32 score = -search<false, false, false>(
+                    td, nmpDepth, ply + 1, -beta, -alpha
+                );
 
-                td.board.undoMove();
-
-                if (shouldStop(td)) return 0;
+                undoMove(td);
 
                 if (score >= beta) return score >= MIN_MATE_SCORE ? beta : score;
-            }
-
-            // Probcut
-            const i32 probcutBeta = beta + probcutMargin() - improving * probcutMargin() * probcutImprovingPercentage();
-            if (depth >= 5
-            && abs(beta) < MIN_MATE_SCORE - 1
-            && probcutBeta < MIN_MATE_SCORE - 1
-            && !(ttHit && ttEntry.depth() >= depth - 3 && ttEntry.score < probcutBeta))
-            {
-                const i32 probcutScore = probcut(
-                    td, depth, ply, probcutBeta, cutNode, doubleExtsLeft, ttMove, ttEntryIdx);
-
-                if (shouldStop(td)) return 0;
-
-                if (probcutScore != VALUE_NONE) return probcutScore;
             }
         }
 
         // IIR (Internal iterative reduction)
-        if (depth >= iirMinDepth()
-        && (ttMove == MOVE_NONE || ttEntry.depth() < depth - iirMinDepth())
-        && singularMove == MOVE_NONE
-        && (pvNode || cutNode))
+        if ((isPvNode || isCutNode) && depth >= 4 && !ttMove && !singularMove)
             depth--;
 
-        const bool lmrImproving = ply > 1 && eval != VALUE_NONE && (plyDataPtr - 2)->eval != VALUE_NONE
-                                  && eval > (plyDataPtr - 2)->eval;
-
-        const int stm = int(td.board.sideToMove());
-        int legalMovesSeen = 0;
+        size_t legalMovesSeen = 0;
         i32 bestScore = -INF;
         Move bestMove = MOVE_NONE;
-        bool isBestMoveQuiet = false;
-        Bound bound = Bound::UPPER;
+        Bound bound = Bound::Upper;
 
+        // Keep track of moves that fail low
         ArrayVec<Move, 256> failLowQuiets;
-        ArrayVec<i16*, 256> failLowNoisiesHistory;
+        ArrayVec<Move, 256> failLowNoisies;
+        ArrayVec<PieceType, 256> capturedArray;
 
         // Moves loop
-
-        MovePicker movePicker = MovePicker(false);
-        Move move;
-
-        while ((move = movePicker.next(
-            td.board, ttMove, plyDataPtr->killer, td.historyTable, singularMove
-            )) != MOVE_NONE)
+        MovePicker mp = MovePicker(false, ttMove, plyData.killer, singularMove);
+        while (true)
         {
+            // Move, i32
+            const auto [move, moveScore] = mp.nextLegal(td->pos, td->historyTable);
+
+            if (!move) break;
+
+            // In singular searches, singular move (TT move) isn't searched
             assert(move != singularMove);
 
             legalMovesSeen++;
-            const bool isQuiet = td.board.isQuiet(move);
 
-            assert([&]() {
-                const MoveGenStage stage = movePicker.stage();
+            const bool isQuiet = td->pos.isQuiet(move);
+            const float quietHist = static_cast<float>(isQuiet ? moveScore : 0);
 
-                return stage == MoveGenStage::TT_MOVE_YIELDED
-                       ? move == ttMove && legalMovesSeen == 1
-                       : stage == MoveGenStage::KILLER_YIELDED
-                       ? move == plyDataPtr->killer && isQuiet
-                       : (isQuiet ? stage == MoveGenStage::QUIETS
-                                  : stage == MoveGenStage::GOOD_NOISIES || stage == MoveGenStage::BAD_NOISIES
-                         );
-            }());
-
-            int pt = int(move.pieceType());
-            HistoryEntry &historyEntry = td.historyTable[stm][pt][move.to()];
-
-            i16* noisyHistoryPtr;
-            if (!isQuiet) noisyHistoryPtr = historyEntry.noisyHistoryPtr(td.board.captured(move), move.promotion());
-
-            // Moves loop pruning
-            if (ply > 0
-            && bestScore > -MIN_MATE_SCORE
-            && legalMovesSeen >= 3
-            && (movePicker.stage() == MoveGenStage::QUIETS || movePicker.stage() == MoveGenStage::BAD_NOISIES))
+            // Moves loop pruning at shallow depths
+            if (!isRoot && bestScore > -MIN_MATE_SCORE && (isQuiet || moveScore < 0))
             {
                 // LMP (Late move pruning)
-                if (legalMovesSeen >= lmpMinMoves() + pvNode + td.board.inCheck()
-                                      + depth * depth * lmpDepthMul())
+                if (legalMovesSeen > static_cast<size_t>(3 + depth * depth))
                     break;
 
-                const i32 lmrDepth = depth - LMR_TABLE[isQuiet][depth][legalMovesSeen];
+                const i32 lmrDepth
+                    = depth - LMR_TABLE[static_cast<size_t>(depth)][isQuiet][legalMovesSeen];
 
                 // FP (Futility pruning)
-                if (lmrDepth <= fpMaxDepth()
-                && !td.board.inCheck()
+                if (!td->pos.inCheck()
+                && lmrDepth <= 7
+                && legalMovesSeen > 2
                 && alpha < MIN_MATE_SCORE
-                && alpha > eval + fpBase() + std::max(lmrDepth + improving, 0) * fpDepthMul())
+                && alpha - eval > fpBase() + std::max<i32>(lmrDepth, 1) * fpDepthMul())
                     break;
 
                 // SEE pruning
 
-                const i32 threshold = isQuiet ? depth * seeQuietThreshold() - movePicker.moveScore() * seeQuietHistMul()
-                                              : depth * seeNoisyThreshold() - i32(*noisyHistoryPtr)  * seeNoisyHistMul();
+                i32 threshold = isQuiet ? seeQuietThreshold() : seeNoisyThreshold();
+                threshold *= depth;
+                threshold -= lround(quietHist * seeQuietHistMul());
+                threshold = std::min<i32>(threshold, -1);
 
-                if (depth <= seePruningMaxDepth() && !td.board.SEE(move, threshold))
+                if (td->pos.stmHasNonPawns() && !td->pos.SEE(move, threshold))
                     continue;
             }
 
             i32 newDepth = depth - 1;
 
             // SE (Singular extensions)
-            // In singular searches, ttMove = MOVE_NONE, which prevents SE
-            i32 singularBeta;
-            if (move == ttMove
-            && ply > 0
-            && depth >= singularMinDepth()
-            && ttEntry.depth() >= depth - singularDepthMargin()
-            && ttEntry.bound() != Bound::UPPER
-            && abs(ttEntry.score) < MIN_MATE_SCORE
-            && (singularBeta = i32(ttEntry.score) - depth) > -MIN_MATE_SCORE + 1)
+            if (!isRoot
+            && !singularMove
+            && move == ttMove
+            && static_cast<i32>(ply) < td->rootDepth * 2
+            && depth >= 6
+            && ttDepth >= depth - 3
+            && std::abs(*ttScore) < MIN_MATE_SCORE
+            && ttBound == Bound::Lower)
             {
-                // Singular search: before searching any move,
-                // search this node at a shallower depth with TT move excluded
+                const i32 singularBeta = std::max<i32>(*ttScore - depth, -MIN_MATE_SCORE);
 
-                const i32 singularScore = search(
-                    td, (depth - 1) / 2, ply, singularBeta - 1, singularBeta, cutNode, doubleExtsLeft, ttMove);
+                const i32 singularScore = search<isRoot, false, isCutNode>(
+                    td, newDepth / 2, ply, singularBeta - 1, singularBeta, ttMove
+                );
 
-                // Double extension
-                if (!pvNode && singularScore < singularBeta - doubleExtensionMargin() && doubleExtsLeft > 0) {
-                    newDepth += 2;
-                    doubleExtsLeft--;
-                }
-                // Normal singular extension
-                else if (singularScore < singularBeta)
-                    newDepth++;
+                // Single or double extension
+                if (singularScore < singularBeta)
+                    newDepth += 1 + (singularBeta - singularScore > doubleExtMargin());
                 // Multicut
-                else if (singularBeta >= beta)
-                    return singularBeta;
-                // Negative extension
-                else if (cutNode)
-                    newDepth -= 2;
+                else if (singularScore >= beta && std::abs(singularScore) < MIN_MATE_SCORE)
+                    return singularScore;
             }
 
-            const u64 nodesBefore = td.nodes;
-            td.makeMove(move, ply + 1, mTT);
+            const u64 nodesBefore = td->nodes.load(std::memory_order_relaxed);
 
-            i32 score = 0;
+            makeMove(td, move, ply + 1, &mTT);
 
-            if (td.board.isDraw(ply + 1))
-                goto moveSearched;
+            const std::optional<PieceType> captured = td->pos.captured();
 
             // PVS (Principal variation search)
 
-            // LMR (Late move reductions)
-            if (depth >= 2
-            && !td.board.inCheck()
-            && legalMovesSeen >= 2
-            && (movePicker.stage() == MoveGenStage::QUIETS || movePicker.stage() == MoveGenStage::BAD_NOISIES))
-            {
-                i32 lmr = LMR_TABLE[isQuiet][depth][legalMovesSeen]
-                          - pvNode       // reduce pv nodes less
-                          - lmrImproving // reduce less if were improving
-                          + 2 * cutNode; // reduce more if we expect to fail high
+            i32 score = 0, numFailHighs = 0;
 
-                // reduce moves with good history less and vice versa
-                lmr -= round(
-                    isQuiet ? float(movePicker.moveScore()) / (float)lmrQuietHistoryDiv()
-                            : float(*noisyHistoryPtr) / (float)lmrNoisyHistoryDiv()
+            // LMR (Late move reductions)
+            if (depth >= 2 && legalMovesSeen > 1 + isRoot && (isQuiet || moveScore < 0))
+            {
+                // Base reduction
+                i32 r = LMR_TABLE[static_cast<size_t>(depth)][isQuiet][legalMovesSeen];
+
+                r -= isPvNode;          // Reduce PV nodes less
+                r += isCutNode * 2;     // Reduce more if parent node expects to fail high
+                r -= td->pos.inCheck(); // Reduce moves that give check less
+
+                // For quiet moves, less reduction the higher the move's history and vice-versa
+                r -= lround(quietHist * lmrQuietHistMul());
+
+                r = std::max<i32>(r, 0); // Don't extend
+
+                const i32 reducedDepth = newDepth - r;
+
+                // Reduced null window search
+                score = -search<false, false, true>(
+                    td, reducedDepth, ply + 1, -alpha - 1, -alpha
                 );
 
-                if (lmr < 0) lmr = 0; // dont extend
+                numFailHighs += score > alpha;
 
-                score = -search(td, newDepth - lmr, ply + 1, -alpha - 1, -alpha, true, doubleExtsLeft);
-
-                if (score > alpha && lmr > 0)
+                if (score > alpha && reducedDepth < newDepth)
                 {
-                    // Deeper or shallower search?
-                    newDepth += ply > 0 && score > bestScore + deeperBase() + newDepth * 2;
-                    newDepth -= ply > 0 && score < bestScore + newDepth;
+                    // Deeper or shallower research?
+                    newDepth += score - bestScore > deeperBase() + newDepth * 2;
+                    newDepth -= score - bestScore < shallowerMargin();
+                }
 
-                    score = -search(td, newDepth, ply + 1, -alpha - 1, -alpha, !cutNode, doubleExtsLeft);
+                if (score > alpha && reducedDepth < newDepth)
+                {
+                    // Null window research
+                    score = -search<false, false, !isCutNode>(
+                        td, newDepth, ply + 1, -alpha - 1, -alpha
+                    );
+
+                    numFailHighs += score > alpha;
                 }
             }
-            else if (!pvNode || legalMovesSeen > 1)
-                score = -search(td, newDepth, ply + 1, -alpha - 1, -alpha, !cutNode, doubleExtsLeft);
+            else if (!isPvNode || legalMovesSeen > 1)
+            {
+                // Null window search
+                score = -search<false, false, !isCutNode>(
+                    td, newDepth, ply + 1, -alpha - 1, -alpha
+                );
 
-            if (pvNode && (legalMovesSeen == 1 || score > alpha))
-                score = -search(td, newDepth, ply + 1, -beta, -alpha, false, doubleExtsLeft);
+                numFailHighs += score > alpha;
+            }
 
-            moveSearched:
+            // Full window search
+            if (isPvNode && (legalMovesSeen == 1 || score > alpha))
+            {
+                score = -search<false, true, false>(td, newDepth, ply + 1, -beta, -alpha);
+                numFailHighs += score >= beta;
+            }
 
-            td.board.undoMove();
-            td.accumulatorPtr--;
+            undoMove(td);
 
-            if (shouldStop(td)) return 0;
+            if (mStopSearch.load(std::memory_order_relaxed))
+                return 0;
 
-            assert(td.nodes > nodesBefore);
-            if (ply == 0) td.nodesByMove[move.encoded()] += td.nodes - nodesBefore;
+            assert(td->nodes.load(std::memory_order_relaxed) > nodesBefore);
 
-            if (score > bestScore) bestScore = score;
+            if constexpr (isRoot)
+            {
+                td->nodesByMove[move.asU16()]
+                    += td->nodes.load(std::memory_order_relaxed) - nodesBefore;
+            }
+
+            bestScore = std::max<i32>(bestScore, score);
 
             // Fail low?
-            if (score <= alpha) {
-                if (isQuiet)
-                    failLowQuiets.push_back(move);
-                else
-                    failLowNoisiesHistory.push_back(noisyHistoryPtr);
+            if (score <= alpha)
+            {
+                (isQuiet ? failLowQuiets : failLowNoisies).push_back(move);
+
+                if (!isQuiet) capturedArray.push_back(captured.value_or(PieceType::King));
 
                 continue;
             }
 
             alpha = score;
             bestMove = move;
-            isBestMoveQuiet = isQuiet;
-            bound = Bound::EXACT;
+            bound = Bound::Exact;
 
-            // If PV node, update PV line
-            if (pvNode) {
-                plyDataPtr->pvLine.clear();
-                plyDataPtr->pvLine.push_back(move);
+            // In PV nodes, update PV line
+            if constexpr (isPvNode)
+            {
+                plyData.pvLine.clear();
+                plyData.pvLine.push_back(move);
 
                 // Copy child's PV line
-                for (const Move move : (plyDataPtr + 1)->pvLine)
-                    plyDataPtr->pvLine.push_back(move);
+                for (const Move m : td->pliesData[ply + 1].pvLine)
+                    plyData.pvLine.push_back(m);
             }
 
             if (score < beta) continue;
 
-            // Fail high / beta cutoff
+            // This move failed high
 
-            bound = Bound::LOWER;
+            bound = Bound::Lower;
 
-            const i32 bonus =  std::clamp(depth * historyBonusMul() - historyBonusOffset(), 0, historyBonusMax());
-            const i32 malus = -std::clamp(depth * historyMalusMul() - historyMalusOffset(), 0, historyMalusMax());
+            // Update histories
 
-            // History malus: decrease history of fail low noisy moves
-            for (i16* noisyHistoryPtr : failLowNoisiesHistory)
-                updateHistory(noisyHistoryPtr, malus);
+            HistoryEntry& histEntry
+                = td->historyTable[td->pos.sideToMove()][move.pieceType()][move.to()];
 
-            if (!isQuiet) {
-                // History bonus: increase this move's history
-                updateHistory(noisyHistoryPtr, bonus);
+            i32 histBonus = std::clamp<i32>(
+                depth * histBonusMul() - histBonusOffset(), 0, histBonusMax()
+            );
+
+            histBonus *= numFailHighs;
+
+            const i32 histMalus = -std::clamp<i32>(
+                depth * histMalusMul() - histMalusOffset(), 0, histMalusMax()
+            );
+
+            // Decrease history of fail low noisy moves
+            for (size_t i = 0; i < failLowNoisies.size(); i++)
+            {
+                const auto [move2, captured2]
+                    = std::pair<Move, PieceType>{ failLowNoisies[i], capturedArray[i] };
+
+                HistoryEntry& histEntry2
+                    = td->historyTable[td->pos.sideToMove()][move2.pieceType()][move2.to()];
+
+                histEntry2.updateNoisyHistory(
+                    std::optional<PieceType>(captured2), move2.promotion(), histMalus
+                );
+            }
+
+            if (!isQuiet)
+            {
+                // Increase history of this fail high noisy move
+                histEntry.updateNoisyHistory(captured, move.promotion(), histBonus);
                 break;
             }
 
-            // This move is a fail high quiet
+            // At this point, this move is quiet
 
-            plyDataPtr->killer = move;
-            const Color nstm = td.board.oppSide();
+            plyData.killer = move;
 
-            const std::array<Move, 3> lastMoves = {
-                td.board.lastMove(), td.board.nthToLastMove(2), td.board.nthToLastMove(4)
-            };
+            // Increase histories of this fail high quiet move
+            histEntry.updateQuietHistories(td->pos, move, histBonus);
 
-            // History bonus: increase this move's history
-            historyEntry.updateQuietHistories(
-                td.board.isSquareAttacked(move.from(), nstm),
-                td.board.isSquareAttacked(move.to(),   nstm),
-                lastMoves,
-                bonus
-            );
+            // Decrease histories of fail low quiet moves
+            for (const Move move2 : failLowQuiets)
+            {
+                HistoryEntry& histEntry2
+                    = td->historyTable[td->pos.sideToMove()][move2.pieceType()][move2.to()];
 
-            // History malus: decrease history of fail low quiets
-            for (const Move failLow : failLowQuiets) {
-                pt = int(failLow.pieceType());
-
-                td.historyTable[stm][pt][failLow.to()].updateQuietHistories(
-                    td.board.isSquareAttacked(failLow.from(), nstm),
-                    td.board.isSquareAttacked(failLow.to(),   nstm),
-                    lastMoves,
-                    malus
-                );
+                histEntry2.updateQuietHistories(td->pos, move2, histMalus);
             }
 
             break;
         }
 
-        if (legalMovesSeen == 0) {
-            if (singularMove != MOVE_NONE) return alpha;
-
-            assert(!td.board.hasLegalMove());
-
-            // Checkmate or stalemate
-            return td.board.inCheck() ? -INF + ply : 0;
+        if (legalMovesSeen == 0)
+        {
+            assert(singularMove);
+            return alpha;
         }
 
-        assert(td.board.hasLegalMove());
-
-        if (singularMove == MOVE_NONE) {
-            // Store in TT
-            mTT[ttEntryIdx].update(td.board.zobristHash(), depth, ply, bestScore, bestMove, bound);
+        if (!singularMove)
+        {
+            // Update TT entry
+            ttEntry.update(
+                td->pos.zobristHash(),
+                static_cast<u8>(depth),
+                static_cast<i16>(bestScore),
+                static_cast<i16>(ply),
+                bound,
+                bestMove
+            );
 
             // Update correction histories
-            if (!td.board.inCheck()
-            && abs(bestScore) < MIN_MATE_SCORE
-            && (bestMove == MOVE_NONE || isBestMoveQuiet)
-            && !(bound == Bound::LOWER && bestScore <= eval)
-            && !(bound == Bound::UPPER && bestScore >= eval))
+            if (!td->pos.inCheck()
+            && std::abs(bestScore) < MIN_MATE_SCORE
+            && (!bestMove || td->pos.isQuiet(bestMove))
+            && !(bound == Bound::Lower && bestScore <= eval)
+            && !(bound == Bound::Upper && bestScore >= eval))
             {
-                for (i16* corrHist : td.correctionHistories())
-                    if (corrHist != nullptr) updateHistory(corrHist, (bestScore - eval) * depth);
+                const i32 bonus = (bestScore - eval) * depth;
+
+                for (i16* corrHistPtr : corrHistsPtrs(td))
+                    updateHistory(corrHistPtr, bonus);
             }
         }
 
+        assert(std::abs(bestScore) < INF);
         return bestScore;
     }
 
-    constexpr i32 qSearch(ThreadData &td, const i32 ply, i32 alpha, i32 beta)
+    // Quiescence search
+    template<bool isPvNode, bool isFirstCall>
+    constexpr i32 qSearch(ThreadData* td, const size_t ply, i32 alpha, const i32 beta)
     {
-        assert(ply > 0 && ply <= mMaxDepth);
-        assert(alpha >= -INF && alpha <= INF);
-        assert(beta  >= -INF && beta  <= INF);
+        assert(ply > 0 && ply <= MAX_DEPTH);
+        assert(std::abs(alpha) <= INF);
+        assert(std::abs(beta) <= INF);
         assert(alpha < beta);
+        assert(isPvNode || alpha + 1 == beta);
 
-        if (shouldStop(td)) return 0;
+        if (isHardTimeUp(td)) return 0;
 
-        // Probe TT
-        const auto ttEntryIdx = TTEntryIndex(td.board.zobristHash(), mTT.size());
-        TTEntry ttEntry = mTT[ttEntryIdx];
-        const bool ttHit = td.board.zobristHash() == ttEntry.zobristHash;
+        const GameState gameState = td->pos.gameState(hasLegalMove, ply);
 
-        // TT cutoff
-        if (ttHit) {
-            ttEntry.adjustScore(ply);
+        if (gameState == GameState::Draw)
+            return 0;
 
-            if (ttEntry.bound() == Bound::EXACT
-            || (ttEntry.bound() == Bound::LOWER && ttEntry.score >= beta)
-            || (ttEntry.bound() == Bound::UPPER && ttEntry.score <= alpha))
-                return ttEntry.score;
-        }
+        if (gameState == GameState::Loss)
+            return -INF + static_cast<i32>(ply);
 
-        PlyData* plyDataPtr = &(td.pliesData[ply]);
+        // Detect upcoming repetition (cuckoo)
+        if (alpha < 0 && td->pos.hasUpcomingRepetition(ply) && (alpha = 0) >= beta)
+            return 0;
 
-        // Max ply cutoff
-        if (ply >= mMaxDepth)
-            return td.board.inCheck() ? 0 : td.updateAccumulatorAndEval(plyDataPtr->eval);
-
-        const i32 eval = td.updateAccumulatorAndEval(plyDataPtr->eval);
-
-        if (!td.board.inCheck()) {
-            if (eval >= beta) return eval;
-            if (eval > alpha) alpha = eval;
-        }
-
-        i32 bestScore = td.board.inCheck() ? -INF : eval;
-        Move bestMove = MOVE_NONE;
-        Bound bound = Bound::UPPER;
-
-        // Moves loop
-
-        MovePicker movePicker = MovePicker(!td.board.inCheck());
-        Move move;
-        const Move ttMove = !ttHit || !td.board.inCheck() ? MOVE_NONE : Move(ttEntry.move);
-
-        while ((move = movePicker.next(td.board, ttMove, plyDataPtr->killer, td.historyTable)) != MOVE_NONE)
+        if constexpr (!isPvNode && isFirstCall)
         {
-            assert([&]() {
-                const MoveGenStage stage = movePicker.stage();
-                const bool isNoisiesStage = stage == MoveGenStage::GOOD_NOISIES || stage == MoveGenStage::BAD_NOISIES;
+            // Probe TT for TT entry
+            const TTEntry& ttEntry = ttEntryRef(mTT, td->pos.zobristHash());
 
-                if (td.board.inCheck())
-                    return stage == MoveGenStage::TT_MOVE_YIELDED
-                           ? move == ttMove
-                           : stage == MoveGenStage::KILLER_YIELDED
-                           ? move == plyDataPtr->killer && td.board.isQuiet(move)
-                           : (td.board.isQuiet(move) ? stage == MoveGenStage::QUIETS : isNoisiesStage);
+            // Get TT entry data
+            const auto [ttDepth, ttScore, ttBound, ttMove]
+                = ttEntry.get(td->pos.zobristHash(), static_cast<i16>(ply));
 
-                return isNoisiesStage && td.board.isNoisyNotUnderpromo(move);
-            }());
+            // TT cutoff
+            if (ttBound == Bound::Exact
+            || (ttBound == Bound::Upper && ttScore <= alpha)
+            || (ttBound == Bound::Lower && ttScore >= beta))
+                return *ttScore;
+        }
 
-            // If in check, skip quiets and bad noisy moves
-            if (td.board.inCheck() && bestScore > -MIN_MATE_SCORE && int(movePicker.stage()) > int(MoveGenStage::GOOD_NOISIES))
+        const i32 eval = getEval(td, td->pliesData[ply]);
+
+        if (ply >= MAX_DEPTH) return eval;
+
+        if (!td->pos.inCheck())
+        {
+            // Stand pat
+            // Return immediately if static eval fails high
+            if (eval >= beta) return eval;
+
+            alpha = std::max<i32>(alpha, eval);
+        }
+        else
+            updateBothAccs(td);
+
+        // Reset killer move of next tree level
+        td->pliesData[ply + 1].killer = MOVE_NONE;
+
+        i32 bestScore = td->pos.inCheck() ? -INF : eval;
+        Move bestMove = MOVE_NONE;
+
+        // Moves loop (if not in check, only noisy moves)
+        MovePicker mp = MovePicker(!td->pos.inCheck(), MOVE_NONE, td->pliesData[ply].killer);
+        while (true)
+        {
+            // Move, i32
+            const auto [move, moveScore] = mp.nextLegal(td->pos, td->historyTable);
+
+            if (!move) break;
+
+            // In check, we search all moves until we find a non-losing move
+            // When that happens, we prune quiets and bad noisy moves
+            // Also, if not in check, prune underpromotions
+            if (bestScore > -MIN_MATE_SCORE && (td->pos.isQuiet(move) || moveScore < 0))
                 break;
 
-            // If not in check, skip bad noisy moves
-            if (!td.board.inCheck() && !td.board.SEE(move))
+            // SEE pruning if not in check (skip bad noisy moves)
+            if (!td->pos.inCheck() && !td->pos.SEE(move))
                 continue;
 
-            td.makeMove(move, ply + 1, mTT);
+            makeMove(td, move, ply + 1);
 
-            const i32 score = td.board.isDraw(ply + 1) ? 0 : -qSearch(td, ply + 1, -beta, -alpha);
+            const i32 score = -qSearch<isPvNode, false>(td, ply + 1, -beta, -alpha);
 
-            td.board.undoMove();
-            td.accumulatorPtr--;
+            undoMove(td);
 
-            if (shouldStop(td)) return 0;
+            if (mStopSearch.load(std::memory_order_relaxed))
+                return 0;
 
-            if (score <= bestScore) continue;
+            bestScore = std::max<i32>(bestScore, score);
 
-            bestScore = score;
-
-            if (bestScore > alpha) {
-                alpha = bestScore;
+            if (score > alpha)
+            {
+                // This move didn't fail low
+                alpha = score;
                 bestMove = move;
             }
 
-             // Fail high / beta cutoff
-            if (bestScore >= beta) {
-                bound = Bound::LOWER;
-                break;
-            }
+             // Fail high?
+            if (score >= beta) break;
         }
 
-        // Checkmate?
-        if (bestScore == -INF) {
-            assert(!td.board.hasLegalMove());
-            return -INF + ply;
-        }
-
-        // Store in TT
-        mTT[ttEntryIdx].update(td.board.zobristHash(), 0, ply, bestScore, bestMove, bound);
-
+        assert(std::abs(bestScore) < INF);
         return bestScore;
-    }
-
-    constexpr i32 probcut(ThreadData &td, const i32 depth, const i32 ply, const i32 probcutBeta,
-        const bool cutNode, const u8 doubleExtsLeft, const Move ttMove, const auto ttEntryIdx)
-    {
-        PlyData* plyDataPtr = &(td.pliesData[ply]);
-
-        // Moves loop
-
-        MovePicker movePicker = MovePicker(true);
-        Move move;
-
-        while ((move = movePicker.next(td.board, ttMove, plyDataPtr->killer, td.historyTable)) != MOVE_NONE)
-        {
-            assert(movePicker.stage() == MoveGenStage::TT_MOVE_YIELDED
-                ? move == ttMove
-                : movePicker.stage() == MoveGenStage::GOOD_NOISIES || movePicker.stage() == MoveGenStage::BAD_NOISIES
-            );
-
-            assert(td.board.isNoisyNotUnderpromo(move));
-
-            // SEE pruning (skip bad noisy moves)
-            if (!td.board.SEE(move, probcutBeta - plyDataPtr->eval))
-                continue;
-
-            td.makeMove(move, ply + 1, mTT);
-
-            i32 score = 0;
-
-            if (td.board.isDraw(ply + 1))
-                goto moveSearched;
-
-            score = -qSearch(td, ply + 1, -probcutBeta, -probcutBeta + 1);
-
-            if (score >= probcutBeta)
-                score = -search(td, depth - 4, ply + 1, -probcutBeta, -probcutBeta + 1, !cutNode, doubleExtsLeft);
-
-            moveSearched:
-
-            td.board.undoMove();
-            td.accumulatorPtr--;
-
-            if (shouldStop(td)) return 0;
-
-            if (score >= probcutBeta) {
-                mTT[ttEntryIdx].update(td.board.zobristHash(), depth - 3, ply, score, move, Bound::LOWER);
-                return score;
-            }
-        }
-
-        return VALUE_NONE;
     }
 
 }; // class Searcher

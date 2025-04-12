@@ -3,77 +3,101 @@
 #pragma once
 
 #include "utils.hpp"
-#include "move.hpp"
 #include "search_params.hpp"
 
-MAYBE_CONSTEXPR void updateHistory(i16* history, i32 bonus)
+constexpr void updateHistory(i16* historyPtr, i32 bonus)
 {
-    assert(abs(*history) <= HISTORY_MAX);
+    if (historyPtr == nullptr) return;
 
-    bonus = std::clamp(bonus, -HISTORY_MAX, HISTORY_MAX);
-    *history += bonus - abs(bonus) * i32(*history) / HISTORY_MAX;
+    assert(std::abs(*historyPtr) <= HISTORY_MAX);
 
-    assert(abs(*history) <= HISTORY_MAX);
+    bonus = std::clamp<i32>(bonus, -HISTORY_MAX, HISTORY_MAX);
+
+    *historyPtr += static_cast<i16>(
+        bonus - std::abs(bonus) * static_cast<i32>(*historyPtr) / HISTORY_MAX
+    );
+
+    assert(std::abs(*historyPtr) <= HISTORY_MAX);
 }
 
-constexpr void updateHistory(i16 &history, const i32 bonus) {
-    updateHistory(&history, bonus);
-}
+struct HistoryEntry
+{
+private:
 
-struct HistoryEntry {
-    private:
+    MultiArray<i16, 2, 2> mMainHist = { }; // [enemyAttacksSrc][enemyAttacksDst]
 
-    MultiArray<i16, 2, 2>  mMainHist  = { }; // [enemyAttacksOrigin][enemyAttacksDestination]
-    MultiArray<i16, 6, 64> mContHist  = { }; // [previousMovePieceType][previousMoveTo]
-    MultiArray<i16, 7, 5>  mNoisyHist = { }; // [pieceTypeCaptured][promotionPieceType]
+    EnumArray<i16, Color, PieceType, Square> mContHist = { };
 
-    public:
+    EnumArray<i16, PieceType, PieceType> mNoisyHist = { }; // [captured][promotion] (King if none)
+
+    // Main history, 1-ply cont hist, 2-ply cont hist
+    constexpr auto quietHistsPtrs(this auto&& self, Position& pos, const Move move)
+    {
+        const Bitboard enemyAttacks = pos.enemyAttacksNoStmKing();
+
+        const bool enemyAttacksSrc = hasSquare(enemyAttacks, move.from());
+        const bool enemyAttacksDst = hasSquare(enemyAttacks, move.to());
+
+        auto& mainHist = self.mMainHist[enemyAttacksSrc][enemyAttacksDst];
+
+        Move prevMove = pos.lastMove();
+
+        auto onePlyContHistPtr
+            = prevMove
+            ? &(self.mContHist[!pos.sideToMove()][prevMove.pieceType()][prevMove.to()])
+            : nullptr;
+
+        prevMove = pos.nthToLastMove(2);
+
+        auto twoPlyContHistPtr
+            = prevMove
+            ? &(self.mContHist[pos.sideToMove()][prevMove.pieceType()][prevMove.to()])
+            : nullptr;
+
+        return std::array{ &mainHist, onePlyContHistPtr, twoPlyContHistPtr };
+    }
+
+public:
 
     i16 mCorrHist = 0;
 
-    constexpr i32 quietHistory(
-        const bool enemyAttacksOrigin, const bool enemyAttacksDst, const std::array<Move, 3> moves) const
+    EnumArray<i16, PieceType, Square> mContCorrHist = { };
+
+    constexpr i32 quietHistory(Position& pos, const Move move) const
     {
-        #if defined(TUNE)
-            CONT_HIST_WEIGHTS = {
-                contHist1PlyWeight(), contHist2PlyWeight(), contHist4PlyWeight()
-            };
-        #endif
+        i32 total = 0;
 
-        float total = float(mMainHist[enemyAttacksOrigin][enemyAttacksDst]) * mainHistoryWeight();
-
-        Move move;
-        for (size_t i = 0; i < moves.size(); i++)
-            if ((move = moves[i]) != MOVE_NONE)
-            {
-                const int pt = int(move.pieceType());
-                total += float(mContHist[pt][move.to()]) * CONT_HIST_WEIGHTS[i];
-            }
+        for (const i16* historyPtr : quietHistsPtrs(pos, move))
+            if (historyPtr != nullptr)
+                total += static_cast<i32>(*historyPtr);
 
         return total;
     }
 
-    constexpr void updateQuietHistories(
-        const bool enemyAttacksOrigin, const bool enemyAttacksDst, const std::array<Move, 3> moves, const i32 bonus)
+    constexpr void updateQuietHistories(Position& pos, const Move move, const i32 bonus)
     {
-        updateHistory(mMainHist[enemyAttacksOrigin][enemyAttacksDst], bonus);
-
-        for (const Move move : moves)
-            if (move != MOVE_NONE) {
-                const int pt = int(move.pieceType());
-                updateHistory(mContHist[pt][move.to()], bonus);
-            }
+        for (i16* historyPtr : quietHistsPtrs(pos, move))
+            updateHistory(historyPtr, bonus);
     }
 
-    constexpr i16* noisyHistoryPtr(const PieceType captured, const PieceType promotion)
+    constexpr i32 noisyHistory(
+        const std::optional<PieceType> captured, const std::optional<PieceType> promotion) const
     {
-        const int secondIdx = promotion == PieceType::NONE ? 0 : (int)promotion - (int)PieceType::KNIGHT + 1;
-        return &mNoisyHist[(int)captured][secondIdx];
+        return mNoisyHist[captured.value_or(PieceType::King)][promotion.value_or(PieceType::King)];
     }
 
-    constexpr i32 noisyHistory(const PieceType captured, const PieceType promotion)
+    constexpr void updateNoisyHistory(
+        const std::optional<PieceType> captured,
+        const std::optional<PieceType> promotion,
+        const i32 bonus)
     {
-        return *noisyHistoryPtr(captured, promotion);
+        i16& noisyHist
+            = mNoisyHist[captured.value_or(PieceType::King)][promotion.value_or(PieceType::King)];
+
+        updateHistory(&noisyHist, bonus);
     }
 
-}; // HistoryEntry
+}; // struct HistoryEntry
+
+// [stm][pieceType][dst]
+using HistoryTable = EnumArray<HistoryEntry, Color, PieceType, Square>;

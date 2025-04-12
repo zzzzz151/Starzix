@@ -3,157 +3,193 @@
 #pragma once
 
 #include "utils.hpp"
-#include "board.hpp"
+#include "position.hpp"
+#include "move_gen.hpp"
 #include "search_params.hpp"
+#include "nnue.hpp"
 #include "tt.hpp"
 #include "history_entry.hpp"
-#include "nnue.hpp"
+#include <algorithm>
+#include <atomic>
 #include <mutex>
 #include <condition_variable>
 
-struct PlyData {
-    public:
-    ArrayVec<Move, MAX_DEPTH+1> pvLine = { };
+struct PlyData
+{
+public:
+
+    bool inCheck;
+    ArrayVec<Move, MAX_DEPTH + 1> pvLine;
+    std::optional<i32> eval = std::nullopt;
     Move killer = MOVE_NONE;
-    i32 eval = VALUE_NONE;
 };
 
-enum class ThreadState {
-    SLEEPING, SEARCHING, EXIT_ASAP, EXITED
+enum class ThreadState : i32 {
+    Sleeping, Searching, ExitAsap, Exited
 };
 
-struct ThreadData {
-    public:
+struct ThreadData
+{
+public:
 
-    Board board = START_BOARD;
+    Position pos;
 
-    i32 score = 0;
+    i32 rootDepth = 0;
 
-    u64 nodes = 0;
-    i32 maxPlyReached = 0;
+    std::atomic<u64> nodes = 0;
+    size_t maxPlyReached = 0;
 
-    std::array<PlyData, MAX_DEPTH+1> pliesData; // [ply]
+    std::array<PlyData, MAX_DEPTH + 1> pliesData; // [ply]
 
-    // [stm][pieceType][targetSquare]
-    MultiArray<HistoryEntry, 2, 6, 64> historyTable = { };
+    std::array<u64, 1ULL << 17> nodesByMove; // [Move.asU16()]
 
-    std::array<u64, 1ULL << 17> nodesByMove; // [move]
+    HistoryTable historyTable = { };
 
-    std::array<BothAccumulators, MAX_DEPTH+1> accumulators;
-    BothAccumulators* accumulatorPtr = &accumulators[0];
+    std::array<nnue::BothAccumulators, MAX_DEPTH + 1> bothAccsStack;
+    size_t bothAccsIdx = 0;
 
-    FinnyTable finnyTable; // [color][mirrorHorizontally][inputBucket]
+    nnue::FinnyTable finnyTable;
 
-    // [stm][board.pawnsHash() % CORR_HIST_SIZE]
-    MultiArray<i16, 2, CORR_HIST_SIZE> pawnsCorrHist = { };
+    // [stm][pawnsHash % CORR_HIST_SIZE]
+    EnumArray<std::array<i16, CORR_HIST_SIZE>, Color> pawnsCorrHist = { };
 
-    // [stm][pieceColor][board.nonPawnsHash(pieceColor) % CORR_HIST_SIZE]
-    MultiArray<i16, 2, 2, CORR_HIST_SIZE> nonPawnsCorrHist = { };
+    // [stm][pieceColor][[pieceColorNonPawnsHash % CORR_HIST_SIZE]
+    EnumArray<std::array<i16, CORR_HIST_SIZE>, Color, Color> nonPawnsCorrHist = { };
 
     // Threading stuff
-    ThreadState threadState = ThreadState::SLEEPING;
+    ThreadState threadState = ThreadState::Sleeping;
     std::mutex mutex;
     std::condition_variable cv;
 
-    inline void wake(const ThreadState newState)
-    {
-        std::unique_lock<std::mutex> lock(mutex);
-        threadState = newState;
-        lock.unlock();
-        cv.notify_one();
-    }
-
-    constexpr std::array<i16*, 4> correctionHistories()
-    {
-        const int stm = int(board.sideToMove());
-
-        const Move lastMove = board.lastMove();
-        i16* lastMoveCorrHistPtr = nullptr;
-
-        if (lastMove != MOVE_NONE) {
-            const int pt = int(lastMove.pieceType());
-            lastMoveCorrHistPtr = &(historyTable[stm][pt][lastMove.to()].mCorrHist);
-        }
-
-        return {
-            &pawnsCorrHist[stm][board.pawnsHash() % CORR_HIST_SIZE],
-            &nonPawnsCorrHist[stm][WHITE][board.nonPawnsHash(Color::WHITE) % CORR_HIST_SIZE],
-            &nonPawnsCorrHist[stm][BLACK][board.nonPawnsHash(Color::BLACK) % CORR_HIST_SIZE],
-            lastMoveCorrHistPtr
-        };
-    }
-
-    constexpr void makeMove(const Move move, const i32 newPly, const std::vector<TTEntry> &tt)
-    {
-        // If not a special move, we can probably correctly predict the zobrist hash after it
-        // and prefetch the TT entry
-        if (move.flag() <= Move::KING_FLAG) {
-            const auto ttEntryIdx = TTEntryIndex(board.roughHashAfter(move), tt.size());
-            __builtin_prefetch(&tt[ttEntryIdx]);
-        }
-
-        board.makeMove(move);
-        nodes++;
-
-        // update seldepth
-        if (newPly > maxPlyReached) maxPlyReached = newPly;
-
-        pliesData[newPly].pvLine.clear();
-        pliesData[newPly].eval = VALUE_NONE;
-
-        // Killer move must be quiet move
-        if (pliesData[newPly].killer != MOVE_NONE && !board.isQuiet(pliesData[newPly].killer))
-            pliesData[newPly].killer = MOVE_NONE;
-
-        if (move != MOVE_NONE) {
-            accumulatorPtr++;
-            accumulatorPtr->mUpdated = false;
-        }
-    }
-
-    constexpr i32 updateAccumulatorAndEval(i32 &eval)
-    {
-        assert(accumulatorPtr == &accumulators[0]
-               ? accumulatorPtr->mUpdated
-               : (accumulatorPtr - 1)->mUpdated);
-
-        if (!accumulatorPtr->mUpdated)
-            accumulatorPtr->update(accumulatorPtr - 1, board, finnyTable);
-
-        if (board.inCheck())
-            eval = VALUE_NONE;
-        else if (eval == VALUE_NONE)
-        {
-            assert(BothAccumulators(board) == *accumulatorPtr);
-
-            eval = nnue::evaluate(accumulatorPtr, board.sideToMove());
-
-            eval *= materialScale(board); // Scale eval with material
-
-            // Correct eval with correction histories
-
-            #if defined(TUNE)
-                CORR_HISTS_WEIGHTS = {
-                    corrHistPawnsWeight(),
-                    corrHistNonPawnsWeight(),
-                    corrHistNonPawnsWeight(),
-                    corrHistLastMoveWeight()
-                };
-            #endif
-
-            const auto corrHists = correctionHistories();
-
-            for (size_t i = 0; i < corrHists.size() - (corrHists.back() == nullptr); i++)
-            {
-                const float corrHist = *(corrHists[i]);
-                eval += corrHist * CORR_HISTS_WEIGHTS[i];
-            }
-
-            // Clamp to avoid false mate scores and invalid scores
-            eval = std::clamp(eval, -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
-        }
-
-        return eval;
-    }
-
 }; // struct ThreadData
+
+inline void wakeThread(ThreadData* td, const ThreadState newState)
+{
+    std::unique_lock<std::mutex> lock(td->mutex);
+    td->threadState = newState;
+    lock.unlock();
+    td->cv.notify_one();
+}
+
+constexpr Move bestMoveAtRoot(const ThreadData* td)
+{
+    return td->pliesData[0].pvLine.size() > 0
+         ? td->pliesData[0].pvLine[0]
+         : MOVE_NONE;
+}
+
+constexpr void makeMove(
+    ThreadData* td, const Move move, const size_t newPly, std::vector<TTEntry>* ttPtr = nullptr)
+{
+    td->pos.makeMove(move);
+
+    // Prefetch TT entry
+    if (ttPtr != nullptr)
+    {
+        const TTEntry& ttEntry = ttEntryRef(*ttPtr, td->pos.zobristHash());
+        __builtin_prefetch(&ttEntry);
+    }
+
+    td->nodes.fetch_add(1, std::memory_order_relaxed);
+
+    // Update seldepth
+    td->maxPlyReached = std::max<size_t>(td->maxPlyReached, newPly);
+
+    PlyData& newPlyData = td->pliesData[newPly];
+    newPlyData.inCheck = td->pos.inCheck();
+    newPlyData.pvLine.clear();
+    newPlyData.eval = std::nullopt;
+
+    if (move)
+    {
+        td->bothAccsIdx++;
+        td->bothAccsStack[td->bothAccsIdx].mUpdated = false;
+    }
+}
+
+constexpr void undoMove(ThreadData* td)
+{
+    if (td->pos.lastMove())
+        td->bothAccsIdx--;
+
+    td->pos.undoMove();
+}
+
+constexpr void updateBothAccs(ThreadData* td)
+{
+    assert(td->bothAccsIdx > 0 || td->bothAccsStack[td->bothAccsIdx].mUpdated);
+
+    if (td->bothAccsIdx > 0)
+    {
+        td->bothAccsStack[td->bothAccsIdx]
+            .updateMove(td->bothAccsStack[td->bothAccsIdx - 1], td->pos, td->finnyTable);
+    }
+}
+
+constexpr auto corrHistsPtrs(ThreadData* td)
+{
+    const size_t whiteNonPawnsIdx = td->pos.nonPawnsHash(Color::White) % CORR_HIST_SIZE;
+    const size_t blackNonPawnsIdx = td->pos.nonPawnsHash(Color::Black) % CORR_HIST_SIZE;
+
+    Move prevMove = td->pos.lastMove();
+    i16* lastMoveCorrPtr = nullptr;
+    i16* contCorrPtr     = nullptr;
+
+    if (prevMove)
+    {
+        HistoryEntry& histEntry
+            = td->historyTable[td->pos.sideToMove()][prevMove.pieceType()][prevMove.to()];
+
+        lastMoveCorrPtr = &(histEntry.mCorrHist);
+
+        prevMove = td->pos.nthToLastMove(2);
+
+        if (prevMove)
+            contCorrPtr = &(histEntry.mContCorrHist[prevMove.pieceType()][prevMove.to()]);
+    }
+
+    return std::array {
+        &(td->pawnsCorrHist[td->pos.sideToMove()][td->pos.pawnsHash() % CORR_HIST_SIZE]),
+        &(td->nonPawnsCorrHist[td->pos.sideToMove()][Color::White][whiteNonPawnsIdx]),
+        &(td->nonPawnsCorrHist[td->pos.sideToMove()][Color::Black][blackNonPawnsIdx]),
+        lastMoveCorrPtr,
+        contCorrPtr
+    };
+}
+
+constexpr i32 getEval(ThreadData* td, PlyData& plyData)
+{
+    if (td->pos.inCheck())
+        plyData.eval = 0;
+    else if (!plyData.eval.has_value())
+    {
+        updateBothAccs(td);
+
+        plyData.eval = nnue::evaluate(td->bothAccsStack[td->bothAccsIdx], td->pos.sideToMove());
+
+        // Adjust eval with correction histories
+
+        const auto [
+            pawnsCorrPtr, whiteNonPawnsCorrPtr, blackNonPawnsCorrPtr, lastMoveCorrPtr, contCorrPtr
+        ] = corrHistsPtrs(td);
+
+        const i32 nonPawnsCorr
+            = static_cast<i32>(*whiteNonPawnsCorrPtr) + static_cast<i32>(*blackNonPawnsCorrPtr);
+
+        float correction = static_cast<float>(*pawnsCorrPtr) * corrHistPawnsWeight()
+                         + static_cast<float>(nonPawnsCorr)  * corrHistNonPawnsWeight();
+
+        if (lastMoveCorrPtr != nullptr)
+            correction += static_cast<float>(*lastMoveCorrPtr) * corrHistLastMoveWeight();
+
+        if (contCorrPtr != nullptr)
+            correction += static_cast<float>(*contCorrPtr) * corrHistContWeight();
+
+        *(plyData.eval) += lround(correction);
+
+        // Clamp eval to avoid invalid values and checkmate values
+        plyData.eval = std::clamp<i32>(*(plyData.eval), -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
+    }
+
+    return *(plyData.eval);
+}

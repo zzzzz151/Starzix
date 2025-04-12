@@ -2,96 +2,98 @@
 
 #pragma once
 
-#include <cstring>
 #include "utils.hpp"
 #include "move.hpp"
-#include "search_params.hpp"
+#include <cmath>
+#include <tuple>
 
-enum class Bound {
-    NONE = 0, EXACT = 1, LOWER = 2, UPPER = 3
+enum class Bound : u8 {
+    None = 0, Exact = 1, Lower = 2, Upper = 3
 };
 
-struct TTEntry {
-    public:
+struct TTEntry
+{
+private:
 
-    u64 zobristHash = 0;
-    i16 score = 0;
-    u16 move = MOVE_NONE.encoded();
-    u16 depthBoundAge = 0; // from lowest to highest bits: 7 for depth, 2 for bound, 7 for age
+    u64 mZobristHash = 0;
+    u8 mDepth = 0;
+    i16 mScore = 0;
+    Bound mBound = Bound::None;
+    u16 mMove = 0;
 
-    constexpr i32 depth() const {
-        return depthBoundAge & 0b1111111;
-    }
+public:
 
-    constexpr Bound bound() const {
-         return Bound((depthBoundAge >> 7) & 0b11);
-    }
-
-    constexpr void adjustScore(const i16 ply)
+    // ttDepth, ttScore, ttBound, ttMove
+    constexpr std::tuple<std::optional<i32>, std::optional<i32>, Bound, Move> get(
+        const u64 zobristHash, const i16 ply) const
     {
-        if (score >= MIN_MATE_SCORE)
-            score -= ply;
-        else if (score <= -MIN_MATE_SCORE)
-            score += ply;
+        if (mZobristHash != zobristHash || mBound == Bound::None)
+            return { std::nullopt, std::nullopt, Bound::None, MOVE_NONE };
+
+        const i16 score = mScore >= MIN_MATE_SCORE  ? mScore - ply
+                        : mScore <= -MIN_MATE_SCORE ? mScore + ply
+                        : mScore;
+
+        return {
+            static_cast<i32>(mDepth),
+            static_cast<i32>(score),
+            mBound,
+            Move(mMove)
+        };
     }
 
-    constexpr void update(const u64 newZobristHash, const u8 newDepth, const i16 ply,
-        const i16 newScore, const Move newBestMove, const Bound newBound)
+    constexpr void update(
+        const u64 newHash,
+        const u8 newDepth,
+        const i16 newScore,
+        const i16 ply,
+        const Bound newBound,
+        const Move newMove)
     {
-        assert((newDepth & 0b1000'0000) == 0);
+        mZobristHash = newHash;
 
-        // Update TT entry if
-        if (this->zobristHash != newZobristHash // this entry is empty or a TT collision
-        || newBound == Bound::EXACT             // or new bound is exact
-        || this->depth() < (i32)newDepth + 4)   // or new depth isn't much lower
-        {
-            this->zobristHash = newZobristHash;
+        mDepth = newDepth;
 
-            this->depthBoundAge = newDepth;
-            this->depthBoundAge |= (u16)newBound << 7;
+        mScore = newScore >= MIN_MATE_SCORE  ? newScore + ply
+               : newScore <= -MIN_MATE_SCORE ? newScore - ply
+               : newScore;
 
-            this->score = newScore >= MIN_MATE_SCORE  ? newScore + ply
-                        : newScore <= -MIN_MATE_SCORE ? newScore - ply
-                        : newScore;
-        }
+        mBound = newBound;
 
-        // Update entry's best move if
-        if (this->zobristHash != newZobristHash // this entry is empty or a TT collision
-        || Move(this->move) == MOVE_NONE        // or this TT entry doesn't have a move
-        || newBound != Bound::UPPER)            // or if it has a move, if the new move is not a fail low
-            this->move = newBestMove.encoded();
+        if (mZobristHash != newHash || newMove)
+            mMove = newMove.asU16();
     }
 
 } __attribute__((packed)); // struct TTEntry
 
-static_assert(sizeof(TTEntry) == 8 + 2 + 2 + 2);
+static_assert(sizeof(TTEntry) == 8 + 2 + 2 + 1 + 1);
 
-constexpr u64 TTEntryIndex(const u64 zobristHash, const auto numEntries)
+inline void printTTSize(const std::vector<TTEntry>& tt)
 {
-    return ((u128)zobristHash * (u128)numEntries) >> 64;
-}
+    const size_t bytes = tt.size() * sizeof(TTEntry);
+    const double mebibytes = static_cast<double>(bytes) / (1024.0 * 1024.0);
+    const size_t mebibytesRounded = static_cast<size_t>(llround(mebibytes));
 
-inline void printTTSize(const std::vector<TTEntry> &tt)
-{
-    const double bytes = u64(tt.size()) * (u64)sizeof(TTEntry);
-    const double megabytes = bytes / (1024.0 * 1024.0);
-
-    std::cout << "info string TT size " << round(megabytes) << " MB"
+    std::cout << "info string TT size " << mebibytesRounded << " MiB"
               << " (" << tt.size() << " entries)"
               << std::endl;
 }
 
-constexpr void resizeTT(std::vector<TTEntry> &tt, i64 newSizeMB)
+constexpr void resizeTT(std::vector<TTEntry>& tt, const size_t newMebibytes)
 {
-    newSizeMB = std::max(newSizeMB, (i64)1);
-    const u64 numEntries = (u64)newSizeMB * 1024 * 1024 / (u64)sizeof(TTEntry);
-
-    tt.clear(); // remove all elements
+    const size_t numEntries = newMebibytes * 1024 * 1024 / sizeof(TTEntry);
+    tt.clear(); // Remove all elements
     tt.resize(numEntries);
     tt.shrink_to_fit();
 }
 
-constexpr void resetTT(std::vector<TTEntry> &tt)
+constexpr TTEntry& ttEntryRef(std::vector<TTEntry>& tt, const u64 zobristHash)
 {
-    std::memset(tt.data(), 0, tt.size() * sizeof(TTEntry));
+    assert(tt.size() > 0);
+
+    const size_t idx = static_cast<size_t>(
+        (static_cast<u128>(zobristHash) * static_cast<u128>(tt.size())) >> 64
+    );
+
+    return tt[idx];
 }

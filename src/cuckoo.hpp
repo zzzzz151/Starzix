@@ -5,58 +5,90 @@
 #include "utils.hpp"
 #include "move.hpp"
 #include "attacks.hpp"
+#include <algorithm>
+#include <stdexcept>
 
-struct CuckooTable {
-    public:
-    std::array<u64,  8192> keys  = { };
-    std::array<Move, 8192> moves = { };
+constexpr u64 h1(const u64 hash)
+{
+    return hash & 0x1fff;
+}
+
+constexpr u64 h2(const u64 hash)
+{
+    return (hash >> 16) & 0x1fff;
+}
+
+struct CuckooData
+{
+public:
+    std::array<u64, 8192>  hashes = { };
+    std::array<Move, 8192> moves  = makeArray<Move, 8192>(MOVE_NONE);
 };
 
-constexpr u64 cuckoo_h1(const u64 key) { return key & 0x1fff; }
-
-constexpr u64 cuckoo_h2(const u64 key) { return (key >> 16) & 0x1fff; }
-
-constexpr CuckooTable CUCKOO_TABLE = []() consteval
+constexpr CuckooData CUCKOO_DATA = [] () consteval
 {
-    CuckooTable cuckooTable = { };
+    CuckooData cuckooData = { };
+    size_t count = 0;
 
-    [[maybe_unused]] int count = 0;
-
-    auto initPiece = [&](const Color color, const PieceType pieceType) consteval -> void
+    const auto processFeature = [&] (
+        const Color pieceColor, const PieceType pt, const Square square) consteval
     {
-        for (Square sq1 = 0; sq1 < 64; sq1++)
-            for (Square sq2 = sq1 + 1; sq2 < 64; sq2++)
+        if (pt == PieceType::Pawn)
+            return;
+
+        const Bitboard attacks
+            = pt == PieceType::Knight ? getKnightAttacks(square)
+            : pt == PieceType::Bishop ? getBishopAttacks(square, 0)
+            : pt == PieceType::Rook   ? getRookAttacks  (square, 0)
+            : pt == PieceType::Queen  ? getQueenAttacks (square, 0)
+            : getKingAttacks(square);
+
+        Square square2 = square;
+
+        while (square2 != Square::H8)
+        {
+            square2 = next<Square>(square2);
+
+            if (!hasSquare(attacks, square2))
+                continue;
+
+            const MoveFlag flag = asEnum<MoveFlag>(static_cast<i32>(pt) + 1);
+            Move move = Move(square, square2, flag);
+
+            u64 hash = ZOBRIST_COLOR
+                     ^ ZOBRIST_PIECES[pieceColor][pt][square]
+                     ^ ZOBRIST_PIECES[pieceColor][pt][square2];
+
+            auto i = h1(hash);
+
+            while (true)
             {
-                const u64 attacks = pieceType == PieceType::KNIGHT ? getKnightAttacks(sq1)
-                                  : pieceType == PieceType::BISHOP ? getBishopAttacks(sq1, 0)
-                                  : pieceType == PieceType::ROOK   ? getRookAttacks(sq1, 0)
-                                  : pieceType == PieceType::QUEEN  ? getQueenAttacks(sq1, 0)
-                                  : getKingAttacks(sq1);
+                std::swap(cuckooData.hashes[i], hash);
+                std::swap(cuckooData.moves[i], move);
 
-                if ((attacks & bitboard(sq2)) == 0) continue;
+                // Arrived at empty slot?
+                if (!move) break;
 
-                Move move = Move(sq1, sq2, (u16)pieceType + 1);
-
-                u64 key = ZOBRIST_COLOR
-                        ^ ZOBRIST_PIECES[(int)color][(int)pieceType][sq1]
-                        ^ ZOBRIST_PIECES[(int)color][(int)pieceType][sq2];
-
-                u64 idx = cuckoo_h1(key);
-
-                while (move != MOVE_NONE) {
-                    std::swap(cuckooTable.keys[idx], key);
-                    std::swap(cuckooTable.moves[idx], move);
-                    idx = idx == cuckoo_h1(key) ? cuckoo_h2(key) : cuckoo_h1(key);
-                }
-
-                count++;
+                // Push victim to alternative slot
+                i = i == h1(hash) ? h2(hash) : h1(hash);
             }
+
+            count++;
+        }
     };
 
-    for (const Color color : {Color::WHITE, Color::BLACK})
-        for (int pt = KNIGHT; pt <= KING; pt++)
-            initPiece(color, (PieceType)pt);
+    for (const Color pieceColor : EnumIter<Color>())
+        for (const PieceType pt : EnumIter<PieceType>())
+        {
+            if (pt == PieceType::Pawn)
+                continue;
 
-    assert(count == 3668);
-    return cuckooTable;
+            for (const Square square : EnumIter<Square>())
+                processFeature(pieceColor, pt, square);
+        }
+
+    if (count != 3668)
+        throw std::logic_error("Wrong cuckoo count, expected 3668");
+
+    return cuckooData;
 }();
