@@ -590,7 +590,7 @@ private:
                     return singularScore;
                 // Negative extension
                 else if (ttScore >= beta)
-                    newDepth -= 2;
+                    newDepth--;
             }
 
             const u64 nodesBefore = td->nodes.load(std::memory_order_relaxed);
