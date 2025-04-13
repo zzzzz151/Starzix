@@ -231,9 +231,9 @@ public:
                   : *PROMO_SCORE[*promo];
         }
         else {
-            const i32 threshold = static_cast<i32>(lround(
+            const i32 threshold = static_cast<i32>(
                 static_cast<float>(-noisyHist) * seeNoisyHistMul()
-            ));
+            );
 
             score = 2 * (pos.SEE(move, threshold) ? 1 : -1);
         }

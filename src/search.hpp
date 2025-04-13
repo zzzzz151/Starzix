@@ -20,11 +20,9 @@
 
 struct SearchConfig
 {
-private:
-
-    size_t maxDepth = MAX_DEPTH;
-
 public:
+
+    i32 maxDepth = MAX_DEPTH;
 
     std::optional<u64> maxNodes = std::nullopt;
 
@@ -35,18 +33,6 @@ public:
     std::optional<u64> softMs = std::nullopt;
 
     bool printInfo = true;
-
-    constexpr auto getMaxDepth() const
-    {
-        return this->maxDepth;
-    }
-
-    constexpr void setMaxDepth(const i32 newMaxDepth)
-    {
-        this->maxDepth = static_cast<size_t>(std::clamp<i32>(
-            newMaxDepth, 1, static_cast<i32>(MAX_DEPTH)
-        ));
-    }
 
 }; // struct SearchConfig
 
@@ -165,7 +151,7 @@ public:
         if (!hasLegalMove(pos))
             return MOVE_NONE;
 
-        mStopSearch.store(false, std::memory_order_relaxed);
+        mSearchConfig.maxDepth = std::clamp<i32>(mSearchConfig.maxDepth, 1, MAX_DEPTH);
 
         // Init main thread's position
         mainThreadData()->pos = pos;
@@ -207,6 +193,8 @@ public:
             mThreadsData[i]->bothAccsStack[0] = bothAccs;
             mThreadsData[i]->finnyTable = mainThreadData()->finnyTable;
         }
+
+        mStopSearch.store(false, std::memory_order_relaxed);
 
         for (ThreadData* td : mThreadsData)
         {
@@ -276,10 +264,9 @@ private:
 
     constexpr void iterativeDeepening(ThreadData* td)
     {
-        const i32 maxDepth = static_cast<i32>(mSearchConfig.getMaxDepth());
         i32 score = 0;
 
-        for (td->rootDepth = 1; td->rootDepth <= maxDepth; td->rootDepth++)
+        for (td->rootDepth = 1; td->rootDepth <= mSearchConfig.maxDepth; td->rootDepth++)
         {
             td->maxPlyReached = 0; // Reset seldepth
 
@@ -352,7 +339,7 @@ private:
                     = static_cast<double>(*(mSearchConfig.softMs))
                     * (nodesTmBase() - bestMoveNodesFraction * nodesTmMul());
 
-                return static_cast<u64>(llround(scaled));
+                return static_cast<u64>(scaled);
             };
 
             // Soft time limit hit?
@@ -397,7 +384,7 @@ private:
             else
                 return score;
 
-            delta = static_cast<i32>(lround(static_cast<double>(delta) * aspDeltaMul()));
+            delta = static_cast<i32>(static_cast<double>(delta) * aspDeltaMul());
         }
     }
 
@@ -439,7 +426,7 @@ private:
                 return 0;
         }
 
-        depth = std::min<i32>(depth, static_cast<i32>(MAX_DEPTH));
+        depth = std::min<i32>(depth, MAX_DEPTH);
 
         // Probe TT for TT entry
         TTEntry& ttEntry = ttEntryRef(mTT, td->pos.zobristHash());
@@ -546,18 +533,27 @@ private:
                     = depth - LMR_TABLE[static_cast<size_t>(depth)][isQuiet][legalMovesSeen];
 
                 // FP (Futility pruning)
+
+                const auto fpMargin = [lmrDepth, quietHist] () constexpr -> i32
+                {
+                    const i32 depthFactor     = std::max<i32>(lmrDepth, 1) * fpDepthMul();
+                    const i32 quietHistFactor = static_cast<i32>(quietHist * fpQuietHistMul());
+
+                    return std::max<i32>(fpBase() + depthFactor + quietHistFactor, 0);
+                };
+
                 if (!td->pos.inCheck()
                 && lmrDepth <= 7
                 && legalMovesSeen > 2
                 && alpha < MIN_MATE_SCORE
-                && alpha - eval > fpBase() + std::max<i32>(lmrDepth, 1) * fpDepthMul())
+                && alpha - eval > fpMargin())
                     break;
 
                 // SEE pruning
 
                 i32 threshold = isQuiet ? seeQuietThreshold() : seeNoisyThreshold();
                 threshold *= depth;
-                threshold -= lround(quietHist * seeQuietHistMul());
+                threshold -= static_cast<i32>(quietHist * seeQuietHistMul());
                 threshold = std::min<i32>(threshold, -1);
 
                 if (td->pos.stmHasNonPawns() && !td->pos.SEE(move, threshold))

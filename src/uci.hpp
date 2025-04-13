@@ -262,7 +262,7 @@ constexpr void go(
             searchConfig.hardMs = value;
         }
         else if (tokens[i] == "depth")
-            searchConfig.setMaxDepth(static_cast<i32>(value));
+            searchConfig.maxDepth = static_cast<i32>(value);
         else if (tokens[i] == "nodes")
             searchConfig.maxNodes = value;
     }
@@ -277,13 +277,13 @@ constexpr void go(
 
         if (!isMoveTime)
         {
-            searchConfig.hardMs = static_cast<u64>(llround(
+            searchConfig.hardMs = static_cast<u64>(
                 static_cast<double>(*(searchConfig.hardMs)) * timeHardPercentage()
-            ));
+            );
 
-            searchConfig.softMs = static_cast<u64>(llround(
+            searchConfig.softMs = static_cast<u64>(
                 static_cast<double>(*(searchConfig.hardMs)) * timeSoftPercentage()
-            ));
+            );
         }
     }
 
