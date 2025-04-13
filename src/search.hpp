@@ -588,6 +588,9 @@ private:
                 // Multicut
                 else if (singularScore >= beta && std::abs(singularScore) < MIN_MATE_SCORE)
                     return singularScore;
+                // Negative extension
+                else if (ttScore >= beta)
+                    newDepth -= 3;
             }
 
             const u64 nodesBefore = td->nodes.load(std::memory_order_relaxed);
