@@ -20,7 +20,8 @@ public:
 
     bool inCheck;
     ArrayVec<Move, MAX_DEPTH + 1> pvLine;
-    std::optional<i32> eval = std::nullopt;
+    std::optional<i32> rawEval       = std::nullopt;
+    std::optional<i32> correctedEval = std::nullopt;
     Move killer = MOVE_NONE;
 };
 
@@ -98,7 +99,7 @@ constexpr void makeMove(
     PlyData& newPlyData = td->pliesData[newPly];
     newPlyData.inCheck = td->pos.inCheck();
     newPlyData.pvLine.clear();
-    newPlyData.eval = std::nullopt;
+    newPlyData.rawEval = newPlyData.correctedEval = std::nullopt;
 
     if (move)
     {
@@ -160,36 +161,43 @@ constexpr auto corrHistsPtrs(ThreadData* td)
 constexpr i32 getEval(ThreadData* td, PlyData& plyData)
 {
     if (td->pos.inCheck())
-        plyData.eval = 0;
-    else if (!plyData.eval.has_value())
     {
-        updateBothAccs(td);
-
-        plyData.eval = nnue::evaluate(td->bothAccsStack[td->bothAccsIdx], td->pos.sideToMove());
-
-        // Adjust eval with correction histories
-
-        const auto [
-            pawnsCorrPtr, whiteNonPawnsCorrPtr, blackNonPawnsCorrPtr, lastMoveCorrPtr, contCorrPtr
-        ] = corrHistsPtrs(td);
-
-        const i32 nonPawnsCorr
-            = static_cast<i32>(*whiteNonPawnsCorrPtr) + static_cast<i32>(*blackNonPawnsCorrPtr);
-
-        float correction = static_cast<float>(*pawnsCorrPtr) * corrHistPawnsWeight()
-                         + static_cast<float>(nonPawnsCorr)  * corrHistNonPawnsWeight();
-
-        if (lastMoveCorrPtr != nullptr)
-            correction += static_cast<float>(*lastMoveCorrPtr) * corrHistLastMoveWeight();
-
-        if (contCorrPtr != nullptr)
-            correction += static_cast<float>(*contCorrPtr) * corrHistContWeight();
-
-        *(plyData.eval) += lround(correction);
-
-        // Clamp eval to avoid invalid values and checkmate values
-        plyData.eval = std::clamp<i32>(*(plyData.eval), -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1);
+        plyData.rawEval = plyData.correctedEval = 0;
+        return 0;
     }
 
-    return *(plyData.eval);
+    if (!plyData.rawEval.has_value())
+    {
+        updateBothAccs(td);
+        plyData.rawEval = nnue::evaluate(td->bothAccsStack[td->bothAccsIdx], td->pos.sideToMove());
+    }
+
+    // Adjust eval with correction histories
+
+    plyData.correctedEval = plyData.rawEval;
+
+    const auto [
+        pawnsCorrPtr, whiteNonPawnsCorrPtr, blackNonPawnsCorrPtr, lastMoveCorrPtr, contCorrPtr
+    ] = corrHistsPtrs(td);
+
+    const i32 nonPawnsCorr
+        = static_cast<i32>(*whiteNonPawnsCorrPtr) + static_cast<i32>(*blackNonPawnsCorrPtr);
+
+    float correction = static_cast<float>(*pawnsCorrPtr) * corrHistPawnsWeight()
+                     + static_cast<float>(nonPawnsCorr)  * corrHistNonPawnsWeight();
+
+    if (lastMoveCorrPtr != nullptr)
+        correction += static_cast<float>(*lastMoveCorrPtr) * corrHistLastMoveWeight();
+
+    if (contCorrPtr != nullptr)
+        correction += static_cast<float>(*contCorrPtr) * corrHistContWeight();
+
+    *(plyData.correctedEval) += lround(correction);
+
+    // Clamp eval to avoid invalid values and checkmate values
+    plyData.correctedEval = std::clamp<i32>(
+        *(plyData.correctedEval), -MIN_MATE_SCORE + 1, MIN_MATE_SCORE - 1
+    );
+
+    return *(plyData.correctedEval);
 }

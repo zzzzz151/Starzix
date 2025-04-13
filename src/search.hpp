@@ -470,7 +470,7 @@ private:
         // Node pruning
         if (!isPvNode && !td->pos.inCheck() && !singularMove)
         {
-            const i32 parentEval = *(td->pliesData[ply - 1].eval);
+            const i32 parentEval = *(td->pliesData[ply - 1].correctedEval);
             const bool oppWorsening = !td->pliesData[ply - 1].inCheck && eval > -parentEval;
 
             // RFP (Reverse futility pruning)
