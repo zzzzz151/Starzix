@@ -66,7 +66,7 @@ inline void bench(const i32 depth = 14)
     Searcher searcher = { };
 
     SearchConfig searchConfig = { };
-    searchConfig.setMaxDepth(depth);
+    searchConfig.maxDepth = depth;
     searchConfig.printInfo = false;
 
     u64 totalNodes = 0, totalMs = 0;

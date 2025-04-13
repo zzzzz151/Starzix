@@ -262,7 +262,7 @@ constexpr void go(
             searchConfig.hardMs = value;
         }
         else if (tokens[i] == "depth")
-            searchConfig.setMaxDepth(static_cast<i32>(value));
+            searchConfig.maxDepth = static_cast<i32>(value);
         else if (tokens[i] == "nodes")
             searchConfig.maxNodes = value;
     }
