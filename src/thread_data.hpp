@@ -192,7 +192,7 @@ constexpr i32 getEval(ThreadData* td, PlyData& plyData)
     if (contCorrPtr != nullptr)
         correction += static_cast<float>(*contCorrPtr) * corrHistContWeight();
 
-    *(plyData.correctedEval) += lround(correction);
+    *(plyData.correctedEval) += static_cast<i32>(correction);
 
     // Clamp eval to avoid invalid values and checkmate values
     plyData.correctedEval = std::clamp<i32>(

@@ -352,7 +352,7 @@ private:
                     = static_cast<double>(*(mSearchConfig.softMs))
                     * (nodesTmBase() - bestMoveNodesFraction * nodesTmMul());
 
-                return static_cast<u64>(llround(scaled));
+                return static_cast<u64>(scaled);
             };
 
             // Soft time limit hit?
@@ -397,7 +397,7 @@ private:
             else
                 return score;
 
-            delta = static_cast<i32>(lround(static_cast<double>(delta) * aspDeltaMul()));
+            delta = static_cast<i32>(static_cast<double>(delta) * aspDeltaMul());
         }
     }
 
@@ -549,15 +549,20 @@ private:
                 if (!td->pos.inCheck()
                 && lmrDepth <= 7
                 && legalMovesSeen > 2
-                && alpha < MIN_MATE_SCORE
-                && alpha - eval > fpBase() + std::max<i32>(lmrDepth, 1) * fpDepthMul())
-                    break;
+                && alpha < MIN_MATE_SCORE)
+                {
+                    const i32 maxAllowed = fpBase()
+                                         + std::max<i32>(lmrDepth, 1) * fpDepthMul()
+                                         + static_cast<i32>(quietHist * fpQuietHistMul());
+
+                    if (alpha - eval > maxAllowed) break;
+                }
 
                 // SEE pruning
 
                 i32 threshold = isQuiet ? seeQuietThreshold() : seeNoisyThreshold();
                 threshold *= depth;
-                threshold -= lround(quietHist * seeQuietHistMul());
+                threshold -= static_cast<i32>(quietHist * seeQuietHistMul());
                 threshold = std::min<i32>(threshold, -1);
 
                 if (td->pos.stmHasNonPawns() && !td->pos.SEE(move, threshold))
