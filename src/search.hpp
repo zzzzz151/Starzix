@@ -591,6 +591,9 @@ private:
                 // Negative extension
                 else if (ttScore >= beta)
                     newDepth -= 3;
+                // Cut-node negative extension
+                else if constexpr (isCutNode)
+                    newDepth -= 2;
             }
 
             const u64 nodesBefore = td->nodes.load(std::memory_order_relaxed);
