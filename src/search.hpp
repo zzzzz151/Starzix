@@ -501,8 +501,8 @@ private:
         Bound bound = Bound::Upper;
 
         // Keep track of moves that fail low
-        ArrayVec<Move, 256> failLowQuiets;
         ArrayVec<Move, 256> failLowNoisies;
+        ArrayVec<Move, 256> failLowQuiets;
         ArrayVec<PieceType, 256> capturedArray;
 
         // Moves loop
@@ -678,9 +678,12 @@ private:
             // Fail low?
             if (score <= alpha)
             {
-                (isQuiet ? failLowQuiets : failLowNoisies).push_back(move);
-
-                if (!isQuiet) capturedArray.push_back(captured.value_or(PieceType::King));
+                if (isQuiet)
+                    failLowQuiets.push_back(move);
+                else {
+                    failLowNoisies.push_back(move);
+                    capturedArray.push_back(captured.value_or(PieceType::King));
+                }
 
                 continue;
             }
@@ -700,65 +703,19 @@ private:
                     plyData.pvLine.push_back(m);
             }
 
-            if (score < beta) continue;
-
-            // This move failed high
-
-            bound = Bound::Lower;
-
-            // Update histories
-
-            HistoryEntry& histEntry
-                = td->historyTable[td->pos.sideToMove()][move.pieceType()][move.to()];
-
-            i32 histBonus = std::clamp<i32>(
-                depth * histBonusMul() - histBonusOffset(), 0, histBonusMax()
-            );
-
-            histBonus *= numFailHighs;
-
-            const i32 histMalus = -std::clamp<i32>(
-                depth * histMalusMul() - histMalusOffset(), 0, histMalusMax()
-            );
-
-            // Decrease history of fail low noisy moves
-            for (size_t i = 0; i < failLowNoisies.size(); i++)
+            // Fail high?
+            if (score >= beta)
             {
-                const auto [move2, captured2]
-                    = std::pair<Move, PieceType>{ failLowNoisies[i], capturedArray[i] };
+                bound = Bound::Lower;
 
-                HistoryEntry& histEntry2
-                    = td->historyTable[td->pos.sideToMove()][move2.pieceType()][move2.to()];
+                if (isQuiet) plyData.killer = move;
 
-                histEntry2.updateNoisyHistory(
-                    std::optional<PieceType>(captured2), move2.promotion(), histMalus
+                updateHistories(
+                    td, move, depth, numFailHighs, failLowNoisies, failLowQuiets, capturedArray
                 );
-            }
 
-            if (!isQuiet)
-            {
-                // Increase history of this fail high noisy move
-                histEntry.updateNoisyHistory(captured, move.promotion(), histBonus);
                 break;
             }
-
-            // At this point, this move is quiet
-
-            plyData.killer = move;
-
-            // Increase histories of this fail high quiet move
-            histEntry.updateQuietHistories(td->pos, move, histBonus);
-
-            // Decrease histories of fail low quiet moves
-            for (const Move move2 : failLowQuiets)
-            {
-                HistoryEntry& histEntry2
-                    = td->historyTable[td->pos.sideToMove()][move2.pieceType()][move2.to()];
-
-                histEntry2.updateQuietHistories(td->pos, move2, histMalus);
-            }
-
-            break;
         }
 
         if (legalMovesSeen == 0)
@@ -858,6 +815,11 @@ private:
         i32 bestScore = td->pos.inCheck() ? -INF : eval;
         Move bestMove = MOVE_NONE;
 
+        // Keep track of moves that fail low
+        ArrayVec<Move, 256> failLowNoisies;
+        ArrayVec<Move, 256> failLowQuiets;
+        ArrayVec<PieceType, 256> capturedArray;
+
         // Moves loop (if not in check, only noisy moves)
         MovePicker mp = MovePicker(!td->pos.inCheck(), MOVE_NONE, td->pliesData[ply].killer);
         while (true)
@@ -879,6 +841,8 @@ private:
 
             makeMove(td, move, ply + 1);
 
+            const std::optional<PieceType> captured = td->pos.captured();
+
             const i32 score = -qSearch<isPvNode, false>(td, ply + 1, -beta, -alpha);
 
             undoMove(td);
@@ -888,15 +852,28 @@ private:
 
             bestScore = std::max<i32>(bestScore, score);
 
-            if (score > alpha)
+            // Fail low?
+            if (score <= alpha)
             {
-                // This move didn't fail low
-                alpha = score;
-                bestMove = move;
+                if (td->pos.isQuiet(move))
+                    failLowQuiets.push_back(move);
+                else {
+                    failLowNoisies.push_back(move);
+                    capturedArray.push_back(captured.value_or(PieceType::King));
+                }
+
+                continue;
             }
 
-             // Fail high?
-            if (score >= beta) break;
+            alpha = score;
+            bestMove = move;
+
+            // Fail high?
+            if (score >= beta)
+            {
+                updateHistories(td, move, 1, 1, failLowNoisies, failLowQuiets, capturedArray);
+                break;
+            }
         }
 
         assert(std::abs(bestScore) < INF);
