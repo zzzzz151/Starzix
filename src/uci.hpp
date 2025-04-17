@@ -267,7 +267,7 @@ constexpr void go(
             searchConfig.maxNodes = value;
     }
 
-    if (searchConfig.hardMs)
+    if (searchConfig.hardMs.has_value())
     {
         // Remove move overheard milliseconds from hard time limit
         searchConfig.hardMs = static_cast<u64>(std::max<i64>(

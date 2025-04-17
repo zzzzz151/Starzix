@@ -388,7 +388,7 @@ private:
         }
     }
 
-    template<bool isRoot, bool isPvNode, bool isCutNode>
+    template<bool isRoot, bool pvNode, bool cutNode>
     constexpr i32 search(
         ThreadData* td,
         i32 depth,
@@ -402,12 +402,12 @@ private:
         assert(std::abs(alpha) <= INF);
         assert(std::abs(beta) <= INF);
         assert(alpha < beta);
-        assert(!(isRoot && !isPvNode));
-        assert(isPvNode || alpha + 1 == beta);
-        assert(!(isPvNode && isCutNode));
+        assert(!(isRoot && !pvNode));
+        assert(pvNode || alpha + 1 == beta);
+        assert(!(pvNode && cutNode));
 
         // Quiescence search at leaf nodes
-        if (depth <= 0) return qSearch<isPvNode, true>(td, ply, alpha, beta);
+        if (depth <= 0) return qSearch<pvNode, true>(td, ply, alpha, beta);
 
         if (isHardTimeUp(td)) return 0;
 
@@ -436,7 +436,7 @@ private:
             = ttEntry.get(td->pos.zobristHash(), static_cast<i16>(ply));
 
         // TT cutoff
-        if (!isPvNode
+        if (!pvNode
         && !singularMove
         && ttDepth >= depth
         && (ttBound == Bound::Exact
@@ -455,7 +455,7 @@ private:
         td->pliesData[ply + 1].killer = MOVE_NONE;
 
         // Node pruning
-        if (!isPvNode && !td->pos.inCheck() && !singularMove)
+        if (!pvNode && !td->pos.inCheck() && !singularMove)
         {
             const i32 parentEval = *(td->pliesData[ply - 1].correctedEval);
             const bool oppWorsening = !td->pliesData[ply - 1].inCheck && eval > -parentEval;
@@ -468,7 +468,7 @@ private:
 
             // Razoring
             if (alpha - eval > razoringBase() + depth * depth * razoringDepthMul())
-                return qSearch<isPvNode, true>(td, ply, alpha, beta);
+                return qSearch<pvNode, true>(td, ply, alpha, beta);
 
             // NMP (Null move pruning)
             if (depth >= 3
@@ -492,7 +492,7 @@ private:
         }
 
         // IIR (Internal iterative reduction)
-        if ((isPvNode || isCutNode) && depth >= 4 && !ttMove && !singularMove)
+        if ((pvNode || cutNode) && depth >= 4 && !ttMove && !singularMove)
             depth--;
 
         size_t legalMovesSeen = 0;
@@ -500,10 +500,12 @@ private:
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::Upper;
 
-        // Keep track of moves that fail low
-        ArrayVec<Move, 256> failLowQuiets;
+        // Keep track of fail low moves
         ArrayVec<Move, 256> failLowNoisies;
+        ArrayVec<Move, 256> failLowQuiets;
+
         ArrayVec<PieceType, 256> capturedArray;
+        capturedArray.push_back(PieceType::King);
 
         // Moves loop
         MovePicker mp = MovePicker(false, ttMove, plyData.killer, singularMove);
@@ -574,7 +576,7 @@ private:
             {
                 const i32 singularBeta = std::max<i32>(*ttScore - depth, -MIN_MATE_SCORE);
 
-                const i32 singularScore = search<isRoot, false, isCutNode>(
+                const i32 singularScore = search<isRoot, false, cutNode>(
                     td, newDepth / 2, ply, singularBeta - 1, singularBeta, ttMove
                 );
 
@@ -588,7 +590,7 @@ private:
                 else if (ttScore >= beta)
                     newDepth -= 3;
                 // Cut-node negative extension
-                else if constexpr (isCutNode)
+                else if constexpr (cutNode)
                     newDepth -= 2;
             }
 
@@ -596,7 +598,7 @@ private:
 
             makeMove(td, move, ply + 1, &mTT);
 
-            const std::optional<PieceType> captured = td->pos.captured();
+            capturedArray[0] = td->pos.captured().value_or(PieceType::King);
 
             // PVS (Principal variation search)
 
@@ -608,8 +610,8 @@ private:
                 // Base reduction
                 i32 r = LMR_TABLE[static_cast<size_t>(depth)][isQuiet][legalMovesSeen];
 
-                r -= isPvNode;          // Reduce PV nodes less
-                r += isCutNode * 2;     // Reduce more if parent node expects to fail high
+                r -= pvNode;            // Reduce less if parent is an expected PV node
+                r += cutNode * 2;       // Reduce more if parent node expects to fail high
                 r -= td->pos.inCheck(); // Reduce moves that give check less
 
                 // For quiet moves, less reduction the higher the move's history and vice-versa
@@ -636,17 +638,17 @@ private:
                 if (score > alpha && reducedDepth < newDepth)
                 {
                     // Null window research
-                    score = -search<false, false, !isCutNode>(
+                    score = -search<false, false, !cutNode>(
                         td, newDepth, ply + 1, -alpha - 1, -alpha
                     );
 
                     numFailHighs += score > alpha;
                 }
             }
-            else if (!isPvNode || legalMovesSeen > 1)
+            else if (!pvNode || legalMovesSeen > 1)
             {
                 // Null window search
-                score = -search<false, false, !isCutNode>(
+                score = -search<false, false, !cutNode>(
                     td, newDepth, ply + 1, -alpha - 1, -alpha
                 );
 
@@ -654,7 +656,7 @@ private:
             }
 
             // Full window search
-            if (isPvNode && (legalMovesSeen == 1 || score > alpha))
+            if (pvNode && (legalMovesSeen == 1 || score > alpha))
             {
                 score = -search<false, true, false>(td, newDepth, ply + 1, -beta, -alpha);
                 numFailHighs += score >= beta;
@@ -678,9 +680,12 @@ private:
             // Fail low?
             if (score <= alpha)
             {
-                (isQuiet ? failLowQuiets : failLowNoisies).push_back(move);
-
-                if (!isQuiet) capturedArray.push_back(captured.value_or(PieceType::King));
+                if (isQuiet)
+                    failLowQuiets.push_back(move);
+                else {
+                    failLowNoisies.push_back(move);
+                    capturedArray.push_back(capturedArray[0]);
+                }
 
                 continue;
             }
@@ -690,7 +695,7 @@ private:
             bound = Bound::Exact;
 
             // In PV nodes, update PV line
-            if constexpr (isPvNode)
+            if constexpr (pvNode)
             {
                 plyData.pvLine.clear();
                 plyData.pvLine.push_back(move);
@@ -700,65 +705,19 @@ private:
                     plyData.pvLine.push_back(m);
             }
 
-            if (score < beta) continue;
-
-            // This move failed high
-
-            bound = Bound::Lower;
-
-            // Update histories
-
-            HistoryEntry& histEntry
-                = td->historyTable[td->pos.sideToMove()][move.pieceType()][move.to()];
-
-            i32 histBonus = std::clamp<i32>(
-                depth * histBonusMul() - histBonusOffset(), 0, histBonusMax()
-            );
-
-            histBonus *= numFailHighs;
-
-            const i32 histMalus = -std::clamp<i32>(
-                depth * histMalusMul() - histMalusOffset(), 0, histMalusMax()
-            );
-
-            // Decrease history of fail low noisy moves
-            for (size_t i = 0; i < failLowNoisies.size(); i++)
+            // Fail high?
+            if (score >= beta)
             {
-                const auto [move2, captured2]
-                    = std::pair<Move, PieceType>{ failLowNoisies[i], capturedArray[i] };
+                bound = Bound::Lower;
 
-                HistoryEntry& histEntry2
-                    = td->historyTable[td->pos.sideToMove()][move2.pieceType()][move2.to()];
+                if (isQuiet) plyData.killer = move;
 
-                histEntry2.updateNoisyHistory(
-                    std::optional<PieceType>(captured2), move2.promotion(), histMalus
+                updateHistories(
+                    td, move, depth, numFailHighs, failLowNoisies, failLowQuiets, capturedArray
                 );
-            }
 
-            if (!isQuiet)
-            {
-                // Increase history of this fail high noisy move
-                histEntry.updateNoisyHistory(captured, move.promotion(), histBonus);
                 break;
             }
-
-            // At this point, this move is quiet
-
-            plyData.killer = move;
-
-            // Increase histories of this fail high quiet move
-            histEntry.updateQuietHistories(td->pos, move, histBonus);
-
-            // Decrease histories of fail low quiet moves
-            for (const Move move2 : failLowQuiets)
-            {
-                HistoryEntry& histEntry2
-                    = td->historyTable[td->pos.sideToMove()][move2.pieceType()][move2.to()];
-
-                histEntry2.updateQuietHistories(td->pos, move2, histMalus);
-            }
-
-            break;
         }
 
         if (legalMovesSeen == 0)
@@ -798,14 +757,14 @@ private:
     }
 
     // Quiescence search
-    template<bool isPvNode, bool isFirstCall>
+    template<bool pvNode, bool isFirstCall>
     constexpr i32 qSearch(ThreadData* td, const size_t ply, i32 alpha, const i32 beta)
     {
         assert(ply > 0 && ply <= MAX_DEPTH);
         assert(std::abs(alpha) <= INF);
         assert(std::abs(beta) <= INF);
         assert(alpha < beta);
-        assert(isPvNode || alpha + 1 == beta);
+        assert(pvNode || alpha + 1 == beta);
 
         if (isHardTimeUp(td)) return 0;
 
@@ -821,7 +780,7 @@ private:
         if (alpha < 0 && td->pos.hasUpcomingRepetition(ply) && (alpha = 0) >= beta)
             return 0;
 
-        if constexpr (!isPvNode && isFirstCall)
+        if constexpr (!pvNode && isFirstCall)
         {
             // Probe TT for TT entry
             const TTEntry& ttEntry = ttEntryRef(mTT, td->pos.zobristHash());
@@ -858,6 +817,13 @@ private:
         i32 bestScore = td->pos.inCheck() ? -INF : eval;
         Move bestMove = MOVE_NONE;
 
+        // Keep track of fail low moves
+        ArrayVec<Move, 256> failLowNoisies;
+        ArrayVec<Move, 256> failLowQuiets;
+
+        ArrayVec<PieceType, 256> capturedArray;
+        capturedArray.push_back(PieceType::King);
+
         // Moves loop (if not in check, only noisy moves)
         MovePicker mp = MovePicker(!td->pos.inCheck(), MOVE_NONE, td->pliesData[ply].killer);
         while (true)
@@ -879,7 +845,9 @@ private:
 
             makeMove(td, move, ply + 1);
 
-            const i32 score = -qSearch<isPvNode, false>(td, ply + 1, -beta, -alpha);
+            capturedArray[0] = td->pos.captured().value_or(PieceType::King);
+
+            const i32 score = -qSearch<pvNode, false>(td, ply + 1, -beta, -alpha);
 
             undoMove(td);
 
@@ -888,15 +856,28 @@ private:
 
             bestScore = std::max<i32>(bestScore, score);
 
-            if (score > alpha)
+            // Fail low?
+            if (score <= alpha)
             {
-                // This move didn't fail low
-                alpha = score;
-                bestMove = move;
+                if (td->pos.isQuiet(move))
+                    failLowQuiets.push_back(move);
+                else {
+                    failLowNoisies.push_back(move);
+                    capturedArray.push_back(capturedArray[0]);
+                }
+
+                continue;
             }
 
-             // Fail high?
-            if (score >= beta) break;
+            alpha = score;
+            bestMove = move;
+
+            // Fail high?
+            if (score >= beta)
+            {
+                updateHistories(td, move, 1, 1, failLowNoisies, failLowQuiets, capturedArray);
+                break;
+            }
         }
 
         assert(std::abs(bestScore) < INF);

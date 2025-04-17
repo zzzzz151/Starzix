@@ -201,3 +201,58 @@ constexpr i32 getEval(ThreadData* td, PlyData& plyData)
 
     return *(plyData.correctedEval);
 }
+
+constexpr void updateHistories(
+    ThreadData* td,
+    const Move move,
+    const i32 depth,
+    const i32 numFailHighs,
+    const ArrayVec<Move, 256>& noisiesToPenalize,
+    const ArrayVec<Move, 256>& quietsToPenalize,
+    const ArrayVec<PieceType, 256>& capturedArray)
+{
+    HistoryEntry& histEntry
+        = td->historyTable[td->pos.sideToMove()][move.pieceType()][move.to()];
+
+    i32 histBonus = std::clamp<i32>(
+        depth * histBonusMul() - histBonusOffset(), 0, histBonusMax()
+    );
+
+    histBonus *= numFailHighs;
+
+    const i32 histMalus = -std::clamp<i32>(
+        depth * histMalusMul() - histMalusOffset(), 0, histMalusMax()
+    );
+
+    // Always decrease noisy history of noisy moves to penalize
+    for (size_t i = 0; i < noisiesToPenalize.size(); i++)
+    {
+        const Move move2 = noisiesToPenalize[i];
+
+        HistoryEntry& histEntry2
+            = td->historyTable[td->pos.sideToMove()][move2.pieceType()][move2.to()];
+
+        histEntry2.updateNoisyHistory(
+            std::optional<PieceType>(capturedArray[i + 1]), move2.promotion(), histMalus
+        );
+    }
+
+    if (td->pos.isQuiet(move))
+    {
+        // Increase move's main hist and cont hist
+        histEntry.updateMainHistContHist(td->pos, move, histBonus);
+
+        // Decrease main hist and cont hist of quiet moves to penalize
+        for (const Move move2 : quietsToPenalize)
+        {
+            HistoryEntry& histEntry2
+                = td->historyTable[td->pos.sideToMove()][move2.pieceType()][move2.to()];
+
+            histEntry2.updateMainHistContHist(td->pos, move2, histMalus);
+        }
+    }
+    else {
+        // Increase move's noisy history
+        histEntry.updateNoisyHistory(capturedArray[0], move.promotion(), histBonus);
+    }
+}
