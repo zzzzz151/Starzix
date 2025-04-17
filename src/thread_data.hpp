@@ -20,10 +20,15 @@ public:
 
     bool inCheck;
     ArrayVec<Move, MAX_DEPTH + 1> pvLine;
+    Move killer = MOVE_NONE;
+
     std::optional<i32> rawEval       = std::nullopt;
     std::optional<i32> correctedEval = std::nullopt;
-    Move killer = MOVE_NONE;
-};
+
+    ArrayVec<Move, 256> failLowQuiets;
+    ArrayVec<std::pair<Move, std::optional<PieceType>>, 256> failLowNoisies; // move, captured
+
+}; // struct PlyData
 
 enum class ThreadState : i32 {
     Sleeping, Searching, ExitAsap, Exited
@@ -205,11 +210,11 @@ constexpr i32 getEval(ThreadData* td, PlyData& plyData)
 constexpr void updateHistories(
     ThreadData* td,
     const Move move,
+    const std::optional<PieceType> captured,
     const i32 depth,
     const i32 numFailHighs,
-    const ArrayVec<Move, 256>& noisiesToPenalize,
-    const ArrayVec<Move, 256>& quietsToPenalize,
-    const ArrayVec<PieceType, 256>& capturedArray)
+    const ArrayVec<std::pair<Move, std::optional<PieceType>>, 256>& noisiesToPenalize,
+    const ArrayVec<Move, 256>& quietsToPenalize)
 {
     HistoryEntry& histEntry
         = td->historyTable[td->pos.sideToMove()][move.pieceType()][move.to()];
@@ -225,16 +230,12 @@ constexpr void updateHistories(
     );
 
     // Always decrease noisy history of noisy moves to penalize
-    for (size_t i = 0; i < noisiesToPenalize.size(); i++)
+    for (const auto [move2, captured2] : noisiesToPenalize)
     {
-        const Move move2 = noisiesToPenalize[i];
-
         HistoryEntry& histEntry2
             = td->historyTable[td->pos.sideToMove()][move2.pieceType()][move2.to()];
 
-        histEntry2.updateNoisyHistory(
-            std::optional<PieceType>(capturedArray[i + 1]), move2.promotion(), histMalus
-        );
+        histEntry2.updateNoisyHistory(captured2, move2.promotion(), histMalus);
     }
 
     if (td->pos.isQuiet(move))
@@ -253,6 +254,6 @@ constexpr void updateHistories(
     }
     else {
         // Increase move's noisy history
-        histEntry.updateNoisyHistory(capturedArray[0], move.promotion(), histBonus);
+        histEntry.updateNoisyHistory(captured, move.promotion(), histBonus);
     }
 }

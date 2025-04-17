@@ -501,11 +501,8 @@ private:
         Bound bound = Bound::Upper;
 
         // Keep track of fail low moves
-        ArrayVec<Move, 256> failLowNoisies;
-        ArrayVec<Move, 256> failLowQuiets;
-
-        ArrayVec<PieceType, 256> capturedArray;
-        capturedArray.push_back(PieceType::King);
+        plyData.failLowNoisies.clear();
+        plyData.failLowQuiets .clear();
 
         // Moves loop
         MovePicker mp = MovePicker(false, ttMove, plyData.killer, singularMove);
@@ -577,7 +574,7 @@ private:
                 const i32 singularBeta = std::max<i32>(*ttScore - depth, -MIN_MATE_SCORE);
 
                 const i32 singularScore = search<isRoot, false, cutNode>(
-                    td, newDepth / 2, ply, singularBeta - 1, singularBeta, ttMove
+                    td, newDepth / 2, ply, singularBeta - 1, singularBeta, move
                 );
 
                 // Single or double extension
@@ -592,13 +589,16 @@ private:
                 // Cut-node negative extension
                 else if constexpr (cutNode)
                     newDepth -= 2;
+
+                plyData.failLowNoisies.clear();
+                plyData.failLowQuiets .clear();
             }
 
             const u64 nodesBefore = td->nodes.load(std::memory_order_relaxed);
 
             makeMove(td, move, ply + 1, &mTT);
 
-            capturedArray[0] = td->pos.captured().value_or(PieceType::King);
+            const std::optional<PieceType> captured = td->pos.captured();
 
             // PVS (Principal variation search)
 
@@ -681,11 +681,9 @@ private:
             if (score <= alpha)
             {
                 if (isQuiet)
-                    failLowQuiets.push_back(move);
-                else {
-                    failLowNoisies.push_back(move);
-                    capturedArray.push_back(capturedArray[0]);
-                }
+                    plyData.failLowQuiets.push_back(move);
+                else
+                    plyData.failLowNoisies.push_back({ move, captured });
 
                 continue;
             }
@@ -713,7 +711,13 @@ private:
                 if (isQuiet) plyData.killer = move;
 
                 updateHistories(
-                    td, move, depth, numFailHighs, failLowNoisies, failLowQuiets, capturedArray
+                    td,
+                    move,
+                    captured,
+                    depth,
+                    numFailHighs,
+                    plyData.failLowNoisies,
+                    plyData.failLowQuiets
                 );
 
                 break;
@@ -796,7 +800,8 @@ private:
                 return *ttScore;
         }
 
-        const i32 eval = getEval(td, td->pliesData[ply]);
+        PlyData& plyData = td->pliesData[ply];
+        const i32 eval = getEval(td, plyData);
 
         if (ply >= MAX_DEPTH) return eval;
 
@@ -818,14 +823,11 @@ private:
         Move bestMove = MOVE_NONE;
 
         // Keep track of fail low moves
-        ArrayVec<Move, 256> failLowNoisies;
-        ArrayVec<Move, 256> failLowQuiets;
-
-        ArrayVec<PieceType, 256> capturedArray;
-        capturedArray.push_back(PieceType::King);
+        plyData.failLowNoisies.clear();
+        plyData.failLowQuiets .clear();
 
         // Moves loop (if not in check, only noisy moves)
-        MovePicker mp = MovePicker(!td->pos.inCheck(), MOVE_NONE, td->pliesData[ply].killer);
+        MovePicker mp = MovePicker(!td->pos.inCheck(), MOVE_NONE, plyData.killer);
         while (true)
         {
             // Move, i32
@@ -845,7 +847,7 @@ private:
 
             makeMove(td, move, ply + 1);
 
-            capturedArray[0] = td->pos.captured().value_or(PieceType::King);
+            const std::optional<PieceType> captured = td->pos.captured();
 
             const i32 score = -qSearch<pvNode, false>(td, ply + 1, -beta, -alpha);
 
@@ -860,11 +862,9 @@ private:
             if (score <= alpha)
             {
                 if (td->pos.isQuiet(move))
-                    failLowQuiets.push_back(move);
-                else {
-                    failLowNoisies.push_back(move);
-                    capturedArray.push_back(capturedArray[0]);
-                }
+                    plyData.failLowQuiets.push_back(move);
+                else
+                    plyData.failLowNoisies.push_back({ move, captured });
 
                 continue;
             }
@@ -875,7 +875,10 @@ private:
             // Fail high?
             if (score >= beta)
             {
-                updateHistories(td, move, 1, 1, failLowNoisies, failLowQuiets, capturedArray);
+                updateHistories(
+                    td, move, captured, 1, 1, plyData.failLowNoisies, plyData.failLowQuiets
+                );
+
                 break;
             }
         }
