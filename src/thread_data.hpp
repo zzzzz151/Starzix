@@ -228,32 +228,31 @@ constexpr void updateHistories(
     for (size_t i = 0; i < noisiesToPenalize.size(); i++)
     {
         const Move move2 = noisiesToPenalize[i];
-        const PieceType captured = capturedArray[i];
 
         HistoryEntry& histEntry2
             = td->historyTable[td->pos.sideToMove()][move2.pieceType()][move2.to()];
 
         histEntry2.updateNoisyHistory(
-            std::optional<PieceType>(captured), move2.promotion(), histMalus
+            std::optional<PieceType>(capturedArray[i + 1]), move2.promotion(), histMalus
         );
     }
 
     if (td->pos.isQuiet(move))
     {
-        // Increase move's quiet histories
-        histEntry.updateQuietHistories(td->pos, move, histBonus);
+        // Increase move's main hist and cont hist
+        histEntry.updateMainHistContHist(td->pos, move, histBonus);
 
-        // Decrease quiet histories of quiet moves to penalize
+        // Decrease main hist and cont hist of quiet moves to penalize
         for (const Move move2 : quietsToPenalize)
         {
             HistoryEntry& histEntry2
                 = td->historyTable[td->pos.sideToMove()][move2.pieceType()][move2.to()];
 
-            histEntry2.updateQuietHistories(td->pos, move2, histMalus);
+            histEntry2.updateMainHistContHist(td->pos, move2, histMalus);
         }
     }
     else {
         // Increase move's noisy history
-        histEntry.updateNoisyHistory(td->pos.captured(move), move.promotion(), histBonus);
+        histEntry.updateNoisyHistory(capturedArray[0], move.promotion(), histBonus);
     }
 }

@@ -594,13 +594,12 @@ public:
 
     constexpr Bitboard enemyAttacksNoStmKing()
     {
-        // Cached?
-        if (state().enemyAttacksNoStmKing.has_value())
-            return *(state().enemyAttacksNoStmKing);
-
-        // Calculate and cache
-        const Bitboard occNoStmKing = occupied() ^ squareBb(kingSquare());
-        state().enemyAttacksNoStmKing = attacks(!sideToMove(), occNoStmKing);
+        // If not cached, calculate and cache
+        if (!state().enemyAttacksNoStmKing.has_value())
+        {
+            const Bitboard occNoStmKing = occupied() ^ squareBb(kingSquare());
+            state().enemyAttacksNoStmKing = attacks(!sideToMove(), occNoStmKing);
+        }
 
         return *(state().enemyAttacksNoStmKing);
     }

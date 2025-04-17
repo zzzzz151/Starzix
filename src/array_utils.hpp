@@ -85,22 +85,16 @@ private:
 
 public:
 
-    constexpr T operator[](const std::size_t i) const
+    constexpr const T& operator[](const std::size_t i) const
     {
         assert(i < mSize);
         return mArr[i];
     }
 
-    constexpr const T& operator[](const std::size_t i)
+    constexpr T& operator[](const std::size_t i)
     {
         assert(i < mSize);
         return mArr[i];
-    }
-
-    constexpr T* ptr(const std::size_t i) const
-    {
-        assert(i < mSize);
-        return &mArr[i];
     }
 
     constexpr auto begin() const {

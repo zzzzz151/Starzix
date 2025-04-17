@@ -75,7 +75,8 @@ public:
         return asEnum<Square>((mMove >> 4) & 0b111111);
     }
 
-    constexpr MoveFlag flag() const {
+    constexpr MoveFlag flag() const
+    {
         return asEnum<MoveFlag>(mMove & 0x000f);
     }
 

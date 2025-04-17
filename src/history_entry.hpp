@@ -30,54 +30,50 @@ private:
 
     EnumArray<i16, PieceType, PieceType> mNoisyHist = { }; // [captured][promotion] (King if none)
 
-    // Main history, 1-ply cont hist, 2-ply cont hist
-    constexpr auto quietHistsPtrs(this auto&& self, Position& pos, const Move move)
-    {
-        const Bitboard enemyAttacks = pos.enemyAttacksNoStmKing();
-
-        const bool enemyAttacksSrc = hasSquare(enemyAttacks, move.from());
-        const bool enemyAttacksDst = hasSquare(enemyAttacks, move.to());
-
-        auto& mainHist = self.mMainHist[enemyAttacksSrc][enemyAttacksDst];
-
-        Move prevMove = pos.lastMove();
-
-        auto onePlyContHistPtr
-            = prevMove
-            ? &(self.mContHist[!pos.sideToMove()][prevMove.pieceType()][prevMove.to()])
-            : nullptr;
-
-        prevMove = pos.nthToLastMove(2);
-
-        auto twoPlyContHistPtr
-            = prevMove
-            ? &(self.mContHist[pos.sideToMove()][prevMove.pieceType()][prevMove.to()])
-            : nullptr;
-
-        return std::array{ &mainHist, onePlyContHistPtr, twoPlyContHistPtr };
-    }
-
 public:
 
     i16 mCorrHist = 0;
 
     EnumArray<i16, PieceType, Square> mContCorrHist = { };
 
+    // Main history + 1-ply cont hist + 2-ply cont hist
     constexpr i32 quietHistory(Position& pos, const Move move) const
     {
-        i32 total = 0;
+        const bool enemyAttacksSrc = hasSquare(pos.enemyAttacksNoStmKing(), move.from());
+        const bool enemyAttacksDst = hasSquare(pos.enemyAttacksNoStmKing(), move.to());
 
-        for (const i16* historyPtr : quietHistsPtrs(pos, move))
-            if (historyPtr != nullptr)
-                total += static_cast<i32>(*historyPtr);
+        const Move prevMove  = pos.lastMove();
+        const Move prevMove2 = pos.nthToLastMove(2);
+
+        i32 total = mMainHist[enemyAttacksSrc][enemyAttacksDst];
+
+        if (prevMove)
+            total += mContHist[!pos.sideToMove()][prevMove.pieceType()][prevMove.to()];
+
+        if (prevMove2)
+            total += mContHist[pos.sideToMove()][prevMove2.pieceType()][prevMove2.to()];
 
         return total;
     }
 
-    constexpr void updateQuietHistories(Position& pos, const Move move, const i32 bonus)
+    // Update main history, 1-ply cont hist and 2-ply cont hist
+    constexpr void updateMainHistContHist(Position& pos, const Move move, const i32 bonus)
     {
-        for (i16* historyPtr : quietHistsPtrs(pos, move))
-            updateHistory(historyPtr, bonus);
+        const bool enemyAttacksSrc = hasSquare(pos.enemyAttacksNoStmKing(), move.from());
+        const bool enemyAttacksDst = hasSquare(pos.enemyAttacksNoStmKing(), move.to());
+
+        const Color stm = pos.sideToMove();
+
+        const Move prevMove  = pos.lastMove();
+        const Move prevMove2 = pos.nthToLastMove(2);
+
+        updateHistory(&mMainHist[enemyAttacksSrc][enemyAttacksDst], bonus);
+
+        if (prevMove)
+            updateHistory(&mContHist[!stm][prevMove.pieceType()][prevMove.to()], bonus);
+
+        if (prevMove2)
+            updateHistory(&mContHist[stm][prevMove2.pieceType()][prevMove2.to()], bonus);
     }
 
     constexpr i32 noisyHistory(
