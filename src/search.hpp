@@ -604,7 +604,7 @@ private:
                 // Negative extension
                 else if (ttScore >= beta)
                     newDepth -= 3;
-                // Cut-node negative extension
+                // Expected cut-node negative extension
                 else if constexpr (cutNode)
                     newDepth -= 2;
 
