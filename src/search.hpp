@@ -265,6 +265,8 @@ private:
     constexpr void iterativeDeepening(ThreadData* td)
     {
         i32 score = 0;
+        i32 avgScore = 0;
+        size_t stableScoreStreak = 0;
 
         for (td->rootDepth = 1; td->rootDepth <= mSearchConfig.maxDepth; td->rootDepth++)
         {
@@ -322,10 +324,25 @@ private:
             if (mSearchConfig.maxNodes.has_value() && nodes >= mSearchConfig.maxNodes)
                 break;
 
-            // Nodes time management
-            // Scale soft time limit based on nodes spent on best move at root
+            // Soft time limit hit?
+
+            if (!mSearchConfig.softMs.has_value())
+                continue;
+
+            // Keep track of score stability for soft time scaling
+            // Deeper search scores are valued more
+            if (td->rootDepth <= 1)
+                avgScore = score;
+            else {
+                avgScore = (score + avgScore) / 2;
+                stableScoreStreak = std::abs(score - avgScore) <= 10 ? stableScoreStreak + 1 : 0;
+            }
+
             const auto softMsScaled = [&] () constexpr -> u64
             {
+                // Nodes time management
+                // Less/more soft time the bigger/smaller the fraction of nodes spent on best move
+
                 const u64 threadNodes   = td->nodes.load(std::memory_order_relaxed);
                 const u64 bestMoveNodes = td->nodesByMove[bestMoveAtRoot(td).asU16()];
 
@@ -335,16 +352,17 @@ private:
 
                 assert(bestMoveNodesFraction >= 0.0 && bestMoveNodesFraction <= 1.0);
 
-                const double scaled
-                    = static_cast<double>(*(mSearchConfig.softMs))
-                    * (nodesTmBase() - bestMoveNodesFraction * nodesTmMul());
+                double scale = nodesTmBase() - bestMoveNodesFraction * nodesTmMul();
 
-                return static_cast<u64>(scaled);
+                // Score stability time management
+                // Less/more soft time the more/less stable the root score is
+                scale *= std::max<double>(1.5 - static_cast<double>(stableScoreStreak) * 0.1, 0.5);
+
+                const double originalSoftMs = static_cast<double>(*(mSearchConfig.softMs));
+                return static_cast<u64>(originalSoftMs * scale);
             };
 
-            // Soft time limit hit?
-            if (mSearchConfig.softMs.has_value()
-            && msElapsed >= (td->rootDepth >= 6 ? softMsScaled() : mSearchConfig.softMs))
+            if (msElapsed >= (td->rootDepth >= 6 ? softMsScaled() : mSearchConfig.softMs))
                 break;
         }
 
