@@ -57,13 +57,16 @@ public:
 }; // struct TunableParam
 
 // Time management
-MAYBE_CONSTEXPR auto tmHardPercentage = TunableParam<double>(0.71, 0.25, 0.75, 0.1);
-MAYBE_CONSTEXPR auto tmSoftPercentage = TunableParam<double>(12.5, 2.0, 20.0, 2.0) / 100.0;
-MAYBE_CONSTEXPR auto tmNodesBase      = TunableParam<double>(1.23, 1.0, 2.0, 0.1);
-MAYBE_CONSTEXPR auto tmNodesMul       = TunableParam<double>(1.0, 0.5, 1.0, 0.1);
-MAYBE_CONSTEXPR auto tmScoreStabBase  = TunableParam<double>(1.5, 1.0, 2.0, 0.1);
-MAYBE_CONSTEXPR auto tmScoreStabMul   = TunableParam<double>(0.1, 0.0, 0.5, 0.05);
-MAYBE_CONSTEXPR auto tmScoreStabMin   = TunableParam<double>(0.5, 0.1, 1.0, 0.1);
+MAYBE_CONSTEXPR auto tmHardPercentage  = TunableParam<double>(0.71, 0.25, 0.75, 0.1);
+MAYBE_CONSTEXPR auto tmSoftPercentage  = TunableParam<double>(12.5, 2.0, 20.0, 2.0) / 100.0;
+MAYBE_CONSTEXPR auto tmNodesBase       = TunableParam<double>(1.23, 1.0, 2.0, 0.1);
+MAYBE_CONSTEXPR auto tmNodesMul        = TunableParam<double>(1.0, 0.5, 1.0, 0.1);
+MAYBE_CONSTEXPR auto tmScoreStabBase   = TunableParam<double>(1.5, 1.0, 2.0, 0.1);
+MAYBE_CONSTEXPR auto tmScoreStabMul    = TunableParam<double>(0.1, 0.0, 0.5, 0.05);
+MAYBE_CONSTEXPR auto tmScoreStabMin    = TunableParam<double>(0.5, 0.1, 1.0, 0.1);
+MAYBE_CONSTEXPR auto tmBestMovStabBase = TunableParam<double>(1.5, 1.0, 2.0, 0.1);
+MAYBE_CONSTEXPR auto tmBestMovStabMul  = TunableParam<double>(0.1, 0.0, 0.5, 0.05);
+MAYBE_CONSTEXPR auto tmBestMovStabMin  = TunableParam<double>(0.5, 0.1, 1.0, 0.1);
 
 // Pieces values
 MAYBE_CONSTEXPR auto pawnValue  = TunableParam<i32>(170, 50, 200, 50);
@@ -164,6 +167,9 @@ MAYBE_CONST auto LMR_TABLE = getLmrTable();
         { stringify(tmScoreStabBase),        &tmScoreStabBase },
         { stringify(tmScoreStabMul),         &tmScoreStabMul },
         { stringify(tmScoreStabMin),         &tmScoreStabMin },
+        { stringify(tmBestMovStabBase),      &tmBestMovStabBase },
+        { stringify(tmBestMovStabMul),       &tmBestMovStabMul },
+        { stringify(tmBestMovStabMin),       &tmBestMovStabMin },
         { stringify(pawnValue),              &pawnValue },
         { stringify(minorValue),             &minorValue },
         { stringify(rookValue),              &rookValue },

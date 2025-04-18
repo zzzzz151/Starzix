@@ -264,12 +264,16 @@ private:
 
     constexpr void iterativeDeepening(ThreadData* td)
     {
-        i32 score = 0;
+        i32 score    = 0;
         i32 avgScore = 0;
+
         size_t stableScoreStreak = 0;
+        size_t bestMoveStreak    = 0;
 
         for (td->rootDepth = 1; td->rootDepth <= mSearchConfig.maxDepth; td->rootDepth++)
         {
+            const Move prevBestMove = bestMoveAtRoot(td);
+
             td->maxPlyReached = 0; // Reset seldepth
 
             score = td->rootDepth >= 4
@@ -338,6 +342,9 @@ private:
                 stableScoreStreak = std::abs(score - avgScore) <= 10 ? stableScoreStreak + 1 : 0;
             }
 
+            // Keep track of best move stability for soft time scaling
+            bestMoveStreak = bestMoveAtRoot(td) == prevBestMove ? bestMoveStreak + 1 : 0;
+
             const auto softMsScaled = [&] () constexpr -> u64
             {
                 // Nodes time management
@@ -359,6 +366,13 @@ private:
                 scale *= std::max<double>(
                     tmScoreStabBase() - static_cast<double>(stableScoreStreak) * tmScoreStabMul(),
                     tmScoreStabMin()
+                );
+
+                // Best move stability time management
+                // Less/more soft time the more/less stable the best root move is
+                scale *= std::max<double>(
+                    tmBestMovStabBase() - static_cast<double>(bestMoveStreak) * tmBestMovStabMul(),
+                    tmBestMovStabMin()
                 );
 
                 const double originalSoftMs = static_cast<double>(*(mSearchConfig.softMs));
