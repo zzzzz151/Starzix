@@ -16,7 +16,7 @@ inline void setoption(const std::vector<std::string>& tokens, Searcher& searcher
 
 constexpr void position(const std::vector<std::string>& tokens, Position& pos);
 
-constexpr void go(
+inline void go(
     const std::vector<std::string>& tokens, Position& pos, Searcher& searcher);
 
 inline void runCommand(std::string& command, Position& pos, Searcher& searcher)
@@ -232,7 +232,7 @@ constexpr void position(const std::vector<std::string>& tokens, Position& pos)
         pos.makeMove(tokens[i]);
 }
 
-constexpr void go(
+inline void go(
     const std::vector<std::string>& tokens, Position& pos, Searcher& searcher)
 {
     SearchConfig searchConfig = { };
@@ -278,11 +278,11 @@ constexpr void go(
         if (!isMoveTime)
         {
             searchConfig.hardMs = static_cast<u64>(
-                static_cast<double>(*(searchConfig.hardMs)) * timeHardPercentage()
+                static_cast<double>(*(searchConfig.hardMs)) * tmHardPercentage()
             );
 
             searchConfig.softMs = static_cast<u64>(
-                static_cast<double>(*(searchConfig.hardMs)) * timeSoftPercentage()
+                static_cast<double>(*(searchConfig.hardMs)) * tmSoftPercentage()
             );
         }
     }
