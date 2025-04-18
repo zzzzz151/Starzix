@@ -352,11 +352,14 @@ private:
 
                 assert(bestMoveNodesFraction >= 0.0 && bestMoveNodesFraction <= 1.0);
 
-                double scale = nodesTmBase() - bestMoveNodesFraction * nodesTmMul();
+                double scale = tmNodesBase() - bestMoveNodesFraction * tmNodesMul();
 
                 // Score stability time management
                 // Less/more soft time the more/less stable the root score is
-                scale *= std::max<double>(1.5 - static_cast<double>(stableScoreStreak) * 0.1, 0.5);
+                scale *= std::max<double>(
+                    tmScoreStabBase() - static_cast<double>(stableScoreStreak) * tmScoreStabMul(),
+                    tmScoreStabMin()
+                );
 
                 const double originalSoftMs = static_cast<double>(*(mSearchConfig.softMs));
                 return static_cast<u64>(originalSoftMs * scale);
