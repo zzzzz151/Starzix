@@ -649,6 +649,14 @@ private:
                 r += cutNode * 2;       // Reduce more if parent node expects to fail high
                 r -= td->pos.inCheck(); // Reduce moves that give check less
 
+                const bool improving
+                    = ply > 1
+                    && !plyData.inCheck
+                    && !td->pliesData[ply - 2].inCheck
+                    && eval > *(td->pliesData[ply - 2].correctedEval);
+
+                r -= improving; // Reduce less if parent's static eval is improving
+
                 // For quiet moves, less reduction the higher the move's history and vice-versa
                 r -= lround(quietHist * lmrQuietHistMul());
 
