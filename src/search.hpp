@@ -649,11 +649,19 @@ private:
                 r += cutNode * 2;       // Reduce more if parent node expects to fail high
                 r -= td->pos.inCheck(); // Reduce moves that give check less
 
-                const bool improving
-                    = ply > 1
-                    && !plyData.inCheck
-                    && !td->pliesData[ply - 2].inCheck
-                    && eval > *(td->pliesData[ply - 2].correctedEval);
+                // Parent's static eval improving?
+                const bool improving = [&] () constexpr
+                {
+                    if (plyData.inCheck) return false;
+
+                    if (ply >= 2 && !td->pliesData[ply - 2].inCheck)
+                        return eval > td->pliesData[ply - 2].correctedEval;
+
+                    if (ply >= 4 && !td->pliesData[ply - 4].inCheck)
+                        return eval > td->pliesData[ply - 4].correctedEval;
+
+                    return false;
+                }();
 
                 r -= improving; // Reduce less if parent's static eval is improving
 
