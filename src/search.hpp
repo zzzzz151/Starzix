@@ -492,8 +492,13 @@ private:
         // Node pruning
         if (!pvNode && !td->pos.inCheck() && !singularMove)
         {
-            const i32 parentEval = *(td->pliesData[ply - 1].correctedEval);
-            const bool oppWorsening = !td->pliesData[ply - 1].inCheck && eval > -parentEval;
+            const Move lastMove = td->pos.lastMove();
+
+            const bool oppWorsening
+                = !td->pliesData[ply - 1].inCheck
+                && !td->pos.captured().has_value()
+                && !(lastMove && lastMove.promotion().has_value())
+                && -eval < td->pliesData[ply - 1].correctedEval;
 
             // RFP (Reverse futility pruning)
             if (depth <= 7
@@ -653,7 +658,7 @@ private:
                     = ply > 1
                     && !plyData.inCheck
                     && !td->pliesData[ply - 2].inCheck
-                    && eval > *(td->pliesData[ply - 2].correctedEval);
+                    && eval > td->pliesData[ply - 2].correctedEval;
 
                 r -= improving; // Reduce less if parent's static eval is improving
 
