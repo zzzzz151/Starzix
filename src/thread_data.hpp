@@ -175,6 +175,10 @@ constexpr i32 getEval(ThreadData* td, PlyData& plyData)
     {
         updateBothAccs(td);
         plyData.rawEval = nnue::evaluate(td->bothAccsStack[td->bothAccsIdx], td->pos.sideToMove());
+
+        // Scale eval with halfmove clock
+        const i32 pliesSincePawnOrCapture = static_cast<i32>(td->pos.pliesSincePawnOrCapture());
+        plyData.rawEval = *(plyData.rawEval) * (200 - pliesSincePawnOrCapture) / 200;
     }
 
     // Adjust eval with correction histories
