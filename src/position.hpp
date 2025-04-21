@@ -221,6 +221,11 @@ public:
         return state().enPassantSquare;
     }
 
+    constexpr auto pliesSincePawnOrCapture() const
+    {
+        return state().pliesSincePawnOrCapture;
+    }
+
     constexpr void setPliesSincePawnOrCapture(const u8 newValue)
     {
         state().pliesSincePawnOrCapture = newValue;

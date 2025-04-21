@@ -56,14 +56,21 @@ public:
 
 }; // struct TunableParam
 
-// Time management
-MAYBE_CONSTEXPR auto tmHardPercentage  = TunableParam<double>(0.71, 0.25, 0.75, 0.1);
-MAYBE_CONSTEXPR auto tmSoftPercentage  = TunableParam<double>(12.5, 2.0, 20.0, 2.0) / 100.0;
-MAYBE_CONSTEXPR auto tmNodesBase       = TunableParam<double>(1.23, 1.0, 2.0, 0.1);
-MAYBE_CONSTEXPR auto tmNodesMul        = TunableParam<double>(1.0, 0.5, 1.0, 0.1);
-MAYBE_CONSTEXPR auto tmScoreStabBase   = TunableParam<double>(1.5, 1.0, 2.0, 0.1);
-MAYBE_CONSTEXPR auto tmScoreStabMul    = TunableParam<double>(0.1, 0.0, 0.5, 0.05);
-MAYBE_CONSTEXPR auto tmScoreStabMin    = TunableParam<double>(0.5, 0.1, 1.0, 0.1);
+// Base time management
+MAYBE_CONSTEXPR auto tmHardPercentage = TunableParam<double>(0.71, 0.25, 0.75, 0.1);
+MAYBE_CONSTEXPR auto tmSoftPercentage = TunableParam<double>(12.5, 2.0, 20.0, 2.0) / 100.0;
+
+// Nodes TM
+MAYBE_CONSTEXPR auto tmNodesBase = TunableParam<double>(1.23, 1.0, 2.0, 0.1);
+MAYBE_CONSTEXPR auto tmNodesMul  = TunableParam<double>(1.0, 0.5, 1.0, 0.1);
+
+// Score stability TM
+MAYBE_CONSTEXPR auto tmScoreStabThreshold = TunableParam<i32>(10, 0, 50, 10);
+MAYBE_CONSTEXPR auto tmScoreStabBase      = TunableParam<double>(1.5, 1.0, 2.0, 0.1);
+MAYBE_CONSTEXPR auto tmScoreStabMul       = TunableParam<double>(0.1, 0.0, 0.5, 0.05);
+MAYBE_CONSTEXPR auto tmScoreStabMin       = TunableParam<double>(0.5, 0.1, 1.0, 0.1);
+
+// Best move stability TM
 MAYBE_CONSTEXPR auto tmBestMovStabBase = TunableParam<double>(1.5, 1.0, 2.0, 0.1);
 MAYBE_CONSTEXPR auto tmBestMovStabMul  = TunableParam<double>(0.1, 0.0, 0.5, 0.05);
 MAYBE_CONSTEXPR auto tmBestMovStabMin  = TunableParam<double>(0.5, 0.1, 1.0, 0.1);
@@ -164,6 +171,7 @@ MAYBE_CONST auto LMR_TABLE = getLmrTable();
         { stringify(tmSoftPercentage),       &tmSoftPercentage },
         { stringify(tmNodesBase),            &tmNodesBase },
         { stringify(tmNodesMul),             &tmNodesMul },
+        { stringify(tmScoreStabThreshold),   &tmScoreStabThreshold },
         { stringify(tmScoreStabBase),        &tmScoreStabBase },
         { stringify(tmScoreStabMul),         &tmScoreStabMul },
         { stringify(tmScoreStabMin),         &tmScoreStabMin },
