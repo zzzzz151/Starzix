@@ -339,7 +339,10 @@ private:
                 avgScore = score;
             else {
                 avgScore = (score + avgScore) / 2;
-                stableScoreStreak = std::abs(score - avgScore) <= 10 ? stableScoreStreak + 1 : 0;
+
+                stableScoreStreak = std::abs(score - avgScore) <= tmScoreStabThreshold()
+                                  ? stableScoreStreak + 1
+                                  : 0;
             }
 
             // Keep track of best move stability for soft time scaling
@@ -347,7 +350,7 @@ private:
 
             const auto softMsScaled = [&] () constexpr -> u64
             {
-                // Nodes time management
+                // Nodes TM
                 // Less/more soft time the bigger/smaller the fraction of nodes spent on best move
 
                 const u64 threadNodes   = td->nodes.load(std::memory_order_relaxed);
@@ -361,14 +364,14 @@ private:
 
                 double scale = tmNodesBase() - bestMoveNodesFraction * tmNodesMul();
 
-                // Score stability time management
+                // Score stability TM
                 // Less/more soft time the more/less stable the root score is
                 scale *= std::max<double>(
                     tmScoreStabBase() - static_cast<double>(stableScoreStreak) * tmScoreStabMul(),
                     tmScoreStabMin()
                 );
 
-                // Best move stability time management
+                // Best move stability TM
                 // Less/more soft time the more/less stable the best root move is
                 scale *= std::max<double>(
                     tmBestMovStabBase() - static_cast<double>(bestMoveStreak) * tmBestMovStabMul(),
@@ -492,8 +495,8 @@ private:
         // Node pruning
         if (!pvNode && !td->pos.inCheck() && !singularMove)
         {
-            const i32 parentEval = *(td->pliesData[ply - 1].correctedEval);
-            const bool oppWorsening = !td->pliesData[ply - 1].inCheck && eval > -parentEval;
+            const bool oppWorsening
+                = !td->pliesData[ply - 1].inCheck && -eval < td->pliesData[ply - 1].correctedEval;
 
             // RFP (Reverse futility pruning)
             if (depth <= 7
@@ -625,6 +628,7 @@ private:
                 else if constexpr (cutNode)
                     newDepth -= 2;
 
+                // The singular search used these so clear them
                 plyData.failLowNoisies.clear();
                 plyData.failLowQuiets .clear();
             }
@@ -650,10 +654,10 @@ private:
                 r -= td->pos.inCheck(); // Reduce moves that give check less
 
                 const bool improving
-                    = ply > 1
+                    = ply >= 2
                     && !plyData.inCheck
                     && !td->pliesData[ply - 2].inCheck
-                    && eval > *(td->pliesData[ply - 2].correctedEval);
+                    && eval > td->pliesData[ply - 2].correctedEval;
 
                 r -= improving; // Reduce less if parent's static eval is improving
 
