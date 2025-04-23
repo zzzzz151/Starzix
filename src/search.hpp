@@ -665,7 +665,7 @@ private:
                 r -= lround(quietHist * lmrQuietHistMul());
 
                 // Don't extend depth
-                const i32 reducedDepth = std::clamp<i32>(newDepth - r, 0, newDepth);
+                const i32 reducedDepth = std::clamp<i32>(newDepth - r, 1, newDepth);
 
                 // Reduced null window search
                 score = -search<false, false, true>(
