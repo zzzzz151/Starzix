@@ -245,7 +245,7 @@ public:
 
         const PieceType pieceType = move.pieceType();
         const std::optional<PieceType> promotion = move.promotion();
-        const PieceType place = promotion.has_value() ? *promotion : pieceType;
+        const PieceType ptPlaced = promotion.value_or(pieceType);
 
         // If king moved, we update mMirrorVAxis[colorMoving]
         // Our vertical axis mirroring toggles if our king just crossed vertical axis
@@ -309,7 +309,7 @@ public:
                     mAccumulators[color][i]
                         = prevBothAccs.mAccumulators[color][i]
                         - ftWeights[colorMoving][pieceType][newFrom][i]
-                        + ftWeights[colorMoving][place][newTo][i]
+                        + ftWeights[colorMoving][ptPlaced][newTo][i]
                         - ftWeights[!colorMoving][captured][capturedSq][i];
                 }
             }
@@ -329,7 +329,7 @@ public:
                     mAccumulators[color][i]
                         = prevBothAccs.mAccumulators[color][i]
                         - ftWeights[pieceType][newFrom][i]
-                        + ftWeights[place][newTo][i]
+                        + ftWeights[ptPlaced][newTo][i]
                         - ftWeights[PieceType::Rook][rookFrom][i]
                         + ftWeights[PieceType::Rook][rookTo][i];
                 }
@@ -342,7 +342,7 @@ public:
                     mAccumulators[color][i]
                         = prevBothAccs.mAccumulators[color][i]
                         - ftWeights[pieceType][newFrom][i]
-                        + ftWeights[place][newTo][i];
+                        + ftWeights[ptPlaced][newTo][i];
                 }
             }
         }

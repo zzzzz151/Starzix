@@ -522,6 +522,81 @@ public:
             || getBb(sideToMove(), PieceType::Queen)  > 0;
     }
 
+    constexpr bool givesCheck(const Move move) const
+    {
+        assert(move);
+
+        const Color stm = sideToMove();
+
+        auto tempColorBbs  = colorBbs();
+        auto tempPiecesBbs = piecesBbs();
+
+        const auto tempTogglePiece = [&] (
+            const Color color, const PieceType pt, const Square square) constexpr
+        {
+            tempColorBbs[color] ^= squareBb(square);
+            tempPiecesBbs[pt]   ^= squareBb(square);
+        };
+
+        const Square    from      = move.from();
+        const Square    to        = move.to();
+        const MoveFlag  moveFlag  = move.flag();
+        const PieceType pieceType = move.pieceType();
+
+        tempTogglePiece(stm, pieceType, from);
+
+        if (moveFlag == MoveFlag::Castling)
+        {
+            tempTogglePiece(stm, PieceType::King, to);
+
+            const auto [rookFrom, rookTo] = CASTLING_ROOK_FROM_TO[to];
+
+            tempTogglePiece(stm, PieceType::Rook, rookFrom);
+            tempTogglePiece(stm, PieceType::Rook, rookTo);
+        }
+        else if (moveFlag == MoveFlag::EnPassant)
+        {
+            tempTogglePiece(!stm, PieceType::Pawn, enPassantRelative(to));
+            tempTogglePiece(stm, PieceType::Pawn, to);
+        }
+        else {
+            const std::optional<PieceType> capt = pieceTypeAt(to);
+
+            if (capt.has_value())
+                tempTogglePiece(!stm, *capt, to);
+
+            tempTogglePiece(stm, move.promotion().value_or(pieceType), to);
+        }
+
+        const Square enemyKingSquare = kingSquare(!stm);
+
+        const Bitboard ourPawns = tempColorBbs[stm] & tempPiecesBbs[PieceType::Pawn];
+
+        if (ourPawns & getPawnAttacks(enemyKingSquare, !stm))
+            return true;
+
+        const Bitboard ourKnights = tempColorBbs[stm] & tempPiecesBbs[PieceType::Knight];
+
+        if (ourKnights & getKnightAttacks(enemyKingSquare))
+            return true;
+
+        const Bitboard occ = tempColorBbs[Color::White] | tempColorBbs[Color::Black];
+
+        const Bitboard bishopsQueens
+            = tempPiecesBbs[PieceType::Bishop] | tempPiecesBbs[PieceType::Queen];
+
+        if (tempColorBbs[stm] & bishopsQueens & getBishopAttacks(enemyKingSquare, occ))
+            return true;
+
+        const Bitboard rooksQueens
+            = tempPiecesBbs[PieceType::Rook] | tempPiecesBbs[PieceType::Queen];
+
+        if (tempColorBbs[stm] & rooksQueens & getRookAttacks(enemyKingSquare, occ))
+            return true;
+
+        return false;
+    }
+
     constexpr Bitboard pinned()
     {
         // Cached?
@@ -540,7 +615,7 @@ public:
             = theirBishopsQueens & getBishopAttacks(kingSquare, them());
 
         potentialAttackers
-            |= theirRooksQueens   & getRookAttacks(kingSquare, them());
+            |= theirRooksQueens & getRookAttacks(kingSquare, them());
 
         state().pinned = 0;
 
@@ -640,6 +715,8 @@ public:
         const PosState copy = state();
         mStates.push_back(copy);
 
+        const Color stm = sideToMove();
+
         state().lastMove = move.asU16();
 
         // These will be calculated and cached later
@@ -649,7 +726,7 @@ public:
         if (!move) {
             assert(!inCheck());
 
-            state().colorToMove = !sideToMove();
+            state().colorToMove = !stm;
             state().zobristHash ^= ZOBRIST_COLOR;
 
             if (state().enPassantSquare.has_value())
@@ -661,36 +738,35 @@ public:
 
             state().pliesSincePawnOrCapture++;
 
-            if (sideToMove() == Color::White)
+            if (stm == Color::Black)
                 state().currentMoveCounter++;
 
             state().captured = std::nullopt;
             return;
         }
 
-        const Square from = move.from();
-        const Square to   = move.to();
-        const MoveFlag moveFlag = move.flag();
-        const std::optional<PieceType> promotion = move.promotion();
+        const Square    from      = move.from();
+        const Square    to        = move.to();
+        const MoveFlag  moveFlag  = move.flag();
         const PieceType pieceType = move.pieceType();
 
-        togglePiece(sideToMove(), pieceType, from);
+        togglePiece(stm, pieceType, from);
 
         if (moveFlag == MoveFlag::Castling)
         {
-            togglePiece(sideToMove(), PieceType::King, to);
+            togglePiece(stm, PieceType::King, to);
 
             const auto [rookFrom, rookTo] = CASTLING_ROOK_FROM_TO[to];
 
-            togglePiece(sideToMove(), PieceType::Rook, rookFrom);
-            togglePiece(sideToMove(), PieceType::Rook, rookTo);
+            togglePiece(stm, PieceType::Rook, rookFrom);
+            togglePiece(stm, PieceType::Rook, rookTo);
 
             state().captured = std::nullopt;
         }
         else if (moveFlag == MoveFlag::EnPassant)
         {
-            togglePiece(!sideToMove(), PieceType::Pawn, enPassantRelative(to));
-            togglePiece(sideToMove(), PieceType::Pawn, to);
+            togglePiece(!stm, PieceType::Pawn, enPassantRelative(to));
+            togglePiece(stm, PieceType::Pawn, to);
 
             state().captured = PieceType::Pawn;
         }
@@ -698,9 +774,9 @@ public:
             state().captured = pieceTypeAt(to);
 
             if (state().captured.has_value())
-                togglePiece(!sideToMove(), *(state().captured), to);
+                togglePiece(!stm, *(state().captured), to);
 
-            togglePiece(sideToMove(), promotion.has_value() ? *promotion : pieceType, to);
+            togglePiece(stm, move.promotion().value_or(pieceType), to);
         }
 
         state().zobristHash ^= state().castlingRights; // XOR old castling rights out
@@ -709,8 +785,8 @@ public:
 
         if (pieceType == PieceType::King)
         {
-            state().castlingRights &= ~squareBb(CASTLING_ROOK_FROM[sideToMove()][false]);
-            state().castlingRights &= ~squareBb(CASTLING_ROOK_FROM[sideToMove()][true]);
+            state().castlingRights &= ~squareBb(CASTLING_ROOK_FROM[stm][false]);
+            state().castlingRights &= ~squareBb(CASTLING_ROOK_FROM[stm][true]);
         }
         else if (hasSquare(state().castlingRights, from))
             state().castlingRights &= ~squareBb(from);
@@ -736,7 +812,7 @@ public:
             state().zobristHash ^= ZOBRIST_FILES[squareFile(enPassantSquare)];
         }
 
-        state().colorToMove = !sideToMove();
+        state().colorToMove = !stm;
         state().zobristHash ^= ZOBRIST_COLOR;
 
         if (pieceType == PieceType::Pawn || state().captured.has_value())
@@ -744,7 +820,7 @@ public:
         else
             state().pliesSincePawnOrCapture++;
 
-        if (sideToMove() == Color::White)
+        if (stm == Color::Black)
             state().currentMoveCounter++;
 
         state().checkers = attackers(kingSquare()) & them();
@@ -825,8 +901,7 @@ public:
 
         if (score < 0) return false;
 
-        const PieceType next = promotion.has_value() ? *promotion : move.pieceType();
-        score -= PIECES_VALUES[next];
+        score -= PIECES_VALUES[promotion.value_or(move.pieceType())];
 
         if (score >= 0) return true;
 
@@ -863,14 +938,12 @@ public:
 
             if (ourAttackers == 0) break;
 
-            const std::optional<PieceType> optNext = popLeastValuable(ourAttackers);
+            const std::optional<PieceType> next = popLeastValuable(ourAttackers);
 
-            if (optNext == PieceType::Pawn
-            ||  optNext == PieceType::Bishop
-            ||  optNext == PieceType::Queen)
+            if (next == PieceType::Pawn || next == PieceType::Bishop || next == PieceType::Queen)
                 attackers |= bishopsQueens & getBishopAttacks(to, occ);
 
-            if (optNext == PieceType::Rook || optNext == PieceType::Queen)
+            if (next == PieceType::Rook || next == PieceType::Queen)
                 attackers |= rooksQueens & getRookAttacks(to, occ);
 
             attackers &= occ;
@@ -878,11 +951,11 @@ public:
 
             score = -score - 1;
 
-            if (optNext.has_value())
-                score -= PIECES_VALUES[*optNext];
+            if (next.has_value())
+                score -= PIECES_VALUES[*next];
 
             // If our only attacker is our king, but the opponent still has defenders
-            if (score >= 0 && optNext == PieceType::King && (attackers & getBb(ourColor)) > 0)
+            if (score >= 0 && next == PieceType::King && (attackers & getBb(ourColor)) > 0)
                 ourColor = !ourColor;
 
             if (score >= 0) break;
