@@ -60,7 +60,7 @@ public:
 
         mBound = newBound;
 
-        if (mZobristHash != newHash || newMove)
+        if (mZobristHash != newHash || !Move(mMove) || newBound != Bound::Upper)
             mMove = newMove.asU16();
     }
 

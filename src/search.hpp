@@ -776,6 +776,8 @@ private:
             return alpha;
         }
 
+        assert(std::abs(bestScore) < INF);
+
         if (!singularMove)
         {
             // Update TT entry
@@ -802,7 +804,6 @@ private:
             }
         }
 
-        assert(std::abs(bestScore) < INF);
         return bestScore;
     }
 
@@ -830,21 +831,19 @@ private:
         if (alpha < 0 && td->pos.hasUpcomingRepetition(ply) && (alpha = 0) >= beta)
             return 0;
 
-        if constexpr (!pvNode)
-        {
-            // Probe TT for TT entry
-            const TTEntry& ttEntry = ttEntryRef(mTT, td->pos.zobristHash());
+        // Probe TT for TT entry
+        TTEntry& ttEntry = ttEntryRef(mTT, td->pos.zobristHash());
 
-            // Get TT entry data
-            const auto [ttDepth, ttScore, ttBound, ttMove]
-                = ttEntry.get(td->pos.zobristHash(), static_cast<i16>(ply));
+        // Get TT entry data
+        const auto [ttDepth, ttScore, ttBound, ttMove]
+            = ttEntry.get(td->pos.zobristHash(), static_cast<i16>(ply));
 
-            // TT cutoff
-            if (ttBound == Bound::Exact
-            || (ttBound == Bound::Upper && ttScore <= alpha)
-            || (ttBound == Bound::Lower && ttScore >= beta))
-                return *ttScore;
-        }
+        // TT cutoff
+        if (!pvNode
+        && (ttBound == Bound::Exact
+        || (ttBound == Bound::Upper && ttScore <= alpha)
+        || (ttBound == Bound::Lower && ttScore >= beta)))
+            return *ttScore;
 
         PlyData& plyData = td->pliesData[ply];
         const i32 eval = getEval(td, plyData);
@@ -867,6 +866,7 @@ private:
 
         i32 bestScore = td->pos.inCheck() ? -INF : eval;
         Move bestMove = MOVE_NONE;
+        Bound bound = Bound::Upper;
 
         // Keep track of fail low moves
         plyData.failLowNoisies.clear();
@@ -921,6 +921,8 @@ private:
             // Fail high?
             if (score >= beta)
             {
+                bound = Bound::Lower;
+
                 updateHistories(
                     td, move, captured, 1, 1, plyData.failLowNoisies, plyData.failLowQuiets
                 );
@@ -930,6 +932,20 @@ private:
         }
 
         assert(std::abs(bestScore) < INF);
+
+        // Update TT entry
+        if (ttDepth <= 0)
+        {
+            ttEntry.update(
+                td->pos.zobristHash(),
+                0,
+                static_cast<i16>(bestScore),
+                static_cast<i16>(ply),
+                bound,
+                bestMove
+            );
+        }
+
         return bestScore;
     }
 
