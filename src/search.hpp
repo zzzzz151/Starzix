@@ -933,18 +933,15 @@ private:
 
         assert(std::abs(bestScore) < INF);
 
-        // Update TT entry if hash collision or current entry is a qsearch one
-        if (ttDepth <= 0)
-        {
-            ttEntry.update(
-                td->pos.zobristHash(),
-                0,
-                static_cast<i16>(bestScore),
-                static_cast<i16>(ply),
-                bound,
-                bestMove
-            );
-        }
+        // Update TT entry
+        ttEntry.update(
+            td->pos.zobristHash(),
+            0,
+            static_cast<i16>(bestScore),
+            static_cast<i16>(ply),
+            bound,
+            bestMove
+        );
 
         return bestScore;
     }
