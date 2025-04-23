@@ -445,7 +445,7 @@ private:
         assert(!(pvNode && cutNode));
 
         // Quiescence search at leaf nodes
-        if (depth <= 0) return qSearch<pvNode, true>(td, ply, alpha, beta);
+        if (depth <= 0) return qSearch<pvNode>(td, ply, alpha, beta);
 
         if (isHardTimeUp(td)) return 0;
 
@@ -506,7 +506,7 @@ private:
 
             // Razoring
             if (alpha - eval > razoringBase() + depth * depth * razoringDepthMul())
-                return qSearch<pvNode, true>(td, ply, alpha, beta);
+                return qSearch<pvNode>(td, ply, alpha, beta);
 
             // NMP (Null move pruning)
             if (depth >= 3
@@ -515,7 +515,7 @@ private:
             && eval >= beta
             && !(ttBound == Bound::Upper && ttScore < beta))
             {
-                makeMove(td, MOVE_NONE, ply + 1, &mTT);
+                makeMove(td, MOVE_NONE, ply + 1, mTT);
 
                 const i32 nmpDepth = depth - 4 - depth / 3;
 
@@ -635,7 +635,7 @@ private:
 
             const u64 nodesBefore = td->nodes.load(std::memory_order_relaxed);
 
-            makeMove(td, move, ply + 1, &mTT);
+            makeMove(td, move, ply + 1, mTT);
 
             const std::optional<PieceType> captured = td->pos.captured();
 
@@ -807,7 +807,7 @@ private:
     }
 
     // Quiescence search
-    template<bool pvNode, bool isFirstCall>
+    template<bool pvNode>
     constexpr i32 qSearch(ThreadData* td, const size_t ply, i32 alpha, const i32 beta)
     {
         assert(ply > 0 && ply <= MAX_DEPTH);
@@ -830,7 +830,7 @@ private:
         if (alpha < 0 && td->pos.hasUpcomingRepetition(ply) && (alpha = 0) >= beta)
             return 0;
 
-        if constexpr (!pvNode && isFirstCall)
+        if constexpr (!pvNode)
         {
             // Probe TT for TT entry
             const TTEntry& ttEntry = ttEntryRef(mTT, td->pos.zobristHash());
@@ -891,11 +891,11 @@ private:
             if (!td->pos.inCheck() && !td->pos.SEE(move))
                 continue;
 
-            makeMove(td, move, ply + 1);
+            makeMove(td, move, ply + 1, mTT);
 
             const std::optional<PieceType> captured = td->pos.captured();
 
-            const i32 score = -qSearch<pvNode, false>(td, ply + 1, -beta, -alpha);
+            const i32 score = -qSearch<pvNode>(td, ply + 1, -beta, -alpha);
 
             undoMove(td);
 

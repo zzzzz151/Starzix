@@ -84,17 +84,14 @@ constexpr Move bestMoveAtRoot(const ThreadData* td)
          : MOVE_NONE;
 }
 
-constexpr void makeMove(
-    ThreadData* td, const Move move, const size_t newPly, std::vector<TTEntry>* ttPtr = nullptr)
+inline void makeMove(
+    ThreadData* td, const Move move, const size_t newPly, std::vector<TTEntry>& tt)
 {
     td->pos.makeMove(move);
 
     // Prefetch TT entry
-    if (ttPtr != nullptr)
-    {
-        const TTEntry& ttEntry = ttEntryRef(*ttPtr, td->pos.zobristHash());
-        __builtin_prefetch(&ttEntry);
-    }
+    const TTEntry& ttEntry = ttEntryRef(tt, td->pos.zobristHash());
+    __builtin_prefetch(&ttEntry);
 
     td->nodes.fetch_add(1, std::memory_order_relaxed);
 
