@@ -664,7 +664,7 @@ private:
                 // For quiet moves, less reduction the higher the move's history and vice-versa
                 r -= lround(quietHist * lmrQuietHistMul());
 
-                // Don't extend depth
+                // Don't reduce into quiescence search nor extend depth
                 const i32 reducedDepth = std::clamp<i32>(newDepth - r, 1, newDepth);
 
                 // Reduced null window search
@@ -933,7 +933,7 @@ private:
 
         assert(std::abs(bestScore) < INF);
 
-        // Update TT entry
+        // Update TT entry if hash collision or current entry is a qsearch one
         if (ttDepth <= 0)
         {
             ttEntry.update(
