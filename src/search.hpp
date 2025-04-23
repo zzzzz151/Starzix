@@ -664,9 +664,8 @@ private:
                 // For quiet moves, less reduction the higher the move's history and vice-versa
                 r -= lround(quietHist * lmrQuietHistMul());
 
-                r = std::max<i32>(r, 0); // Don't extend
-
-                const i32 reducedDepth = newDepth - r;
+                // Don't extend depth
+                const i32 reducedDepth = std::clamp<i32>(newDepth - r, 0, newDepth);
 
                 // Reduced null window search
                 score = -search<false, false, true>(
