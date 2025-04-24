@@ -873,7 +873,7 @@ private:
         plyData.failLowQuiets .clear();
 
         // Moves loop (if not in check, only noisy moves)
-        MovePicker mp = MovePicker(!td->pos.inCheck(), MOVE_NONE, plyData.killer);
+        MovePicker mp = MovePicker(!td->pos.inCheck(), ttMove, plyData.killer);
         while (true)
         {
             // Move, i32
