@@ -568,16 +568,16 @@ public:
             tempTogglePiece(stm, move.promotion().value_or(pieceType), to);
         }
 
-        const Square enemyKingSquare = kingSquare(!stm);
+        const Square enemyKingSq = kingSquare(!stm);
 
         const Bitboard ourPawns = tempColorBbs[stm] & tempPiecesBbs[PieceType::Pawn];
 
-        if (ourPawns & getPawnAttacks(enemyKingSquare, !stm))
+        if (ourPawns & getPawnAttacks(enemyKingSq, !stm))
             return true;
 
         const Bitboard ourKnights = tempColorBbs[stm] & tempPiecesBbs[PieceType::Knight];
 
-        if (ourKnights & getKnightAttacks(enemyKingSquare))
+        if (ourKnights & getKnightAttacks(enemyKingSq))
             return true;
 
         const Bitboard occ = tempColorBbs[Color::White] | tempColorBbs[Color::Black];
@@ -585,13 +585,13 @@ public:
         const Bitboard bishopsQueens
             = tempPiecesBbs[PieceType::Bishop] | tempPiecesBbs[PieceType::Queen];
 
-        if (tempColorBbs[stm] & bishopsQueens & getBishopAttacks(enemyKingSquare, occ))
+        if (tempColorBbs[stm] & bishopsQueens & getBishopAttacks(enemyKingSq, occ))
             return true;
 
         const Bitboard rooksQueens
             = tempPiecesBbs[PieceType::Rook] | tempPiecesBbs[PieceType::Queen];
 
-        if (tempColorBbs[stm] & rooksQueens & getRookAttacks(enemyKingSquare, occ))
+        if (tempColorBbs[stm] & rooksQueens & getRookAttacks(enemyKingSq, occ))
             return true;
 
         return false;
@@ -605,17 +605,17 @@ public:
 
         const Square kingSquare = this->kingSquare();
 
-        const Bitboard theirBishopsQueens
+        const Bitboard enemyBishopsQueens
             = them() & (getBb(PieceType::Bishop) | getBb(PieceType::Queen));
 
-        const Bitboard theirRooksQueens
+        const Bitboard enemyRooksQueens
             = them() & (getBb(PieceType::Rook)   | getBb(PieceType::Queen));
 
         Bitboard potentialAttackers
-            = theirBishopsQueens & getBishopAttacks(kingSquare, them());
+            = enemyBishopsQueens & getBishopAttacks(kingSquare, them());
 
         potentialAttackers
-            |= theirRooksQueens & getRookAttacks(kingSquare, them());
+            |= enemyRooksQueens & getRookAttacks(kingSquare, them());
 
         state().pinned = 0;
 
@@ -723,7 +723,8 @@ public:
         state().pinned = std::nullopt;
         state().enemyAttacksNoStmKing = std::nullopt;
 
-        if (!move) {
+        if (!move)
+        {
             assert(!inCheck());
 
             state().colorToMove = !stm;
@@ -923,7 +924,8 @@ public:
             {
                 const Bitboard bb = ourAttackers & getBb(ourColor, pt);
 
-                if (bb > 0) {
+                if (bb > 0)
+                {
                     const Square square = lsb(bb);
                     occ ^= squareBb(square);
                     return pt;

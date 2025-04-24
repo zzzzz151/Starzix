@@ -60,11 +60,13 @@ constexpr ArrayVec<Move, 256> pseudolegalMoves(Position& pos)
         const Rank rank = squareRank(fromSquare);
         assert(!isBackrank(rank));
 
-        if (rank == Rank::Rank2) {
+        if (rank == Rank::Rank2)
+        {
             pawnHasntMoved = stm == Color::White;
             willPromote    = stm == Color::Black;
         }
-        else if (rank == Rank::Rank7) {
+        else if (rank == Rank::Rank7)
+        {
             pawnHasntMoved = stm == Color::Black;
             willPromote    = stm == Color::White;
         }
@@ -334,7 +336,8 @@ constexpr bool isPseudolegalLegal(Position& pos, const Move move)
         return false;
 
     // 1 checker?
-    if (pos.inCheck()) {
+    if (pos.inCheck())
+    {
         const Square checkerSquare = lsb(pos.checkers());
         return hasSquare(pos.checkers() | BETWEEN_EXCLUSIVE_BB[kingSquare][checkerSquare], to);
     }
@@ -578,7 +581,8 @@ constexpr u64 perft(Position& pos, const i32 depth)
 
 constexpr u64 perftSplit(Position& pos, const i32 depth)
 {
-    if (depth <= 0) {
+    if (depth <= 0)
+    {
         std::cout << "Total: 1" << std::endl;
         return 1;
     }

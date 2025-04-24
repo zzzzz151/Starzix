@@ -211,7 +211,7 @@ MAYBE_CONST auto LMR_TABLE = getLmrTable();
         { stringify(corrHistPawnsWeight),    &corrHistPawnsWeight },
         { stringify(corrHistNonPawnsWeight), &corrHistNonPawnsWeight },
         { stringify(corrHistLastMoveWeight), &corrHistLastMoveWeight },
-        { stringify(corrHistContWeight),     &corrHistContWeight }
+        { stringify(corrHistContWeight),     &corrHistContWeight },
     };
 
     inline void printSpsaInput()
