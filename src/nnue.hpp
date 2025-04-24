@@ -17,13 +17,13 @@
 
 namespace nnue {
 
+constexpr size_t NUM_INPUT_BUCKETS = 6;
 constexpr size_t HL_SIZE = 1024;
-constexpr size_t NUM_INPUT_BUCKETS = 5;
 constexpr i32 SCALE = 400;
 constexpr i32 QA = 256;
 constexpr i32 QB = 64;
 
-// Enemy queen input buckets (0 if enemy doesnt have exactly 1 queen)
+// Enemy queen input buckets (0 if no enemy queens, NUM_INPUT_BUCKETS-1 if multiple)
 constexpr EnumArray<size_t, Square> INPUT_BUCKETS_MAP = {
 //  A  B  C  D  E  F  G  H
     1, 1, 1, 1, 2, 2, 2, 2, // 1
@@ -44,11 +44,10 @@ struct Net
 {
 public:
 
-    using FtWeightsForBucket = EnumArray<HLArray, Color, PieceType, Square>;
-    using FtWeightsForColor = std::array<FtWeightsForBucket, NUM_INPUT_BUCKETS>;
+    using HLArrayPST = EnumArray<HLArray, Color, PieceType, Square>;
 
     // [perspectiveColor][inputBucket][pieceColor][pieceType][square][hiddenNeuronIdx]
-    alignas(sizeof(Vec)) EnumArray<FtWeightsForColor, Color> ftWeights;
+    alignas(sizeof(Vec)) EnumArray<std::array<HLArrayPST, NUM_INPUT_BUCKETS>, Color> ftWeights;
 
     // [perspectiveColor][hiddenNeuronIdx]
     alignas(sizeof(Vec)) EnumArray<HLArray, Color> hiddenBiases;
@@ -153,15 +152,17 @@ private:
 
     constexpr size_t setInputBucket(const Color color, const Bitboard enemyQueensBb)
     {
-        if (std::popcount(enemyQueensBb) != 1)
+        if (std::popcount(enemyQueensBb) == 0)
             mInputBucket[color] = 0;
+        else if (std::popcount(enemyQueensBb) > 1)
+            mInputBucket[color] = NUM_INPUT_BUCKETS - 1;
         else {
-            Square enemyQueenSquare = lsb(enemyQueensBb);
+            Square enemyQueenSq = lsb(enemyQueensBb);
 
             if (mMirrorVAxis[color])
-                enemyQueenSquare = flipFile(enemyQueenSquare);
+                enemyQueenSq = flipFile(enemyQueenSq);
 
-            mInputBucket[color] = INPUT_BUCKETS_MAP[enemyQueenSquare];
+            mInputBucket[color] = INPUT_BUCKETS_MAP[enemyQueenSq];
         }
 
         return mInputBucket[color];
@@ -171,7 +172,7 @@ private:
         FinnyTable& finnyTable, const Color accColor, const Position& pos)
     {
         const size_t inputBucket = mInputBucket[accColor];
-        const bool mirrorVAxis = mMirrorVAxis[accColor];
+        const bool mirrorVAxis   = mMirrorVAxis[accColor];
 
         FinnyTableEntry& finnyEntry = finnyTable[accColor][mirrorVAxis][inputBucket];
 
@@ -226,7 +227,8 @@ public:
     {
         assert(prevBothAccs.mUpdated);
 
-        if (mUpdated) {
+        if (mUpdated)
+        {
             assert(*this == nnue::BothAccumulators(pos));
             return;
         }
@@ -255,28 +257,19 @@ public:
                 = static_cast<i32>(squareFile(to)) >= static_cast<i32>(File::E);
         }
 
-        // Our input bucket may change if
-        // our vertical axis mirroring toggled
-        // or if we captured a queen
-        if (mMirrorVAxis[colorMoving] != prevBothAccs.mMirrorVAxis[colorMoving]
-        || pos.captured() == PieceType::Queen)
-            setInputBucket(colorMoving, pos.getBb(!colorMoving, PieceType::Queen));
+        // Update current input buckets (mInputBucket)
+        setInputBucket(colorMoving,  pos.getBb(!colorMoving, PieceType::Queen));
+        setInputBucket(!colorMoving, pos.getBb(colorMoving,  PieceType::Queen));
 
         // If our vertical axis mirroring toggled or our input bucket changed,
-        // reset our accumulator
+        // rebuild our accumulator
         if  (mMirrorVAxis[colorMoving] != prevBothAccs.mMirrorVAxis[colorMoving]
-        || mInputBucket[colorMoving] != prevBothAccs.mInputBucket[colorMoving])
+        ||   mInputBucket[colorMoving] != prevBothAccs.mInputBucket[colorMoving])
             updateFinnyEntryAndAccumulator(finnyTable, colorMoving, pos);
 
-        // If our queen moved or we promoted to a queen, enemy's input bucket may have changed
-        if (pieceType == PieceType::Queen || promotion == PieceType::Queen)
-        {
-            setInputBucket(!colorMoving, pos.getBb(colorMoving, PieceType::Queen));
-
-            // If their input bucket changed, reset their accumulator
-            if  (mInputBucket[!colorMoving] != prevBothAccs.mInputBucket[!colorMoving])
-                updateFinnyEntryAndAccumulator(finnyTable, !colorMoving, pos);
-        }
+        // If enemy input bucket changed, rebuild enemy accumulator
+        if (mInputBucket[!colorMoving] != prevBothAccs.mInputBucket[!colorMoving])
+            updateFinnyEntryAndAccumulator(finnyTable, !colorMoving, pos);
 
         // Update accumulators with the move played
 
@@ -317,7 +310,8 @@ public:
             {
                 auto [rookFrom, rookTo] = CASTLING_ROOK_FROM_TO[to];
 
-                if (mMirrorVAxis[color]) {
+                if (mMirrorVAxis[color])
+                {
                     rookFrom = flipFile(rookFrom);
                     rookTo   = flipFile(rookTo);
                 }

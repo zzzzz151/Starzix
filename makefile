@@ -19,19 +19,19 @@ all:
 	$(CXX) $(CXXFLAGS) -march=native -DNDEBUG src/*.cpp -o $(EXE)$(SUFFIX)
 debug:
 	$(CXX) $(CXXFLAGS) -march=native src/*.cpp -o $(EXE)$(SUFFIX)
-test:
+testPosition:
 	$(CXX) $(CXXFLAGS) -march=native tests/test_position.cpp -o test-position$(SUFFIX)
 	./test-position$(SUFFIX)
-
+testMoveGen:
 	$(CXX) $(CXXFLAGS) -march=native tests/test_move_gen.cpp -o test-move-gen$(SUFFIX)
 	./test-move-gen$(SUFFIX)
-
+testGameState:
 	$(CXX) $(CXXFLAGS) -march=native tests/test_game_state.cpp -o test-game-state$(SUFFIX)
 	./test-game-state$(SUFFIX)
-
+testSEE:
 	$(CXX) $(CXXFLAGS) -march=native -DTUNE tests/test_SEE.cpp -o test-SEE$(SUFFIX)
 	./test-SEE$(SUFFIX)
-
+testNNUE:
 	$(CXX) $(CXXFLAGS) -march=native tests/test_NNUE.cpp -o test-NNUE$(SUFFIX)
 	./test-NNUE$(SUFFIX)
 tune:
