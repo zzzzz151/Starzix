@@ -864,6 +864,8 @@ private:
         // Reset killer move of next tree level
         td->pliesData[ply + 1].killer = MOVE_NONE;
 
+        const i32 fpValue = std::min<i32>(eval + fpQsMargin(), MIN_MATE_SCORE - 1);
+
         i32 bestScore = td->pos.inCheck() ? -INF : eval;
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::Upper;
@@ -881,13 +883,22 @@ private:
 
             if (!move) break;
 
-            // In check, we search all moves until we find a non-losing move
-            // When that happens, we prune quiets and bad noisy moves
-            // Also, if not in check, prune underpromotions
+            // In check, we search all moves
+            // But once we find a non-losing move, we prune quiets and bad noisy moves
+            // Also, if not in check, prune underpromotions (negative moveScore)
             if (bestScore > -MIN_MATE_SCORE && (td->pos.isQuiet(move) || moveScore < 0))
                 break;
 
-            // SEE pruning if not in check (skip bad noisy moves)
+            // FP (Futility pruning)
+            if (!td->pos.inCheck() && fpValue <= alpha && !td->pos.SEE(move, 1))
+            {
+                bestScore = std::max<i32>(bestScore, fpValue);
+                continue;
+            }
+
+            // SEE pruning (skip bad noisy moves)
+            // Remember that if not in check, we only search noisy moves,
+            // and in this case the move picker doesn't SEE
             if (!td->pos.inCheck() && !td->pos.SEE(move))
                 continue;
 
