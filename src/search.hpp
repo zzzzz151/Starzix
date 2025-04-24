@@ -864,6 +864,8 @@ private:
         // Reset killer move of next tree level
         td->pliesData[ply + 1].killer = MOVE_NONE;
 
+        const i32 fpValue = std::min<i32>(eval + fpQsMargin(), MIN_MATE_SCORE - 1);
+
         i32 bestScore = td->pos.inCheck() ? -INF : eval;
         Move bestMove = MOVE_NONE;
         Bound bound = Bound::Upper;
@@ -888,23 +890,10 @@ private:
                 break;
 
             // FP (Futility pruning)
-            if (!td->pos.inCheck() && !move.promotion().has_value())
+            if (!td->pos.inCheck() && fpValue <= alpha && !td->pos.SEE(move, 1))
             {
-                CONSTEXPR_OR_CONST EnumArray<i32, PieceType> PIECES_VALUES = {
-                //      P            N             B             R            Q         K
-                    pawnValue(), minorValue(), minorValue(), rookValue(), queenValue(), 0
-                };
-
-                const std::optional<PieceType> captured = td->pos.captured(move);
-
-                i32 fpValue = eval + fpQsOffset() + PIECES_VALUES[*captured];
-                fpValue = std::min<i32>(fpValue, MIN_MATE_SCORE - 1);
-
-                if (fpValue <= alpha)
-                {
-                    bestScore = std::max<i32>(bestScore, fpValue);
-                    continue;
-                }
+                bestScore = std::max<i32>(bestScore, fpValue);
+                continue;
             }
 
             // SEE pruning (skip bad noisy moves)

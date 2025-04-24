@@ -96,7 +96,7 @@ MAYBE_CONSTEXPR auto razoringDepthMul = TunableParam<i32>(276, 150, 600, 15);
 MAYBE_CONSTEXPR auto fpBase         = TunableParam<i32>(130, 40, 260, 20);
 MAYBE_CONSTEXPR auto fpDepthMul     = TunableParam<i32>(175, 40, 260, 20);
 MAYBE_CONSTEXPR auto fpQuietHistMul = TunableParam<float>(2.75f, 0.0f, 4.0f, 0.5f) / 100.0f;
-MAYBE_CONSTEXPR auto fpQsOffset     = TunableParam<i32>(360, 100, 600, 50);
+MAYBE_CONSTEXPR auto fpQsMargin     = TunableParam<i32>(300, 100, 500, 25);
 
 // SEE thresholds
 MAYBE_CONSTEXPR auto seeNoisyThreshold = TunableParam<i32>(-198, -210, -10, 20);
@@ -191,7 +191,7 @@ MAYBE_CONST auto LMR_TABLE = getLmrTable();
         { stringify(fpBase),                 &fpBase },
         { stringify(fpDepthMul),             &fpDepthMul },
         { stringify(fpQuietHistMul),         &fpQuietHistMul },
-        { stringify(fpQsOffset),             &fpQsOffset },
+        { stringify(fpQsMargin),             &fpQsMargin },
         { stringify(seeNoisyThreshold),      &seeNoisyThreshold },
         { stringify(seeQuietThreshold),      &seeQuietThreshold },
         { stringify(seeNoisyHistMul),        &seeNoisyHistMul },
