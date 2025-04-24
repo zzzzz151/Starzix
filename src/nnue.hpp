@@ -17,7 +17,7 @@
 
 namespace nnue {
 
-constexpr size_t HIDDEN_LAYER_SIZE = 1024;
+constexpr size_t HL_SIZE = 1024;
 constexpr size_t NUM_INPUT_BUCKETS = 5;
 constexpr i32 SCALE = 400;
 constexpr i32 QA = 256;
@@ -38,7 +38,7 @@ constexpr EnumArray<size_t, Square> INPUT_BUCKETS_MAP = {
 };
 
 // [hiddenNeuronIdx]
-using HLArray = std::array<i16, HIDDEN_LAYER_SIZE>;
+using HLArray = std::array<i16, HL_SIZE>;
 
 struct Net
 {
@@ -128,7 +128,7 @@ public:
                 const size_t inputBucket = mInputBucket[color];
                 const Square newSquare = mMirrorVAxis[color] ? flipFile(square) : square;
 
-                for (size_t i = 0; i < HIDDEN_LAYER_SIZE; i++)
+                for (size_t i = 0; i < HL_SIZE; i++)
                 {
                     mAccumulators[color][i]
                         += NET->ftWeights[color][inputBucket][pieceColor][pt][newSquare][i];
@@ -189,7 +189,7 @@ private:
             {
                 const Square newSquare = mirrorVAxis ? flipFile(square) : square;
 
-                for (size_t i = 0; i < HIDDEN_LAYER_SIZE; i++)
+                for (size_t i = 0; i < HL_SIZE; i++)
                 {
                     finnyEntry.accumulator[i]
                         -= NET->ftWeights[accColor][inputBucket][pieceColor][pt][newSquare][i];
@@ -201,7 +201,7 @@ private:
             {
                 const Square newSquare = mirrorVAxis ? flipFile(square) : square;
 
-                for (size_t i = 0; i < HIDDEN_LAYER_SIZE; i++)
+                for (size_t i = 0; i < HL_SIZE; i++)
                 {
                     finnyEntry.accumulator[i]
                         += NET->ftWeights[accColor][inputBucket][pieceColor][pt][newSquare][i];
@@ -304,7 +304,7 @@ public:
 
                 const auto& ftWeights = NET->ftWeights[color][inputBucket];
 
-                for (size_t i = 0; i < HIDDEN_LAYER_SIZE; i++)
+                for (size_t i = 0; i < HL_SIZE; i++)
                 {
                     mAccumulators[color][i]
                         = prevBothAccs.mAccumulators[color][i]
@@ -324,7 +324,7 @@ public:
 
                 const auto& ftWeights = NET->ftWeights[color][inputBucket][colorMoving];
 
-                for (size_t i = 0; i < HIDDEN_LAYER_SIZE; i++)
+                for (size_t i = 0; i < HL_SIZE; i++)
                 {
                     mAccumulators[color][i]
                         = prevBothAccs.mAccumulators[color][i]
@@ -337,7 +337,7 @@ public:
             else {
                 const auto& ftWeights = NET->ftWeights[color][inputBucket][colorMoving];
 
-                for (size_t i = 0; i < HIDDEN_LAYER_SIZE; i++)
+                for (size_t i = 0; i < HL_SIZE; i++)
                 {
                     mAccumulators[color][i]
                         = prevBothAccs.mAccumulators[color][i]
@@ -371,7 +371,7 @@ constexpr i32 evaluate(const BothAccumulators& bothAccs, const Color stm)
         Vec vecSum = vecZero; // N/2 i32 zeros, the total running sum
 
         for (const Color color : { stm, !stm })
-            for (size_t i = 0; i < HIDDEN_LAYER_SIZE; i += sizeof(Vec) / sizeof(i16))
+            for (size_t i = 0; i < HL_SIZE; i += sizeof(Vec) / sizeof(i16))
             {
                 // Load the next N hidden neurons and clamp them to [0, QA]
                 const i16& accStart = bothAccs.mAccumulators[color][i];
@@ -402,7 +402,7 @@ constexpr i32 evaluate(const BothAccumulators& bothAccs, const Color stm)
         sum = sumVec(vecSum); // Add the N/2 i32's to get final sum (i32)
     #else
         for (const Color color : { stm, !stm })
-            for (size_t i = 0; i < HIDDEN_LAYER_SIZE; i++)
+            for (size_t i = 0; i < HL_SIZE; i++)
             {
                 const i16 clipped = std::clamp<i16>(bothAccs.mAccumulators[color][i], 0, QA);
                 const i16 x = clipped * NET->outputWeights[color != stm][i];
