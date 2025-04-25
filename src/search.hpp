@@ -513,7 +513,7 @@ private:
             && td->pos.lastMove()
             && td->pos.stmHasNonPawns()
             && eval >= beta
-            && !(ttBound == Bound::Upper && ttScore < beta))
+            && (ttBound != Bound::Upper || ttScore >= beta))
             {
                 makeMove(td, MOVE_NONE, ply + 1, mTT);
 
@@ -532,9 +532,9 @@ private:
 
             const i32 probcutBeta = std::min<i32>(beta + 185, MIN_MATE_SCORE);
 
-            if (depth >= 3
+            if (depth >= 5
             && std::abs(beta) < MIN_MATE_SCORE
-            && !(ttScore.has_value() && ttScore < probcutBeta))
+            && (ttBound == Bound::None || ttDepth < depth - 3 || ttScore >= probcutBeta))
             {
                 const std::optional<i32> score = probcut<cutNode>(
                     td, depth, ply, probcutBeta, ttMove, ttEntry
@@ -809,8 +809,8 @@ private:
             if (!td->pos.inCheck()
             && std::abs(bestScore) < MIN_MATE_SCORE
             && (!bestMove || td->pos.isQuiet(bestMove))
-            && !(bound == Bound::Lower && bestScore <= eval)
-            && !(bound == Bound::Upper && bestScore >= eval))
+            && (bound != Bound::Lower || bestScore > eval)
+            && (bound != Bound::Upper || bestScore < eval))
             {
                 const i32 bonus = (bestScore - eval) * depth;
 
@@ -981,13 +981,12 @@ private:
         const Move ttMove,
         TTEntry& ttEntry)
     {
-        assert(depth > 0 && static_cast<size_t>(depth) <= MAX_DEPTH);
+        assert(depth >= 5 && static_cast<size_t>(depth) <= MAX_DEPTH);
         assert(ply > 0 && ply <= MAX_DEPTH);
         assert(std::abs(probcutBeta) <= MIN_MATE_SCORE);
         assert(!td->pos.inCheck());
 
         const i32 eval = *(td->pliesData[ply].correctedEval);
-        const i32 probcutDepth = std::max<i32>(depth - 4, 0);
 
         // Noisy moves loop
         MovePicker mp = MovePicker(true, ttMove, MOVE_NONE);
@@ -1008,10 +1007,10 @@ private:
 
             i32 score = -qSearch<false>(td, ply + 1, -probcutBeta, -probcutBeta + 1);
 
-            if (score >= probcutBeta && probcutDepth > 0)
+            if (score >= probcutBeta)
             {
                 score = -search<false, false, !cutNode>(
-                    td, probcutDepth, ply + 1, -probcutBeta, -probcutBeta + 1
+                    td, depth - 4, ply + 1, -probcutBeta, -probcutBeta + 1
                 );
             }
 
@@ -1025,7 +1024,7 @@ private:
                 // Update TT entry
                 ttEntry.update(
                     td->pos.zobristHash(),
-                    static_cast<u8>(probcutDepth + 1),
+                    static_cast<u8>(depth - 3),
                     static_cast<i16>(score),
                     static_cast<i16>(ply),
                     Bound::Lower,
