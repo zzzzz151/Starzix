@@ -92,6 +92,9 @@ MAYBE_CONSTEXPR auto rfpDepthMul = TunableParam<i32>(72, 30, 150, 10);
 MAYBE_CONSTEXPR auto razoringBase     = TunableParam<i32>(365, 150, 600, 50);
 MAYBE_CONSTEXPR auto razoringDepthMul = TunableParam<i32>(276, 150, 600, 15);
 
+// Probcut
+MAYBE_CONSTEXPR auto probcutMargin = TunableParam<i32>(185, 100, 400, 30);
+
 // FP (Futility pruning)
 MAYBE_CONSTEXPR auto fpBase         = TunableParam<i32>(130, 40, 260, 20);
 MAYBE_CONSTEXPR auto fpDepthMul     = TunableParam<i32>(175, 40, 260, 20);
@@ -188,6 +191,7 @@ MAYBE_CONST auto LMR_TABLE = getLmrTable();
         { stringify(rfpDepthMul),            &rfpDepthMul },
         { stringify(razoringBase),           &razoringBase },
         { stringify(razoringDepthMul),       &razoringDepthMul },
+        { stringify(probcutMargin),          &probcutMargin },
         { stringify(fpBase),                 &fpBase },
         { stringify(fpDepthMul),             &fpDepthMul },
         { stringify(fpQuietHistMul),         &fpQuietHistMul },

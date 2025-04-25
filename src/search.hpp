@@ -530,7 +530,7 @@ private:
 
             // Probcut
 
-            const i32 probcutBeta = std::min<i32>(beta + 185, MIN_MATE_SCORE);
+            const i32 probcutBeta = std::min<i32>(beta + probcutMargin(), MIN_MATE_SCORE);
 
             if (depth >= 5
             && std::abs(beta) < MIN_MATE_SCORE
