@@ -513,7 +513,7 @@ private:
             && td->pos.lastMove()
             && td->pos.stmHasNonPawns()
             && eval >= beta
-            && !(ttBound == Bound::Upper && ttScore < beta))
+            && (ttBound != Bound::Upper || ttScore >= beta))
             {
                 makeMove(td, MOVE_NONE, ply + 1, mTT);
 
@@ -526,6 +526,21 @@ private:
                 undoMove(td);
 
                 if (score >= beta) return score >= MIN_MATE_SCORE ? beta : score;
+            }
+
+            // Probcut
+
+            const i32 probcutBeta = std::min<i32>(beta + probcutMargin(), MIN_MATE_SCORE);
+
+            if (depth >= 5
+            && std::abs(beta) < MIN_MATE_SCORE
+            && (ttBound == Bound::None || ttDepth < depth - 3 || ttScore >= probcutBeta))
+            {
+                const std::optional<i32> score = probcut<cutNode>(
+                    td, depth, ply, probcutBeta, ttMove, ttEntry
+                );
+
+                if (score.has_value()) return *score;
             }
         }
 
@@ -794,8 +809,8 @@ private:
             if (!td->pos.inCheck()
             && std::abs(bestScore) < MIN_MATE_SCORE
             && (!bestMove || td->pos.isQuiet(bestMove))
-            && !(bound == Bound::Lower && bestScore <= eval)
-            && !(bound == Bound::Upper && bestScore >= eval))
+            && (bound != Bound::Lower || bestScore > eval)
+            && (bound != Bound::Upper || bestScore < eval))
             {
                 const i32 bonus = (bestScore - eval) * depth;
 
@@ -955,6 +970,72 @@ private:
         );
 
         return bestScore;
+    }
+
+    template<bool cutNode>
+    constexpr std::optional<i32> probcut(
+        ThreadData* td,
+        const i32 depth,
+        const size_t ply,
+        const i32 probcutBeta,
+        const Move ttMove,
+        TTEntry& ttEntry)
+    {
+        assert(depth >= 5 && static_cast<size_t>(depth) <= MAX_DEPTH);
+        assert(ply > 0 && ply <= MAX_DEPTH);
+        assert(std::abs(probcutBeta) <= MIN_MATE_SCORE);
+        assert(!td->pos.inCheck());
+
+        const i32 eval = *(td->pliesData[ply].correctedEval);
+
+        // Noisy moves loop
+        MovePicker mp = MovePicker(true, ttMove, MOVE_NONE);
+        while (true)
+        {
+            // Move, i32
+            const auto [move, moveScore] = mp.nextLegal(td->pos, td->historyTable);
+
+            // Prune underpromotions
+            if (!move || move.isUnderpromotion())
+                break;
+
+            // SEE pruning (skip bad noisy moves)
+            if (!td->pos.SEE(move, probcutBeta - eval))
+                continue;
+
+            makeMove(td, move, ply + 1, mTT);
+
+            i32 score = -qSearch<false>(td, ply + 1, -probcutBeta, -probcutBeta + 1);
+
+            if (score >= probcutBeta)
+            {
+                score = -search<false, false, !cutNode>(
+                    td, depth - 4, ply + 1, -probcutBeta, -probcutBeta + 1
+                );
+            }
+
+            undoMove(td);
+
+            if (mStopSearch.load(std::memory_order_relaxed))
+                return 0;
+
+            if (score >= probcutBeta)
+            {
+                // Update TT entry
+                ttEntry.update(
+                    td->pos.zobristHash(),
+                    static_cast<u8>(depth - 3),
+                    static_cast<i16>(score),
+                    static_cast<i16>(ply),
+                    Bound::Lower,
+                    move
+                );
+
+                return score;
+            }
+        }
+
+        return std::nullopt;
     }
 
 }; // class Searcher
