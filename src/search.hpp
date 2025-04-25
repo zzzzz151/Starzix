@@ -674,7 +674,9 @@ private:
                 r += cutNode * 2;       // Reduce more if parent node expects to fail high
                 r -= td->pos.inCheck(); // Reduce moves that give check less
                 r -= improving;         // Reduce less if parent's static eval is improving
-                r -= ttScore > alpha;   // Reduce less if TT entry doesn't fail low
+
+                // Reduce more if parent is an expected PV node and TT score fails low
+                r += pvNode && ttScore.has_value() && ttScore <= alpha;
 
                 // For quiet moves, less reduction the higher the move's history and vice-versa
                 r -= lround(quietHist * lmrQuietHistMul());
