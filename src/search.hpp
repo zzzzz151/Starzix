@@ -534,7 +534,7 @@ private:
 
             if (depth >= 5
             && std::abs(beta) < MIN_MATE_SCORE
-            && (ttBound == Bound::None || ttDepth < depth - 3 || ttScore >= probcutBeta))
+            && (ttBound == Bound::None || depth - *ttDepth >= 4 || ttScore >= probcutBeta))
             {
                 const std::optional<i32> score = probcut<cutNode>(
                     td, depth, ply, probcutBeta, ttMove, ttEntry
@@ -620,7 +620,7 @@ private:
             && move == ttMove
             && static_cast<i32>(ply) < td->rootDepth * 2
             && depth >= 6
-            && ttDepth >= depth - 3
+            && depth - *ttDepth <= 3
             && std::abs(*ttScore) < MIN_MATE_SCORE
             && ttBound == Bound::Lower)
             {
