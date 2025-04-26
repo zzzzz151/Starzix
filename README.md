@@ -4,7 +4,7 @@ Starzix is a strong C++ chess engine that communicates using [UCI](https://www.c
 
 The search is a standard fail-soft negamax principal variation search with various enhancements such as alpha-beta pruning, quiescence search and transposition table.
 
-For evaluation, it uses a `(768x2x6 -> 1024)x2 -> 1` horizontally mirrored NNUE trained on [Lc0](https://github.com/LeelaChessZero/lc0) data with my trainer [Starway](https://github.com/zzzzz151/Starway).
+For evaluation, it uses a `(768x2x6 -> 1536)x2 -> 1` horizontally mirrored NNUE trained on [Lc0](https://github.com/LeelaChessZero/lc0) data with my trainer [Starway](https://github.com/zzzzz151/Starway).
 
 # Elo (v6.0)
 

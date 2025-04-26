@@ -18,7 +18,7 @@
 namespace nnue {
 
 constexpr size_t NUM_INPUT_BUCKETS = 6;
-constexpr size_t HL_SIZE = 1024;
+constexpr size_t HL_SIZE = 1536;
 constexpr i32 SCALE = 400;
 constexpr i32 QA = 256;
 constexpr i32 QB = 64;
