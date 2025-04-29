@@ -409,15 +409,15 @@ private:
             // Fail low?
             if (score <= alpha)
             {
-                beta = (alpha + beta) / 2;
-                alpha = std::max<i32>(alpha - delta, -INF);
                 depth = td->rootDepth;
+                alpha = std::max<i32>(alpha - delta, -INF);
+                beta  = (alpha + beta) / 2;
             }
             // Fail high?
             else if (score >= beta)
             {
+                depth -= depth > 1;
                 beta = std::min<i32>(beta + delta, INF);
-                if (depth > 1) depth--;
             }
             else
                 return score;
