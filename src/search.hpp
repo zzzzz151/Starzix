@@ -586,12 +586,13 @@ private:
 
                 // FP (Futility pruning)
 
-                const auto fpMargin = [lmrDepth, quietHist] () constexpr -> i32
+                const auto fpMargin = [&] () constexpr -> i32
                 {
-                    const i32 depthFactor     = std::max<i32>(lmrDepth, 1) * fpDepthMul();
-                    const i32 quietHistFactor = static_cast<i32>(quietHist * fpQuietHistMul());
+                    const i32 margin = fpBase()
+                                     + std::max<i32>(lmrDepth - cutNode * 2, 1) * fpDepthMul()
+                                     + static_cast<i32>(quietHist * fpQuietHistMul());
 
-                    return std::max<i32>(fpBase() + depthFactor + quietHistFactor, 0);
+                    return std::max<i32>(margin, 0);
                 };
 
                 if (!td->pos.inCheck()
