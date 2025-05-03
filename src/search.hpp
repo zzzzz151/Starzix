@@ -718,7 +718,7 @@ private:
             if (doFullDepthZws)
             {
                 constexpr NodeType newNodeType
-                    = nodeType != NodeType::Cut ? NodeType::Cut : NodeType::All;
+                    = nodeType == NodeType::Cut ? NodeType::All : NodeType::Cut;
 
                 score = -search<false, newNodeType>(td, newDepth, ply + 1, -alpha - 1, -alpha);
 
