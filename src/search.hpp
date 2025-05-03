@@ -18,6 +18,10 @@
 #include <mutex>
 #include <condition_variable>
 
+enum class NodeType : i32 {
+    PV, Cut, All
+};
+
 struct SearchConfig
 {
 public:
@@ -278,7 +282,7 @@ private:
 
             score = td->rootDepth >= 4
                   ? aspirationWindows(td, score)
-                  : search<true, true, false>(td, td->rootDepth, 0, -INF, INF);
+                  : search<true, NodeType::PV>(td, td->rootDepth, 0, -INF, INF);
 
             if (mStopSearch.load(std::memory_order_relaxed))
                 break;
@@ -402,7 +406,7 @@ private:
 
         while (true)
         {
-            score = search<true, true, false>(td, depth, 0, alpha, beta);
+            score = search<true, NodeType::PV>(td, depth, 0, alpha, beta);
 
             if (isHardTimeUp(td)) return 0;
 
@@ -426,7 +430,7 @@ private:
         }
     }
 
-    template<bool isRoot, bool pvNode, bool cutNode>
+    template<bool isRoot, NodeType nodeType>
     constexpr i32 search(
         ThreadData* td,
         i32 depth,
@@ -435,17 +439,16 @@ private:
         const i32 beta,
         const Move singularMove = MOVE_NONE)
     {
+        assert(!isRoot || nodeType == NodeType::PV);
         assert(isRoot == (ply == 0));
         assert(ply >= 0 && ply <= MAX_DEPTH);
         assert(std::abs(alpha) <= INF);
         assert(std::abs(beta) <= INF);
         assert(alpha < beta);
-        assert(!(isRoot && !pvNode));
-        assert(pvNode || alpha + 1 == beta);
-        assert(!(pvNode && cutNode));
+        assert(nodeType == NodeType::PV || alpha + 1 == beta);
 
         // Quiescence search at leaf nodes
-        if (depth <= 0) return qSearch<pvNode>(td, ply, alpha, beta);
+        if (depth <= 0) return qSearch<nodeType == NodeType::PV>(td, ply, alpha, beta);
 
         if (isHardTimeUp(td)) return 0;
 
@@ -474,7 +477,7 @@ private:
             = ttEntry.get(td->pos.zobristHash(), static_cast<i16>(ply));
 
         // TT cutoff
-        if (!pvNode
+        if (nodeType != NodeType::PV
         && !singularMove
         && ttDepth >= depth
         && (ttBound == Bound::Exact
@@ -493,7 +496,7 @@ private:
         td->pliesData[ply + 1].killer = MOVE_NONE;
 
         // Node pruning
-        if (!pvNode && !td->pos.inCheck() && !singularMove)
+        if (nodeType != NodeType::PV && !td->pos.inCheck() && !singularMove)
         {
             const bool oppWorsening
                 = !td->pliesData[ply - 1].inCheck && -eval < td->pliesData[ply - 1].correctedEval;
@@ -506,7 +509,7 @@ private:
 
             // Razoring
             if (alpha - eval > razoringBase() + depth * depth * razoringDepthMul())
-                return qSearch<pvNode>(td, ply, alpha, beta);
+                return qSearch<nodeType == NodeType::PV>(td, ply, alpha, beta);
 
             // NMP (Null move pruning)
             if (depth >= 3
@@ -519,7 +522,7 @@ private:
 
                 const i32 nmpDepth = depth - 4 - depth / 3;
 
-                const i32 score = -search<false, false, false>(
+                const i32 score = -search<false, NodeType::All>(
                     td, nmpDepth, ply + 1, -beta, -alpha
                 );
 
@@ -536,7 +539,7 @@ private:
             && std::abs(beta) < MIN_MATE_SCORE
             && (ttBound == Bound::None || depth - *ttDepth >= 4 || ttScore >= probcutBeta))
             {
-                const std::optional<i32> score = probcut<cutNode>(
+                const std::optional<i32> score = probcut<nodeType == NodeType::Cut>(
                     td, depth, ply, probcutBeta, ttMove, ttEntry
                 );
 
@@ -545,7 +548,7 @@ private:
         }
 
         // IIR (Internal iterative reduction)
-        if ((pvNode || cutNode) && depth >= 4 && !ttMove && !singularMove)
+        if (nodeType != NodeType::All && depth >= 4 && !ttMove && !singularMove)
             depth--;
 
         size_t legalMovesSeen = 0;
@@ -574,6 +577,12 @@ private:
             const bool isQuiet = td->pos.isQuiet(move);
             const float quietHist = static_cast<float>(isQuiet ? moveScore : 0);
 
+            i32 reducedDepth
+                = depth - 1 - LMR_TABLE[static_cast<size_t>(depth)][isQuiet][legalMovesSeen];
+
+            // Reduce more if parent node expects to fail high
+            reducedDepth -= (nodeType == NodeType::Cut) * 2;
+
             // Moves loop pruning at shallow depths
             if (!isRoot && bestScore > -MIN_MATE_SCORE && (isQuiet || moveScore < 0))
             {
@@ -581,22 +590,19 @@ private:
                 if (legalMovesSeen > static_cast<size_t>(2 + depth * depth))
                     break;
 
-                const i32 lmrDepth
-                    = depth - LMR_TABLE[static_cast<size_t>(depth)][isQuiet][legalMovesSeen];
-
                 // FP (Futility pruning)
 
-                const auto fpMargin = [&] () constexpr -> i32
+                const auto fpMargin = [reducedDepth, quietHist] () constexpr -> i32
                 {
                     const i32 margin = fpBase()
-                                     + std::max<i32>(lmrDepth - cutNode * 2, 1) * fpDepthMul()
+                                     + std::max<i32>(reducedDepth, 1) * fpDepthMul()
                                      + static_cast<i32>(quietHist * fpQuietHistMul());
 
                     return std::max<i32>(margin, 0);
                 };
 
                 if (!td->pos.inCheck()
-                && lmrDepth <= 7
+                && depth <= 7
                 && legalMovesSeen > 2
                 && alpha < MIN_MATE_SCORE
                 && alpha - eval > fpMargin())
@@ -625,9 +631,12 @@ private:
             && std::abs(*ttScore) < MIN_MATE_SCORE
             && ttBound == Bound::Lower)
             {
+                constexpr NodeType newNodeType
+                    = nodeType == NodeType::Cut ? NodeType::Cut : NodeType::All;
+
                 const i32 singularBeta = std::max<i32>(*ttScore - depth, -MIN_MATE_SCORE);
 
-                const i32 singularScore = search<isRoot, false, cutNode>(
+                const i32 singularScore = search<isRoot, newNodeType>(
                     td, newDepth / 2, ply, singularBeta - 1, singularBeta, move
                 );
 
@@ -641,7 +650,7 @@ private:
                 else if (ttScore >= beta)
                     newDepth -= 3;
                 // Expected cut-node negative extension
-                else if constexpr (cutNode)
+                else if constexpr (nodeType == NodeType::Cut)
                     newDepth -= 2;
 
                 // The singular search used these so clear them
@@ -659,11 +668,17 @@ private:
 
             i32 score = 0, numFailHighs = 0;
 
+            // Do full depth, zero window search?
+            bool doFullDepthZws = nodeType != NodeType::PV || legalMovesSeen > 1;
+
             // LMR (Late move reductions)
             if (depth >= 2 && legalMovesSeen > 1 + isRoot && (isQuiet || moveScore < 0))
             {
-                // Base reduction
-                i32 r = LMR_TABLE[static_cast<size_t>(depth)][isQuiet][legalMovesSeen];
+                // Reduce less if parent is an expected PV node and TT score doesn't fail low
+                reducedDepth += nodeType == NodeType::PV && ttScore.value_or(INF) > alpha;
+
+                // Reduce moves that give check less
+                reducedDepth += td->pos.inCheck();
 
                 const bool improving
                     = ply >= 2
@@ -671,58 +686,49 @@ private:
                     && !td->pliesData[ply - 2].inCheck
                     && eval > td->pliesData[ply - 2].correctedEval;
 
-                r -= pvNode;            // Reduce less if parent is an expected PV node
-                r += cutNode * 2;       // Reduce more if parent node expects to fail high
-                r -= td->pos.inCheck(); // Reduce moves that give check less
-                r -= improving;         // Reduce less if parent's static eval is improving
-
-                // Reduce more if parent is an expected PV node and TT score fails low
-                r += pvNode && ttScore.has_value() && ttScore <= alpha;
+                // Reduce less if parent's static eval is improving
+                reducedDepth += improving;
 
                 // For quiet moves, less reduction the higher the move's history and vice-versa
-                r -= lround(quietHist * lmrQuietHistMul());
+                reducedDepth += lround(quietHist * lmrQuietHistMul());
 
-                // Don't reduce into quiescence search nor extend depth
-                const i32 reducedDepth = std::clamp<i32>(newDepth - r, 1, newDepth);
+                // Don't reduce into quiescence search nor extend
+                reducedDepth = std::clamp<i32>(reducedDepth, 1, newDepth);
 
-                // Reduced null window search
-                score = -search<false, false, true>(
+                // Reduced depth, zero window search
+                score = -search<false, NodeType::Cut>(
                     td, reducedDepth, ply + 1, -alpha - 1, -alpha
                 );
 
-                numFailHighs += score > alpha;
+                doFullDepthZws = score > alpha && reducedDepth < newDepth;
 
-                if (score > alpha && reducedDepth < newDepth)
+                // Deeper or shallower research?
+                if (doFullDepthZws)
                 {
-                    // Deeper or shallower research?
                     newDepth += score - bestScore > deeperBase() + newDepth * 2;
                     newDepth -= score - bestScore < shallowerMargin();
-                }
 
-                if (score > alpha && reducedDepth < newDepth)
-                {
-                    // Null window research
-                    score = -search<false, false, !cutNode>(
-                        td, newDepth, ply + 1, -alpha - 1, -alpha
-                    );
-
-                    numFailHighs += score > alpha;
+                    doFullDepthZws = reducedDepth < newDepth;
                 }
-            }
-            else if (!pvNode || legalMovesSeen > 1)
-            {
-                // Null window search
-                score = -search<false, false, !cutNode>(
-                    td, newDepth, ply + 1, -alpha - 1, -alpha
-                );
 
                 numFailHighs += score > alpha;
             }
 
-            // Full window search
-            if (pvNode && (legalMovesSeen == 1 || score > alpha))
+            // Full depth, zero window search
+            if (doFullDepthZws)
             {
-                score = -search<false, true, false>(td, newDepth, ply + 1, -beta, -alpha);
+                constexpr NodeType newNodeType
+                    = nodeType == NodeType::Cut ? NodeType::All : NodeType::Cut;
+
+                score = -search<false, newNodeType>(td, newDepth, ply + 1, -alpha - 1, -alpha);
+
+                numFailHighs += score > alpha;
+            }
+
+            // Full depth, full window search
+            if (nodeType == NodeType::PV && (legalMovesSeen == 1 || score > alpha))
+            {
+                score = -search<false, NodeType::PV>(td, newDepth, ply + 1, -beta, -alpha);
                 numFailHighs += score >= beta;
             }
 
@@ -757,7 +763,7 @@ private:
             bound = Bound::Exact;
 
             // In PV nodes, update PV line
-            if constexpr (pvNode)
+            if constexpr (nodeType == NodeType::PV)
             {
                 plyData.pvLine.clear();
                 plyData.pvLine.push_back(move);
@@ -984,10 +990,10 @@ private:
         const Move ttMove,
         TTEntry& ttEntry)
     {
+        assert(!td->pos.inCheck());
         assert(depth >= 5 && static_cast<size_t>(depth) <= MAX_DEPTH);
         assert(ply > 0 && ply <= MAX_DEPTH);
         assert(std::abs(probcutBeta) <= MIN_MATE_SCORE);
-        assert(!td->pos.inCheck());
 
         const i32 eval = *(td->pliesData[ply].correctedEval);
 
@@ -1012,7 +1018,7 @@ private:
 
             if (score >= probcutBeta)
             {
-                score = -search<false, false, !cutNode>(
+                score = -search<false, cutNode ? NodeType::All : NodeType::Cut>(
                     td, depth - 4, ply + 1, -probcutBeta, -probcutBeta + 1
                 );
             }
