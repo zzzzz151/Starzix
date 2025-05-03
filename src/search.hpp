@@ -592,7 +592,7 @@ private:
 
                 // FP (Futility pruning)
 
-                const auto fpMargin = [&] () constexpr -> i32
+                const auto fpMargin = [reducedDepth, quietHist] () constexpr -> i32
                 {
                     const i32 margin = fpBase()
                                      + std::max<i32>(reducedDepth, 1) * fpDepthMul()
@@ -602,7 +602,7 @@ private:
                 };
 
                 if (!td->pos.inCheck()
-                && reducedDepth <= 6
+                && depth <= 7
                 && legalMovesSeen > 2
                 && alpha < MIN_MATE_SCORE
                 && alpha - eval > fpMargin())
