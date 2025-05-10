@@ -401,11 +401,24 @@ private:
 
         i32 depth = td->rootDepth;
         i32 delta = aspStartDelta();
-        i32 alpha = std::max<i32>(score - delta, -INF);
-        i32 beta  = std::min<i32>(score + delta, INF);
+
+        auto [alpha, beta] = score <= -MIN_MATE_SCORE
+                           ? std::make_pair(-INF, -MIN_MATE_SCORE + 1)
+                           : score >= MIN_MATE_SCORE
+                           ? std::make_pair(MIN_MATE_SCORE - 1, INF)
+                           : std::make_pair(score - delta, score + delta);
 
         while (true)
         {
+            assert(alpha <  MIN_MATE_SCORE);
+            assert(beta  > -MIN_MATE_SCORE);
+
+            if (alpha <= -MIN_MATE_SCORE)
+                alpha = -INF;
+
+            if (beta >= MIN_MATE_SCORE)
+                beta = INF;
+
             score = search<true, NodeType::PV>(td, depth, 0, alpha, beta);
 
             if (isHardTimeUp(td)) return 0;
@@ -414,14 +427,17 @@ private:
             if (score <= alpha)
             {
                 depth = td->rootDepth;
-                alpha = std::max<i32>(alpha - delta, -INF);
-                beta  = (alpha + beta) / 2;
+
+                alpha -= delta;
+
+                if (std::abs(alpha) < MIN_MATE_SCORE && std::abs(beta) < MIN_MATE_SCORE)
+                    beta = (alpha + beta) / 2;
             }
             // Fail high?
             else if (score >= beta)
             {
                 depth -= depth > 1;
-                beta = std::min<i32>(beta + delta, INF);
+                beta  += delta;
             }
             else
                 return score;
@@ -443,7 +459,7 @@ private:
         assert(isRoot == (ply == 0));
         assert(ply >= 0 && ply <= MAX_DEPTH);
         assert(std::abs(alpha) <= INF);
-        assert(std::abs(beta) <= INF);
+        assert(std::abs(beta)  <= INF);
         assert(alpha < beta);
         assert(nodeType == NodeType::PV || alpha + 1 == beta);
 
@@ -508,13 +524,15 @@ private:
                 return (eval + beta) / 2;
 
             // Razoring
-            if (alpha - eval > razoringBase() + depth * depth * razoringDepthMul())
+            if (std::abs(alpha) < MIN_MATE_SCORE
+            && alpha - eval > razoringBase() + depth * depth * razoringDepthMul())
                 return qSearch<nodeType == NodeType::PV>(td, ply, alpha, beta);
 
             // NMP (Null move pruning)
-            if (depth >= 3
-            && td->pos.lastMove()
+            if (td->pos.lastMove()
             && td->pos.stmHasNonPawns()
+            && depth >= 3
+            && std::abs(beta) < MIN_MATE_SCORE
             && eval >= beta
             && (ttBound != Bound::Upper || ttScore >= beta))
             {
@@ -604,7 +622,7 @@ private:
                 if (!td->pos.inCheck()
                 && depth <= 7
                 && legalMovesSeen > 2
-                && alpha < MIN_MATE_SCORE
+                && std::abs(alpha) < MIN_MATE_SCORE
                 && alpha - eval > fpMargin())
                     break;
 
@@ -634,18 +652,21 @@ private:
                 constexpr NodeType newNodeType
                     = nodeType == NodeType::Cut ? NodeType::Cut : NodeType::All;
 
-                const i32 singularBeta = std::max<i32>(*ttScore - depth, -MIN_MATE_SCORE);
+                const i32 seBeta = std::max<i32>(*ttScore - depth, -MIN_MATE_SCORE);
 
-                const i32 singularScore = search<isRoot, newNodeType>(
-                    td, newDepth / 2, ply, singularBeta - 1, singularBeta, move
+                const i32 seScore = search<isRoot, newNodeType>(
+                    td, newDepth / 2, ply, seBeta - 1, seBeta, move
                 );
 
                 // Single or double extension
-                if (singularScore < singularBeta)
-                    newDepth += 1 + (singularBeta - singularScore > doubleExtMargin());
+                if (seScore < seBeta)
+                {
+                    newDepth++;
+                    newDepth += seScore > -MIN_MATE_SCORE && seBeta - seScore > doubleExtMargin();
+                }
                 // Multicut
-                else if (singularScore >= beta && std::abs(singularScore) < MIN_MATE_SCORE)
-                    return singularScore;
+                else if (seScore >= beta && std::abs(seScore) < MIN_MATE_SCORE)
+                    return seScore;
                 // Negative extension
                 else if (ttScore >= beta)
                     newDepth -= 3;
@@ -702,8 +723,11 @@ private:
 
                 doFullDepthZws = score > alpha && reducedDepth < newDepth;
 
+                const bool bothLoss = score <= -MIN_MATE_SCORE && bestScore <= -MIN_MATE_SCORE;
+                const bool bothWin  = score >=  MIN_MATE_SCORE && bestScore >=  MIN_MATE_SCORE;
+
                 // Deeper or shallower research?
-                if (doFullDepthZws)
+                if (doFullDepthZws && !bothLoss && !bothWin)
                 {
                     newDepth += score - bestScore > deeperBase() + newDepth * 2;
                     newDepth -= score - bestScore < shallowerMargin();
@@ -837,7 +861,7 @@ private:
     {
         assert(ply > 0 && ply <= MAX_DEPTH);
         assert(std::abs(alpha) <= INF);
-        assert(std::abs(beta) <= INF);
+        assert(std::abs(beta)  <= INF);
         assert(alpha < beta);
         assert(pvNode || alpha + 1 == beta);
 
@@ -914,7 +938,10 @@ private:
                 break;
 
             // FP (Futility pruning)
-            if (!td->pos.inCheck() && fpValue <= alpha && !td->pos.SEE(move, 1))
+            if (!td->pos.inCheck()
+            && std::abs(alpha) < MIN_MATE_SCORE
+            && fpValue <= alpha
+            && !td->pos.SEE(move, 1))
             {
                 bestScore = std::max<i32>(bestScore, fpValue);
                 continue;
