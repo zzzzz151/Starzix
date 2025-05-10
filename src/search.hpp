@@ -401,16 +401,20 @@ private:
 
         i32 depth = td->rootDepth;
         i32 delta = aspStartDelta();
-        i32 alpha = score - delta;
-        i32 beta  = score + delta;
+
+        auto [alpha, beta] = score <= -MIN_MATE_SCORE
+                           ? std::make_pair(-INF, -MIN_MATE_SCORE + 1)
+                           : score >= MIN_MATE_SCORE
+                           ? std::make_pair(MIN_MATE_SCORE - 1, INF)
+                           : std::make_pair(score - delta, score + delta);
 
         while (true)
         {
-            if (std::abs(alpha) >= MIN_MATE_SCORE || std::abs(beta) >= MIN_MATE_SCORE)
-            {
+            if (alpha <= -MIN_MATE_SCORE)
                 alpha = -INF;
-                beta  = INF;
-            }
+
+            if (beta >= MIN_MATE_SCORE)
+                beta = INF;
 
             score = search<true, NodeType::PV>(td, depth, 0, alpha, beta);
 
@@ -420,14 +424,17 @@ private:
             if (score <= alpha)
             {
                 depth = td->rootDepth;
+
                 alpha -= delta;
-                beta = (alpha + beta) / 2;
+
+                if (std::abs(alpha) < MIN_MATE_SCORE && std::abs(beta) < MIN_MATE_SCORE)
+                    beta = (alpha + beta) / 2;
             }
             // Fail high?
             else if (score >= beta)
             {
                 depth -= depth > 1;
-                beta += delta;
+                beta  += delta;
             }
             else
                 return score;
