@@ -410,6 +410,9 @@ private:
 
         while (true)
         {
+            assert(alpha <  MIN_MATE_SCORE);
+            assert(beta  > -MIN_MATE_SCORE);
+
             if (alpha <= -MIN_MATE_SCORE)
                 alpha = -INF;
 
