@@ -504,7 +504,7 @@ private:
 
         if (ply >= MAX_DEPTH) return eval;
 
-        updateAccumulator(td, ply);
+        td->accs[ply].update(ply >= 2 ? &(td->accs[ply - 2]) : nullptr, td->pos, td->finnyTable);
 
         // Reset killer move of next tree level
         td->pliesData[ply + 1].killer = MOVE_NONE;
@@ -905,8 +905,8 @@ private:
 
             alpha = std::max<i32>(alpha, eval);
         }
-        else
-            updateAccumulator(td, ply);
+
+        td->accs[ply].update(ply >= 2 ? &(td->accs[ply - 2]) : nullptr, td->pos, td->finnyTable);
 
         // Reset killer move of next tree level
         td->pliesData[ply + 1].killer = MOVE_NONE;

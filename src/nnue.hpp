@@ -109,8 +109,6 @@ public:
         mUpdated = true;
     }
 
-private:
-
     // Sets mColorBbs, mPiecesBbs, mMirrorVAxis and mInputBucket
     constexpr void setMetadata(const Position& pos)
     {
@@ -174,11 +172,9 @@ private:
         });
     }
 
-public:
-
-    constexpr void update(const Accumulator& prevAcc, const Position& pos, FinnyTable& finnyTable)
+    constexpr void update(const Accumulator* prevAcc, const Position& pos, FinnyTable& finnyTable)
     {
-        assert(prevAcc.mUpdated);
+        assert(prevAcc == nullptr || prevAcc->mUpdated);
 
         if (mUpdated)
         {
@@ -191,10 +187,12 @@ public:
         Accumulator& finnyAcc = finnyTable[pos.sideToMove()][mMirrorVAxis][mInputBucket];
 
         const bool useFinnyTable
-            = mMirrorVAxis != prevAcc.mMirrorVAxis || mInputBucket != prevAcc.mInputBucket;
+            = prevAcc == nullptr
+            || mMirrorVAxis != prevAcc->mMirrorVAxis
+            || mInputBucket != prevAcc->mInputBucket;
 
         if (!useFinnyTable)
-            mAcc = prevAcc.mAcc;
+            mAcc = prevAcc->mAcc;
 
         for (const Color pieceColor : EnumIter<Color>())
             for (const PieceType pt : EnumIter<PieceType>())
@@ -215,7 +213,8 @@ public:
                     );
                 }
                 else {
-                    const Bitboard prevBb = prevAcc.mColorBbs[pieceColor] & prevAcc.mPiecesBbs[pt];
+                    const Bitboard prevBb
+                        = prevAcc->mColorBbs[pieceColor] & prevAcc->mPiecesBbs[pt];
 
                     updateFeatures<Operation::Remove>(
                         prevBb & ~bb, pos.sideToMove(), pieceColor, pt
@@ -227,8 +226,6 @@ public:
                 }
             }
 
-        mUpdated = true;
-
         if (useFinnyTable)
         {
             finnyAcc.mColorBbs  = pos.colorBbs();
@@ -236,6 +233,8 @@ public:
 
             mAcc = finnyAcc.mAcc;
         }
+
+        mUpdated = true;
 
         assert(*this == Accumulator(pos));
     }

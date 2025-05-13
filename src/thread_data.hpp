@@ -105,16 +105,6 @@ inline void makeMove(
     td->accs[newPly].mUpdated = false;
 }
 
-constexpr void updateAccumulator(ThreadData* td, const size_t ply)
-{
-    assert(td->accs[0].mUpdated);
-
-    if (ply == 1)
-        td->accs[ply] = nnue::Accumulator(td->pos);
-    else if (ply > 1)
-        td->accs[ply].update(td->accs[ply - 2], td->pos, td->finnyTable);
-}
-
 constexpr auto corrHistsPtrs(ThreadData* td)
 {
     const size_t whiteNonPawnsIdx = td->pos.nonPawnsHash(Color::White) % CORR_HIST_SIZE;
@@ -158,7 +148,8 @@ constexpr i32 getEval(ThreadData* td, const size_t ply)
 
     if (!plyData.rawEval.has_value())
     {
-        updateAccumulator(td, ply);
+        td->accs[ply].update(ply >= 2 ? &(td->accs[ply - 2]) : nullptr, td->pos, td->finnyTable);
+
         plyData.rawEval = nnue::evaluate(td->accs[ply]);
 
         // Scale eval with halfmove clock
