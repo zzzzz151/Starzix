@@ -161,26 +161,26 @@ public:
         mainThreadData()->pos = pos;
 
         // Init main thread's root accumulator
-        nnue::BothAccumulators& bothAccs = mainThreadData()->bothAccsStack[0];
-        bothAccs = nnue::BothAccumulators(pos);
+        nnue::Accumulator& rootAcc = mainThreadData()->accs[0];
+        rootAcc = nnue::Accumulator(pos);
 
-        const auto initFinnyEntry = [&] (
+        const auto initFinnyAcc = [&] (
             const Color color, const bool mirrorVAxis, const size_t inputBucket) constexpr
         {
-            nnue::FinnyTableEntry& finnyEntry
+            nnue::Accumulator& finnyAcc
                 = mainThreadData()->finnyTable[color][mirrorVAxis][inputBucket];
 
-            if (mirrorVAxis == bothAccs.mMirrorVAxis[color]
-            &&  inputBucket == bothAccs.mInputBucket[color])
-            {
-                finnyEntry.accumulator = bothAccs.mAccumulators[color];
-                finnyEntry.colorBbs  = pos.colorBbs();
-                finnyEntry.piecesBbs = pos.piecesBbs();
-            }
+            if (color == pos.sideToMove()
+            && mirrorVAxis == rootAcc.mMirrorVAxis
+            && inputBucket == rootAcc.mInputBucket)
+                finnyAcc = rootAcc;
             else {
-                finnyEntry.accumulator = nnue::NET->hiddenBiases[color];
-                finnyEntry.colorBbs  = { };
-                finnyEntry.piecesBbs = { };
+                finnyAcc.mAcc = nnue::NET->hiddenBiases;
+                finnyAcc.mColorBbs  = { };
+                finnyAcc.mPiecesBbs = { };
+                finnyAcc.mMirrorVAxis = mirrorVAxis;
+                finnyAcc.mInputBucket = inputBucket;
+                finnyAcc.mUpdated = true;
             }
         };
 
@@ -188,13 +188,13 @@ public:
         for (const Color color : EnumIter<Color>())
             for (const bool mirrorVAxis : { false, true })
                 for (size_t inputBucket = 0; inputBucket < nnue::NUM_INPUT_BUCKETS; inputBucket++)
-                    initFinnyEntry(color, mirrorVAxis, inputBucket);
+                    initFinnyAcc(color, mirrorVAxis, inputBucket);
 
         // Init position, root accumulator and finny table of secondary threads
         for (size_t i = 1; i < mThreadsData.size(); i++)
         {
             mThreadsData[i]->pos = pos;
-            mThreadsData[i]->bothAccsStack[0] = bothAccs;
+            mThreadsData[i]->accs[0] = rootAcc;
             mThreadsData[i]->finnyTable = mainThreadData()->finnyTable;
         }
 
@@ -205,7 +205,6 @@ public:
             td->pliesData[0] = { };
             td->pliesData[0].inCheck = td->pos.inCheck();
             td->nodesByMove = { };
-            td->bothAccsIdx = 0;
 
             wakeThread(td, ThreadState::Searching);
         }
@@ -501,12 +500,11 @@ private:
         || (ttBound == Bound::Lower && ttScore >= beta)))
             return *ttScore;
 
-        PlyData& plyData = td->pliesData[ply];
-        const i32 eval = getEval(td, plyData);
+        const i32 eval = getEval(td, ply);
 
         if (ply >= MAX_DEPTH) return eval;
 
-        updateBothAccs(td);
+        updateAccumulator(td, ply);
 
         // Reset killer move of next tree level
         td->pliesData[ply + 1].killer = MOVE_NONE;
@@ -544,7 +542,7 @@ private:
                     td, nmpDepth, ply + 1, -beta, -alpha
                 );
 
-                undoMove(td);
+                td->pos.undoMove();
 
                 if (score >= beta) return score >= MIN_MATE_SCORE ? beta : score;
             }
@@ -568,6 +566,8 @@ private:
         // IIR (Internal iterative reduction)
         if (nodeType != NodeType::All && depth >= 4 && !ttMove && !singularMove)
             depth--;
+
+        PlyData& plyData = td->pliesData[ply];
 
         size_t legalMovesSeen = 0;
         i32 bestScore = -INF;
@@ -756,7 +756,7 @@ private:
                 numFailHighs += score >= beta;
             }
 
-            undoMove(td);
+            td->pos.undoMove();
 
             if (mStopSearch.load(std::memory_order_relaxed))
                 return 0;
@@ -893,8 +893,7 @@ private:
         || (ttBound == Bound::Lower && ttScore >= beta)))
             return *ttScore;
 
-        PlyData& plyData = td->pliesData[ply];
-        const i32 eval = getEval(td, plyData);
+        const i32 eval = getEval(td, ply);
 
         if (ply >= MAX_DEPTH) return eval;
 
@@ -907,10 +906,12 @@ private:
             alpha = std::max<i32>(alpha, eval);
         }
         else
-            updateBothAccs(td);
+            updateAccumulator(td, ply);
 
         // Reset killer move of next tree level
         td->pliesData[ply + 1].killer = MOVE_NONE;
+
+        PlyData& plyData = td->pliesData[ply];
 
         const i32 fpValue = std::min<i32>(eval + fpQsMargin(), MIN_MATE_SCORE - 1);
 
@@ -959,7 +960,7 @@ private:
 
             const i32 score = -qSearch<pvNode>(td, ply + 1, -beta, -alpha);
 
-            undoMove(td);
+            td->pos.undoMove();
 
             if (mStopSearch.load(std::memory_order_relaxed))
                 return 0;
@@ -1050,7 +1051,7 @@ private:
                 );
             }
 
-            undoMove(td);
+            td->pos.undoMove();
 
             if (mStopSearch.load(std::memory_order_relaxed))
                 return 0;

@@ -89,8 +89,8 @@ inline void runCommand(std::string& command, Position& pos, Searcher& searcher)
     }
     else if (command == "eval" || command == "evaluate" || command == "evaluation")
     {
-        nnue::BothAccumulators bothAccs = nnue::BothAccumulators(pos);
-        std::cout << "eval " << nnue::evaluate(bothAccs, pos.sideToMove()) << std::endl;
+        nnue::Accumulator acc = nnue::Accumulator(pos);
+        std::cout << "eval " << nnue::evaluate(acc) << std::endl;
     }
     else if (tokens[0] == "makemove" && tokens.size() == 2)
         pos.makeMove(tokens[1]);

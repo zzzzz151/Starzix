@@ -51,10 +51,9 @@ public:
 
     HistoryTable historyTable = { };
 
-    std::array<nnue::BothAccumulators, MAX_DEPTH + 1> bothAccsStack;
-    size_t bothAccsIdx = 0;
+    std::array<nnue::Accumulator, MAX_DEPTH + 1> accs; // [ply]
 
-    nnue::FinnyTable finnyTable;
+    nnue::Accumulator::FinnyTable finnyTable;
 
     // [stm][pawnsHash % CORR_HIST_SIZE]
     EnumArray<std::array<i16, CORR_HIST_SIZE>, Color> pawnsCorrHist = { };
@@ -103,30 +102,17 @@ inline void makeMove(
     newPlyData.pvLine.clear();
     newPlyData.rawEval = newPlyData.correctedEval = std::nullopt;
 
-    if (move)
-    {
-        td->bothAccsIdx++;
-        td->bothAccsStack[td->bothAccsIdx].mUpdated = false;
-    }
+    td->accs[newPly].mUpdated = false;
 }
 
-constexpr void undoMove(ThreadData* td)
+constexpr void updateAccumulator(ThreadData* td, const size_t ply)
 {
-    if (td->pos.lastMove())
-        td->bothAccsIdx--;
+    assert(td->accs[0].mUpdated);
 
-    td->pos.undoMove();
-}
-
-constexpr void updateBothAccs(ThreadData* td)
-{
-    assert(td->bothAccsIdx > 0 || td->bothAccsStack[td->bothAccsIdx].mUpdated);
-
-    if (td->bothAccsIdx > 0)
-    {
-        td->bothAccsStack[td->bothAccsIdx]
-            .updateMove(td->bothAccsStack[td->bothAccsIdx - 1], td->pos, td->finnyTable);
-    }
+    if (ply == 1)
+        td->accs[ply] = nnue::Accumulator(td->pos);
+    else if (ply > 1)
+        td->accs[ply].update(td->accs[ply - 2], td->pos, td->finnyTable);
 }
 
 constexpr auto corrHistsPtrs(ThreadData* td)
@@ -160,8 +146,10 @@ constexpr auto corrHistsPtrs(ThreadData* td)
     };
 }
 
-constexpr i32 getEval(ThreadData* td, PlyData& plyData)
+constexpr i32 getEval(ThreadData* td, const size_t ply)
 {
+    PlyData& plyData = td->pliesData[ply];
+
     if (td->pos.inCheck())
     {
         plyData.rawEval = plyData.correctedEval = 0;
@@ -170,8 +158,8 @@ constexpr i32 getEval(ThreadData* td, PlyData& plyData)
 
     if (!plyData.rawEval.has_value())
     {
-        updateBothAccs(td);
-        plyData.rawEval = nnue::evaluate(td->bothAccsStack[td->bothAccsIdx], td->pos.sideToMove());
+        updateAccumulator(td, ply);
+        plyData.rawEval = nnue::evaluate(td->accs[ply]);
 
         // Scale eval with halfmove clock
         const i32 pliesSincePawnOrCapture = static_cast<i32>(td->pos.pliesSincePawnOrCapture());
