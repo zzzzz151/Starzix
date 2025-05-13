@@ -567,7 +567,17 @@ private:
 
         // IIR (Internal iterative reduction)
         if (nodeType != NodeType::All && depth >= 4 && !ttMove && !singularMove)
+        {
             depth--;
+
+            // Post-IIR TT cutoff
+            if (nodeType != NodeType::PV
+            && ttDepth >= depth
+            && (ttBound == Bound::Exact
+            || (ttBound == Bound::Upper && ttScore <= alpha)
+            || (ttBound == Bound::Lower && ttScore >= beta)))
+                return *ttScore;
+        }
 
         size_t legalMovesSeen = 0;
         i32 bestScore = -INF;
